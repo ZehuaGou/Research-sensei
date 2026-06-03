@@ -18,16 +18,17 @@
 - fail-closed 策略已写入 DEVELOPMENT，但当前代码还未完全实现
 - understanding_status.json 还未实现
 - 当前 card builders 仍使用 rule-based baseline 作为 fallback
-- 外部项目已完成初步 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
+- 外部项目已完成 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
 - Paper Understanding 质量仍未达到导师级
 
 ---
 
-## 3. 当前下一步
+## 3. 当前任务
 
-- 先完成文档模块化与外部项目调研
-- 之后再决定第一个代码任务
-- 不直接进入 Phase 12
+- 完成全模块开发文档细化
+- 当前文档结构已固定：9 个模块开发文档覆盖 parser/evidence/paper understanding/literature search/audit/workspace-api/frontend/engineering/full pipeline
+- 不进入 Phase 12
+- 不写代码
 
 ---
 
@@ -35,3 +36,12 @@
 
 - pytest: 281 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
+
+---
+
+## 5. 当前禁止事项
+
+- 不进入 Phase 12
+- 不新增依赖
+- 不真实联网测试
+- 不真实调用 LLM 测试

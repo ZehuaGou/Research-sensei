@@ -27,6 +27,10 @@
 | [development/PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | EvidencePack / understanding_status / fail-closed / LLM 校验 |
 | [development/LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | QueryPlanner / adapters / SelectionService / DirectionRunner |
 | [development/AUDIT_QUALITY.md](development/AUDIT_QUALITY.md) | QualityReport / hard-fail / 检测算法 / 外部 audit 调研 |
+| [development/WORKSPACE_API.md](development/WORKSPACE_API.md) | WorkspaceStore / JobStore / API endpoints / path traversal |
+| [development/FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | Vue 前端约束 / artifact 展示规则 / 非 SUCCESS 不展示 |
+| [development/ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 测试规范 / cache / artifact versioning / security |
+| [development/FULL_PIPELINE.md](development/FULL_PIPELINE.md) | 单篇链路 / 方向链路 / 状态传递 / 失败规则 |
 
 ---
 

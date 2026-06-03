@@ -6,6 +6,19 @@
 
 判断"讲得好"，不只是 schema 通过。
 
+### "讲得好"的可检查维度
+
+| 维度 | 定义 | 自动检测方法 | hard-fail 条件 |
+|------|------|-------------|----------------|
+| groundedness | 每个解释可追踪到论文证据 | evidence_ref 存在且有效 | 核心 claim 无 evidence_ref (HF-1, HF-4) |
+| faithfulness | 不编造贡献/实验/结论 | token overlap + paper-specific terms | 输出与论文主题不符 (HF-6) |
+| explainability | 用人话解释，不是复制原文 | formula char ratio + raw copy detection | human_explanation 是公式文本 (HF-2) |
+| formula teaching quality | 符号有依据，作用有解释 | symbol 来自上下文或 REASONABLE_INFERENCE | symbol 解释与论文矛盾 (HF-3) |
+| research thinking | 讲清假设/创新点/代价/边界 | claim_type 覆盖 PROBLEM/METHOD/LIMITATION | — |
+| advisor readiness | 追问具体、基于证据 | drill 问题含论文特有术语 | — |
+| non-genericness | 贴合具体论文 | paper-specific terms 命中 | 输出无论文特有术语 (HF-5) |
+| uncertainty handling | 不确定时降级 | INSUFFICIENT_EVIDENCE / NEEDS_HUMAN_CHECK | — |
+
 ## 2. 非目标
 
 - 不用真实 LLM

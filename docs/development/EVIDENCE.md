@@ -117,23 +117,57 @@ class EvidenceRetriever:
 | REASONABLE_INFERENCE | 根据上下文合理推断 |
 | INSUFFICIENT_EVIDENCE | 证据不足 |
 
-## 8. Passage 从 blocks 怎么构建
+## 8. Passage 构建算法
 
-- 同一 section 的连续 blocks 合并为一个 passage
-- heading blocks 不合并到 passage（只标记 section 边界）
-- 空文本 blocks 跳过
-- passage_id 按序分配（p001, p002, ...）
+**输入**: `DocumentIngestion.blocks`
 
-## 9. Claim 怎么从 passage 提取
+**算法**:
+1. 遍历 blocks，按 section 分组
+2. heading blocks 不合并到 passage（只标记 section 边界）
+3. 同一 section 的连续 non-heading blocks 合并为一个 passage
+4. 空文本 blocks（text.strip() == ""）跳过
+5. 太短的 passage（< 50 chars）跳过，产生 `WarningItem(code="PASSAGE_TOO_SHORT", message="...")`
+6. 太长的 passage（> 2000 chars）按句子边界切分
+7. passage_id 按序分配（p001, p002, ...）
+8. block_ids 保存该 passage 包含的所有 block_id
+9. normalized_text = text.lower().strip()
+10. 如果无 passages 可提取，产生 `WarningItem(code="NO_PASSAGES", message="...")`
 
-- Abstract 中含 "propose / present / introduce / develop" → CONTRIBUTION
-- Method section 中含 "we propose / our method / framework / model" → METHOD
-- Experiment/Result section 中含 "improve / outperform / achieve / reduce" → RESULT
-- limitation/future work section → LIMITATION
-- formula block 或含 "loss / objective / equation / optimize" → FORMULA_CONTEXT
-- heading 不生成 claim
-- 空文本不生成 claim
-- 不允许 claim_text 是 "This block belongs to ..."
+**输出**: `PassageIndex`
+
+## 9. Claim 提取算法
+
+**输入**: `PassageIndex.passages`
+
+**算法**（初版不用 LLM，基于 section + keyword + 句子规则）:
+1. 遍历每个 passage
+2. heading 不生成 claim
+3. 空文本不生成 claim
+4. 根据 section + 关键词判断 claim_type:
+   - Abstract + "propose/present/introduce/develop" → CONTRIBUTION
+   - Method section + "we propose/our method/framework/model" → METHOD
+   - Experiment/Result section + "improve/outperform/achieve/reduce" → RESULT
+   - limitation/future work section → LIMITATION
+   - formula block 或含 "loss/objective/equation/optimize" → FORMULA_CONTEXT
+5. claim_id 生成: `{paper_id}:claim:{n}` (递增)
+6. claim_text 从 passage 中提取相关句子（不复制整段）
+7. evidence_ref = `{paper_id}:{first_block_id}`
+8. quote_or_summary 截取前 200 chars
+9. confidence 基于 section 类型和关键词匹配度
+10. semantic_support: DIRECT_QUOTE（直接引用）/ PARAPHRASE（改写）/ REASONABLE_INFERENCE（推断）/ INSUFFICIENT_EVIDENCE（不足）
+11. 无法判断时必须 INSUFFICIENT_EVIDENCE 或跳过
+12. 不允许 "This block belongs to method section" 这种伪 claim
+
+## 10. Artifact 策略
+
+**选择**: 升级 `evidence_index.json`（向后兼容），不新增独立文件。
+
+**理由**:
+- 现有 `EvidenceIndex` schema 已有 `claims: list[ClaimEvidence]`
+- `ClaimEvidence` 新增 v2 可选字段（passage_id, claim_type, semantic_support）
+- v1 字段不变，现有测试不破坏
+- 下游（paper_card, formula_card, teaching_card）不需要改代码就能继续工作
+- PassageIndex 可以作为中间数据结构，不一定要持久化为独立 artifact
 
 ## 10. 错误/失败策略
 
@@ -168,16 +202,39 @@ class EvidenceRetriever:
 
 ## 13. EvidenceRetriever 初版策略
 
-- 当前不使用向量库
-- 初版用 lexical scoring：
-  - tokenize claim
-  - tokenize passage
-  - score = overlap / claim_token_count
-  - 返回 score > threshold 的 passages
-- 如果无 passage 命中，返回空，不编造 evidence
+**当前不使用向量库、不联网、不用 LLM。**
+
+```python
+def tokenize(text: str) -> list[str]:
+    """Lowercase, split on whitespace, remove punctuation."""
+    import re
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+def lexical_score(claim_text: str, passage: Passage) -> float:
+    """Score = overlap / claim_token_count."""
+    claim_tokens = set(tokenize(claim_text))
+    passage_tokens = set(tokenize(passage.text))
+    if not claim_tokens:
+        return 0.0
+    overlap = len(claim_tokens & passage_tokens)
+    return overlap / len(claim_tokens)
+
+def retrieve(claim_text: str, index: PassageIndex, top_k: int = 5, min_score: float = 0.2) -> list[Passage]:
+    """Retrieve passages relevant to a claim."""
+    scored = [(p, lexical_score(claim_text, p)) for p in index.passages]
+    scored = [(p, s) for p, s in scored if s >= min_score]
+    scored.sort(key=lambda x: x[1], reverse=True)
+    return [p for p, s in scored[:top_k]]
+```
+
+**规则**:
+- 无匹配返回空，不编造 evidence
+- min_score = 0.2 为默认阈值，可调
+- top_k = 5 为默认返回数
 
 ## 14. 当前未解决问题
 
-- passage 分段策略（按 section 还是按 paragraph count）
-- claim_type 判断准确性（关键词匹配 vs 位置启发式）
+- passage 分段策略（按 section 还是按 paragraph count）需要实测
+- claim_type 判断准确性（关键词匹配 vs 位置启发式）需要实测
 - EvidenceRetriever 阈值和评分策略需要实测调优
+- 是否需要把 PassageIndex 持久化为独立 artifact

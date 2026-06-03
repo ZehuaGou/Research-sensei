@@ -161,14 +161,88 @@ BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic me
 
 ## 11. EvidencePack 构建流程
 
-- 输入：`ClaimEvidence` + `PassageIndex` + `paper_skeleton`
-- 过滤 `semantic_support == INSUFFICIENT_EVIDENCE` 的 claim
-- 每个 `EvidencePackItem` 必须包含：`claim_id`, `claim_type`, `evidence_ref`, `quote_or_summary`, `passage_text`, `confidence`
-- 如果 `evidence_pack` 为空，直接 `BLOCKED_UNDERSTANDING`
+**输入**: `ClaimEvidence` + `PassageIndex` + `paper_skeleton`
 
-## 12. 当前未解决问题
+**算法**:
+1. 过滤 `semantic_support == INSUFFICIENT_EVIDENCE` 的 claim
+2. 按 claim_type 分组（PROBLEM / METHOD / RESULT / LIMITATION / FORMULA_CONTEXT）
+3. 每个 claim 构建一个 `EvidencePackItem`
+4. passage_text 从 PassageIndex 查找，截取前 500 chars
+5. token_count = len(passage_text.split())
+6. 按 token budget 截断（默认 4000 tokens）
+7. 如果 evidence_pack 为空 → BLOCKED_UNDERSTANDING
+
+**Schema**:
+```python
+class EvidencePackItem(SenseiModel):
+    claim_id: str
+    claim_type: str
+    evidence_ref: str
+    quote_or_summary: str
+    passage_text: str
+    confidence: float
+    source_artifact: str = "evidence_index"
+    token_count: int = 0
+
+class EvidencePack(SenseiModel):
+    paper_id: str
+    items: list[EvidencePackItem]
+    total_tokens: int = 0
+    warnings: list[WarningItem] = []
+```
+
+## 12. LLM Prompt 结构
+
+**system prompt**:
+- 角色：论文研读导师
+- 约束：只能基于 evidence pack 回答，不能编造
+- 输出格式：JSON
+
+**user prompt**:
+- paper title / metadata（从 paper_skeleton）
+- evidence pack（从 build_evidence_pack）
+- 要求：生成指定字段的 JSON
+
+**不允许**:
+- 整篇论文全文塞入 prompt
+- 超出 token budget
+
+**输出 JSON schema**: 与 PaperCard / FormulaCard / TeachingCard schema 一致
+
+**输出校验**:
+- 每个 evidence_ref 必须存在于 evidence_index
+- 无效 evidence_ref → 丢弃该字段
+- 核心字段无有效 evidence_ref → BLOCKED_UNDERSTANDING
+
+## 13. understanding_status.json
+
+**Schema**: 放在 `src/researchsensei/schemas/understanding.py`
+
+```python
+class UnderstandingStatus(SenseiModel):
+    paper_id: str
+    status: str  # SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING / FAILED / BASELINE_ONLY
+    blocking_reason: str = ""
+    warnings: list[WarningItem] = []
+    allowed_for_user_display: bool
+    allowed_for_phase12: bool
+    checked_artifacts: list[str] = []
+```
+
+**由 SinglePaperIngestionRunner 生成**，写入 `understanding_status.json`
+
+**状态规则**:
+| 状态 | allowed_for_user_display | allowed_for_phase12 |
+|------|--------------------------|---------------------|
+| SUCCESS | True | True |
+| DEGRADED_STRUCTURAL | False | False |
+| BLOCKED_UNDERSTANDING | False | False |
+| FAILED | False | False |
+| BASELINE_ONLY | False | False |
+
+## 14. 当前未解决问题
 
 - 当前代码仍有 baseline/fallback 模式，fail-closed 还未实现
-- understanding_status.json 还未实现
-- LLM prompt 结构怎么设计
-- 输出校验规则怎么实现
+- understanding_status.json schema 未定义
+- LLM prompt 需要实际测试调优
+- 输出校验规则需要实现
