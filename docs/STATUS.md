@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 281 tests passing
+- 298 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 是 block-level，不是 claim-level
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -25,26 +25,31 @@
 
 ## 3. 当前任务
 
-- 第一个代码任务已完成：ParserAdapter 接口 + LightweightParserAdapter
+- ParserAdapter 已完成并接入 pipeline：
   - ParserAdapter 抽象接口（supports / parse）
   - LightweightParserAdapter（包装 LightweightIngestionService）
   - ParseMetadata / ParserResult schema
   - DocumentBlock Optional 结构化字段（bbox / table_html / figure_caption / reference_entries）
-  - 292 tests passing（281 existing + 11 new）
+  - ParserAdapter 已接入 SinglePaperIngestionRunner
+  - parser_adapter=None 时仍走 LightweightIngestionService
+  - 注入 parser_adapter 时使用 ParserResult.document
+  - parsed_document.json 仍是 DocumentIngestion shape
+  - 298 tests passing（292 existing + 6 new）
 - 尚未完成：
-  - ParserAdapter 尚未接入 SinglePaperIngestionRunner
-  - Evidence / PassageIndex / ClaimEvidence v2 尚未实现
+  - PassageIndex / passage_index.json 尚未实现
+  - ClaimEvidence v2 / claim_evidence.json 尚未实现
+  - evidence_index.json v1 wrapper 尚未升级
   - Paper Understanding v2 尚未实现
   - Audit / QualityReport / UnderstandingStatus 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：规划"ParserAdapter 接入 pipeline"或"PassageIndex / ClaimEvidence v2"二选一
+- 下一步：规划 PassageIndex + ClaimEvidence v2，不要直接大改
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 292 passed
+- pytest: 298 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
