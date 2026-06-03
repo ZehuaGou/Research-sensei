@@ -23,6 +23,14 @@ PROBLEM_KEYWORDS = re.compile(
 DEFINITION_KEYWORDS = re.compile(
     r"\b(defined\s+as|definition|refers?\s+to|we\s+define)\b", re.IGNORECASE
 )
+METHOD_KEYWORDS = [
+    "propose", "present", "introduce", "method", "model", "framework",
+    "approach", "architecture", "design", "mechanism",
+]
+RESULT_KEYWORDS = [
+    "achieve", "outperform", "improve", "result", "performance",
+    "accuracy", "f1", "benchmark", "evaluate", "demonstrate",
+]
 
 
 def build_claim_evidence(
@@ -52,11 +60,11 @@ def build_claim_evidence(
         # Method section
         if section in METHOD_SECTIONS:
             counter += 1
-            sentence = _find_sentence_with_keywords(passage.text, [])
+            sentence = _find_sentence_with_keywords(passage.text, METHOD_KEYWORDS)
             claims.append(_make_claim(
                 paper_id, counter, passage,
                 claim_type="METHOD",
-                semantic_support="PARAPHRASE" if not sentence else "DIRECT_QUOTE",
+                semantic_support="DIRECT_QUOTE" if sentence else "PARAPHRASE",
                 source_sentence=sentence or passage.text[:300],
             ))
             continue
@@ -64,11 +72,11 @@ def build_claim_evidence(
         # Result section
         if section in RESULT_SECTIONS:
             counter += 1
-            sentence = _find_sentence_with_keywords(passage.text, [])
+            sentence = _find_sentence_with_keywords(passage.text, RESULT_KEYWORDS)
             claims.append(_make_claim(
                 paper_id, counter, passage,
                 claim_type="RESULT",
-                semantic_support="PARAPHRASE" if not sentence else "DIRECT_QUOTE",
+                semantic_support="DIRECT_QUOTE" if sentence else "PARAPHRASE",
                 source_sentence=sentence or passage.text[:300],
             ))
             continue

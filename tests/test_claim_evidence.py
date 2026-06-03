@@ -165,6 +165,20 @@ def test_method_claim_from_method_section() -> None:
     assert len(bundle.claims) == 1
     assert bundle.claims[0].claim_type == "METHOD"
     assert bundle.claims[0].passage_id == "p001"
+    assert bundle.claims[0].semantic_support == "DIRECT_QUOTE"
+    assert "propose" in bundle.claims[0].source_sentence.lower()
+
+
+def test_method_claim_fallback_paraphrase_when_no_keywords() -> None:
+    passage = _make_passage("p001", "method", "The sensor data is processed through multiple layers of computation.")
+    index = PassageIndex(paper_id="test", passages=[passage])
+    doc = _make_document()
+
+    bundle = build_claim_evidence(doc, index)
+
+    assert len(bundle.claims) == 1
+    assert bundle.claims[0].claim_type == "METHOD"
+    assert bundle.claims[0].semantic_support == "PARAPHRASE"
 
 
 def test_result_claim_from_experiment_section() -> None:
@@ -176,6 +190,8 @@ def test_result_claim_from_experiment_section() -> None:
 
     assert len(bundle.claims) == 1
     assert bundle.claims[0].claim_type == "RESULT"
+    assert bundle.claims[0].semantic_support == "DIRECT_QUOTE"
+    assert "achieves" in bundle.claims[0].source_sentence.lower()
 
 
 def test_formula_claim_from_formula_passage() -> None:
