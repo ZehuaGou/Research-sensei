@@ -30,7 +30,7 @@ class OpenAlexAdapter:
             return self._parse_response(response.json())
         except Exception as exc:
             logger.warning("OpenAlex search failed for '%s': %s", query, exc)
-            return []
+            raise
 
     def _parse_response(self, data: dict) -> list[CandidatePaper]:
         """Parse OpenAlex JSON response into CandidatePaper objects."""

@@ -323,7 +323,7 @@ def _extract_symbols(formula_raw: str) -> list[FormulaSymbol]:
         symbols.append(FormulaSymbol(
             symbol=sym,
             meaning=meaning,
-            evidence_status=EvidenceType.NEEDS_HUMAN_CHECK if meaning == "UNKNOWN" else EvidenceType.SUPPORTED_BY_FORMULA,
+            evidence_status=EvidenceType.NEEDS_HUMAN_CHECK if meaning == "UNKNOWN" else EvidenceType.REASONABLE_INFERENCE,
             confidence=0.3 if meaning == "UNKNOWN" else 0.5,
         ))
 

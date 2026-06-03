@@ -77,11 +77,19 @@ class QueryPlanner:
         if not terms:
             terms = [user_query]
 
+        warnings = ["RULE_BASED_FALLBACK"]
+        direction_en = user_query
+        if is_zh:
+            warnings.append("CHINESE_QUERY_NO_LLM_FALLBACK")
+            # For Chinese queries without LLM, pass raw query but warn that
+            # search engines may not handle Chinese terms well
+            direction_en = user_query
+
         return QueryPlan(
             user_query=user_query,
             language="zh" if is_zh else "en",
             direction_zh=user_query if is_zh else "",
-            direction_en=user_query if not is_zh else user_query,
+            direction_en=direction_en,
             core_terms=terms,
             related_terms=[],
             exclude_terms=[],
@@ -89,7 +97,7 @@ class QueryPlanner:
             sub_directions=[],
             is_cross_domain=False,
             domain_components=[],
-            warnings=["RULE_BASED_FALLBACK"],
+            warnings=warnings,
         )
 
 

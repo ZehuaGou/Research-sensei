@@ -136,6 +136,7 @@ Phase 12 not yet authorized.
 - [x] Phase 10 fix: M1 specific paper_role_explanation templates.
 - [x] Phase 10 fix: M2 formula teaching card human_explanation fallback chain.
 - [x] Phase 10 fix: M3 added 7 content quality tests; total 202 passed.
+- [x] **Note**: Phase 8-10 main pipeline (SinglePaperIngestionRunner) uses **rule-based builders only**. LLM-enhanced functions (`build_paper_card_with_llm`, `build_formula_cards_with_llm`, `build_teaching_cards_with_llm`) exist and are tested with MockLLMClient, but are **not wired into the main pipeline**. LLM integration into the pipeline is deferred to a future phase.
 - [x] Phase 11 reuse gate completed: evaluated arXiv/OpenAlex adapters, no new dependencies.
 - [x] Phase 11.1: QueryPlan, CandidatePaper, CandidatePool, ReadingPlan, ScoringBreakdown schemas.
 - [x] Phase 11.2: QueryPlanner with rule-based + LLM-enhanced query planning.

@@ -61,14 +61,16 @@ class LLMClient:
         messages: list[ChatMessage],
         *,
         stream: bool = False,
+        config: LLMConfig | None = None,
     ) -> dict:
+        cfg = config or self.config
         payload: dict = {
             "model": self.provider.model,
             "messages": [m.model_dump() for m in messages],
-            "temperature": self.config.temperature,
-            "max_tokens": self.config.max_tokens,
+            "temperature": cfg.temperature,
+            "max_tokens": cfg.max_tokens,
         }
-        if self.config.json_mode:
+        if cfg.json_mode:
             payload["response_format"] = {"type": "json_object"}
         if stream:
             payload["stream"] = True
@@ -82,7 +84,7 @@ class LLMClient:
     ) -> ChatResponse:
         cfg = config or self.config
         url = self.provider.chat_completions_url()
-        payload = self._chat_payload(messages)
+        payload = self._chat_payload(messages, config=cfg)
 
         for attempt in range(cfg.max_retries + 1):
             try:

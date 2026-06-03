@@ -22,6 +22,17 @@ TOP_VENUE_TERMS = (
     "acl", "emnlp", "naacl", "cvpr", "iccv", "eccv", "sigmod", "sigir",
 )
 
+_DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi:")
+
+
+def _normalize_doi(doi: str) -> str:
+    """Normalize DOI by stripping common prefixes and lowercasing."""
+    normalized = doi.strip().lower()
+    for prefix in _DOI_PREFIXES:
+        if normalized.startswith(prefix):
+            normalized = normalized[len(prefix):]
+    return normalized
+
 
 class SelectionService:
     """Scores, deduplicates, and ranks candidate papers into a reading plan."""
@@ -104,8 +115,8 @@ class SelectionService:
         for paper in candidates:
             normalized = self._normalize_candidate(paper)
 
-            # Check DOI match
-            doi_key = paper.doi.strip().lower() if paper.doi else ""
+            # Check DOI match (normalize: strip prefix, lowercase)
+            doi_key = _normalize_doi(paper.doi) if paper.doi else ""
             if doi_key and doi_key in seen_doi:
                 result[seen_doi[doi_key]] = self._merge_paper(result[seen_doi[doi_key]], paper)
                 continue

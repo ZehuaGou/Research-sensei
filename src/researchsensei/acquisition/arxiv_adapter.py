@@ -38,7 +38,7 @@ class ArxivAdapter:
             return self._parse_response(response.text)
         except Exception as exc:
             logger.warning("arXiv search failed for '%s': %s", query, exc)
-            return []
+            raise
 
     def _parse_response(self, xml_text: str) -> list[CandidatePaper]:
         """Parse arXiv Atom XML response into CandidatePaper objects."""

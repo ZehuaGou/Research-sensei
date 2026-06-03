@@ -47,12 +47,20 @@ class SinglePaperIngestionRunner:
         )
         self.jobs.create(job)
 
-        document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
-        evidence_index = build_evidence_index(document)
-        paper_skeleton = build_paper_skeleton(document, evidence_index)
-        paper_card = build_paper_card(paper_skeleton, evidence_index)
-        formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
-        teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
+        try:
+            document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
+            evidence_index = build_evidence_index(document)
+            paper_skeleton = build_paper_skeleton(document, evidence_index)
+            paper_card = build_paper_card(paper_skeleton, evidence_index)
+            formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
+            teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
+        except Exception as exc:
+            return self.jobs.update(
+                actual_job_id,
+                status=JobStatus.FAILED,
+                current_step="pipeline_error",
+                warnings=[f"Pipeline failed: {type(exc).__name__}: {str(exc)[:200]}"],
+            )
         source_status_path = run_dir / "source_status.json"
         parsed_path = run_dir / "parsed_document.json"
         evidence_path = run_dir / "evidence_index.json"

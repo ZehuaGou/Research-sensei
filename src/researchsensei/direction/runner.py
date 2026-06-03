@@ -42,7 +42,7 @@ class DirectionRunner:
         query_plan = await self.query_planner.plan(user_query)
 
         # Step 2: Acquisition
-        candidates = self._acquire(query_plan)
+        candidates, acquisition_warnings = self._acquire(query_plan)
 
         # Step 3: Build candidate pool (raw, before dedup)
         candidate_pool = self.selection_service.build_candidate_pool(
@@ -79,13 +79,17 @@ class DirectionRunner:
             candidate_pool=candidate_pool,
             filtered_candidates=filtered_candidates,
             reading_plan=reading_plan,
-            warnings=query_plan.warnings + reading_plan.warnings,
+            warnings=query_plan.warnings + acquisition_warnings + reading_plan.warnings,
         )
 
-    def _acquire(self, query_plan: QueryPlan) -> list[CandidatePaper]:
-        """Acquire candidate papers from configured sources."""
+    def _acquire(self, query_plan: QueryPlan) -> tuple[list[CandidatePaper], list[str]]:
+        """Acquire candidate papers from configured sources.
+
+        Returns (candidates, warnings) where warnings records any adapter failures.
+        """
         query = query_plan.direction_en or query_plan.user_query
         candidates: list[CandidatePaper] = []
+        warnings: list[str] = []
 
         for source in self.sources:
             try:
@@ -94,13 +98,17 @@ class DirectionRunner:
                 elif source == "openalex":
                     results = self.openalex_adapter.search(query, max_results=self.max_results_per_source)
                 else:
-                    logger.warning("Unknown source: %s", source)
+                    msg = f"Unknown source: {source}"
+                    logger.warning(msg)
+                    warnings.append(msg)
                     continue
                 candidates.extend(results)
             except Exception as exc:
-                logger.warning("Acquisition failed for source %s: %s", source, exc)
+                msg = f"ACQUISITION_FAILED:{source}: {type(exc).__name__}: {str(exc)[:100]}"
+                logger.warning(msg)
+                warnings.append(msg)
 
-        return candidates
+        return candidates, warnings
 
 
 def _slugify(text: str) -> str:
