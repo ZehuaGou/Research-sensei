@@ -46,7 +46,11 @@
 8. Read `07_TEST_AND_QUALITY_PLAN.md` to understand testing requirements.
 9. Read `08_REUSE_AND_ADAPTER_POLICY.md` before introducing any dependency.
 10. Read `09_AGENT_RULES.md` for hard rules.
-11. Read `10_NEXT_PHASE_SPEC_PHASE_11_6.md` if you are about to start Phase 11.6.
+11. Read `11_FULL_PHASE_MASTER_SPEC.md` for the complete phase lifecycle.
+12. Read `12_PHASE_DETAIL_LEVELS.md` to understand documentation requirements.
+13. Read `10_NEXT_PHASE_SPEC_PHASE_11_6.md` if you are about to start Phase 11.6.
+14. Read `17_PHASE_11_6_DETAILED_PLAYBOOK.md` for Phase 11.6 executable details.
+15. Read `13-15_PHASE_11_7-9_PLAYBOOK_DRAFTS.md` for near-future phase drafts.
 
 ---
 
@@ -64,7 +68,14 @@
 | `07_TEST_AND_QUALITY_PLAN.md` | Testing layers and quality gates |
 | `08_REUSE_AND_ADAPTER_POLICY.md` | External project reuse decisions |
 | `09_AGENT_RULES.md` | Hard rules |
-| `10_NEXT_PHASE_SPEC_PHASE_11_6.md` | Phase 11.6 executable spec |
+| `10_NEXT_PHASE_SPEC_PHASE_11_6.md` | Phase 11.6 spec (not code authorization) |
+| `11_FULL_PHASE_MASTER_SPEC.md` | Complete phase lifecycle (1-18) |
+| `12_PHASE_DETAIL_LEVELS.md` | Documentation detail level requirements |
+| `13_PHASE_11_7_DETAILED_PLAYBOOK_DRAFT.md` | Phase 11.7 draft (not authorized) |
+| `14_PHASE_11_8_DETAILED_PLAYBOOK_DRAFT.md` | Phase 11.8 draft (not authorized) |
+| `15_PHASE_11_9_DETAILED_PLAYBOOK_DRAFT.md` | Phase 11.9 draft (not authorized) |
+| `16_DOCS_DETAIL_AUDIT.md` | Governing docs detail audit |
+| `17_PHASE_11_6_DETAILED_PLAYBOOK.md` | Phase 11.6 executable playbook |
 
 ---
 

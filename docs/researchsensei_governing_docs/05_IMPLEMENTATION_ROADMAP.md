@@ -1,5 +1,10 @@
 # ResearchSensei Implementation Roadmap
 
+> **This file is a roadmap, not a complete development manual.**
+> For the full phase lifecycle, see `11_FULL_PHASE_MASTER_SPEC.md`.
+> For detailed playbook of a specific phase, see the corresponding `*_DETAILED_PLAYBOOK.md`.
+> No code may begin without a detailed playbook and user confirmation.
+
 ---
 
 ## Current State
