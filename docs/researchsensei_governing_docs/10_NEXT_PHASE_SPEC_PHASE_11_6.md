@@ -1,17 +1,8 @@
 # Phase 11.6: ParserAdapter Design — Executable Spec
 
-> **Status**: Ready for detailed planning, NOT authorized for code.
-> This is the only phase currently ready for planning.
->
-> **Code development is NOT authorized until**:
-> 1. The detailed playbook (`12_PHASE_11_6_DETAILED_PLAYBOOK.md`) is reviewed.
-> 2. The agent fills `06_PHASE_EXECUTION_TEMPLATE.md` specifically for Phase 11.6.
-> 3. The filled execution plan is shown to the user.
-> 4. The user explicitly confirms.
-> 5. Then code may begin.
->
-> This document is the next-phase **specification**, not a code authorization.
-> For executable details, see `12_PHASE_11_6_DETAILED_PLAYBOOK.md`.
+> **SUPERSEDED: Use `17_PHASE_11_6_DETAILED_PLAYBOOK.md` instead.**
+> This document is kept for historical reference only.
+> Do not use this document as execution guidance.
 
 ---
 

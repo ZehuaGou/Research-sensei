@@ -267,7 +267,7 @@ The `LightweightParserAdapter` output must be identical to calling `LightweightI
 
 ```
 Arrange: import ParserAdapter
-Act: try to instantiate ParserAdapter(Path("test.md"), "p1")
+Act: try to instantiate ParserAdapter()
 Assert: raises TypeError (cannot instantiate abstract class)
 ```
 
@@ -352,8 +352,9 @@ Assert:
 Arrange: create LightweightParserAdapter, create tmp .md file in tmp_path
 Act: adapter.parse(path, paper_id="test")
 Assert:
-  - no .json files created in tmp_path (other than the source .md)
-  - no directories created in tmp_path
+  - no *.json artifact files are created in tmp_path
+  - no workspace/run artifact directory is created
+  - adapter only returns DocumentIngestion and does not write artifacts
 ```
 
 ### test_lightweight_adapter_uses_injected_service
