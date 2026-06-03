@@ -383,7 +383,99 @@ reference_entries: list[str] = Field(default_factory=list)
 
 ---
 
-## 15. How to Use This Document
+## 16. Evidence + Paper Understanding Deep Discussion
+
+以下为第二批讨论结论，基于六大争议点辩论。
+
+### 16.1 新增共识
+
+**1. PassageIndex 应持久化为 passage_index.json。**
+
+理由：
+- artifact-driven 系统需要可审计、可复现、可调试；
+- audit 需要独立读取 passage 构建结果；
+- 前端 evidence 跳转需要 passage 层信息；
+- ClaimEvidence.passage_id 不能指向不存在的运行时对象。
+
+**2. ClaimEvidence v2 应持久化为 claim_evidence.json。**
+
+- evidence_index.json 保留 v1 兼容；
+- claim_evidence.json 承载 v2 字段（passage_id, claim_type, semantic_support, source_sentence, generated_by）；
+- audit 和未来 Phase 12 读取 claim_evidence.json。
+
+**3. UnderstandingStatus 使用 5 个主状态。**
+
+- SUCCESS
+- DEGRADED_STRUCTURAL
+- BASELINE_ONLY
+- BLOCKED_UNDERSTANDING
+- FAILED
+
+**4. 不引入 SUCCESS_WITH_WARNINGS。** warnings 统一放在 warnings 字段。
+
+**5. BLOCKED_UNDERSTANDING 与 FAILED 的边界。**
+
+- BLOCKED_UNDERSTANDING = 理解失败：evidence 不足、LLM 输出无效、audit hard-fail。
+- FAILED = 系统异常：文件系统错误、Pydantic 崩溃、pipeline 异常。
+
+**6. BASELINE_ONLY 与 DEGRADED_STRUCTURAL 的边界。**
+
+- BASELINE_ONLY = 无 LLM 或只有 rule-based baseline。
+- DEGRADED_STRUCTURAL = LLM 理解成功，但某些结构/组件降级。
+
+**7. UnderstandingStatus 需要 component_status。**
+
+```
+component_status:
+  paper_card: SUCCESS / FAILED / BASELINE
+  formula_cards: SUCCESS / SKIPPED / FAILED / BASELINE
+  teaching_cards: SUCCESS / FAILED / BASELINE
+  audit: SUCCESS / FAILED
+```
+
+**8. formula_cards 失败不能一律 BLOCKED。** 需要区分：
+
+- FORMULA_ABSENT：论文无公式，SKIPPED，不阻断；
+- FORMULA_OPTIONAL_FAILED：公式非核心，warning，不阻断；
+- CORE_FORMULA_FAILED：核心公式失败，BLOCKED。
+
+**9. teaching_cards 失败不能简单视为 SUCCESS。**
+
+ResearchSensei 是研读导师系统，teaching 是核心价值。当前倾向：paper_card 成功但 teaching_cards 失败 → DEGRADED_STRUCTURAL。
+
+**10. EvidencePack 不完整持久化，但 UnderstandingStatus 中保存 EvidencePackSummary。**
+
+```
+EvidencePackSummary:
+  included_claim_ids: list[str]
+  excluded_claim_ids: list[str]
+  total_tokens: int
+  claim_type_counts: dict[str, int]
+  truncated_passage_ids: list[str]
+```
+
+**11. v2 精读链路关键新增 artifact：** passage_index.json, claim_evidence.json, understanding_status.json。
+
+### 16.2 保留的旧共识
+
+1. LLM 三次调用：paper_card, formula_cards, teaching_cards。
+2. EvidencePack 仍然主要是运行时对象。
+3. Audit warning 不阻断，进入 SUCCESS + warnings。
+4. Phase 8-10 迁移方向仍是 baseline_builder + v2_builder，文件名尽量保持兼容。
+
+### 16.3 需要继续讨论的问题
+
+1. DEGRADED_STRUCTURAL 是否允许进入 Phase 12。建议继续讨论是否需要 allowed_for_phase12 或更细的 capability gates。
+2. formula_is_core 如何判断：规则？LLM？skeleton.formulas？formula purpose != UNKNOWN？当前不能强行定。
+3. EvidencePackSummary 是否足够复现 LLM 输入。如果 passage_text 被 token budget 裁剪，仅保存 truncated_passage_ids 是否足够？
+4. component_status 的值是否够用：SUCCESS / SKIPPED / FAILED / BASELINE，是否还需要 DEGRADED？
+5. passage_index.json 和 claim_evidence.json 的生成顺序：parsed_document → passage_index → claim_evidence → evidence_index wrapper？还是保留旧 evidence_index 先生成？
+6. teaching_cards 失败后前端到底展示什么：paper_card 可以展示吗？是否必须标注"讲解层降级"？是否影响 advisor/drill？
+7. allowed_for_phase12 是否太粗，需要改为更细的 downstream gate。
+
+---
+
+## 17. How to Use This Document
 
 - 本文档保存讨论，不直接作为开发依据。
 - 达成稳定共识后，再同步到 DESIGN.md、DEVELOPMENT.md 或 docs/development/*.md。
