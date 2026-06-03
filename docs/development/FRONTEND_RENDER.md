@@ -34,7 +34,7 @@
 - 失败组件隐藏，并显示明显降级提示。
 - teaching_cards FAILED 时，只能称为"论文理解"或"结构化理解"，不能称为"导师级解释"。
 - formula_cards optional failed 时，隐藏公式区并显示"公式讲解暂不可用"。
-- advisor_questions 通常不允许。
+- advisor_questions 是否允许由 `understanding_status.allowed_downstream.advisor_questions` 决定；teaching_cards FAILED 时当前倾向为 False。
 
 ### BASELINE_ONLY
 

@@ -78,13 +78,13 @@
 
 ## 6. Artifact
 
-- 不新增 artifact
-- 不修改现有 artifact 格式
-- `parsed_document.json` 格式不变
-- v2 artifact 应显式写 `schema_version="v2"`（通过 Pydantic 默认值）
-- 旧 artifact 缺少 `schema_version` 时按 v1 读取
-- additive 字段通过默认值兼容，不需要 migration
-- breaking change 未来再讨论 migration 方案
+- ParserAdapter 本身不直接写 artifact。
+- `parsed_document.json` 仍由 pipeline / workspace 写入。
+- Parser 层新增字段必须兼容旧 `parsed_document.json`。
+- v2 pipeline 中新增 artifact 的 versioning 由对应模块文档约束。
+- `ParserResult` / `DocumentIngestion` 写入 `parsed_document.json` 时，新 v2 artifact 应显式 `schema_version="v2"`；旧 artifact 无 `schema_version` 时按 v1 读取。
+- additive 字段通过默认值兼容，不需要 migration。
+- breaking change 未来再讨论 migration 方案。
 
 ### 外部 parser 约束
 
@@ -103,7 +103,7 @@ class ParseMetadata(SenseiModel):
     parser_version: str = ""
     source_format: str = ""
     page_count: int = 0
-    extra: dict = {}
+    extra: dict = Field(default_factory=dict)
 
 class ParserResult(SenseiModel):
     document: DocumentIngestion

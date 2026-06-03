@@ -247,7 +247,7 @@ class EvidencePack(SenseiModel):
     paper_id: str
     items: list[EvidencePackItem]
     total_tokens: int = 0
-    warnings: list[WarningItem] = []
+    warnings: list[WarningItem] = Field(default_factory=list)
 ```
 
 ## 12. LLM Prompt 结构
@@ -296,7 +296,7 @@ class PaperCardLLMOutput(SenseiModel):
 
 class FormulaCardLLMOutput(SenseiModel):
     purpose: str
-    symbols: list[dict] = []
+    symbols: list[dict] = Field(default_factory=list)
     intuition: str = ""
     numeric_example: str = ""
     evidence_ref: str = ""
@@ -321,18 +321,7 @@ class TeachingCardLLMOutput(SenseiModel):
 
 ## 13. understanding_status.json
 
-**Schema**: 放在 `src/researchsensei/schemas/understanding.py`
-
-```python
-class UnderstandingStatus(SenseiModel):
-    paper_id: str
-    status: str  # SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING / FAILED / BASELINE_ONLY
-    blocking_reason: str = ""
-    warnings: list[WarningItem] = []
-    allowed_for_user_display: bool
-    allowed_for_phase12: bool
-    checked_artifacts: list[str] = []
-```
+**Schema**: 放在 `src/researchsensei/schemas/understanding.py`。完整 schema 定义见 §7。
 
 **由 SinglePaperIngestionRunner 根据 QualityReport 生成**，写入 `understanding_status.json`
 
@@ -342,46 +331,39 @@ class UnderstandingStatus(SenseiModel):
 - Runner 读取 QualityReport，映射成 UnderstandingStatus，写 understanding_status.json。
 - Card builder 不能参与 understanding_status 生成（reviewer independence）。
 
-**状态规则**:
-| 状态 | allowed_for_user_display | allowed_for_phase12 |
-|------|--------------------------|---------------------|
-| SUCCESS | True | True |
-| DEGRADED_STRUCTURAL | False | False |
-| BLOCKED_UNDERSTANDING | False | False |
-| FAILED | False | False |
-| BASELINE_ONLY | False | False |
-
 ### BASELINE_ONLY 策略
 
 - BASELINE_ONLY 时仍然写 paper_card.json / formula_cards.json / teaching_cards.json。
 - 这些 card 是有用的结构化数据，可用于 debug 和 diagnostic。
-- 但 understanding_status.status = "BASELINE_ONLY"，allowed_for_user_display = False。
-- 前端/API/Phase 12 必须先读 understanding_status.json。
-- status != SUCCESS 时不展示导师级解释，不进入 Phase 12。
-- BLOCKED_UNDERSTANDING 时只展示 blocking_reason / warnings，不展示解释内容。
+- `allowed_for_user_display = False`。
+- `allowed_downstream` 全部 False。
+- 普通用户不能当最终理解展示。
+- Phase 12 / advisor 是否允许必须看 `allowed_downstream`，不再用 `status != SUCCESS` 简单判断。
 
 ### 前端/API 展示规则
 
-```
-1. 读取 understanding_status.json
-2. if status == "SUCCESS":
-     展示 paper_card, formula_cards, teaching_cards
-   elif status == "BASELINE_ONLY":
-     展示 "基线模式：当前无 LLM，仅展示结构化骨架" + 可选展开
-   elif status == "BLOCKED_UNDERSTANDING":
-     展示 blocking_reason + warnings，不展示 cards
-   elif status == "FAILED":
-     展示 "解析失败" + error
-```
+详细规则见 FRONTEND_RENDER.md。摘要：
+
+- **SUCCESS**: 展示成功组件。
+- **DEGRADED_STRUCTURAL**: 按 component_status 展示成功组件，失败组件隐藏并提示降级。
+- **BASELINE_ONLY**: 普通用户不展示 cards。
+- **BLOCKED_UNDERSTANDING**: 不展示解释性 card。
+- **FAILED**: 展示系统错误。
 
 ### Phase 12 Gating
 
+使用 DownstreamGates，不再用 `status != SUCCESS` 作为唯一判断。
+
 ```python
-if understanding_status.status != "SUCCESS":
-    raise Phase12GatingError(
-        f"Cannot enter Phase 12: status={understanding_status.status}, "
-        f"reason={understanding_status.blocking_reason}"
-    )
+if not understanding_status.allowed_downstream.phase12_patterns:
+    raise Phase12GatingError("phase12_patterns not allowed")
+
+if not understanding_status.allowed_downstream.phase12_drill:
+    if not understanding_status.allowed_downstream.phase12_drill_degraded:
+        raise Phase12GatingError("phase12_drill not allowed")
+
+if not understanding_status.allowed_downstream.advisor_questions:
+    raise Phase12GatingError("advisor_questions not allowed")
 ```
 
 ## 14. 当前未解决问题
