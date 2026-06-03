@@ -135,7 +135,7 @@ user_query
 
 - 上游：source_resolver（提供源文件）
 - 下游：frontend（消费 artifact JSON）
-- 下游：Phase 12 patterns/drill（消费 SUCCESS 状态的 cards）
+- 下游：Phase 12 patterns/drill/advisor（通过 DownstreamGates 判断可用性；SUCCESS 通常全部可用，DEGRADED_STRUCTURAL 可能只允许部分下游能力）
 
 ## 7. 当前未解决问题
 
