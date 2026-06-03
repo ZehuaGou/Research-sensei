@@ -1,20 +1,40 @@
 # ResearchSensei Glossary
 
-| Term | Meaning |
-|---|---|
-| ResearchSensei | 研读导师，科研论文理解与思维框架训练系统 |
-| SOTA | State-of-the-art，当前最先进方法或结果 |
-| RAG | Retrieval-Augmented Generation，检索增强生成 |
-| TTL | Time To Live，缓存有效期 |
-| HTMX | HTML 属性驱动的轻量前端交互库 |
-| MCP | Model Context Protocol，模型上下文协议 |
-| CCF | China Computer Federation，中国计算机学会推荐会议/期刊体系 |
-| SCI | Science Citation Index，科学引文索引 |
-| LaTeX | 学术论文排版系统 |
-| arXiv | 预印本论文平台 |
-| DOI | Digital Object Identifier，论文永久标识 |
-| OCR | Optical Character Recognition，光学字符识别 |
-| XSS | Cross-Site Scripting，跨站脚本攻击 |
-| Evidence Ref | 指向论文 block 的证据引用，如 `paper_x:b001` |
-| A_READ | 必须精读并进入全文解析的论文 |
-| D_IGNORE | 过滤，不生成学习内容 |
+> **Canonical docs**: See `docs/DESIGN.md` for architecture context.
+
+## Core Terms
+
+- **ResearchSensei**: Paper reading tutor system for graduate students.
+- **Paper Skeleton**: Structured extraction of paper components (problem, method, experiments, limitations).
+- **Evidence Index**: Mapping of claims to source blocks with confidence scores.
+- **Paper Card**: Learning card summarizing a paper's core contributions.
+- **Formula Card**: Explanation card for formulas with symbol breakdown.
+- **Teaching Card**: Five-layer explanation card (human, analogy, formula, example, paper role).
+- **Reading Plan**: Prioritized list of papers with scoring breakdown.
+- **ParserAdapter**: Interface for document parsers (Phase 11.6).
+- **PassageIndex**: Passage-level text index (Phase 11.7).
+- **ClaimEvidence**: Evidence binding for a specific claim.
+
+## Artifact Names
+
+- `source_status.json`: Source resolution status
+- `parsed_document.json`: Parsed document blocks
+- `evidence_index.json`: Evidence bindings
+- `paper_skeleton.json`: Paper structure extraction
+- `paper_card.json`: Paper learning card
+- `formula_cards.json`: Formula explanation cards
+- `teaching_cards.json`: Teaching explanation cards
+- `query_plan.json`: Search plan
+- `candidate_pool.json`: Raw candidate papers
+- `filtered_candidates.json`: Deduplicated candidates
+- `reading_plan.json`: Prioritized reading list
+
+## Evidence Types
+
+- SUPPORTED_BY_TEXT: Direct text evidence
+- SUPPORTED_BY_FORMULA: Formula evidence
+- SUPPORTED_BY_EXPERIMENT: Experiment evidence
+- REASONABLE_INFERENCE: Inferred but not directly stated
+- UNVERIFIED: Not yet verified
+- NEEDS_HUMAN_CHECK: Requires human verification
+- INSUFFICIENT_EVIDENCE: Not enough evidence

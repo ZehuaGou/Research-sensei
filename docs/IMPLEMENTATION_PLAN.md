@@ -1,36 +1,33 @@
 # ResearchSensei Implementation Plan
 
-This plan implements v0.5 as a direct architecture refactor.
+> **Canonical docs**: See `docs/DESIGN.md` for current route and `docs/DEVELOPMENT.md` for phase details.
 
-## Phase 1: Documentation and Contracts
+## Completed Phases
 
-- Generate PRODUCT_REQUIREMENTS, REUSE_REPORT, MODULE_CONTRACTS, IMPLEMENTATION_PLAN, REVIEW_CHECKLIST, GLOSSARY, ACCEPTANCE_CRITERIA.
-- Add tests that fail when required docs or module contracts are missing.
+- Phase 1: Project skeleton, CLI, FastAPI health
+- Phase 2: Config, logging, errors, schemas
+- Phase 3: Workspace, job store, artifact writing
+- Phase 4: Single document lightweight parsing
+- Phase 5: Source resolver, parse API, job/artifact query
+- Phase 6: Grounding, evidence index, paper skeleton
+- Phase 7: LLM infrastructure (client, prompt, cache, token budget)
+- Phase 8: Paper card JSON v1
+- Phase 9: Formula cards JSON v1
+- Phase 10: Teaching cards JSON v1
+- Phase 11: Query / Acquisition / Selection / Reading Plan v1
 
-## Phase 2: New Package Skeleton
+## Current Phase
 
-- Create `src/researchsensei` with query, acquisition, selection, source_resolver, ingestion, grounding, understanding, teaching, formula, direction, patterns, drill, interactive, context, llm, render, integrations, web.
-- Add Pydantic schemas for all primary contracts.
-- Keep old `research_sensei` only as migration source.
+Phase 11.6: ParserAdapter Design (not yet authorized for code)
 
-## Phase 3: Vertical Slice
+## Frozen
 
-- Direction mode: query plan -> candidate selection -> reading plan.
-- Paper mode: text/PDF-prechecked input -> ingestion blocks -> grounding -> skeleton -> cards.
-- Interactive mode: current card + selected text + evidence chunk -> prompt builder -> answer.
+Phase 12: Patterns + Drill (requires Phase 11.6-11.9 first)
 
-## Phase 4: Web Workspace
+## Future
 
-- Replace old prototype page concept with learning workspace: left navigation, center learning object, right ask panel.
-- Every card can provide ask actions.
+Phase 13-18: Direction Map, Frontend, Advisor, Reliability, Benchmark, Deployment
 
-## Phase 5: Sample and Evaluation
+## Execution Rule
 
-- Build `outputs/sample` around Attention Is All You Need.
-- Add golden tests for formula cards and paper skeleton quality.
-
-## Budgets and Discipline
-
-- Single paper deep read target: 3-5 minutes, under 50 API calls, under 200K-300K tokens.
-- Every artifact includes generated_at, generator_version, and content hash when persisted.
-- No module may silently fall back from missing full text to deep formula explanation.
+Every phase must have its detailed playbook written and confirmed by user before code begins.

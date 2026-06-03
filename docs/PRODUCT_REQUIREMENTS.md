@@ -1,29 +1,37 @@
-# ResearchSensei / 研读导师 Product Requirements
+# ResearchSensei Product Requirements
 
-ResearchSensei 是科研论文理解与思维框架训练系统。它不是普通论文搜索器、摘要器或申博模拟器；它的目标是让基础薄弱、英文论文阅读慢、数学能力一般的用户真正看懂少数关键论文，并能用自己的话解释问题、机制、公式、证据、局限和可迁移创新模式。
+> **Canonical docs**: See `docs/DESIGN.md` for current product specification.
 
-## Core Goals
+ResearchSensei is a paper reading tutor system for graduate students and junior researchers. It helps users truly understand papers, not just skim them.
 
-- 方向学习：输入研究方向后，输出子问题、演化链、综述/经典/方法转折/当前强方法、最新趋势和推荐学习顺序。
-- 单篇精读：输入 PDF、LaTeX、arXiv 链接、Markdown 或粘贴文本后，生成完整理解卡、公式卡、模式卡、训练卡，并支持继续追问。
-- 思维训练：每篇论文固定拆出 Problem、Old Methods、Bottleneck、Assumption、Representation、Mechanism、Objective、Evidence、Limitation、Transfer。
-- 交互追问：用户能针对当前卡片、公式、选中文本、证据段继续追问，系统带上下文回答，而不是只把一句问题发给模型。
+## Core Requirements
 
-## Non-goals
+1. **Paper Understanding**: Parse PDF/Markdown/text into structured blocks with evidence binding.
+2. **Formula Explanation**: Break formulas into symbols, terms, roles, and numeric examples.
+3. **Teaching Cards**: Five-layer explanation (human, analogy, formula, example, paper role).
+4. **Evidence Constraint**: Every explanation must be backed by evidence from the paper.
+5. **Direction Learning**: Search, deduplicate, score, and rank papers for reading plans.
+6. **Uncertainty Handling**: Degrade honestly when evidence is insufficient.
 
-- 不做只基于标题摘要的深度理解。
-- 不做无证据的论文事实断言。
-- 不从零自研搜索、PDF 解析、通用 RAG、公式渲染、图渲染、复习算法。
-- 不把系统绑定到时间序列异常检测或任何单一方向。
+## Quality Standards
 
-## Product Principles
+- No fabrication of results, datasets, or conclusions.
+- No formula text as human-readable explanation.
+- No template-based generic output.
+- All claims must have evidence_ref or degrade to INSUFFICIENT_EVIDENCE.
 
-- 中文讲解为主，保留必要英文术语。
-- 搜索、解析、讲解、交互、展示必须分离。
-- 所有事实性解释必须标注证据状态：原文支持、公式支持、实验支持、合理推测、不确定、需要人工核验、证据不足。
-- 支持英文、中文、中英混排论文。
-- 页面必须降低认知负担：左目录、中间学习区、右追问区；每屏一个主要学习对象；字体可读；支持折叠、重点、高亮和追问入口。
+## Current Status
 
-## Minimum Acceptable Version
+Phase 1-11 baseline infrastructure complete. Phase 12 frozen pending quality upgrades.
 
-最低版本也必须完成完整垂直闭环：输入方向或一篇论文，经过预检、获取或接收全文、解析 blocks、证据定位、论文骨架理解、公式讲解、科研模式归类、训练题、HTML 学习页面和带上下文追问。只生成摘要视为失败。
+## Non-Goals
+
+- Not a paper summarizer.
+- Not an auto-paper-writing system.
+- Not an auto-research system.
+- Not a RAG chatbot.
+
+## Detailed Specification
+
+See `docs/DESIGN.md` for architecture, artifact contracts, and external project decisions.
+See `docs/DEVELOPMENT.md` for development rules and phase specifications.

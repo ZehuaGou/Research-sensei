@@ -1,45 +1,32 @@
 # ResearchSensei Review Checklist
 
-Use this checklist before accepting any implementation change.
+> **Canonical docs**: See `docs/DEVELOPMENT.md` for development rules.
 
-## Architecture
+## Pre-Commit Checklist
 
-- [ ] Module does one job only.
-- [ ] JSON/Pydantic input and output are explicit.
-- [ ] Search, parsing, teaching, interaction, and render remain separate.
-- [ ] External tools are behind replaceable adapters.
+1. Did I only modify authorized files?
+2. Did I run `python -m pytest -q`?
+3. Are all tests passing?
+4. Did I avoid modifying forbidden files?
+5. Did I avoid new dependencies without reuse gate?
+6. Did I avoid real network/LLM in default tests?
+7. Is there any API key or secret in the changes?
+8. Did I update documentation if needed?
 
-## Evidence
+## Phase Completion Checklist
 
-- [ ] Every factual claim has evidence status.
-- [ ] AI inference is labeled as inference.
-- [ ] Evidence refs point to block IDs.
-- [ ] Missing full text triggers degraded mode.
+1. All new tests pass
+2. All existing tests still pass
+3. No forbidden files modified
+4. No new dependencies (or reuse gate completed)
+5. Documentation updated
+6. Artifacts backward compatible (if applicable)
+7. No real network/LLM in default tests
+8. Hard-fail conditions tested
 
-## Teaching Quality
+## ResearchSensei Quality Standards
 
-- [ ] Output is Chinese-first.
-- [ ] Formula explanations include symbols, terms, numeric example, remove effect, weight effect.
-- [ ] Paper card covers Problem, Old Methods, Bottleneck, Assumption, Representation, Mechanism, Objective, Evidence, Limitation, Transfer.
-- [ ] Drill cards include advisor questions and error attribution.
-
-## Interaction
-
-- [ ] Follow-up question includes current card, selected text, evidence chunks, recent history summary.
-- [ ] Prompt builder isolates user question.
-- [ ] System does not send full paper every time.
-- [ ] Feedback can update memory later.
-
-## Safety and Privacy
-
-- [ ] API keys never appear in logs.
-- [ ] LaTeX commands are not executed.
-- [ ] PDF scripts are not executed.
-- [ ] HTML source is sanitized before render.
-
-## UI
-
-- [ ] Cards are not squeezed horizontally.
-- [ ] Font is readable.
-- [ ] Ask buttons exist for major learning units.
-- [ ] Evidence state is visible.
+- Every claim must have evidence_ref or degrade
+- No formula text as human explanation
+- No template-based generic output
+- No fabrication of results or datasets

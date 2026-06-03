@@ -1,38 +1,34 @@
 # ResearchSensei Acceptance Criteria
 
-ResearchSensei passes v0.5 acceptance only when it behaves as a learning system, not a summary toy.
+> **Canonical docs**: See `docs/DESIGN.md` for quality standards and `docs/DEVELOPMENT.md` for phase completion criteria.
 
-## Direction Learning
+## Global Criteria
 
-- Produces a reading plan, not a raw paper table.
-- Selects few core papers and labels A_READ/B_SKIM/C_REFERENCE/D_IGNORE.
-- Gives explainable scoring breakdown and filtering reasons.
-- Survey is not treated as baseline.
-- Recent arXiv is not promoted without quality evidence.
+Every phase must satisfy:
+1. Related files exist and code can import.
+2. Tests can run and pass.
+3. Output conforms to schema.
+4. Failures produce structured errors.
+5. Logs do not leak API keys.
+6. Unfinished items recorded in development docs.
 
-## Single Paper Learning
+## Paper Understanding Quality
 
-- Ingests full text when available; missing full text is explicitly degraded.
-- Produces block-level parsed document with evidence refs.
-- Builds paper skeleton with core ten-part framework.
-- Produces paper, formula, pattern, and drill cards.
-- Formula cards explain each term, numeric example, remove effect, weight effect, and uncertainty.
+- Every claim must have evidence_ref or degrade to INSUFFICIENT_EVIDENCE.
+- human_explanation must not be formula text.
+- Formula symbols from generic dictionary must be REASONABLE_INFERENCE.
+- Output must contain paper-specific terms (not generic templates).
+- Confidence must degrade when evidence is insufficient.
+- LLM output must be evidence-constrained.
 
-## Interaction
+## Phase 12 Gate
 
-- User can ask about current card, formula, concept, or selected text.
-- Follow-up includes context package and evidence chunks.
-- Prompt isolates user question to reduce injection risk.
-- Session memory tracks confusion and weak concepts.
+Phase 12 unfreezes only when:
+- Phase 11.6-11.9 complete.
+- Quality benchmarks pass.
+- All hard-fail conditions tested.
+- User confirms.
 
-## Reliability
+## Detailed Criteria
 
-- Pipeline writes artifacts per step and supports restart from successful steps.
-- Logs record duration, model, token/cost where available, cache hit, errors, degraded reason, output paths.
-- API keys are never written to logs.
-
-## UI
-
-- Learning workspace has left navigation, center reading area, right ask panel.
-- Text is readable; cards are vertical and not squeezed.
-- Evidence state and ask buttons are visible.
+See `docs/DEVELOPMENT.md` for per-phase completion criteria and hard-fail conditions.

@@ -4,32 +4,14 @@
 
 ## 当前状态
 
-- Phase 1-11 完成 (269 tests passing)
-- Phase 12 (patterns + drill) 未开始
-- interactive / render / frontend 对接未实现
+- Phase 1-11 baseline complete (281 tests passing)
+- Phase 12 (patterns + drill) frozen
+- 下一步：Phase 11.6 ParserAdapter（待用户确认）
 
-## 已实现功能
+## 主要文档
 
-### 单篇论文精读
-
-输入 PDF / Markdown / 纯文本，生成 7 个结构化 artifact：
-
-1. `source_status.json` — 来源状态
-2. `parsed_document.json` — 文档解析 blocks
-3. `evidence_index.json` — 证据定位
-4. `paper_skeleton.json` — 论文骨架
-5. `paper_card.json` — 论文学习卡
-6. `formula_cards.json` — 公式讲解卡
-7. `teaching_cards.json` — 五层教学卡
-
-### 研究方向学习
-
-输入研究方向（中/英文），生成 4 个 artifact：
-
-1. `query_plan.json` — 查询计划
-2. `candidate_pool.json` — 候选论文池
-3. `filtered_candidates.json` — 去重后候选
-4. `reading_plan.json` — 阅读计划
+- [docs/DESIGN.md](docs/DESIGN.md) — 产品定位、架构、artifact 链路、技术路线
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规则、Phase 1-11 baseline、Phase 11.6 开发说明
 
 ## 安装
 
@@ -72,22 +54,4 @@ src/researchsensei/
 backend/         — 旧版代码（冻结，仅作迁移参考）
 frontend/        — Vue 3 前端（保留，未重写）
 tests/           — 测试
-legacy_tests/    — 旧测试（已排除）
-tests_e2e/       — E2E 测试（已排除）
 ```
-
-## 配置
-
-复制 `.env.example` 为 `.env`，填入 API key：
-
-```bash
-cp .env.example .env
-```
-
-支持 DeepSeek、MiMo 和任意 OpenAI-compatible provider。
-
-## 复用边界
-
-不自研：论文搜索、PDF 解析、RAG、向量检索、间隔复习算法。
-
-自研：Teach-Me Engine、Formula Tutor、Research Pattern Library、Learning Card Schema、交互追问协议。
