@@ -614,7 +614,124 @@ class DownstreamGates(SenseiModel):
 
 ---
 
-## 18. How to Use This Document
+## 18. Engineering Reliability Discussion
+
+以下为第四批讨论结论，基于 Engineering Reliability 九大问题讨论。
+
+### 18.1 新增倾向共识
+
+**1. Artifact versioning。**
+
+- 每个 artifact 顶层应有 `schema_version`。
+- 旧 artifact 没有 `schema_version` 时按 v1 读取。
+- 新 v2 artifact 写出时必须显式写 `schema_version="v2"`。
+- additive schema change 通过 Pydantic 默认值兼容。
+- breaking change 未来再引入 migration，不在初版实现。
+- 暂不引入 `artifact_manifest.json`。
+
+**2. Artifact 原子写入。**
+
+- `WorkspaceStore.write_json` 应采用 tmp + rename 原子写入。
+- 写入失败时 `job.status=FAILED`。
+- 部分 artifact 写成功后不回滚，用于 debug。
+- 已写 artifact 不覆盖。rerun 创建新 run_id，resume 才复用已有 artifact。
+
+**3. rerun / resume。**
+
+- resume 必须显式开启，默认 `resume=False`。
+- resume 按 artifact 是否存在 + schema_version 是否匹配决定是否跳过。
+- schema_version 不匹配时强制重跑。
+- resume 和 LLM cache 是两个独立机制。
+- resume 的具体 run_id 复用规则仍需继续讨论。
+
+**4. Cache strategy。**
+
+- 初版只 cache LLM。Parser / BM25 / EvidenceRetriever 不 cache。
+- LLM cache key 应包含：model, prompt_version, prompt_hash, schema_version, temperature。
+- cache 不进 Git。
+- 测试环境默认关闭 cache，生产/本地可开启。
+
+**5. CI / pytest。**
+
+- 默认 pytest 不联网、不真实调用 LLM。
+- 需要 pytest markers：live, network, llm, slow。
+- 必须在默认 pytest/CI 命令中排除：`pytest -m "not live and not network and not llm and not slow"`
+- live smoke 放 `tests_live/`，默认不跑。
+- live / network / llm 测试必须通过环境变量显式开启：`RUN_LIVE_TESTS=1`, `RUN_LLM_TESTS=1`
+- 外部 adapter 测试默认用 MockTransport。
+
+**6. Secret scanning / repo hygiene。**
+
+- 项目有过真实 key 泄露历史，必须加入 secret scan 规则。
+- 扫描关键词：`sk-`, `api_key`, `DEEPSEEK_API_KEY=`, `MIMO_API_KEY=`, `OPENAI_API_KEY=`, `ANTHROPIC_API_KEY=`。
+- `.env.example` 只能放 placeholder。
+- `.env`、`.env.*`、cache、runs、artifacts、大模型文件、数据库文件不得提交。
+- commit message 不允许 Claude / Happy / Anthropic contributor 信息。
+- 是否使用 pre-commit / CI gitleaks / trufflehog 仍需后续实现时确认。
+
+**7. debug/admin 权限和 raw artifacts。**
+
+- `/cards` 是用户端受控 API，按 understanding_status + component_status 过滤。
+- `/understanding_status` 是用户端状态 API。
+- `/artifacts` 应定位为 debug/admin raw API，不给普通用户直接使用。
+- `/quality_report` 应定位为 debug/admin API。
+- 普通前端不应直接用 `/artifacts` 展示 cards。
+- 本地开发可用 `SENSEI_DEBUG=1`，生产环境必须有鉴权。
+- debug/admin 鉴权机制仍未定。
+
+**8. Error taxonomy。**
+
+- 需要统一 error code taxonomy。
+- Parser: PARSER_FAILED, PDF_PARSE_FAILED, UNSUPPORTED_FILE_TYPE
+- Evidence: NO_PASSAGES, NO_CLAIMS, MISSING_METHOD_EVIDENCE
+- LLM: LLM_UNAVAILABLE, LLM_TIMEOUT, LLM_INVALID_JSON, LLM_INVALID_EVIDENCE_REF
+- Audit: AUDIT_HARD_FAIL, AUDIT_INTERNAL_ERROR
+- API: UNAUTHORIZED_DEBUG_ACCESS, STATUS_BLOCKED
+- pipeline 层 warnings 用 WarningItem。audit 层 findings 用 AuditFinding。job 层错误写 Job.error。
+- 日志应包含 job_id / run_id / artifact_name。日志禁止打印 API key、prompt 全文、过长论文文本。
+
+**9. live smoke / external adapter validation。**
+
+- live smoke 独立 `tests_live/`。默认不跑，不阻塞普通 CI。
+- 通过 `RUN_LIVE_TESTS=1` 显式开启。
+- Docling adapter 接入前至少需要样例：simple PDF, formula-heavy PDF, table-heavy PDF, scanned PDF。
+- 需要记录外部项目版本和验证日期。
+- 样例 PDF 来源和版权仍需确认。
+
+### 18.2 需要修正或不能定死的点
+
+1. "全项目技术路线讨论可以收尾"不能直接写成最终结论。更准确说法：Engineering Reliability 已形成第一批倾向共识；全项目主要路线已基本收敛；仍需把共识同步到正式模块文档，并在同步时发现冲突再讨论。
+2. `artifact_manifest.json` 暂不引入，但 content_hash / dependencies 未来可能需要。不要永久否定 artifact_manifest。
+3. resume 语义仍需继续确认：是同一 run 继续？还是新 run 复用旧 artifact？与"不覆盖 artifact"的关系还需细化。
+4. debug/admin 鉴权机制未定：环境变量只适合本地开发；production 必须另设鉴权策略。
+5. secret scanning 的具体工具未定：pre-commit / gitleaks / trufflehog，后续实现阶段再选。
+6. live smoke 样例 PDF 来源未定。
+
+### 18.3 仍未决问题
+
+1. artifact_manifest 是否未来需要。
+2. content_hash 是否在 v2 初版加入。
+3. resume 与 rerun 的 run_id 语义。
+4. cache 默认开启策略。
+5. debug/admin 鉴权机制。
+6. /artifacts 是否需要脱敏版本。
+7. secret scan 工具选型。
+8. live smoke 样例 PDF 来源。
+9. external_versions.json 手动维护还是自动生成。
+10. CI 是否强制 no-network monkeypatch。
+
+### 18.4 下一步建议
+
+1. 保存本轮讨论后，不直接写代码。
+2. 下一步任务：把 TECHNICAL_DISCUSSION.md 中已经稳定的共识同步到正式模块文档。
+   - 同步范围：PARSER.md, EVIDENCE.md, PAPER_UNDERSTANDING.md, AUDIT_QUALITY.md, FULL_PIPELINE.md
+   - 可能新增：FRONTEND_RENDER.md, ENGINEERING_RELIABILITY.md
+   - 同步前先给出同步计划，不直接修改。
+3. 正式开发文档同步完成后，再考虑 ParserAdapter 代码实现。
+
+---
+
+## 19. How to Use This Document
 
 - 本文档保存讨论，不直接作为开发依据。
 - 达成稳定共识后，再同步到 DESIGN.md、DEVELOPMENT.md 或 docs/development/*.md。
