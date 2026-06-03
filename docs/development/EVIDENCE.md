@@ -191,6 +191,11 @@ class EvidenceRetriever:
 | test_claim_evidence_v2_backward_compatible | v1 字段不变，v2 字段默认空 |
 | test_evidence_retriever_finds_relevant | 输入 claim → 返回相关 passage |
 | test_evidence_retriever_unrelated_returns_empty | 不相关 claim → 空列表 |
+| test_bm25_exact_match_scores_high | 完全匹配 claim-passage 对得分 > 0.8 |
+| test_bm25_unrelated_scores_low | 不相关 claim-passage 对得分 < 0.1 |
+| test_bm25_prefers_specific_over_generic | 包含论文特有术语的 passage 得分高于通用 passage |
+| test_bm25_length_normalization | 长 passage 不因长度获得不公平高分 |
+| test_bm25_empty_query_returns_empty | 空 query 返回空列表 |
 
 ## 12. Hard-Fail
 
@@ -202,39 +207,91 @@ class EvidenceRetriever:
 
 ## 13. EvidenceRetriever 初版策略
 
-**当前不使用向量库、不联网、不用 LLM。**
+**当前不使用向量库、不联网、不用 LLM、不新增依赖。**
+
+### 为什么用 BM25 而不是 simple overlap
+
+- simple overlap 不考虑 IDF（高频词 "the"/"model" 和低频词 "anomaly" 权重一样）
+- simple overlap 不考虑词频（出现 10 次和 1 次得分一样）
+- simple overlap 不考虑文档长度（50 词 passage 和 500 词 passage 同样 overlap 比例得分一样）
+- BM25 解决以上所有问题，纯 Python 实现约 30 行
+
+### BM25 实现
 
 ```python
+import math
+from collections import Counter
+import re
+
 def tokenize(text: str) -> list[str]:
-    """Lowercase, split on whitespace, remove punctuation."""
-    import re
+    """Lowercase, split on whitespace/punctuation."""
     return re.findall(r"[a-z0-9]+", text.lower())
 
-def lexical_score(claim_text: str, passage: Passage) -> float:
-    """Score = overlap / claim_token_count."""
-    claim_tokens = set(tokenize(claim_text))
-    passage_tokens = set(tokenize(passage.text))
-    if not claim_tokens:
-        return 0.0
-    overlap = len(claim_tokens & passage_tokens)
-    return overlap / len(claim_tokens)
+def compute_idf(corpus_tokens: list[list[str]]) -> dict[str, float]:
+    """Compute IDF for each term in the corpus."""
+    n = len(corpus_tokens)
+    doc_freq: Counter = Counter()
+    for tokens in corpus_tokens:
+        doc_freq.update(set(tokens))
+    return {
+        term: math.log((n - df + 0.5) / (df + 0.5) + 1)
+        for term, df in doc_freq.items()
+    }
 
-def retrieve(claim_text: str, index: PassageIndex, top_k: int = 5, min_score: float = 0.2) -> list[Passage]:
-    """Retrieve passages relevant to a claim."""
-    scored = [(p, lexical_score(claim_text, p)) for p in index.passages]
-    scored = [(p, s) for p, s in scored if s >= min_score]
-    scored.sort(key=lambda x: x[1], reverse=True)
-    return [p for p, s in scored[:top_k]]
+def bm25_score(
+    query_tokens: list[str],
+    doc_tokens: list[str],
+    avg_dl: float,
+    idf: dict[str, float],
+    k1: float = 1.5,
+    b: float = 0.75,
+) -> float:
+    """BM25 scoring function."""
+    doc_len = len(doc_tokens)
+    tf = Counter(doc_tokens)
+    score = 0.0
+    for qt in query_tokens:
+        if qt not in tf or qt not in idf:
+            continue
+        numerator = tf[qt] * (k1 + 1)
+        denominator = tf[qt] + k1 * (1 - b + b * doc_len / avg_dl)
+        score += idf[qt] * numerator / denominator
+    return score
+```
+
+### EvidenceRetriever
+
+```python
+class EvidenceRetrievalResult(SenseiModel):
+    passage: Passage
+    score: float
+
+class EvidenceRetriever:
+    def __init__(self, k1: float = 1.5, b: float = 0.75, min_score: float = 0.5, top_k: int = 5): ...
+    def retrieve(self, claim_text: str, index: PassageIndex) -> list[EvidenceRetrievalResult]: ...
 ```
 
 **规则**:
 - 无匹配返回空，不编造 evidence
-- min_score = 0.2 为默认阈值，可调
+- min_score = 0.5 为默认阈值，可调
 - top_k = 5 为默认返回数
+- IDF 在 PassageIndex 上预计算，不每次 retrieve 重算
+
+### 测试断言
+
+| 测试 | 断言 |
+|------|------|
+| test_bm25_exact_match_scores_high | 完全匹配 claim-passage 对得分 > 0.8 |
+| test_bm25_unrelated_scores_low | 不相关 claim-passage 对得分 < 0.1 |
+| test_bm25_prefers_specific_over_generic | 包含论文特有术语的 passage 得分高于通用 passage |
+| test_bm25_length_normalization | 长 passage 不因长度获得不公平高分 |
+| test_bm25_empty_query_returns_empty | 空 query 返回空列表 |
 
 ## 14. 当前未解决问题
 
 - passage 分段策略（按 section 还是按 paragraph count）需要实测
 - claim_type 判断准确性（关键词匹配 vs 位置启发式）需要实测
-- EvidenceRetriever 阈值和评分策略需要实测调优
+- BM25 阈值和 k1/b 参数需要实测调优
 - 是否需要把 PassageIndex 持久化为独立 artifact
+- passage_index.json 和 claim_evidence.json 是否作为独立 artifact
+- evidence_index.json 是否作为兼容 wrapper 保留

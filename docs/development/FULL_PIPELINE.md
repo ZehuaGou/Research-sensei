@@ -40,7 +40,7 @@ source (PDF/MD/TXT)
 
 | 步骤 | 输入 | 输出 | 失败行为 |
 |------|------|------|----------|
-| ParserAdapter.parse | source file | DocumentIngestion | degraded=True + warning |
+| ParserAdapter.parse | source file | ParserResult (DocumentIngestion + ParseMetadata) | degraded=True + warning |
 | build_evidence_index | DocumentIngestion | EvidenceIndex | NO_BLOCKS_AVAILABLE warning |
 | build_paper_skeleton | DocumentIngestion + EvidenceIndex | PaperSkeleton | section MISSING warnings |
 | PassageIndex (11.7) | DocumentIngestion.blocks | PassageIndex | NO_PASSAGES warning |
@@ -48,7 +48,7 @@ source (PDF/MD/TXT)
 | build_evidence_pack (11.8) | ClaimEvidence + PassageIndex | EvidencePack | 空 → BLOCKED_UNDERSTANDING |
 | build_cards_with_llm (11.8) | EvidencePack + skeleton | cards | LLM 失败 → BLOCKED_UNDERSTANDING |
 | audit (11.9) | cards + evidence_index | QualityReport | hard-fail → BLOCKED |
-| understanding_status | audit result | UnderstandingStatus | — |
+| understanding_status | QualityReport (from audit) | UnderstandingStatus | Runner 根据 QualityReport 映射 |
 
 ### 状态传递规则
 
@@ -117,3 +117,5 @@ user_query
 - understanding_status.json 未实现
 - fail-closed 策略代码未完全落地
 - 单篇链路和方向链路的连接点（A_READ → source_resolver）未实现自动化
+- QualityReport 到 UnderstandingStatus 的映射规则
+- Phase 12 gating 代码未实现

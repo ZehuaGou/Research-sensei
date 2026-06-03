@@ -25,10 +25,10 @@
 
 ## 3. 当前任务
 
-- 当前处于技术路线讨论阶段
-- 已新增 TECHNICAL_DISCUSSION.md 保存全项目技术讨论
-- 尚未进入代码开发
-- 尚未进入 Phase 12
+- 五大未决问题已有初步共识，已同步到模块开发文档
+- 下一步是把共识落地为代码（ParserAdapter 接口 + LightweightParserAdapter）
+- 当前仍不进入 Phase 12
+- 当前仍不写代码，等待确认后开始
 
 ---
 

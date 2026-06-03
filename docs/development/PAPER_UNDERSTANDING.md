@@ -229,7 +229,13 @@ class UnderstandingStatus(SenseiModel):
     checked_artifacts: list[str] = []
 ```
 
-**由 SinglePaperIngestionRunner 生成**，写入 `understanding_status.json`
+**由 SinglePaperIngestionRunner 根据 QualityReport 生成**，写入 `understanding_status.json`
+
+**职责划分**:
+- Card builder 只生成 card，不写 understanding_status。
+- Audit (QualityAuditor) 是纯逻辑，输出 QualityReport，不写 artifact。
+- Runner 读取 QualityReport，映射成 UnderstandingStatus，写 understanding_status.json。
+- Card builder 不能参与 understanding_status 生成（reviewer independence）。
 
 **状态规则**:
 | 状态 | allowed_for_user_display | allowed_for_phase12 |
@@ -240,9 +246,46 @@ class UnderstandingStatus(SenseiModel):
 | FAILED | False | False |
 | BASELINE_ONLY | False | False |
 
+### BASELINE_ONLY 策略
+
+- BASELINE_ONLY 时仍然写 paper_card.json / formula_cards.json / teaching_cards.json。
+- 这些 card 是有用的结构化数据，可用于 debug 和 diagnostic。
+- 但 understanding_status.status = "BASELINE_ONLY"，allowed_for_user_display = False。
+- 前端/API/Phase 12 必须先读 understanding_status.json。
+- status != SUCCESS 时不展示导师级解释，不进入 Phase 12。
+- BLOCKED_UNDERSTANDING 时只展示 blocking_reason / warnings，不展示解释内容。
+
+### 前端/API 展示规则
+
+```
+1. 读取 understanding_status.json
+2. if status == "SUCCESS":
+     展示 paper_card, formula_cards, teaching_cards
+   elif status == "BASELINE_ONLY":
+     展示 "基线模式：当前无 LLM，仅展示结构化骨架" + 可选展开
+   elif status == "BLOCKED_UNDERSTANDING":
+     展示 blocking_reason + warnings，不展示 cards
+   elif status == "FAILED":
+     展示 "解析失败" + error
+```
+
+### Phase 12 Gating
+
+```python
+if understanding_status.status != "SUCCESS":
+    raise Phase12GatingError(
+        f"Cannot enter Phase 12: status={understanding_status.status}, "
+        f"reason={understanding_status.blocking_reason}"
+    )
+```
+
 ## 14. 当前未解决问题
 
 - 当前代码仍有 baseline/fallback 模式，fail-closed 还未实现
-- understanding_status.json schema 未定义
+- understanding_status.json schema 未实现
 - LLM prompt 需要实际测试调优
 - 输出校验规则需要实现
+- QualityReport 到 UnderstandingStatus 的具体映射规则（多少 hard_fail → BLOCKED，多少 warning 仍算 SUCCESS）
+- LLM 输出 schema 是否拆成 PaperCardLLMOutput / FormulaCardsLLMOutput / TeachingCardsLLMOutput
+- 旧 Phase 8-10 代码如何迁移
+- 旧测试中 fallback 断言如何迁移

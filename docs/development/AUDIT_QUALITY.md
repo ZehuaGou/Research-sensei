@@ -52,6 +52,8 @@
 - Audit 输入只能是 artifacts 路径或已序列化 JSON
 - Audit 不接收生成器的自然语言解释
 - Audit 输出 `QualityReport`
+- Audit 是纯逻辑模块，不依赖 WorkspaceStore，不写 artifact
+- Runner 负责把 QualityReport 映射为 UnderstandingStatus，并写 understanding_status.json
 
 ### OpenScholar citation accuracy
 
@@ -78,15 +80,19 @@
 
 | 项 | 值 |
 |----|-----|
-| 输入 | card JSON + evidence_index |
-| 输出 | quality report (JSON) |
-| 用于 | pytest tests |
+| 输入 | card JSON + evidence_index（纯数据，不依赖 IO） |
+| 输出 | QualityReport（纯数据） |
+| 不写 artifact | Audit 是纯逻辑，不依赖 WorkspaceStore |
+| understanding_status | 由 Runner 根据 QualityReport 映射并写入 |
 
 ## 6. Artifact
 
-- 不修改 artifact，只读取
+- Audit 不写 artifact，只读取
+- Runner 负责把 QualityReport 映射为 UnderstandingStatus 并写 understanding_status.json
 
 ## 7. 核心类和方法签名
+
+### QualityReport
 
 ```python
 class QualityReport(SenseiModel):
@@ -96,6 +102,30 @@ class QualityReport(SenseiModel):
     warnings: list[WarningItem]
     checked_artifacts: list[str]
 ```
+
+### Auditor 接口（未来扩展）
+
+```python
+from abc import ABC, abstractmethod
+
+class Auditor(ABC):
+    @abstractmethod
+    def audit(self, artifacts: ArtifactBundle) -> AuditResult: ...
+```
+
+初版 audit 倾向 rule-based。未来可预留 LLM-based auditor 实现同一接口。
+
+### 可拆分子 Auditor
+
+| Auditor | 检查内容 |
+|---------|---------|
+| EvidenceAuditor | evidence_ref 有效性、claim-evidence binding |
+| FormulaAuditor | formula char ratio、symbol 解释一致性 |
+| GenericnessAuditor | paper-specific terms、通用性检测 |
+| CopyAuditor | token overlap、raw copy 检测 |
+| AdvisorReadinessAuditor | cards 是否足够支撑 Phase 12 drill |
+
+`QualityAuditor` 综合所有子 auditor 的结果，生成 `QualityReport`。
 
 ## 8. 检测算法
 
@@ -183,3 +213,8 @@ if token_overlap(core_idea.text, method_overview.text) > 0.8:
 - formula char ratio 阈值是否需要调优
 - token overlap 阈值是否需要调优
 - 是否需要生成 audit report artifact
+- Audit 初版是否完全 rule-based（倾向是）
+- 是否预留 LLM-based auditor 接口
+- QualityReport 到 UnderstandingStatus 的映射规则
+- "讲得好"的自动检测边界
+- 是否需要人工评估集

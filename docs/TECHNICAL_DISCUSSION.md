@@ -262,7 +262,76 @@ source / selected paper
 
 ---
 
-## 13. How to Use This Document
+## 13. Five Key Questions Discussion Conclusions
+
+以下五个问题已在技术讨论中形成初步共识，同步到对应模块开发文档。
+
+### Q1: ParserAdapter.parse() 返回类型
+
+**共识：返回 ParserResult。**
+
+```python
+class ParseMetadata(SenseiModel):
+    parser_name: str
+    parser_version: str = ""
+    source_format: str = ""
+    page_count: int = 0
+    extra: dict = {}
+
+class ParserResult(SenseiModel):
+    document: DocumentIngestion
+    metadata: ParseMetadata
+```
+
+- DocumentIngestion 负责统一文档内容。
+- ParseMetadata 负责 parser 运行元数据。
+- LightweightParserAdapter 把现有 DocumentIngestion 包装成 ParserResult。
+- 下游只消费 `result.document`，不影响现有逻辑。
+
+### Q2: DocumentBlock 扩展字段
+
+**共识：现在加 Optional 字段。**
+
+```python
+bbox: tuple[float, float, float, float] | None = None
+table_html: str = ""
+figure_caption: str = ""
+reference_entries: list[str] = Field(default_factory=list)
+```
+
+- Optional 默认值保证向后兼容。
+- Docling / MinerU 的结构化输出可以保留。
+- 不会破坏现有 parsed_document.json 反序列化。
+
+### Q3: EvidenceRetriever 策略
+
+**共识：自实现 BM25，不新增依赖。**
+
+- simple overlap 太弱，不考虑 IDF / 词频 / 文档长度。
+- BM25 纯 Python 实现，约 30 行核心代码。
+- 默认 pytest 可直接用 fixture 测试。
+
+### Q4: understanding_status 由谁写
+
+**共识：Runner 根据 QualityReport 写。**
+
+- QualityAuditor.audit(...) 是纯逻辑，输出 QualityReport。
+- Audit 不依赖 WorkspaceStore，不写 artifact。
+- Runner 负责读取 QualityReport，映射成 UnderstandingStatus，写 understanding_status.json。
+- Card builder 不能参与 understanding_status 生成。
+
+### Q5: BASELINE_ONLY 放哪里
+
+**共识：写正式 card 文件，用 understanding_status 标记。**
+
+- BASELINE_ONLY 时仍然写 paper_card.json / formula_cards.json / teaching_cards.json。
+- understanding_status.status = "BASELINE_ONLY"。
+- 前端/API/Phase 12 必须先读 understanding_status.json。
+- status != SUCCESS 时不展示导师级解释，不进入 Phase 12。
+
+---
+
+## 14. How to Use This Document
 
 - 本文档保存讨论，不直接作为开发依据。
 - 达成稳定共识后，再同步到 DESIGN.md、DEVELOPMENT.md 或 docs/development/*.md。

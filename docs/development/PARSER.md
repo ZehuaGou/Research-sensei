@@ -69,9 +69,9 @@
 | 项 | 值 |
 |----|-----|
 | 输入 | `Path source`, `str paper_id` |
-| 输出 | `DocumentIngestion` |
+| 输出 | `ParserResult`（包含 `DocumentIngestion` + `ParseMetadata`） |
 | 不生成 paper_id | 调用者传入 |
-| 不写 artifact | 只返回 DocumentIngestion |
+| 不写 artifact | 只返回 ParserResult |
 | 不更新 job | — |
 | 不调用 LLM | — |
 | 不联网 | — |
@@ -84,11 +84,51 @@
 
 ## 7. 核心类和方法签名
 
+### ParseMetadata / ParserResult
+
+```python
+# src/researchsensei/schemas/document.py（或 src/researchsensei/schemas/parser.py，实现前确认）
+class ParseMetadata(SenseiModel):
+    parser_name: str
+    parser_version: str = ""
+    source_format: str = ""
+    page_count: int = 0
+    extra: dict = {}
+
+class ParserResult(SenseiModel):
+    document: DocumentIngestion
+    metadata: ParseMetadata
+```
+
+### DocumentBlock 扩展字段
+
+```python
+class DocumentBlock(SenseiModel):
+    # 现有字段不变
+    block_id: str
+    type: BlockType
+    text: str
+    evidence_ref: str
+    section: str = ""
+    page: int | None = None
+    normalized_text: str = ""
+    offset_start: int = 0
+    offset_end: int = 0
+    raw_latex: str = ""
+    # 新增 Optional 字段（向后兼容）
+    bbox: tuple[float, float, float, float] | None = None
+    table_html: str = ""
+    figure_caption: str = ""
+    reference_entries: list[str] = Field(default_factory=list)
+```
+
+### ParserAdapter
+
 ```python
 # src/researchsensei/parser/adapter.py
 from abc import ABC, abstractmethod
 from pathlib import Path
-from researchsensei.schemas.document import DocumentIngestion
+from researchsensei.schemas.document import ParserResult
 
 class ParserAdapter(ABC):
     @abstractmethod
@@ -96,7 +136,7 @@ class ParserAdapter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse(self, source: Path, paper_id: str) -> DocumentIngestion:
+    def parse(self, source: Path, paper_id: str) -> ParserResult:
         raise NotImplementedError
 ```
 
@@ -105,7 +145,9 @@ class ParserAdapter(ABC):
 class LightweightParserAdapter(ParserAdapter):
     def __init__(self, ingestion: LightweightIngestionService | None = None) -> None: ...
     def supports(self, source: Path) -> bool: ...
-    def parse(self, source: Path, paper_id: str) -> DocumentIngestion: ...
+    def parse(self, source: Path, paper_id: str) -> ParserResult: ...
+    # 内部调用 self.ingestion.ingest_path(source, paper_id)
+    # 返回 ParserResult(document=document, metadata=ParseMetadata(parser_name="lightweight"))
 ```
 
 ## 8. 错误/失败策略
@@ -129,30 +171,50 @@ class LightweightParserAdapter(ParserAdapter):
 - Act: call supports() on paper.md, paper.txt, paper.pdf, paper.MD, paper.TXT, paper.PDF, paper.markdown, paper.docx
 - Assert: first six return True, paper.markdown is False, paper.docx is False
 
+**test_lightweight_adapter_returns_parser_result**
+- Arrange: create tmp markdown file, create LightweightParserAdapter
+- Act: result = adapter.parse(path, paper_id="p1")
+- Assert: result is ParserResult, result.document is DocumentIngestion, result.metadata.parser_name == "lightweight"
+
 **test_lightweight_adapter_matches_original_output**
 - Arrange: create tmp markdown file with abstract/method/experiments/formula, create LightweightIngestionService, create LightweightParserAdapter
-- Act: original = service.ingest_path(path, paper_id="p1"), adapted = adapter.parse(path, paper_id="p1")
-- Assert: paper_id equal, detected_language equal, degraded equal, warning count equal, warning code/message equal, block count equal, each block block_id/type/section/text/evidence_ref equal
+- Act: original = service.ingest_path(path, paper_id="p1"), result = adapter.parse(path, paper_id="p1")
+- Assert: result.document.paper_id equal to original, detected_language equal, degraded equal, warning count equal, block count equal, each block block_id/type/section/text/evidence_ref equal
 
-**test_lightweight_adapter_json_round_trip**
+**test_parser_result_json_round_trip**
 - Arrange: parse tmp markdown
+- Act: result.model_dump_json() then ParserResult.model_validate_json(...)
+- Assert: document.paper_id, document.block_count, metadata.parser_name preserved
+
+**test_parse_metadata_defaults**
+- Arrange: ParseMetadata(parser_name="test")
+- Act: model_dump
+- Assert: parser_version="", source_format="", page_count=0, extra={}
+
+**test_document_block_new_fields_round_trip**
+- Arrange: DocumentBlock with bbox=(0.1, 0.2, 0.3, 0.4), table_html="<table>...</table>", figure_caption="Fig 1", reference_entries=["[1] Smith 2020"]
 - Act: model_dump_json then model_validate_json
-- Assert: paper_id/block count/degraded/warnings preserved
+- Assert: all new fields preserved
+
+**test_document_block_new_fields_backward_compatible**
+- Arrange: JSON string without new fields
+- Act: DocumentBlock.model_validate_json(...)
+- Assert: bbox=None, table_html="", figure_caption="", reference_entries=[]
 
 **test_lightweight_adapter_does_not_write_artifacts**
 - Arrange: create tmp source file
 - Act: adapter.parse(...)
-- Assert: no *.json artifact files created, no workspace/runs directory created, adapter only returns DocumentIngestion
+- Assert: no *.json artifact files created, no workspace/runs directory created
 
 **test_lightweight_adapter_uses_injected_service**
 - Arrange: create fake service with ingest_path(), inject into LightweightParserAdapter
 - Act: call parse
-- Assert: fake service called once, path and paper_id passed correctly, returned object is fake result
+- Assert: fake service called once, result.document is fake result
 
 **test_lightweight_adapter_propagates_degraded**
 - Arrange: create broken PDF bytes
 - Act: adapter.parse(...)
-- Assert: result.degraded is True, warning code contains PDF_PARSE_FAILED or PYMUPDF_MISSING
+- Assert: result.document.degraded is True, warning code contains PDF_PARSE_FAILED or PYMUPDF_MISSING
 
 ## 10. Hard-Fail
 
@@ -166,3 +228,5 @@ class LightweightParserAdapter(ParserAdapter):
 
 - 已完成初步 GitHub README 级调研；正式接入前仍需本地安装验证和样例 PDF 对比
 - ParserAdapter 接口是否需要 `supports()` 还是只靠构造函数选择
+- ParseMetadata / ParserResult schema 放 `schemas/document.py` 还是 `schemas/parser.py`（实现前确认）
+- Docling 本地样例验证需要哪些论文
