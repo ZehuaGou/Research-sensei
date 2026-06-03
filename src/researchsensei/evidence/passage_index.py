@@ -65,27 +65,6 @@ def build_passage_index(
                 passages.append(_make_passage(paper_id, f"p{passage_counter:03d}", buffer_section, buffer_blocks, chunk.strip()))
         buffer_blocks.clear()
 
-    def flush_as_split_passages(blocks: list[DocumentBlock], section: str) -> None:
-        nonlocal passage_counter, split_long
-        text = " ".join(b.text.strip() for b in blocks if b.text.strip())
-        if not text:
-            return
-        if len(text) <= cfg.max_passage_chars:
-            passage_counter += 1
-            passages.append(_make_passage(paper_id, f"p{passage_counter:03d}", section, blocks, text))
-            return
-        # Split at sentence boundaries
-        chunks = _split_text(text, cfg.max_passage_chars)
-        split_long += len(chunks) - 1
-        for chunk in chunks:
-            if len(chunk.strip()) < cfg.min_passage_chars:
-                skipped_short += 1
-                continue
-            passage_counter += 1
-            passages.append(
-                _make_passage(paper_id, f"p{passage_counter:03d}", section, blocks, chunk.strip())
-            )
-
     def flush_standalone(block: DocumentBlock) -> None:
         nonlocal passage_counter
         text = block.text.strip()
