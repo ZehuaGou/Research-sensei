@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.llm.client import LLMClient, MockLLMClient, parse_llm_json
+from researchsensei.llm.client import LLMClient, MockLLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.validator import validate_paper_card_llm_output
 from researchsensei.schemas import (
@@ -51,8 +51,7 @@ Evidence Pack:
 }}""",
     )
 
-    response = await llm_client.chat(messages)
-    data = parse_llm_json(response.content)
+    data = await llm_client.chat_json(messages)
     output = PaperCardLLMOutput.model_validate(data)
     validate_paper_card_llm_output(output, evidence_pack)
 

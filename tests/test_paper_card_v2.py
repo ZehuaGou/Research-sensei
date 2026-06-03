@@ -147,6 +147,9 @@ async def test_paper_card_v2_llm_failure_raises_no_fallback() -> None:
         async def chat(self, messages, **kwargs):
             raise RuntimeError("LLM exploded")
 
+        async def chat_json(self, messages, **kwargs):
+            raise RuntimeError("LLM exploded")
+
     with pytest.raises(RuntimeError, match="LLM exploded"):
         await build_paper_card_v2(pack, skeleton, FailingClient())
 

@@ -31,6 +31,7 @@
   - isolated PaperCard v2 builder（fail-closed，不 fallback）
   - isolated FormulaCards v2 builder（fail-closed，不 fallback）
   - isolated TeachingCards v2 builder（fail-closed，不 fallback）
+  - v2 builders 使用 llm_client.chat_json，不依赖 chat() + parse_llm_json()
   - v2 builders 未接 pipeline
   - 未改旧 rule-based builders
   - 未改旧 with_llm builders
