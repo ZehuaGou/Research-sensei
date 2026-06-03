@@ -13,6 +13,8 @@
 - LLM 测试用 `MockLLMClient`
 - 不提交 `.env` / key / 缓存 / 大文件
 - 不写 Claude 贡献者信息
+- 所有 warnings 必须是 `list[WarningItem]`，禁止 `list[str]`
+- 测试必须检查 `warning.code` 和 `warning.message`
 
 ---
 
@@ -29,6 +31,27 @@
 | BLOCKED_UNDERSTANDING | evidence 不足、LLM 输出无效、LLM 失败、核心解释无法验证。不生成最终 paper_card/formula_cards/teaching_cards。只输出 error/warning/diagnostic artifact。 | NO — 必须明确说明"无法可靠生成解释" |
 | FAILED | pipeline 失败或异常中断。job status 必须 FAILED。 | NO |
 
+### 理解状态 artifact: understanding_status.json
+
+```python
+class UnderstandingStatus(SenseiModel):
+    paper_id: str
+    status: str  # SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING / FAILED / BASELINE_ONLY
+    blocking_reason: str = ""
+    warnings: list[WarningItem] = []
+    allowed_for_user_display: bool
+    allowed_for_phase12: bool
+    checked_artifacts: list[str] = []
+```
+
+| 状态 | allowed_for_user_display | allowed_for_phase12 |
+|------|--------------------------|---------------------|
+| SUCCESS | True | True |
+| DEGRADED_STRUCTURAL | False (for understanding content) | False |
+| BLOCKED_UNDERSTANDING | False | False |
+| FAILED | False | False |
+| BASELINE_ONLY | False (as final understanding) | False |
+
 ### 核心规则
 
 - 不能把 DEGRADED_STRUCTURAL 当作内容理解成功。
@@ -36,6 +59,10 @@
 - 没有 evidence 的内容不能出现在最终用户解释里。
 - LLM 失败默认进入 BLOCKED_UNDERSTANDING，不是自动 fallback 成 final card。
 - rule-based baseline 只能作为 diagnostic / baseline artifact，不能冒充最终导师级解释。
+- 每次理解尝试必须写 `understanding_status.json`。
+- Phase 12 只能读取 `status=SUCCESS` 且 `allowed_for_phase12=True` 的结果。
+- 结构性解析问题可以用 DEGRADED_STRUCTURAL。
+- 内容理解问题不能简单 degraded，必须 BLOCKED_UNDERSTANDING 或 INSUFFICIENT_EVIDENCE。
 
 ---
 
@@ -453,7 +480,7 @@ class EvidenceRetriever:
 
 ### 1. 模块目标
 
-基于证据生成学习卡片，LLM 输出必须绑定 evidence，无 evidence 必须降级。
+基于证据生成学习卡片，LLM 输出必须绑定 evidence，无 evidence 必须进入 BLOCKED_UNDERSTANDING，不允许生成最终解释。
 
 ### 2. 非目标
 
@@ -509,6 +536,11 @@ class SinglePaperIngestionRunner:
     def run(self, ...):
         ...
         if self.llm_client is None:
+            # 可以生成 baseline diagnostic artifact
+            # 必须写 understanding_status.json, status=BASELINE_ONLY
+            # 不得标记为最终 paper understanding
+            # UI/API 不得展示为最终解释
+            # Phase 12 不得使用
             return build_baseline_cards_with_status("BASELINE_ONLY")
 
         try:
@@ -566,6 +598,10 @@ class SinglePaperIngestionRunner:
 
 - `paper_card.json`, `formula_cards.json`, `teaching_cards.json` 格式不变
 - 内容质量提升（v2），但 schema 兼容
+- 新增 `understanding_status.json` 承载理解状态
+- 如果状态不是 SUCCESS，不得把 card 当最终用户结果
+- BASELINE_ONLY 只能作为 diagnostic artifact
+- Phase 12 只能读取 status=SUCCESS 且 allowed_for_phase12=True 的结果
 
 ### 10. 测试要求
 
@@ -623,6 +659,21 @@ class SinglePaperIngestionRunner:
 - Arrange: create runner with formula-heavy input
 - Act: run()
 - Assert: symbols from paper context or evidence_type == REASONABLE_INFERENCE
+
+**test_understanding_status_blocks_phase12_for_baseline_only**
+- Arrange: generate BASELINE_ONLY status
+- Act: validate phase12 eligibility
+- Assert: allowed_for_phase12 is False
+
+**test_blocked_understanding_writes_status_artifact**
+- Arrange: MockLLMClient raises error
+- Act: run understanding
+- Assert: understanding_status.status == "BLOCKED_UNDERSTANDING", allowed_for_user_display is False, allowed_for_phase12 is False
+
+**test_success_status_required_for_final_display**
+- Arrange: create successful evidence-bound card
+- Act: validate status
+- Assert: status == "SUCCESS", allowed_for_user_display is True, allowed_for_phase12 is True
 
 ### 11. Hard-Fail 条件
 
@@ -736,7 +787,8 @@ relevance (0.36) + venue_prestige (0.22) + citation (0.14) + code (0.06) + metho
 - OpenAlex 失败不影响 arXiv
 - 单 source 失败写入 `candidate_pool.warnings` (WarningItem)
 - `search_log` 写 `source: failed (ExceptionType)`
-- 所有 source 都失败，reading_plan 为空并 BLOCKED_UNDERSTANDING
+- 所有 source 都失败，reading_plan 为空，并写入 `WarningItem(code="SEARCH_FAILED", message="...")` 或 `BLOCKED_ACQUISITION` warning
+- BLOCKED_UNDERSTANDING 只用于单篇论文理解，不用于搜索
 - 不能静默失败
 
 ### 9. Artifact 影响
