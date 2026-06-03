@@ -25,10 +25,10 @@
 
 ## 3. 当前任务
 
-- 完成全模块开发文档细化
-- 当前文档结构已固定：9 个模块开发文档覆盖 parser/evidence/paper understanding/literature search/audit/workspace-api/frontend/engineering/full pipeline
-- 不进入 Phase 12
-- 不写代码
+- 当前处于技术路线讨论阶段
+- 已新增 TECHNICAL_DISCUSSION.md 保存全项目技术讨论
+- 尚未进入代码开发
+- 尚未进入 Phase 12
 
 ---
 
