@@ -5,9 +5,9 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 313 tests passing
+- 334 tests passing
 - 当前代码仍不是最终论文理解系统
-- Phase 6 evidence 已有 PassageIndex，但 ClaimEvidence 仍是 block-level
+- Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
 - Phase 11 是 direction pipeline v1，不是完整 literature review
 
@@ -25,29 +25,27 @@
 
 ## 3. 当前任务
 
-- PassageIndex 第一小批已完成：
-  - Passage / PassageIndex / PassageIndexBuildConfig / PassageIndexStats schema
-  - build_passage_index(document) builder
-  - pipeline 写入 passage_index.json
-  - artifact 数量从 7 变为 8
-  - 旧 evidence_index.json 仍保留，build_evidence_index / ClaimEvidence / EvidenceIndex v1 未修改
-  - 313 tests passing（298 existing + 15 new）
+- ClaimEvidenceV2 已完成：
+  - ClaimEvidenceV2 独立 schema（不污染 v1）
+  - ClaimEvidenceBundle schema
+  - build_claim_evidence(document, passage_index) extractor
+  - pipeline 写入 claim_evidence.json
+  - artifact 数量从 8 变为 9
+  - 旧 evidence_index.json 仍保留，build_evidence_index / ClaimEvidence v1 / EvidenceIndex v1 未修改
+  - 334 tests passing（313 existing + 21 new）
 - 尚未完成：
-  - ClaimEvidence v2 字段尚未实现
-  - ClaimEvidenceBundle 尚未实现
-  - claim_evidence.json 尚未实现
   - BM25 / EvidenceRetriever 尚未实现
   - Paper Understanding v2 尚未实现
   - Audit / QualityReport / UnderstandingStatus 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：规划 ClaimEvidence v2 + claim_evidence.json，不要直接大改
+- 下一步：规划 BM25 / EvidenceRetriever
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 313 passed
+- pytest: 334 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---

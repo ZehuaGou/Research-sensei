@@ -56,7 +56,7 @@ Table 1 reports F1.
 
     assert evidence_path.exists()
     assert skeleton_path.exists()
-    assert {"source_status", "ingestion", "passage_index", "evidence_index", "paper_skeleton", "paper_card", "formula_cards", "teaching_cards"} == artifact_types
+    assert {"source_status", "ingestion", "passage_index", "claim_evidence", "evidence_index", "paper_skeleton", "paper_card", "formula_cards", "teaching_cards"} == artifact_types
     assert json.loads(evidence_path.read_text(encoding="utf-8"))["claims"]
     assert json.loads(skeleton_path.read_text(encoding="utf-8"))["method_overview"] == "We minimize L = L_rec."
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+from researchsensei.evidence.claim_extractor import build_claim_evidence
 from researchsensei.evidence.passage_index import build_passage_index
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
@@ -62,6 +63,7 @@ class SinglePaperIngestionRunner:
             else:
                 document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
             passage_index = build_passage_index(document)
+            claim_evidence = build_claim_evidence(document, passage_index)
             evidence_index = build_evidence_index(document)
             paper_skeleton = build_paper_skeleton(document, evidence_index)
             paper_card = build_paper_card(paper_skeleton, evidence_index)
@@ -79,6 +81,7 @@ class SinglePaperIngestionRunner:
         source_status_path = run_dir / "source_status.json"
         parsed_path = run_dir / "parsed_document.json"
         passage_index_path = run_dir / "passage_index.json"
+        claim_evidence_path = run_dir / "claim_evidence.json"
         evidence_path = run_dir / "evidence_index.json"
         skeleton_path = run_dir / "paper_skeleton.json"
         card_path = run_dir / "paper_card.json"
@@ -87,6 +90,7 @@ class SinglePaperIngestionRunner:
         self.workspace.write_json(source_status_path, resolved_source_status)
         self.workspace.write_json(parsed_path, document)
         self.workspace.write_json(passage_index_path, passage_index)
+        self.workspace.write_json(claim_evidence_path, claim_evidence)
         self.workspace.write_json(evidence_path, evidence_index)
         self.workspace.write_json(skeleton_path, paper_skeleton)
         self.workspace.write_json(card_path, paper_card)
@@ -103,6 +107,7 @@ class SinglePaperIngestionRunner:
                 WorkspaceArtifact(artifact_type="ingestion", path=str(parsed_path)),
                 WorkspaceArtifact(artifact_type="source_status", path=str(source_status_path)),
                 WorkspaceArtifact(artifact_type="passage_index", path=str(passage_index_path)),
+                WorkspaceArtifact(artifact_type="claim_evidence", path=str(claim_evidence_path)),
                 WorkspaceArtifact(artifact_type="evidence_index", path=str(evidence_path)),
                 WorkspaceArtifact(artifact_type="paper_skeleton", path=str(skeleton_path)),
                 WorkspaceArtifact(artifact_type="paper_card", path=str(card_path)),

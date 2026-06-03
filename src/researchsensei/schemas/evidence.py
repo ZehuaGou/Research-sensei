@@ -76,3 +76,26 @@ class PassageIndex(SenseiModel):
     warnings: list[WarningItem] = Field(default_factory=list)
     build_config: PassageIndexBuildConfig = Field(default_factory=PassageIndexBuildConfig)
     stats: PassageIndexStats | None = None
+
+
+class ClaimEvidenceV2(SenseiModel):
+    claim_id: str
+    claim_text: str
+    evidence_ref: str
+    block_id: str
+    passage_id: str
+    section: str = ""
+    claim_type: str = ""
+    semantic_support: str = ""
+    source_sentence: str = ""
+    quote_or_summary: str = ""
+    confidence: float = Field(ge=0.0, le=1.0)
+    generated_by: str = "rule"
+
+
+class ClaimEvidenceBundle(SenseiModel):
+    schema_version: str = "v2"
+    paper_id: str
+    claims: list[ClaimEvidenceV2] = Field(default_factory=list)
+    warnings: list[WarningItem] = Field(default_factory=list)
+    source_artifacts: list[str] = Field(default_factory=list)
