@@ -1,0 +1,132 @@
+<h2>ResearchSensei v0.5 重构架构</h2>
+<p class="subtitle">4 阶段递进式重构，每阶段独立可交付</p>
+
+<div class="section">
+  <h3>Phase 1: LLM 集成层</h3>
+  <div class="mockup">
+    <div class="mockup-header">LLM Client Architecture</div>
+    <div class="mockup-body" style="padding:20px;font-family:monospace;font-size:13px;line-height:1.8">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="background:#f0f7ff;padding:12px;border-radius:6px;border-left:3px solid #2563eb">
+          <strong>LLMClient</strong><br>
+          httpx → OpenAI-compatible API<br>
+          支持 MiMo / DeepSeek / 任意兼容模型<br>
+          streaming + timeout + retry<br>
+          token 预算控制
+        </div>
+        <div style="background:#f0fff4;padding:12px;border-radius:6px;border-left:3px solid #16a34a">
+          <strong>PromptBuilder</strong><br>
+          System Instruction (教学角色)<br>
+          User Profile (数学水平/偏好)<br>
+          Current Context (论文/卡片/公式)<br>
+          Evidence Chunks (原文证据)<br>
+          Conversation History (压缩后)<br>
+          <span style="color:#dc2626">⚠ 指令隔离：用户输入包裹在标记中</span>
+        </div>
+      </div>
+      <div style="margin-top:16px;background:#fefce8;padding:12px;border-radius:6px;border-left:3px solid #ca8a04">
+        <strong>接入模块：</strong>
+        query → LLM 分解方向 | selection → LLM 相关性判断 | understanding → LLM 论文骨架 | teaching → LLM 五层讲解 | formula → LLM 公式拆解 | drill → LLM 导师追问 | patterns → LLM 模式归类 | interactive → LLM 上下文追问
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Phase 2: Backend API 重构</h3>
+  <div class="mockup">
+    <div class="mockup-header">FastAPI REST + WebSocket Endpoints</div>
+    <div class="mockup-body" style="padding:20px;font-family:monospace;font-size:13px;line-height:1.8">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="background:#f5f3ff;padding:12px;border-radius:6px;border-left:3px solid #7c3aed">
+          <strong>REST API</strong><br>
+          POST /api/directions/search<br>
+          POST /api/papers/upload<br>
+          POST /api/jobs/{id}/run<br>
+          GET  /api/jobs/{id}/status<br>
+          GET  /api/learn/{id}/bundle<br>
+          GET  /api/artifacts/{id}/download
+        </div>
+        <div style="background:#fff1f2;padding:12px;border-radius:6px;border-left:3px solid #e11d48">
+          <strong>WebSocket</strong><br>
+          WS /ws/jobs/{id} → 实时进度<br>
+          WS /ws/interactive/{session} → 流式追问<br>
+          <br>
+          <span style="color:#666">进度推送 + LLM streaming 输出</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Phase 3: Vue 3 前端</h3>
+  <div class="mockup">
+    <div class="mockup-header">Vue 3 + Vite + Pinia + TailwindCSS</div>
+    <div class="mockup-body" style="padding:20px;font-size:13px;line-height:1.8">
+      <div style="display:grid;grid-template-columns:240px 1fr 380px;gap:12px;min-height:300px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden">
+        <div style="background:#f9fafb;padding:12px;border-right:1px solid #e5e7eb">
+          <strong>📁 学习目录</strong><br>
+          <div style="margin-top:8px;font-size:12px">
+            ▸ 方向：RAG可信性<br>
+            &nbsp;&nbsp;📝 综述 A Survey on RAG ✅<br>
+            &nbsp;&nbsp;🧱 基石 RAG <span style="color:#2563eb">← 当前</span><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;├ 核心机制 ✅<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;├ 检索公式 ❓<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;└ 生成公式 ⏳<br>
+            &nbsp;&nbsp;🚀 前沿 Self-RAG ⏳<br>
+          </div>
+        </div>
+        <div style="padding:16px;max-width:100%;overflow:auto">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px">
+            <span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:99px;font-size:11px">必须掌握</span>
+            <span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:99px;font-size:11px">已证实</span>
+            <h4 style="margin:8px 0 4px">30秒看懂</h4>
+            <p style="color:#374151;font-size:14px">RAG 的核心问题是：检索到的文档不一定相关，生成时模型可能忽略检索内容...</p>
+          </div>
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:12px">
+            <h4>5分钟讲懂</h4>
+            <p style="color:#374151;font-size:14px">想象你开卷考试...检索=翻书，生成=答题...</p>
+          </div>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">
+            <h4>📐 公式卡：检索增强损失</h4>
+            <div style="background:#f1f5f9;padding:8px;border-radius:4px;font-family:monospace;text-align:center;margin:8px 0">
+              L = L_task + λ·L_retrieval
+            </div>
+            <table style="width:100%;font-size:12px;border-collapse:collapse">
+              <tr style="border-bottom:1px solid #e2e8f0"><td><strong>λ</strong></td><td>平衡系数</td><td>太大→忽略检索</td><td>太小→过度依赖</td></tr>
+            </table>
+          </div>
+        </div>
+        <div style="background:#f9fafb;padding:12px;border-left:1px solid #e5e7eb;display:flex;flex-direction:column">
+          <strong>💬 交互追问</strong>
+          <div style="flex:1;background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:8px;margin:8px 0;font-size:12px;overflow:auto">
+            <div style="margin-bottom:6px"><strong>🧑</strong> λ 怎么选？</div>
+            <div style="margin-bottom:6px;color:#374151"><strong>🤖</strong> 一句话：通过验证集搜索...</div>
+          </div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+            <span style="background:#e0e7ff;color:#3730a3;padding:2px 6px;border-radius:4px;font-size:11px;cursor:pointer">没看懂</span>
+            <span style="background:#fef3c7;color:#92400e;padding:2px 6px;border-radius:4px;font-size:11px;cursor:pointer">举个例子</span>
+            <span style="background:#d1fae5;color:#065f46;padding:2px 6px;border-radius:4px;font-size:11px;cursor:pointer">一步步推导</span>
+          </div>
+          <div style="display:flex;gap:4px">
+            <input style="flex:1;padding:6px;border:1px solid #d1d5db;border-radius:4px;font-size:12px" placeholder="追问...">
+            <button style="background:#2563eb;color:white;border:none;padding:6px 10px;border-radius:4px;font-size:12px">发送</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Phase 4: 清理</h3>
+  <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px">
+    <ul style="margin:0;padding-left:20px;font-size:14px;color:#7f1d1d">
+      <li>删除旧包 <code>research_sensei/</code></li>
+      <li>统一到 <code>src/researchsensei/</code>（后端）+ <code>frontend/</code>（Vue）</li>
+      <li>完善测试覆盖</li>
+      <li>更新文档</li>
+    </ul>
+  </div>
+</div>

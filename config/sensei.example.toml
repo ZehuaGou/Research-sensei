@@ -1,0 +1,41 @@
+active_provider = "deepseek"
+
+[providers.deepseek]
+kind = "openai_compatible"
+base_url = "https://api.deepseek.com"
+api_key_env = "DEEPSEEK_API_KEY"
+model = "deepseek-chat"
+timeout_seconds = 60
+
+[providers.mimo]
+kind = "openai_compatible"
+base_url = "https://api.xiaomimimo.com/v1"
+api_key_env = "MIMO_API_KEY"
+model = "mimo-v2.5-pro"
+auth_header = "api-key"
+timeout_seconds = 60
+
+[providers.openai_compatible]
+kind = "openai_compatible"
+base_url = "https://api.example.com/v1"
+api_key_env = "OPENAI_COMPATIBLE_API_KEY"
+model = "example-model"
+timeout_seconds = 60
+
+[app]
+workspace_dir = "workspace"
+default_learning_mode = "reproducible_2h"
+max_upload_mb = 80
+parser_backend = "docling"
+
+[server]
+host = "127.0.0.1"
+port = 8765
+reload = false
+
+[search]
+execution = "uvx"
+command = "paper-search"
+sources = ["arxiv"]
+max_results = 10
+timeout_seconds = 90

@@ -1,0 +1,51 @@
+{
+  "title": "Scaled Dot-Product Attention",
+  "formula_latex": "\\mathrm{Attention}(Q,K,V)=\\mathrm{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V",
+  "problem": "让每个 token 根据相关性从其他 token 聚合信息。",
+  "inputs": [
+    "Q: 当前 token 想查询什么",
+    "K: 每个 token 提供什么匹配线索",
+    "V: 每个 token 提供什么内容"
+  ],
+  "outputs": [
+    "按相关性加权后的上下文表示"
+  ],
+  "symbols": [
+    {
+      "symbol": "QK^T",
+      "meaning": "query 与 key 的匹配分数",
+      "role": "鼓励相关 token 互相连接",
+      "remove_effect": "无法判断该看谁",
+      "weight_change_effect": ""
+    },
+    {
+      "symbol": "\\sqrt{d_k}",
+      "meaning": "维度缩放",
+      "role": "避免点积过大导致 softmax 过尖",
+      "remove_effect": "",
+      "weight_change_effect": "缩放变小会让分布更尖"
+    },
+    {
+      "symbol": "V",
+      "meaning": "被聚合的内容",
+      "role": "把注意力权重转成实际上下文表示",
+      "remove_effect": "",
+      "weight_change_effect": ""
+    }
+  ],
+  "mechanism_link": "这个公式把“找相关 token”和“聚合信息”合成一个可微模块。",
+  "numeric_example": "若两个 key 得分分别为 2 和 0，softmax 后第一个 token 权重更高。",
+  "plain_summary": "Attention 是一个按相关性加权取信息的机制。",
+  "manual_check": [
+    "真实论文中的矩阵维度和多头细节需要回原文核验。"
+  ],
+  "recall_questions": [
+    "解释为什么要除以 sqrt(d_k)。"
+  ],
+  "review_questions": [
+    "明天用两个 token 的数字例子复述 softmax 加权。"
+  ],
+  "understanding_checks": [
+    "能说明去掉 V 后公式还剩什么吗？"
+  ]
+}

@@ -1,0 +1,425 @@
+{
+  "topic": "Transformer 到检索增强语言模型",
+  "reading_budget": "90-120 分钟",
+  "mode": "reproducible_2h",
+  "core_papers": [
+    {
+      "paper": {
+        "title": "Attention Is All You Need",
+        "authors": [
+          "Ashish Vaswani",
+          "Noam Shazeer",
+          "Niki Parmar"
+        ],
+        "year": 2017,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/1706.03762",
+        "pdf_url": "https://arxiv.org/pdf/1706.03762",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Introduces the Transformer architecture based entirely on attention mechanisms.",
+        "citation_count": 100000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "anchor",
+      "why_read": "作为 Transformer 到检索增强语言模型 的主锚点，用来建立问题、机制和证据框架。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        "authors": [
+          "Jacob Devlin",
+          "Ming-Wei Chang",
+          "Kenton Lee",
+          "Kristina Toutanova"
+        ],
+        "year": 2019,
+        "venue": "NAACL",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/1810.04805",
+        "pdf_url": "https://arxiv.org/pdf/1810.04805",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Introduces masked language model pre-training for bidirectional representations.",
+        "citation_count": 80000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "origin",
+      "why_read": "补足方向起点，帮助理解问题为什么出现。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "Language Models are Few-Shot Learners",
+        "authors": [
+          "Tom B. Brown"
+        ],
+        "year": 2020,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/2005.14165",
+        "pdf_url": "https://arxiv.org/pdf/2005.14165",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Studies scaling language models and in-context few-shot behavior.",
+        "citation_count": 30000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "baseline",
+      "why_read": "代表旧方法，帮助看清真实瓶颈。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "unknown"
+        },
+        "manual_check_needed": [
+          "核验 ablation 和 baseline 是否足够支撑 claim"
+        ],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        "authors": [
+          "Patrick Lewis"
+        ],
+        "year": 2020,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/2005.11401",
+        "pdf_url": "https://arxiv.org/pdf/2005.11401",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Combines parametric generation with non-parametric retrieval memory.",
+        "citation_count": 12000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "turning_point",
+      "why_read": "代表关键假设或机制转折。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    }
+  ],
+  "optional_papers": [],
+  "paper_roles": [
+    {
+      "paper": {
+        "title": "Attention Is All You Need",
+        "authors": [
+          "Ashish Vaswani",
+          "Noam Shazeer",
+          "Niki Parmar"
+        ],
+        "year": 2017,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/1706.03762",
+        "pdf_url": "https://arxiv.org/pdf/1706.03762",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Introduces the Transformer architecture based entirely on attention mechanisms.",
+        "citation_count": 100000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "anchor",
+      "why_read": "作为 Transformer 到检索增强语言模型 的主锚点，用来建立问题、机制和证据框架。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding",
+        "authors": [
+          "Jacob Devlin",
+          "Ming-Wei Chang",
+          "Kenton Lee",
+          "Kristina Toutanova"
+        ],
+        "year": 2019,
+        "venue": "NAACL",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/1810.04805",
+        "pdf_url": "https://arxiv.org/pdf/1810.04805",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Introduces masked language model pre-training for bidirectional representations.",
+        "citation_count": 80000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "origin",
+      "why_read": "补足方向起点，帮助理解问题为什么出现。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "Language Models are Few-Shot Learners",
+        "authors": [
+          "Tom B. Brown"
+        ],
+        "year": 2020,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/2005.14165",
+        "pdf_url": "https://arxiv.org/pdf/2005.14165",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Studies scaling language models and in-context few-shot behavior.",
+        "citation_count": 30000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "baseline",
+      "why_read": "代表旧方法，帮助看清真实瓶颈。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "unknown"
+        },
+        "manual_check_needed": [
+          "核验 ablation 和 baseline 是否足够支撑 claim"
+        ],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    },
+    {
+      "paper": {
+        "title": "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+        "authors": [
+          "Patrick Lewis"
+        ],
+        "year": 2020,
+        "venue": "NeurIPS",
+        "source_tool": "manual-seed",
+        "source_platform": "manual",
+        "url": "https://arxiv.org/abs/2005.11401",
+        "pdf_url": "https://arxiv.org/pdf/2005.11401",
+        "doi": "",
+        "arxiv_id": "",
+        "abstract": "Combines parametric generation with non-parametric retrieval memory.",
+        "citation_count": 12000,
+        "open_access": true,
+        "code_url": "",
+        "data_url": "",
+        "quality_signals": [
+          "ablation:strong",
+          "baseline:strong"
+        ],
+        "risk_flags": [],
+        "retraction_status": "unknown",
+        "raw_result_ref": ""
+      },
+      "role": "turning_point",
+      "why_read": "代表关键假设或机制转折。",
+      "quality": {
+        "venue_tier": "top-tier",
+        "reading_priority": "A-read",
+        "risk_flags": [],
+        "strengths": [
+          "顶会/顶刊信号",
+          "开放获取",
+          "ablation 较完整",
+          "已有较多引用"
+        ],
+        "retraction_status": "unknown",
+        "reproducibility": {
+          "code": "unknown",
+          "data": "unknown",
+          "ablation_quality": "strong"
+        },
+        "manual_check_needed": [],
+        "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+      }
+    }
+  ],
+  "evolution_chain": [
+    "anchor: Attention Is All You Need -> 作为 Transformer 到检索增强语言模型 的主锚点，用来建立问题、机制和证据框架。",
+    "origin: BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding -> 补足方向起点，帮助理解问题为什么出现。",
+    "baseline: Language Models are Few-Shot Learners -> 代表旧方法，帮助看清真实瓶颈。",
+    "turning_point: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks -> 代表关键假设或机制转折。"
+  ],
+  "open_questions": [
+    "Transformer 到检索增强语言模型 的核心假设在哪些场景下会失败？",
+    "已有方法的证据是否真的支撑主要 claim？",
+    "能否把这个机制迁移到一个更小、更可复现的 mini project？"
+  ],
+  "skip_reason": [],
+  "mermaid_graph": "flowchart LR\n  T[\"Transformer 到检索增强语言模型\"]\n  P1[\"anchor: Attention Is All You Need\"]\n  T --> P1\n  P2[\"origin: BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding\"]\n  P1 --> P2\n  P3[\"baseline: Language Models are Few-Shot Learners\"]\n  P2 --> P3\n  P4[\"turning_point: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks\"]\n  P3 --> P4"
+}

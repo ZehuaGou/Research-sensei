@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transformer 到检索增强语言模型</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.10/dist/contrib/auto-render.min.js"
+    onload="renderMathInElement(document.body);"></script>
+  <script type="module">
+    import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+    mermaid.initialize({ startOnLoad: true, theme: "neutral" });
+  </script>
+  <style>
+    :root {
+      --ink: #19202a;
+      --muted: #5b6472;
+      --line: #d8dee8;
+      --paper: #ffffff;
+      --bg: #f6f7f9;
+      --must: #c73e1d;
+      --confuse: #9a6b00;
+      --transfer: #18706f;
+      --skip: #667085;
+      --accent: #244a8f;
+      --green: #236b4e;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", Arial, sans-serif;
+      line-height: 1.62;
+    }
+    main {
+      width: min(1040px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+    header {
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+      margin-bottom: 20px;
+    }
+    h1, h2, h3 { line-height: 1.25; letter-spacing: 0; }
+    h1 { margin: 0 0 10px; font-size: 28px; }
+    h2 { margin: 24px 0 12px; font-size: 20px; }
+    h3 { margin: 16px 0 8px; font-size: 16px; }
+    p { margin: 8px 0; }
+    .muted { color: var(--muted); }
+    .band, .panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 18px;
+      margin: 14px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 12px;
+    }
+    .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 3px 9px;
+      font-size: 13px;
+      background: #fff;
+    }
+    .must { border-color: color-mix(in srgb, var(--must), white 55%); color: var(--must); }
+    .confuse { border-color: color-mix(in srgb, var(--confuse), white 55%); color: var(--confuse); }
+    .transfer { border-color: color-mix(in srgb, var(--transfer), white 55%); color: var(--transfer); }
+    .skip { border-color: color-mix(in srgb, var(--skip), white 55%); color: var(--skip); }
+    .focus {
+      border-left: 4px solid var(--accent);
+      background: #f9fbff;
+      padding: 12px 14px;
+      margin: 12px 0;
+    }
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      margin: 12px 0;
+      padding: 12px 14px;
+    }
+    summary { cursor: pointer; font-weight: 700; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+    table { border-collapse: collapse; width: 100%; background: #fff; }
+    th, td { border: 1px solid var(--line); padding: 8px; vertical-align: top; }
+    th { text-align: left; background: #f0f3f7; }
+    .mermaid {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+    code {
+      background: #eef1f5;
+      border-radius: 4px;
+      padding: 1px 4px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+<header>
+  <h1>Transformer 到检索增强语言模型</h1>
+  <p class="muted">学习预算：90-120 分钟</p>
+</header>
+<section class="grid">
+  <article class="panel"><h2>30秒看懂</h2><p>Transformer 到检索增强语言模型 的主线先由 anchor paper 建立，再用少量论文补旧方法、转折和强结果。</p></article>
+  <article class="panel"><h2>5分钟讲懂</h2><ol><li>anchor: Attention Is All You Need -&gt; 作为 Transformer 到检索增强语言模型 的主锚点，用来建立问题、机制和证据框架。</li><li>origin: BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding -&gt; 补足方向起点，帮助理解问题为什么出现。</li><li>baseline: Language Models are Few-Shot Learners -&gt; 代表旧方法，帮助看清真实瓶颈。</li><li>turning_point: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks -&gt; 代表关键假设或机制转折。</li></ol></article>
+</section>
+<section class="band">
+  <h2>方向脉络图</h2>
+  <pre class="mermaid">flowchart LR
+  T[&#34;Transformer 到检索增强语言模型&#34;]
+  P1[&#34;anchor: Attention Is All You Need&#34;]
+  T --&gt; P1
+  P2[&#34;origin: BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding&#34;]
+  P1 --&gt; P2
+  P3[&#34;baseline: Language Models are Few-Shot Learners&#34;]
+  P2 --&gt; P3
+  P4[&#34;turning_point: Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks&#34;]
+  P3 --&gt; P4</pre>
+</section>
+<section class="band">
+  <h2>核心论文</h2>
+  <table>
+    <tr><th>角色</th><th>论文</th><th>为什么读</th><th>优先级</th></tr>
+      <tr><td>anchor</td><td>Attention Is All You Need</td><td>作为 Transformer 到检索增强语言模型 的主锚点，用来建立问题、机制和证据框架。</td><td>A-read</td></tr>
+      <tr><td>origin</td><td>BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding</td><td>补足方向起点，帮助理解问题为什么出现。</td><td>A-read</td></tr>
+      <tr><td>baseline</td><td>Language Models are Few-Shot Learners</td><td>代表旧方法，帮助看清真实瓶颈。</td><td>A-read</td></tr>
+      <tr><td>turning_point</td><td>Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks</td><td>代表关键假设或机制转折。</td><td>A-read</td></tr>
+  </table>
+</section>
+<details><summary>深挖推导</summary><h3>暂时跳过</h3><ul></ul><h3>开放问题</h3><ul><li>Transformer 到检索增强语言模型 的核心假设在哪些场景下会失败？</li><li>已有方法的证据是否真的支撑主要 claim？</li><li>能否把这个机制迁移到一个更小、更可复现的 mini project？</li></ul></details>
+<section class="grid">
+  <article class="panel"><h2>复述题</h2><ul><li>用 1 分钟讲清这个方向的起点、瓶颈和转折。</li></ul></article>
+  <article class="panel"><h2>隔天复习题</h2><ul><li>不看卡片，说出 anchor paper 和 baseline paper 的本质差异。</li></ul></article>
+  <article class="panel"><h2>我是否真的懂</h2><ul><li>能解释为什么只读这几篇，而不是堆更多论文吗？</li></ul></article>
+</section>
+  </main>
+</body>
+</html>

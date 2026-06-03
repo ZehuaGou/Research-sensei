@@ -1,0 +1,468 @@
+{
+  "$defs": {
+    "EvidenceLink": {
+      "additionalProperties": false,
+      "properties": {
+        "claim": {
+          "title": "Claim",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "quote": {
+          "default": "",
+          "title": "Quote",
+          "type": "string"
+        },
+        "confidence": {
+          "default": "unknown",
+          "enum": [
+            "high",
+            "medium",
+            "low",
+            "unknown"
+          ],
+          "title": "Confidence",
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "source"
+      ],
+      "title": "EvidenceLink",
+      "type": "object"
+    },
+    "PaperCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "authors": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Authors",
+          "type": "array"
+        },
+        "year": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Year"
+        },
+        "venue": {
+          "default": "",
+          "title": "Venue",
+          "type": "string"
+        },
+        "source_tool": {
+          "default": "manual",
+          "title": "Source Tool",
+          "type": "string"
+        },
+        "source_platform": {
+          "default": "manual",
+          "title": "Source Platform",
+          "type": "string"
+        },
+        "url": {
+          "default": "",
+          "title": "Url",
+          "type": "string"
+        },
+        "pdf_url": {
+          "default": "",
+          "title": "Pdf Url",
+          "type": "string"
+        },
+        "doi": {
+          "default": "",
+          "title": "Doi",
+          "type": "string"
+        },
+        "arxiv_id": {
+          "default": "",
+          "title": "Arxiv Id",
+          "type": "string"
+        },
+        "abstract": {
+          "default": "",
+          "title": "Abstract",
+          "type": "string"
+        },
+        "citation_count": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Citation Count"
+        },
+        "open_access": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Open Access"
+        },
+        "code_url": {
+          "default": "",
+          "title": "Code Url",
+          "type": "string"
+        },
+        "data_url": {
+          "default": "",
+          "title": "Data Url",
+          "type": "string"
+        },
+        "quality_signals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Quality Signals",
+          "type": "array"
+        },
+        "risk_flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Flags",
+          "type": "array"
+        },
+        "retraction_status": {
+          "default": "unknown",
+          "enum": [
+            "clear",
+            "retracted",
+            "concern",
+            "unknown"
+          ],
+          "title": "Retraction Status",
+          "type": "string"
+        },
+        "raw_result_ref": {
+          "default": "",
+          "title": "Raw Result Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "PaperCandidate",
+      "type": "object"
+    },
+    "PhdThinkingScaffold": {
+      "additionalProperties": false,
+      "properties": {
+        "claims": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Claims",
+          "type": "array"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/EvidenceLink"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "assumptions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Assumptions",
+          "type": "array"
+        },
+        "weak_points": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Weak Points",
+          "type": "array"
+        },
+        "research_questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Research Questions",
+          "type": "array"
+        },
+        "mini_projects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Mini Projects",
+          "type": "array"
+        }
+      },
+      "title": "PhdThinkingScaffold",
+      "type": "object"
+    },
+    "QualityAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "venue_tier": {
+          "default": "unknown",
+          "title": "Venue Tier",
+          "type": "string"
+        },
+        "reading_priority": {
+          "$ref": "#/$defs/ReadingPriority",
+          "default": "C-reference"
+        },
+        "risk_flags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Risk Flags",
+          "type": "array"
+        },
+        "strengths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Strengths",
+          "type": "array"
+        },
+        "retraction_status": {
+          "default": "unknown",
+          "enum": [
+            "clear",
+            "retracted",
+            "concern",
+            "unknown"
+          ],
+          "title": "Retraction Status",
+          "type": "string"
+        },
+        "reproducibility": {
+          "$ref": "#/$defs/ReproducibilitySignal"
+        },
+        "manual_check_needed": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Manual Check Needed",
+          "type": "array"
+        },
+        "rationale": {
+          "default": "",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "title": "QualityAssessment",
+      "type": "object"
+    },
+    "ReadingPriority": {
+      "enum": [
+        "A-read",
+        "B-skim",
+        "C-reference",
+        "Risk-review"
+      ],
+      "title": "ReadingPriority",
+      "type": "string"
+    },
+    "ReproducibilitySignal": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "unknown"
+          ],
+          "title": "Code",
+          "type": "string"
+        },
+        "data": {
+          "default": "unknown",
+          "enum": [
+            "available",
+            "unavailable",
+            "unknown"
+          ],
+          "title": "Data",
+          "type": "string"
+        },
+        "ablation_quality": {
+          "default": "unknown",
+          "enum": [
+            "strong",
+            "weak",
+            "missing",
+            "unknown"
+          ],
+          "title": "Ablation Quality",
+          "type": "string"
+        }
+      },
+      "title": "ReproducibilitySignal",
+      "type": "object"
+    },
+    "ResearchFramework": {
+      "additionalProperties": false,
+      "properties": {
+        "problem": {
+          "title": "Problem",
+          "type": "string"
+        },
+        "old_methods": {
+          "title": "Old Methods",
+          "type": "string"
+        },
+        "bottleneck": {
+          "title": "Bottleneck",
+          "type": "string"
+        },
+        "assumption": {
+          "title": "Assumption",
+          "type": "string"
+        },
+        "representation": {
+          "title": "Representation",
+          "type": "string"
+        },
+        "mechanism": {
+          "title": "Mechanism",
+          "type": "string"
+        },
+        "objective": {
+          "title": "Objective",
+          "type": "string"
+        },
+        "evidence": {
+          "title": "Evidence",
+          "type": "string"
+        },
+        "limitation": {
+          "title": "Limitation",
+          "type": "string"
+        },
+        "transfer": {
+          "title": "Transfer",
+          "type": "string"
+        }
+      },
+      "required": [
+        "problem",
+        "old_methods",
+        "bottleneck",
+        "assumption",
+        "representation",
+        "mechanism",
+        "objective",
+        "evidence",
+        "limitation",
+        "transfer"
+      ],
+      "title": "ResearchFramework",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "paper": {
+      "$ref": "#/$defs/PaperCandidate"
+    },
+    "framework": {
+      "$ref": "#/$defs/ResearchFramework"
+    },
+    "phd": {
+      "$ref": "#/$defs/PhdThinkingScaffold"
+    },
+    "quality": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/QualityAssessment"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "patterns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Patterns",
+      "type": "array"
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "thirty_second": {
+      "title": "Thirty Second",
+      "type": "string"
+    },
+    "five_minute": {
+      "title": "Five Minute",
+      "type": "string"
+    },
+    "deep_dive": {
+      "default": "",
+      "title": "Deep Dive",
+      "type": "string"
+    },
+    "recall_questions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Recall Questions",
+      "type": "array"
+    },
+    "review_questions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Review Questions",
+      "type": "array"
+    },
+    "understanding_checks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Understanding Checks",
+      "type": "array"
+    }
+  },
+  "required": [
+    "paper",
+    "framework",
+    "phd",
+    "thirty_second",
+    "five_minute"
+  ],
+  "title": "PaperCardData",
+  "type": "object"
+}

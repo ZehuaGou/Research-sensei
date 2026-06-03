@@ -1,0 +1,111 @@
+{
+  "paper": {
+    "title": "Attention Is All You Need",
+    "authors": [
+      "Ashish Vaswani",
+      "Noam Shazeer",
+      "Niki Parmar"
+    ],
+    "year": 2017,
+    "venue": "NeurIPS",
+    "source_tool": "manual-seed",
+    "source_platform": "manual",
+    "url": "https://arxiv.org/abs/1706.03762",
+    "pdf_url": "https://arxiv.org/pdf/1706.03762",
+    "doi": "",
+    "arxiv_id": "",
+    "abstract": "Introduces the Transformer architecture based entirely on attention mechanisms.",
+    "citation_count": 100000,
+    "open_access": true,
+    "code_url": "",
+    "data_url": "",
+    "quality_signals": [
+      "ablation:strong",
+      "baseline:strong"
+    ],
+    "risk_flags": [],
+    "retraction_status": "unknown",
+    "raw_result_ref": ""
+  },
+  "framework": {
+    "problem": "序列建模依赖循环或卷积结构，长距离依赖学习慢且难并行。",
+    "old_methods": "RNN/CNN encoder-decoder 通过顺序递推或局部卷积处理 token。",
+    "bottleneck": "计算路径长、并行度低，远距离 token 交互成本高。",
+    "assumption": "如果 token 间关系可以由 attention 直接建模，就不必依赖递归结构。",
+    "representation": "把 token 表示为 query/key/value，并加入 positional encoding 表示顺序。",
+    "mechanism": "Self-attention 让每个 token 按相关性聚合全局上下文。",
+    "objective": "用最大似然训练翻译模型，使目标序列概率最大。",
+    "evidence": "机器翻译实验、速度对比和 ablation 支持 attention-only 结构有效。",
+    "limitation": "需要较大数据和算力；长上下文 attention 成本随长度平方增长。",
+    "transfer": "可迁移到文本、视觉、语音、图结构、检索增强和多模态建模。"
+  },
+  "phd": {
+    "claims": [
+      "仅用 attention 也能获得强序列建模能力。"
+    ],
+    "evidence": [
+      {
+        "claim": "attention-only 有效",
+        "source": "实验章节与 ablation 表",
+        "quote": "需要人工核验具体表格数值。",
+        "confidence": "medium"
+      }
+    ],
+    "assumptions": [
+      "位置编码足以补回序列顺序信息。",
+      "训练数据规模足够支撑模型学习关系。"
+    ],
+    "weak_points": [
+      "长序列二次复杂度会成为瓶颈。",
+      "翻译任务上的证据不能自动推出所有任务都有效。"
+    ],
+    "research_questions": [
+      "如何降低 attention 在长序列上的复杂度？",
+      "attention 是否真的学到了可解释结构？"
+    ],
+    "mini_projects": [
+      "复现一个小型 self-attention 分类器，并去掉 positional encoding 做 ablation。"
+    ]
+  },
+  "quality": {
+    "venue_tier": "top-tier",
+    "reading_priority": "A-read",
+    "risk_flags": [],
+    "strengths": [
+      "顶会/顶刊信号",
+      "开放获取",
+      "ablation 较完整",
+      "已有较多引用"
+    ],
+    "retraction_status": "unknown",
+    "reproducibility": {
+      "code": "unknown",
+      "data": "unknown",
+      "ablation_quality": "strong"
+    },
+    "manual_check_needed": [],
+    "rationale": "top-tier 来源且质量信号较好，适合作为 anchor paper。"
+  },
+  "patterns": [
+    "Representation",
+    "Structure",
+    "System Pipeline"
+  ],
+  "tags": [
+    "必须掌握",
+    "容易混淆",
+    "可以迁移"
+  ],
+  "thirty_second": "Transformer 把序列建模从递归更新改成 token 间直接交互。",
+  "five_minute": "核心不是一句“用了 attention”，而是把表示、交互路径和并行训练方式一起换了。",
+  "deep_dive": "需要人工核验: 具体 BLEU、训练成本和 ablation 表格应回到原文。",
+  "recall_questions": [
+    "不用公式，讲清 self-attention 解决了 RNN 的哪个瓶颈。"
+  ],
+  "review_questions": [
+    "明天比较 Transformer 与 RNN 的信息路径长度。"
+  ],
+  "understanding_checks": [
+    "能说出去掉 positional encoding 会损失什么吗？"
+  ]
+}

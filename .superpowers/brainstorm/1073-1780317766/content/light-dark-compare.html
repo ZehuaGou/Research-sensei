@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Light & Dark Mode</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter','Noto Serif SC',system-ui,sans-serif; line-height:1.7; }
+
+  /* ===== DARK MODE ===== */
+  .dark { background:#0a0a0f; color:#e8e8ed; }
+  .dark .page { max-width:100%; margin:0; padding:32px; }
+  .dark h2 { font-size:20px; font-weight:600; color:#e8e8ed; margin-bottom:4px; }
+  .dark .label { color:#6b6b80; font-size:12px; margin-bottom:16px; }
+
+  .dark .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:16px; padding:24px; margin-bottom:16px; }
+  .dark .tag { display:inline-block; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:500; }
+  .dark .tag-core { background:rgba(99,102,241,0.15); color:#a5b4fc; }
+  .dark .tag-evi { background:rgba(16,185,129,0.15); color:#6ee7b7; }
+  .dark .divider { border:none; border-top:1px solid rgba(255,255,255,0.06); margin:14px 0; }
+  .dark .meta { font-size:12px; color:#6b6b80; }
+  .dark .title { font-size:14px; color:#e8e8ed; font-weight:500; }
+  .dark th { color:#6b6b80; font-weight:500; }
+  .dark td { color:#a0a0b0; }
+  .dark .sym { color:#a5b4fc; }
+  .dark .summary { color:#e8e8ed; font-weight:500; }
+  .dark .red { color:#f87171; }
+  .dark .code { background:rgba(255,255,255,0.03); border-radius:8px; padding:14px; }
+  .dark .ask { padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; }
+
+  /* ===== LIGHT MODE ===== */
+  .light { background:#fafafa; color:#1d1d1f; }
+  .light .page { max-width:100%; margin:0; padding:32px; }
+  .light h2 { font-size:20px; font-weight:600; color:#1d1d1f; margin-bottom:4px; }
+  .light .label { color:#86868b; font-size:12px; margin-bottom:16px; }
+
+  .light .card { background:#ffffff; border:1px solid rgba(0,0,0,0.08); border-radius:16px; padding:24px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+  .light .tag { display:inline-block; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:500; }
+  .light .tag-core { background:rgba(99,102,241,0.1); color:#4f46e5; }
+  .light .tag-evi { background:rgba(16,185,129,0.1); color:#059669; }
+  .light .divider { border:none; border-top:1px solid rgba(0,0,0,0.06); margin:14px 0; }
+  .light .meta { font-size:12px; color:#86868b; }
+  .light .title { font-size:14px; color:#1d1d1f; font-weight:500; }
+  .light th { color:#86868b; font-weight:500; }
+  .light td { color:#6e6e73; }
+  .light .sym { color:#4f46e5; }
+  .light .summary { color:#1d1d1f; font-weight:500; }
+  .light .red { color:#dc2626; }
+  .light .code { background:#f5f5f7; border-radius:8px; padding:14px; }
+  .light .ask { padding:4px 10px; border-radius:6px; font-size:11px; cursor:pointer; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+</head>
+<body>
+
+<!-- ===== DARK MODE ===== -->
+<div class="dark">
+<div class="page">
+<h2>🌙 深色模式</h2>
+<div class="label">背景 #0a0a0f · 卡片 rgba(255,255,255,0.03) · 边框 rgba(255,255,255,0.06)</div>
+
+<div class="card">
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <span class="tag tag-core">公式核心</span>
+    <span class="tag tag-evi">公式支持</span>
+  </div>
+  <div class="title">检索增强损失函数</div>
+  <div class="meta" style="margin-bottom:16px">§ 3.2 Method / 公式 (3)</div>
+
+  <div style="text-align:center;padding:16px 0;font-size:24px;color:#e8e8ed">
+    $$ \mathcal{L}_{total} = \mathcal{L}_{task} + \lambda \cdot \mathcal{L}_{retrieval} $$
+  </div>
+
+  <hr class="divider">
+  <div class="meta" style="margin-bottom:8px">符号含义</div>
+  <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><th style="text-align:left;padding:8px 4px;width:100px">符号</th><th style="text-align:left;padding:8px 4px">含义</th></tr>
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{total} $</td><td style="padding:8px 4px">总损失</td></tr>
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{task} $</td><td style="padding:8px 4px">任务损失</td></tr>
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{retrieval} $</td><td style="padding:8px 4px">检索损失</td></tr>
+    <tr><td style="padding:8px 4px" class="sym">$ \lambda $</td><td style="padding:8px 4px">平衡系数</td></tr>
+  </table>
+
+  <hr class="divider">
+  <div class="meta" style="margin-bottom:8px">小数字例子</div>
+  <div class="code" style="font-size:13px;color:#a0a0b0;line-height:1.8;margin-bottom:16px">
+    $ \mathcal{L}_{task} = 0.8 $，$ \mathcal{L}_{retrieval} = 0.3 $，$ \lambda = 0.5 $<br>
+    → $ \mathcal{L}_{total} = 0.8 + 0.5 \times 0.3 = 0.95 $
+  </div>
+
+  <hr class="divider">
+  <div class="summary">总损失 = 做对任务 + 检索正确，λ 控制平衡。</div>
+
+  <div style="display:flex;gap:6px;margin-top:12px">
+    <span class="ask" style="background:rgba(99,102,241,0.1);color:#a5b4fc;border:1px solid rgba(99,102,241,0.2)">💬 追问</span>
+    <span class="ask" style="background:rgba(251,191,36,0.1);color:#fcd34d;border:1px solid rgba(251,191,36,0.2)">🔢 更多例子</span>
+    <span class="ask" style="background:rgba(16,185,129,0.1);color:#6ee7b7;border:1px solid rgba(16,185,129,0.2)">📐 推导</span>
+  </div>
+</div>
+</div>
+</div>
+
+<!-- ===== LIGHT MODE ===== -->
+<div class="light">
+<div class="page">
+<h2>☀️ 亮色模式</h2>
+<div class="label">背景 #fafafa · 卡片 #ffffff · 阴影 0 1px 3px rgba(0,0,0,0.04)</div>
+
+<div class="card">
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <span class="tag tag-core">公式核心</span>
+    <span class="tag tag-evi">公式支持</span>
+  </div>
+  <div class="title">检索增强损失函数</div>
+  <div class="meta" style="margin-bottom:16px">§ 3.2 Method / 公式 (3)</div>
+
+  <div style="text-align:center;padding:16px 0;font-size:24px;color:#1d1d1f">
+    $$ \mathcal{L}_{total} = \mathcal{L}_{task} + \lambda \cdot \mathcal{L}_{retrieval} $$
+  </div>
+
+  <hr class="divider">
+  <div class="meta" style="margin-bottom:8px">符号含义</div>
+  <table style="width:100%;font-size:13px;border-collapse:collapse;margin-bottom:16px">
+    <tr style="border-bottom:1px solid rgba(0,0,0,0.06)"><th style="text-align:left;padding:8px 4px;width:100px">符号</th><th style="text-align:left;padding:8px 4px">含义</th></tr>
+    <tr style="border-bottom:1px solid rgba(0,0,0,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{total} $</td><td style="padding:8px 4px">总损失</td></tr>
+    <tr style="border-bottom:1px solid rgba(0,0,0,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{task} $</td><td style="padding:8px 4px">任务损失</td></tr>
+    <tr style="border-bottom:1px solid rgba(0,0,0,0.04)"><td style="padding:8px 4px" class="sym">$ \mathcal{L}_{retrieval} $</td><td style="padding:8px 4px">检索损失</td></tr>
+    <tr><td style="padding:8px 4px" class="sym">$ \lambda $</td><td style="padding:8px 4px">平衡系数</td></tr>
+  </table>
+
+  <hr class="divider">
+  <div class="meta" style="margin-bottom:8px">小数字例子</div>
+  <div class="code" style="font-size:13px;color:#6e6e73;line-height:1.8;margin-bottom:16px">
+    $ \mathcal{L}_{task} = 0.8 $，$ \mathcal{L}_{retrieval} = 0.3 $，$ \lambda = 0.5 $<br>
+    → $ \mathcal{L}_{total} = 0.8 + 0.5 \times 0.3 = 0.95 $
+  </div>
+
+  <hr class="divider">
+  <div class="summary">总损失 = 做对任务 + 检索正确，λ 控制平衡。</div>
+
+  <div style="display:flex;gap:6px;margin-top:12px">
+    <span class="ask" style="background:rgba(99,102,241,0.08);color:#4f46e5;border:1px solid rgba(99,102,241,0.2)">💬 追问</span>
+    <span class="ask" style="background:rgba(245,158,11,0.08);color:#d97706;border:1px solid rgba(245,158,11,0.2)">🔢 更多例子</span>
+    <span class="ask" style="background:rgba(16,185,129,0.08);color:#059669;border:1px solid rgba(16,185,129,0.2)">📐 推导</span>
+  </div>
+</div>
+</div>
+</div>
+
+</body>
+</html>
