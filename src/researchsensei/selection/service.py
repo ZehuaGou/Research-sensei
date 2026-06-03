@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import date
 
 from researchsensei.schemas import (
     CandidatePaper,
@@ -194,7 +195,7 @@ class SelectionService:
             weighted_total=total,
         )
 
-        reason = self._selection_reason(relevance, role, total)
+        reason = self._selection_reason(relevance, role, total, venue_score, citation_score, recency)
         risk_note = "评分可解释，需在全文解析后继续校验实验和 claim。" if total >= 0.3 else ""
 
         return ReadingPlanItem(
@@ -268,7 +269,7 @@ class SelectionService:
         """Calculate recency bonus based on publication year."""
         if paper.year is None:
             return 0.0
-        current_year = 2026
+        current_year = date.today().year
         age = current_year - paper.year
         if age <= 1:
             return 1.0
@@ -278,12 +279,35 @@ class SelectionService:
             return 0.4
         return 0.1
 
-    def _selection_reason(self, relevance: float, role: str, total: float) -> str:
-        """Generate a human-readable selection reason."""
+    def _selection_reason(
+        self,
+        relevance: float,
+        role: str,
+        total: float,
+        venue_score: float,
+        citation_score: float,
+        recency: float,
+    ) -> str:
+        """Generate a human-readable selection reason with specific signals."""
         if relevance < 0.3:
             return "方向相关性低，过滤。"
-        if total >= 0.7:
-            return "方向强相关，且具备方法代表性或可信 venue/citation 信号。"
-        if total >= 0.5:
-            return "方向相关，具有一定参考价值。"
-        return "方向弱相关，可作为背景参考。"
+        parts = []
+        if relevance >= 0.7:
+            parts.append("方向强相关")
+        elif relevance >= 0.5:
+            parts.append("方向相关")
+        else:
+            parts.append("方向弱相关")
+        if venue_score >= 0.9:
+            parts.append("顶会 venue")
+        elif venue_score >= 0.5:
+            parts.append("有 venue")
+        if citation_score >= 0.1:
+            parts.append(f"被引 {int(citation_score * 1000)}+")
+        if recency >= 0.7:
+            parts.append("近期发表")
+        if role == "SURVEY":
+            parts.append("综述论文")
+        elif role == "METHOD":
+            parts.append("方法论文")
+        return "，".join(parts) + "。"

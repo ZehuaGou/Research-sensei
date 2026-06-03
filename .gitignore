@@ -13,11 +13,11 @@ __pycache__/
 .env.*
 !.env.example
 config/local.toml
-workspace/
-runs/
-outputs/
-artifacts/
-tmp/
+/workspace/
+/runs/
+/outputs/
+/artifacts/
+/tmp/
 *.ckpt
 *.pt
 *.pth

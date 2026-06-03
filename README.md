@@ -1,109 +1,93 @@
-# ResearchSensei v0.5
+# ResearchSensei / 研读导师
 
-## 安装与测试环境
+科研论文理解与思维框架训练系统。不是论文摘要器，而是帮助用户真正读懂论文、理解公式、形成科研思维、回答导师追问的学习工作台。
 
-本项目使用项目级虚拟环境，避免把依赖安装到全局 Python 或 conda 环境。
+## 当前状态
 
-Windows PowerShell:
+- Phase 1-11 完成 (269 tests passing)
+- Phase 12 (patterns + drill) 未开始
+- interactive / render / frontend 对接未实现
 
-```powershell
+## 已实现功能
+
+### 单篇论文精读
+
+输入 PDF / Markdown / 纯文本，生成 7 个结构化 artifact：
+
+1. `source_status.json` — 来源状态
+2. `parsed_document.json` — 文档解析 blocks
+3. `evidence_index.json` — 证据定位
+4. `paper_skeleton.json` — 论文骨架
+5. `paper_card.json` — 论文学习卡
+6. `formula_cards.json` — 公式讲解卡
+7. `teaching_cards.json` — 五层教学卡
+
+### 研究方向学习
+
+输入研究方向（中/英文），生成 4 个 artifact：
+
+1. `query_plan.json` — 查询计划
+2. `candidate_pool.json` — 候选论文池
+3. `filtered_candidates.json` — 去重后候选
+4. `reading_plan.json` — 阅读计划
+
+## 安装
+
+```bash
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+.venv\Scripts\activate  # Windows
+pip install -e ".[dev]"
+```
+
+## 测试
+
+```bash
 python -m pytest -q
 ```
 
-FastAPI 标准文件上传接口依赖 `python-multipart`，该依赖已记录在 `pyproject.toml`，不要只做本机临时安装。
+默认测试不联网、不调 LLM、不依赖外部服务。
 
-`.venv/` 已加入 `.gitignore`，不要提交虚拟环境目录。
+## 项目结构
 
-ResearchSensei 是一个本地单用户科研理解训练系统。它不是论文摘要器，而是面向“还没有稳定科研思维框架的人读博”的学习工作台：先筛出少量高质量论文，再把全文证据、论文骨架、公式、科研模式和导师追问串成可复述、可迁移的学习闭环。
-
-## 当前架构
-
-新架构的主包在 `src/researchsensei/`。旧 `research_sensei/` 暂时保留为迁移来源，不再作为 v0.5 的主要扩展入口。
-
-核心流水线：
-
-```text
-方向模式:
-query -> acquisition -> selection -> source_resolver -> ingestion
-      -> grounding -> understanding -> teaching/formula/pattern/drill
-      -> render -> interactive
-
-单篇模式:
-PDF/LaTeX/text -> ingestion -> grounding -> understanding
-               -> cards -> interactive
 ```
+src/researchsensei/
+  core/          — 配置、日志、错误类型
+  schemas/       — Pydantic 数据契约
+  llm/           — LLM 客户端、prompt builder、缓存
+  ingestion/     — 文档解析
+  workspace/     — 工作目录管理
+  jobs/          — SQLite job 持久化
+  web/           — FastAPI API
+  acquisition/   — arXiv / OpenAlex adapter
+  selection/     — 去重、评分、阅读计划
+  query/         — 查询规划
+  direction/     — 方向分析编排
+  grounding.py   — 证据定位
+  paper_skeleton.py — 论文骨架
+  paper_card.py  — 论文卡
+  formula_card.py — 公式卡
+  teaching_card.py — 教学卡
+  source_resolver.py — 来源解析
 
-## v0.5 已落地内容
-
-- `docs/`：产品需求、复用报告、模块契约、实施计划、验收标准、评审清单、术语表。
-- `src/researchsensei/schemas.py`：统一 Pydantic 契约。
-- `query`：把用户问题转成 `QueryPlan`。
-- `selection`：把候选论文转成带角色、质量评分、阅读优先级的 `ReadingPlan`。
-- `ingestion`：把文本解析成统一 `DocumentBlock`。
-- `grounding`：生成 `EvidenceIndex`，明确证据类型。
-- `understanding`：生成 `PaperSkeleton`。
-- `teaching/formula/pattern/drill`：生成论文卡、公式卡、模式卡和训练卡。
-- `interactive/context/llm`：追问时携带当前卡片、选中文本、证据块和历史摘要，不发送整篇论文。
-- `render/web`：三栏学习工作台基础页面和 FastAPI 入口。
-- `pipeline.py`：最小垂直闭环协调器。
-- `outputs/sample/`：`Attention Is All You Need` 黄金样例骨架。
-
-## 运行
-
-```powershell
-pytest -q
-python -m researchsensei.web.run
+backend/         — 旧版代码（冻结，仅作迁移参考）
+frontend/        — Vue 3 前端（保留，未重写）
+tests/           — 测试
+legacy_tests/    — 旧测试（已排除）
+tests_e2e/       — E2E 测试（已排除）
 ```
-
-默认地址：
-
-```text
-http://127.0.0.1:8765
-```
-
-## 复用边界
-
-ResearchSensei 不自研成熟基础设施：
-
-- 论文搜索、多源聚合、PDF 下载、DOI 回填、去重；
-- PDF 解析、章节抽取、公式渲染、文献引用解析；
-- 通用 RAG、向量检索、证据型 QA；
-- 工作流编排、图表渲染、HTML 模板引擎；
-- 间隔复习算法、LLM/RAG 评测框架。
-
-本项目自研的是学习与科研思维框架：
-
-- Teach-Me Engine；
-- Formula Tutor；
-- Research Pattern Library；
-- PhD Thinking Scaffold；
-- Learning Card Schema；
-- Direction Curator Rules；
-- 交互追问上下文协议。
 
 ## 配置
 
-现有配置仍在 `config/` 和 `.env` 中。v0.5 后续会把旧配置迁移到统一 `ConfigService`，并继续支持 DeepSeek、MiMo 和任意 OpenAI-compatible provider。
+复制 `.env.example` 为 `.env`，填入 API key：
 
-常用启动参数保持：
-
-```toml
-[server]
-host = "127.0.0.1"
-port = 8765
-reload = false
+```bash
+cp .env.example .env
 ```
 
-## 验收重点
+支持 DeepSeek、MiMo 和任意 OpenAI-compatible provider。
 
-第一版不是“看起来能生成文本”就算合格，而是必须满足：
+## 复用边界
 
-- A_READ 不超过规则上限，弱相关论文不进入深读；
-- 每个事实性 claim 都能回连 evidence 或标注需要人工核验；
-- 公式卡包含符号、每项作用、小数字例子、删项影响；
-- 追问时带上下文包，不把整篇论文塞进 prompt；
-- UI 以左目录、中学习区、右追问区为核心；
-- 黄金样例可用于回归检查。
+不自研：论文搜索、PDF 解析、RAG、向量检索、间隔复习算法。
+
+自研：Teach-Me Engine、Formula Tutor、Research Pattern Library、Learning Card Schema、交互追问协议。
