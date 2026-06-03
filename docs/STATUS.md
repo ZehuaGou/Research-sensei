@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 410 tests passing
+- 427 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever + EvidencePack
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -25,28 +25,30 @@
 
 ## 3. 当前任务
 
-- UnderstandingStatus + BASELINE_ONLY pipeline 写入已完成：
-  - UnderstandingStatus / DownstreamGates / EvidencePackSummary schema 已完成
-  - pipeline baseline 模式写入 understanding_status.json
-  - baseline status 为 BASELINE_ONLY，blocking_reason=NO_LLM_CLIENT
-  - allowed_for_user_display=False，allowed_downstream 全 False
-  - artifact 数量从 9 变 10
-  - old baseline card artifacts 仍写入
-  - pipeline 尚未接 v2 builders
-  - 410 tests passing（400 existing + 10 new）
+- Pipeline v2 path 已接入：
+  - pipeline 新增 llm_client 可选参数
+  - baseline path 仍为 BASELINE_ONLY
+  - v2 path 构建 EvidencePack 并调用 isolated v2 builders
+  - v2 SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTADING 状态映射已实现
+  - BLOCKED 不写 card artifacts
+  - DEGRADED 不写 failed teaching artifact
+  - job.status 区分 FAILED（系统异常）和 BLOCKED（理解失败）
+  - EvidencePackSummary 写入 UnderstandingStatus
+  - _run_async_builder 处理 sync pipeline 调用 async v2 builders
+  - 427 tests passing（410 existing + 17 new）
 - 尚未完成：
-  - pipeline v2 path 尚未实现
-  - SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTADING runtime mapping 尚未实现
   - Audit / QualityReport 尚未实现
   - Frontend/API gating 尚未实现
+  - formula_is_core 判断尚未实现
+  - real LLM integration 尚未验证
 - Phase 12 仍冻结
-- 下一步：讨论 pipeline v2 path：llm_client 参数、EvidencePack 构建、v2 builder 调用、BLOCKED / DEGRADED 状态映射
+- 下一步：讨论 Audit / QualityReport
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 410 passed
+- pytest: 427 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
