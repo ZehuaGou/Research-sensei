@@ -1,7 +1,7 @@
 from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBundle, FormulaSymbol, FormulaTerm, PaperCard, TeachingCard, TeachingCardBundle
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ScoringBreakdown
-from researchsensei.schemas.document import DocumentBlock, DocumentIngestion
+from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, EvidenceIndex
 from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, SearchIntent
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
@@ -17,6 +17,8 @@ __all__ = [
     "DirectionBundle",
     "DocumentBlock",
     "DocumentIngestion",
+    "ParseMetadata",
+    "ParserResult",
     "ErrorItem",
     "EvidenceIndex",
     "EvidenceType",
