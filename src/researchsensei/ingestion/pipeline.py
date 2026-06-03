@@ -9,6 +9,7 @@ from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.jobs import JobStore
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_skeleton import build_paper_skeleton
+from researchsensei.parser.adapter import ParserAdapter
 from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.teaching_card import build_teaching_cards
 from researchsensei.workspace import WorkspaceStore
@@ -20,10 +21,12 @@ class SinglePaperIngestionRunner:
         workspace: WorkspaceStore,
         jobs: JobStore,
         ingestion: LightweightIngestionService | None = None,
+        parser_adapter: ParserAdapter | None = None,
     ) -> None:
         self.workspace = workspace
         self.jobs = jobs
         self.ingestion = ingestion or LightweightIngestionService()
+        self.parser_adapter = parser_adapter
 
     def run(
         self,
@@ -48,7 +51,15 @@ class SinglePaperIngestionRunner:
         self.jobs.create(job)
 
         try:
-            document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
+            if self.parser_adapter is not None:
+                if not self.parser_adapter.supports(copied_source):
+                    raise ValueError(
+                        f"Parser adapter does not support source type: {copied_source.suffix}"
+                    )
+                result = self.parser_adapter.parse(copied_source, paper_id=actual_job_id)
+                document = result.document
+            else:
+                document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
             evidence_index = build_evidence_index(document)
             paper_skeleton = build_paper_skeleton(document, evidence_index)
             paper_card = build_paper_card(paper_skeleton, evidence_index)
