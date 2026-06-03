@@ -264,6 +264,14 @@ source / selected paper
 
 ## 13. Five Key Questions Discussion Conclusions
 
+**本节只是第一批已收敛的基础共识。不代表全项目技术讨论完成。**
+
+仍需继续讨论 Evidence、Paper Understanding、Audit、Frontend/API、Engineering Reliability、Literature Search 等关键模块。未讨论完成前，不允许开始代码开发。
+
+ParserAdapter 只是候选第一个代码任务，不是已授权任务。
+
+---
+
 以下五个问题已在技术讨论中形成初步共识，同步到对应模块开发文档。
 
 ### Q1: ParserAdapter.parse() 返回类型
@@ -331,7 +339,51 @@ reference_entries: list[str] = Field(default_factory=list)
 
 ---
 
-## 14. How to Use This Document
+## 14. Next Discussion Topics
+
+以下为下一轮技术讨论重点，未完成前不允许开始代码开发。
+
+### 14.1 Evidence + Paper Understanding 深入设计
+
+- PassageIndex 构建算法（section 分段 vs paragraph 分段 vs 句子分段）
+- ClaimEvidence 从 passage 提取的规则复杂度
+- EvidenceRetriever BM25 参数调优
+- EvidencePack 构建流程（过滤、截断、token budget）
+- LLM prompt 结构（system / user / 输出约束）
+- LLM 输出 schema（是否拆成 PaperCardLLMOutput / FormulaCardsLLMOutput / TeachingCardsLLMOutput）
+- fail-closed 状态决策树（哪些场景 → BLOCKED / BASELINE_ONLY / FAILED）
+- Phase 8-10 rule-based builders 如何迁移
+- 旧测试中 fallback 断言如何迁移
+
+### 14.2 Audit / Quality 深入设计
+
+- QualityReport schema 定义
+- Auditor 接口设计
+- 子 auditor 拆分（EvidenceAuditor / FormulaAuditor / GenericnessAuditor / CopyAuditor / AdvisorReadinessAuditor）
+- hard-fail 映射规则（多少 hard_fail → BLOCKED，多少 warning 仍算 SUCCESS）
+- 是否允许 LLM-based auditor
+- 人工评估集设计
+
+### 14.3 Frontend / API 状态展示
+
+- SUCCESS / BASELINE_ONLY / BLOCKED_UNDERSTANDING 的 UI 展示规则
+- evidence_ref 跳转（点击 evidence_ref 回原文）
+- formula_cards 如何展示公式、符号、解释
+- blocked 状态的用户文案
+- API 如何返回 understanding_status
+- Phase 12 gating 在 API 层如何实现
+
+### 14.4 Engineering Reliability
+
+- artifact versioning 设计
+- rerun / resume 机制
+- cache 策略
+- CI 约束（no-network / no-real-LLM）
+- secret scanning
+
+---
+
+## 15. How to Use This Document
 
 - 本文档保存讨论，不直接作为开发依据。
 - 达成稳定共识后，再同步到 DESIGN.md、DEVELOPMENT.md 或 docs/development/*.md。
