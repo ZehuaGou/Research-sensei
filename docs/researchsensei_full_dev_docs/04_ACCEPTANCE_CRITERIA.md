@@ -130,6 +130,20 @@ drill_card 必须包含：
 - 能根据错误回答生成 error_attribution。
 - 能生成下一步补救动作。
 
+## 内容质量验收 (2026-06-03 新增)
+
+以下标准适用于 Phase 8-11 的所有 card/plan 输出：
+
+- 解释必须由 evidence 支撑（evidence_ref 存在且可回指）
+- citation/evidence audit 必须通过（无幻觉 ref，无编造证据）
+- formula explanation 需要 symbol grounding（符号从论文上下文推断，不是通用字典）
+- teaching card 不能只是原文复制（human_explanation 不能是公式文本）
+- LLM 输出必须可追踪 evidence（LLM-enhanced 路径的 evidence_ref 必须有效）
+- 不确定内容必须降级（INSUFFICIENT_EVIDENCE / NEEDS_HUMAN_CHECK / UNKNOWN）
+- 输出必须包含论文特有术语（不能全是通用模板）
+
+详见 `docs/QUALITY_EVALUATION_SPEC.md`。
+
 ## Phase 12 可靠性验收
 
 - 支持断点续跑。

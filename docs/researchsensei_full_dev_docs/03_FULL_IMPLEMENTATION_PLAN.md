@@ -1,5 +1,11 @@
 # 03_FULL_IMPLEMENTATION_PLAN
 
+> **2026-06-03 更新**：Phase 1-11 完成作为 baseline infrastructure。Phase 12 冻结。
+> 新增 Phase 11.5-11.9 子阶段，用于升级论文理解核心。
+> 详见 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md` 和 `docs/PHASE_MAPPING.md`。
+>
+> 原始 Phase 12（工程可靠性）推迟到后续。当前 Phase 12 = patterns + drill。
+
 ## 总前置规则：Phase 复用评估门禁
 
 ResearchSensei 的每个 Phase 在执行代码任务前，必须先完成复用评估，并更新 `docs/REUSE_REPORT.md`。

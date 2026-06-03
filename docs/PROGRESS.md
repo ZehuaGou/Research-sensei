@@ -2,8 +2,8 @@
 
 ## Current Phase
 
-Phase 11 - Query / Acquisition / Selection / Reading Plan v1 completed and tested.
-Phase 12 not yet authorized.
+Phase 1-11 complete as baseline infrastructure. Phase 12 frozen.
+Pre-Phase12 technology route reset in progress. No Phase 12 code authorized.
 
 ## Current Status
 
@@ -153,15 +153,18 @@ Phase 12 not yet authorized.
 
 ## Not Started
 
-- [ ] Phase 12 scope final confirmation (see `docs/PHASE_MAPPING.md`).
-- [ ] Phase 12 code development (patterns + drill).
+- [ ] Phase 11.6: ParserAdapter Design
+- [ ] Phase 11.7: PassageIndex + ClaimEvidence v2
+- [ ] Phase 11.8: Evidence-constrained LLM Paper Understanding
+- [ ] Phase 11.9: Paper Understanding Quality Benchmark
+- [ ] Phase 12: Patterns + Drill (frozen, waiting for 11.6-11.9)
 
-## Phase 12 Status
+## Technology Route Status
 
-- Phase 12 reuse gate completed (see `docs/REUSE_REPORT.md`).
-- Phase 12 scope: patterns + drill (per `docs/PHASE_MAPPING.md`).
-- Pre-Phase12 quality gate completed (see `docs/QUALITY_EVALUATION_SPEC.md`).
-- P0 quality tests implemented.
+- Phase 11.5: Technology Route Review completed (see `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`).
+- External projects evaluated: ARIS, PaperQA, OpenScholar, ResearchPilot, STORM, Docling, Nougat, Marker.
+- Key decisions: keep Python/FastAPI/Pydantic, upgrade Parser/Evidence/Audit layers, no ARIS-style skills.
+- Phase 12 frozen until route reset is confirmed.
 
 ## Current Risks
 
@@ -174,8 +177,10 @@ Phase 12 not yet authorized.
 
 ## Next Safe Task
 
-Phase 12 reuse gate and quality gate completed. Ready for Phase 12 code development (patterns + drill).
+Phase 11.5 technology route review completed. Phase 12 frozen.
 
-Before entering Phase 12 code, confirm scope: patterns + drill (per `docs/PHASE_MAPPING.md`).
+Next step: confirm route reset, then proceed to Phase 11.6 (ParserAdapter Design) or Phase 12 (Patterns + Drill).
+
+See `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md` for full analysis and recommended sub-phases.
 
 Do not enter Phase 12 (patterns/drill/batch pipeline) without a separate reuse gate.

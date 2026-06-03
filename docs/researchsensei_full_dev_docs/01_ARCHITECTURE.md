@@ -67,6 +67,20 @@ src/researchsensei/
   context/           # 上下文、记忆、缓存
   llm/               # LLM 客户端、prompt、token budget
   render/            # HTML/Markdown/JSON 输出
+```
+
+### 架构层次 (2026-06-03 更新)
+
+```text
+A. Product Layer       — Vue frontend, FastAPI API, workspace/job store, artifact JSON, Pydantic schemas, mock-first tests
+B. Parser Layer        — ParserAdapter interface, LightweightParser as fallback, optional Docling/Nougat/Marker
+C. Evidence Layer      — PassageIndex, ClaimExtractor, ClaimEvidence v2, EvidenceRetriever
+D. Paper Understanding — paper_skeleton/card/formula/teaching v2, evidence-constrained LLM explainer, uncertainty handling
+E. Direction/Literature— query planner, acquisition adapters, reading plan, cross-paper synthesis (later)
+F. Audit Layer         — explanation audit, formula audit, citation/evidence audit, reviewer independence
+```
+
+详见 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`。
   integrations/      # 外部工具 adapter
   templates/         # Jinja2/HTMX 模板
 ```

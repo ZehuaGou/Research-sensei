@@ -28,11 +28,16 @@
 | Phase 9 | Formula Card JSON v1 | 旧 Phase 6 formula 部分 | ✅ 完成 |
 | Phase 10 | Teaching Card JSON v1 | 旧 Phase 6 teaching 部分 | ✅ 完成 |
 | Phase 11 | Query / Acquisition / Selection / Reading Plan v1 | 旧 Phase 9 部分 | ✅ 完成 |
-| Phase 12 | **待确认**（建议：patterns + drill） | 旧 Phase 6 patterns/drill 部分 | ❌ 未开始 |
-| Phase 13 | **待确认**（建议：interactive + context） | 旧 Phase 8 部分 | ❌ 未开始 |
-| Phase 14 | **待确认**（建议：render + direction） | 旧 Phase 7/10 部分 | ❌ 未开始 |
-| Phase 15 | **待确认**（建议：evaluation / golden tests） | 旧 Phase 13 部分 | ❌ 未开始 |
-| Phase 16 | **待确认**（建议：frontend API 对接） | 旧 Phase 7 前端部分 | ❌ 未开始 |
+| Phase 11.5 | Technology Route Review + External Reuse Audit | 新增 | ✅ 完成 |
+| Phase 11.6 | ParserAdapter Design | 新增（升级 PDF 解析） | ❌ 未开始 |
+| Phase 11.7 | PassageIndex + ClaimEvidence v2 | 新增（升级 evidence 层） | ❌ 未开始 |
+| Phase 11.8 | Evidence-constrained LLM Paper Understanding | 新增（升级 card builder） | ❌ 未开始 |
+| Phase 11.9 | Paper Understanding Quality Benchmark | 新增（质量审计） | ❌ 未开始 |
+| Phase 12 | Patterns + Drill Card JSON v1 | 旧 Phase 6 patterns/drill 部分 | ❌ 冻结 |
+| Phase 13 | Interactive + Context | 旧 Phase 8 部分 | ❌ 未开始 |
+| Phase 14 | Render + Direction Map | 旧 Phase 7/10 部分 | ❌ 未开始 |
+| Phase 15 | Evaluation / Golden Tests | 旧 Phase 13 部分 | ❌ 未开始 |
+| Phase 16 | Frontend API Integration | 旧 Phase 7 前端部分 | ❌ 未开始 |
 
 ## 差异说明
 

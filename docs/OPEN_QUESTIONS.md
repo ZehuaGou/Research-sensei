@@ -76,3 +76,34 @@
 - **理由**：阅读计划场景下，同一论文的不同版本（v1/v2）通常是小修，用户不需要分别阅读。
 - **风险**：如果 v1 和 v2 有重大内容差异（如新增实验），合并可能丢失信息。
 - **状态**：已实现，已测试。如需调整可修改 `_normalize_arxiv_id()`。
+
+## 11. 是否引入 ParserAdapter
+
+- **问题**：当前 PDF 解析用 PyMuPDF fallback，质量低。是否引入 Docling/Nougat/Marker 作为 optional adapter？
+- **当前倾向**：引入 ParserAdapter interface，LightweightParser 作为 default，Docling/Nougat/Marker 作为 optional adapter。
+- **风险**：optional adapter 需要用户自行安装，增加使用门槛。
+- **状态**：待确认。详见 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`。
+
+## 12. 是否引入 PaperQA-style EvidenceRetriever
+
+- **问题**：当前 evidence 是 block-level，不够精确。是否引入 passage-level retrieval？
+- **当前倾向**：升级 evidence_index 为 passage-level，不直接引入 PaperQA。
+- **状态**：待确认。
+
+## 13. 是否引入 ARIS-style audit gate
+
+- **问题**：当前 explanation 和 audit 没有分离。是否参考 ARIS 的 reviewer independence 设计？
+- **当前倾向**：参考 ARIS 的 reviewer independence 和 assurance contract，但不整包接入。
+- **状态**：待确认。
+
+## 14. Phase 12 是否继续冻结
+
+- **问题**：Phase 12 (patterns + drill) 是否在 route reset 完成前继续冻结？
+- **当前倾向**：冻结。先完成 Phase 11.6-11.9（ParserAdapter、PassageIndex、LLM Paper Understanding、Quality Benchmark），再做 Phase 12。
+- **状态**：待确认。
+
+## 15. 哪些外部项目进入 optional adapter shortlist
+
+- **问题**：哪些外部项目值得作为 optional adapter？
+- **当前 shortlist**：Docling、Nougat、Marker（Parser Layer）；PaperQA（Evidence Layer，参考设计）。
+- **状态**：待确认。

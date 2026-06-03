@@ -97,3 +97,40 @@ Agent 每完成一个 task 必须运行相关测试。若失败：
 2. 再失败，停止后续任务。
 3. 写 `PROGRESS.md`。
 4. 写 `OPEN_QUESTIONS.md`。
+
+## 新增测试方向 (2026-06-03)
+
+以下测试方向在 Phase 11.6-11.9 中逐步补充：
+
+### Parser Adapter Contract Tests
+- ParserAdapter interface 定义
+- LightweightParser 作为 default
+- optional adapter 的 fallback 行为
+
+### Passage Index Tests
+- passage-level 索引正确性
+- claim extraction 从 passage 中提取
+- ClaimEvidence v2 的 semantic support
+
+### Evidence Retriever Tests
+- 根据 claim 检索相关 passage
+- evidence_ref 有效性验证
+- 降级行为（无相关 passage 时）
+
+### Evidence-constrained LLM Mock Tests
+- LLM 输出必须绑定 evidence_ref
+- 幻觉 ref 拒绝
+- LLM 失败时 fallback 到 rule-based
+
+### Explanation Audit Tests
+- 解释忠实原文检查
+- 公式解释准确性检查
+- 非模板化检查
+- 不确定性处理检查
+
+### Paper Understanding Benchmark Fixtures
+- 普通方法论文 fixture
+- 公式密集论文 fixture
+- 信息不足论文 fixture
+
+详见 `docs/QUALITY_EVALUATION_SPEC.md` 和 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`。

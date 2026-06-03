@@ -680,6 +680,28 @@ This table records current project-level dependencies already present or recentl
 | uvicorn | ASGI server | DIRECT_DEPENDENCY | Runtime server |
 | aiosqlite | Existing async SQLite dependency | DIRECT_DEPENDENCY | Current migrated JobStore uses sqlite3 sync; keep until reviewed |
 
+## External Reuse Gate v2 (Pre-Phase12 Technology Route Review)
+
+审计日期: 2026-06-03
+问题: ResearchSensei 论文理解核心是否需要引入外部项目？
+
+| 项目 | 核心能力 | 对应模块 | 迁移方式 | 引入 | 风险 | 结论 |
+|------|----------|----------|----------|------|------|------|
+| ARIS | 77 skills, cross-model review, audit chain, reviewer independence | Audit Layer | REFERENCE_ONLY | 否 | 整包接入污染架构 | 参考 audit chain 和 reviewer independence 设计 |
+| PaperQA | scientific QA, passage retrieval, citation-backed answer | Evidence Layer | OPTIONAL_ADAPTER | 否 | QA 系统不是教学系统 | 参考 passage retrieval 设计 |
+| OpenScholar | passage-level retrieval, citation accuracy | Evidence Layer evaluation | REFERENCE_ONLY | 否 | 主要是 benchmark | 参考 citation accuracy 评估方法 |
+| ResearchPilot | research question → retrieval → structured findings | Direction Layer | REFERENCE_ONLY | 否 | 偏 agent | 参考 structured findings 设计 |
+| STORM | outline-guided synthesis, multi-perspective questions | Direction Layer | REFERENCE_ONLY | 否 | 做综述不做教学 | 参考 outline-guided 设计 |
+| Docling | PDF parsing, layout/table/formula | Parser Layer | OPTIONAL_ADAPTER | 否 | 依赖较重 | 作为 optional ParserAdapter |
+| Nougat | PDF → Markdown, formula conversion | Parser Layer | OPTIONAL_ADAPTER | 否 | 需要 GPU | 作为 optional ParserAdapter |
+| Marker | PDF → Markdown, fast | Parser Layer | OPTIONAL_ADAPTER | 否 | 较轻量 | 作为 optional ParserAdapter |
+| MinerU | PDF parsing, layout analysis | Parser Layer | OPTIONAL_ADAPTER | 否 | 依赖重 | 作为 optional ParserAdapter |
+| Unstructured | document parsing, multiple formats | Parser Layer | NOT_USE | 否 | 通用不够学术 | 不引入 |
+
+结论: 当前架构不需要根本改变。论文理解核心可通过 adapter + audit 逐步升级。外部项目不污染默认 pytest。
+
+详见 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`。
+
 ## Phase 12 Reuse Evaluation - Patterns + Drill Card JSON v1
 
 Problem solved:

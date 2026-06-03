@@ -176,10 +176,35 @@ Each migration step must satisfy:
 
 ## Current Phase
 
-The project remains in Phase 0:
+Phase 1-11 complete as baseline infrastructure. Phase 12 frozen pending technology route review.
 
-- Audit completed.
-- Architecture decision recorded.
-- Migration plan prepared.
-- Phase 1 code development not started.
+---
+
+## ADR-002: Hybrid Product + Research Workflow Architecture
+
+**Status**: Accepted on 2026-06-03.
+
+**Context**: Phase 1-11 built a working baseline. Before Phase 12, we evaluated external projects (ARIS, PaperQA, OpenScholar, ResearchPilot, STORM, Docling, Nougat, Marker) to determine whether the current architecture needs fundamental changes.
+
+**Decision**:
+
+1. **Python/FastAPI/Pydantic 作为产品底座保留**。不需要改成 ARIS-style skills 架构。
+2. **论文理解核心升级为 adapter + workflow + audit**。
+   - ParserAdapter interface（可选 Docling/Nougat/Marker）
+   - PassageIndex + ClaimEvidence v2（passage-level evidence）
+   - Evidence-constrained LLM explainer（LLM 输出绑定 evidence_ref）
+   - Audit Layer（explanation audit, formula audit, reviewer independence）
+3. **外部项目先做 reuse audit，不直接接入**。
+   - ARIS: REFERENCE_ONLY（参考 audit chain 和 reviewer independence 设计）
+   - PaperQA: OPTIONAL_ADAPTER（参考 passage retrieval）
+   - Docling/Nougat/Marker: OPTIONAL_ADAPTER（可选 PDF 解析器）
+4. **Phase 8-10 rule-based 保留为 fallback**，LLM-enhanced 需要 evidence constraint。
+5. **Phase 12 冻结**，等待技术路线重审完成。
+
+**Consequences**:
+
+- 产品架构不变，不需要大规模重构
+- 论文理解质量可通过 adapter + audit 逐步升级
+- 外部项目不污染默认 pytest
+- Phase 12 (patterns + drill) 可以在当前架构上继续
 
