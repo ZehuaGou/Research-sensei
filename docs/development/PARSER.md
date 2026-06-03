@@ -119,15 +119,40 @@ class LightweightParserAdapter(ParserAdapter):
 
 ## 9. 测试断言
 
-| 测试 | 断言 |
-|------|------|
-| test_parser_adapter_is_abstract | `ParserAdapter()` raises TypeError |
-| test_lightweight_adapter_supports_md_txt_pdf | .md/.txt/.pdf=True, .MD/.TXT/.PDF=True, .markdown/.docx=False |
-| test_lightweight_adapter_matches_original_output | 字段逐个比较：paper_id, detected_language, degraded, warnings, blocks |
-| test_lightweight_adapter_json_round_trip | dump → validate round-trip |
-| test_lightweight_adapter_does_not_write_artifacts | 无 *.json 文件写入 |
-| test_lightweight_adapter_uses_injected_service | 注入的 service 被调用 |
-| test_lightweight_adapter_propagates_degraded | broken PDF → degraded=True, PDF_PARSE_FAILED |
+**test_parser_adapter_is_abstract**
+- Arrange: import ParserAdapter
+- Act: call ParserAdapter()
+- Assert: raises TypeError
+
+**test_lightweight_adapter_supports_md_txt_pdf**
+- Arrange: create LightweightParserAdapter
+- Act: call supports() on paper.md, paper.txt, paper.pdf, paper.MD, paper.TXT, paper.PDF, paper.markdown, paper.docx
+- Assert: first six return True, paper.markdown is False, paper.docx is False
+
+**test_lightweight_adapter_matches_original_output**
+- Arrange: create tmp markdown file with abstract/method/experiments/formula, create LightweightIngestionService, create LightweightParserAdapter
+- Act: original = service.ingest_path(path, paper_id="p1"), adapted = adapter.parse(path, paper_id="p1")
+- Assert: paper_id equal, detected_language equal, degraded equal, warning count equal, warning code/message equal, block count equal, each block block_id/type/section/text/evidence_ref equal
+
+**test_lightweight_adapter_json_round_trip**
+- Arrange: parse tmp markdown
+- Act: model_dump_json then model_validate_json
+- Assert: paper_id/block count/degraded/warnings preserved
+
+**test_lightweight_adapter_does_not_write_artifacts**
+- Arrange: create tmp source file
+- Act: adapter.parse(...)
+- Assert: no *.json artifact files created, no workspace/runs directory created, adapter only returns DocumentIngestion
+
+**test_lightweight_adapter_uses_injected_service**
+- Arrange: create fake service with ingest_path(), inject into LightweightParserAdapter
+- Act: call parse
+- Assert: fake service called once, path and paper_id passed correctly, returned object is fake result
+
+**test_lightweight_adapter_propagates_degraded**
+- Arrange: create broken PDF bytes
+- Act: adapter.parse(...)
+- Assert: result.degraded is True, warning code contains PDF_PARSE_FAILED or PYMUPDF_MISSING
 
 ## 10. Hard-Fail
 

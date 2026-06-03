@@ -172,4 +172,3 @@ BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic me
 - understanding_status.json 还未实现
 - LLM prompt 结构怎么设计
 - 输出校验规则怎么实现
-- 输出校验规则怎么实现

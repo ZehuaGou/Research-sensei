@@ -34,4 +34,4 @@
 ## 4. 测试和 commit
 
 - pytest: 281 passed
-- 最近 commit: `214d020`
+- commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
