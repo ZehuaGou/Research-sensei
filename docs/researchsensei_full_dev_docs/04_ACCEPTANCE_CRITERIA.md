@@ -1,6 +1,12 @@
 # 04_ACCEPTANCE_CRITERIA
 
-本文件定义“完成”的标准。Agent 不能用“已实现基本功能”糊弄。
+> **2026-06-03 注意**：This file contains legacy target acceptance criteria.
+> Current migration acceptance is governed by `docs/PHASE_MAPPING.md`, `docs/QUALITY_EVALUATION_SPEC.md`, and `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md`.
+> Current Phase 1-11 is **baseline complete**, not final teaching-quality complete.
+> Phase 11.6-11.9 must add acceptance criteria for ParserAdapter, PassageIndex, ClaimEvidence v2, Evidence-constrained LLM Paper Understanding, and Quality Benchmark.
+> Do not pretend current Phase 8-10 already satisfies final advisor-level acceptance.
+
+本文件定义”完成”的标准。Agent 不能用”已实现基本功能”糊弄。
 
 ## 全局完成标准
 

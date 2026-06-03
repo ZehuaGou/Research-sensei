@@ -99,8 +99,8 @@
 ## 14. Phase 12 是否继续冻结
 
 - **问题**：Phase 12 (patterns + drill) 是否在 route reset 完成前继续冻结？
-- **当前倾向**：冻结。先完成 Phase 11.6-11.9（ParserAdapter、PassageIndex、LLM Paper Understanding、Quality Benchmark），再做 Phase 12。
-- **状态**：待确认。
+- **当前决定**：Phase 12 continues frozen until Phase 11.6-11.9 complete and quality gates pass. Accepted unless user overrides.
+- **状态**：accepted unless user overrides.
 
 ## 15. 哪些外部项目进入 optional adapter shortlist
 

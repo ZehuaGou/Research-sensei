@@ -1,10 +1,14 @@
 # 03_FULL_IMPLEMENTATION_PLAN
 
-> **2026-06-03 更新**：Phase 1-11 完成作为 baseline infrastructure。Phase 12 冻结。
-> 新增 Phase 11.5-11.9 子阶段，用于升级论文理解核心。
-> 详见 `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md` 和 `docs/PHASE_MAPPING.md`。
+> **2026-06-03 路由重审警告**
 >
-> 原始 Phase 12（工程可靠性）推迟到后续。当前 Phase 12 = patterns + drill。
+> The original phase table below is **historical product planning**. Do not execute old phase numbers directly.
+> Actual execution order is governed by `docs/PHASE_MAPPING.md`.
+>
+> **Current route**: Phase 11.5 (done) → 11.6 → 11.7 → 11.8 → 11.9 → Phase 12.
+> **Phase 12 is frozen.** It can only resume after Phase 11.6-11.9 complete and quality gates pass.
+>
+> See `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md` for full analysis.
 
 ## 总前置规则：Phase 复用评估门禁
 

@@ -168,7 +168,7 @@ Pre-Phase12 technology route reset in progress. No Phase 12 code authorized.
 
 ## Current Risks
 
-- README currently describes a package layout that does not match the actual project.
+- [RESOLVED] README was rewritten to match current Phase 1-11 baseline and Phase 12 frozen status.
 - Existing `backend/` mixes multiple concerns and should not be expanded.
 - Existing frontend API assumptions may need adjustment when the new backend package becomes active.
 - [RESOLVED] H1: old backend tests moved to `legacy_tests/`, no longer collected by default pytest.
@@ -179,7 +179,7 @@ Pre-Phase12 technology route reset in progress. No Phase 12 code authorized.
 
 Phase 11.5 technology route review completed. Phase 12 frozen.
 
-Next step: confirm route reset, then proceed to Phase 11.6 (ParserAdapter Design) or Phase 12 (Patterns + Drill).
+No Phase 12 code authorized. Next executable phase is Phase 11.6 (ParserAdapter Design), but only after user confirmation.
 
 See `docs/RESEARCHSENSEI_TECH_ROUTE_REVIEW.md` for full analysis and recommended sub-phases.
 

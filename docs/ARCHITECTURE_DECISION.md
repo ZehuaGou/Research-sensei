@@ -206,5 +206,6 @@ Phase 1-11 complete as baseline infrastructure. Phase 12 frozen pending technolo
 - 产品架构不变，不需要大规模重构
 - 论文理解质量可通过 adapter + audit 逐步升级
 - 外部项目不污染默认 pytest
-- Phase 12 (patterns + drill) 可以在当前架构上继续
+- 当前架构可以支撑未来 Phase 12，但不授权现在开发 Phase 12
+- Phase 12 (patterns + drill) remains frozen. It can only resume after Phase 11.6-11.9 complete and quality gates pass.
 
