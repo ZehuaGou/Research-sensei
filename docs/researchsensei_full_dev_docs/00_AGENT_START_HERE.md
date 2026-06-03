@@ -1,5 +1,15 @@
 # 00_AGENT_START_HERE
 
+> **HISTORICAL DOCUMENT — DO NOT EXECUTE DIRECTLY**
+>
+> This original full dev docs package is historical reference only.
+> The canonical execution entry is now:
+> **`docs/researchsensei_governing_docs/00_START_HERE.md`**
+>
+> Do not execute old phase numbers directly. See governing docs for current route.
+
+---
+
 ## 启动必读：复用门禁
 
 每次开始工作前，除本开发文档包外，必须先读取项目根目录下的 `docs/REUSE_REPORT.md`。

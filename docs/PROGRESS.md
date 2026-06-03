@@ -1,5 +1,7 @@
 # ResearchSensei Progress
 
+> **Canonical execution entry**: `docs/researchsensei_governing_docs/00_START_HERE.md`
+
 ## Current Phase
 
 Phase 1-11 complete as baseline infrastructure. Phase 12 frozen.

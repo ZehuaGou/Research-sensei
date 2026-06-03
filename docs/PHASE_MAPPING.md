@@ -1,8 +1,11 @@
 # ResearchSensei Phase Mapping
 
+> **Canonical execution entry**: `docs/researchsensei_governing_docs/00_START_HERE.md`
+
 ## 权威声明
 
-原始开发文档（`docs/researchsensei_full_dev_docs/`）仍作为**产品定义与总体架构依据**。
+原始开发文档（`docs/researchsensei_full_dev_docs/`）是 **historical reference**，不再直接执行。
+权威执行入口是 `docs/researchsensei_governing_docs/`。
 
 但实际执行以以下文件为准：
 

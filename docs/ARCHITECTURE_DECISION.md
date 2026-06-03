@@ -1,5 +1,7 @@
 # ResearchSensei Architecture Decision
 
+> **Canonical execution entry**: `docs/researchsensei_governing_docs/00_START_HERE.md`
+
 ## Status
 
 Accepted on 2026-06-02.

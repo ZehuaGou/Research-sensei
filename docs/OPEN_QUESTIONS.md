@@ -1,5 +1,7 @@
 # OPEN QUESTIONS
 
+> **Canonical execution entry**: `docs/researchsensei_governing_docs/00_START_HERE.md`
+
 ## 1. Phase 编号与原始开发文档的差异
 
 - **问题**：当前迁移路线的 Phase 编号已和原始开发文档 `03_FULL_IMPLEMENTATION_PLAN.md` 存在差异。
