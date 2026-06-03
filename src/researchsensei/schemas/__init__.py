@@ -2,7 +2,7 @@ from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBund
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ScoringBreakdown
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
-from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
+from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
 from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, SearchIntent
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.skeleton import PaperSkeleton
@@ -23,6 +23,8 @@ __all__ = [
     "ParserResult",
     "ErrorItem",
     "EvidenceIndex",
+    "EvidencePack",
+    "EvidencePackItem",
     "EvidenceRetrievalResult",
     "EvidenceType",
     "Passage",

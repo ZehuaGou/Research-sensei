@@ -106,3 +106,23 @@ class EvidenceRetrievalResult(SenseiModel):
     score: float
     matched_terms: list[str] = Field(default_factory=list)
     evidence_ref: str = ""
+
+
+class EvidencePackItem(SenseiModel):
+    claim_id: str
+    claim_type: str
+    evidence_ref: str
+    passage_id: str = ""
+    quote_or_summary: str = ""
+    passage_text: str = ""
+    confidence: float = Field(ge=0.0, le=1.0)
+    retrieval_score: float = 0.0
+    token_count: int = 0
+    source_artifact: str = "claim_evidence"
+
+
+class EvidencePack(SenseiModel):
+    paper_id: str
+    items: list[EvidencePackItem] = Field(default_factory=list)
+    warnings: list[WarningItem] = Field(default_factory=list)
+    total_tokens: int = 0
