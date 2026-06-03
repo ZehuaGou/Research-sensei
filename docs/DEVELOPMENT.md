@@ -29,6 +29,21 @@
 | SUCCESS | 输出可作为用户可见结果。所有核心解释有 evidence_ref。audit/validation 通过。 | YES |
 | DEGRADED_STRUCTURAL | 只用于结构性问题（PDF 部分解析失败、元数据缺失）。可输出 artifact 但必须有 warning。不允许生成无证据解释。 | PARTIAL — 只有结构信息，无理解内容 |
 | BLOCKED_UNDERSTANDING | evidence 不足、LLM 输出无效、LLM 失败、核心解释无法验证。不生成最终 paper_card/formula_cards/teaching_cards。只输出 error/warning/diagnostic artifact。 | NO — 必须明确说明"无法可靠生成解释" |
+
+BLOCKEDUNDERSTANDING 只能展示：
+- status
+- blocking_reason
+- warnings
+- diagnostic metadata
+
+BLOCKED_UNDERSTANDING 不能包含：
+- 论文解释内容
+- 教学内容
+- 推断的核心思想
+- 公式解释
+- 听起来像成功理解的用户摘要
+
+BLOCKED_UNDERSTANDING 只能展示诊断状态和阻塞原因，不能夹带论文解释、教学内容、核心思想推断或公式讲解。
 | FAILED | pipeline 失败或异常中断。job status 必须 FAILED。 | NO |
 
 ### 理解状态 artifact: understanding_status.json
@@ -570,7 +585,7 @@ class SinglePaperIngestionRunner:
 
 | 场景 | 行为 |
 |------|------|
-| LLM client 不存在 | 生成 BASELINE_ONLY artifact，quality_status = "BASELINE_ONLY"，不得标记为 v2 understanding，不得作为 Phase 12 输入 |
+| LLM client 不存在 | 生成 BASELINE_ONLY artifact，understanding_status.status = "BASELINE_ONLY"，不得标记为 v2 understanding，不得作为 Phase 12 输入 |
 | LLM 调用失败 | 输出 BLOCKED_UNDERSTANDING，warning code: "LLM_UNAVAILABLE"。不允许静默 fallback 成 final card |
 | LLM 输出 evidence_ref 不存在 | 丢弃该 LLM 输出。核心字段缺失 → BLOCKED_UNDERSTANDING，warning code: "INVALID_EVIDENCE_REF" |
 | LLM 输出无 evidence_ref | 丢弃该字段。核心解释无法补足 → BLOCKED_UNDERSTANDING，warning code: "MISSING_EVIDENCE_REF" |
@@ -613,7 +628,7 @@ class SinglePaperIngestionRunner:
 **test_no_llm_client_produces_baseline_only**
 - Arrange: create runner without llm_client
 - Act: run()
-- Assert: quality_status == "BASELINE_ONLY", not marked as v2 understanding
+- Assert: understanding_status.status == "BASELINE_ONLY", understanding_status.allowed_for_user_display is False, understanding_status.allowed_for_phase12 is False, no artifact is marked as final v2 understanding
 
 **test_mock_llm_client_produces_evidence_bound_card**
 - Arrange: create runner with MockLLMClient returning valid JSON with evidence_refs
@@ -674,6 +689,11 @@ class SinglePaperIngestionRunner:
 - Arrange: create successful evidence-bound card
 - Act: validate status
 - Assert: status == "SUCCESS", allowed_for_user_display is True, allowed_for_phase12 is True
+
+**test_blocked_understanding_contains_no_user_facing_explanation**
+- Arrange: create BLOCKED_UNDERSTANDING result
+- Act: inspect output payload
+- Assert: no paper explanation text, no teaching_card content, no inferred core_idea, no formula explanation, only status/blocking_reason/warnings/diagnostic metadata
 
 ### 11. Hard-Fail 条件
 
