@@ -25,11 +25,11 @@
 
 ## 3. 当前任务
 
-- Engineering Reliability 已有第四批讨论共识
-- 全项目主要技术路线已基本收敛
+- 正在分批同步技术讨论共识到正式开发文档
+- 第一批（Parser + Evidence）已完成
 - 尚未进入代码开发
 - 尚未进入 Phase 12
-- 下一步是整理技术讨论共识并规划同步到正式开发文档
+- 下一批同步 Paper Understanding + Audit / Quality
 
 ---
 

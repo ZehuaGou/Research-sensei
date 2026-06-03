@@ -59,23 +59,68 @@
 
 ## 6. Artifact
 
-- `evidence_index.json` 格式向后兼容（v1 字段不变，v2 字段可选）
+v2 精读链路新增 3 个 artifact：
+
+| artifact | 用途 | schema_version |
+|----------|------|----------------|
+| `passage_index.json` | PassageIndex，passage 级文档表示 | v2 |
+| `claim_evidence.json` | ClaimEvidence v2，含 passage_id / claim_type / semantic_support | v2 |
+| `evidence_index.json` | v1 兼容 wrapper，保留旧字段 | v1（无 schema_version 时默认 v1） |
+
+- `evidence_index.json` 保留 v1 兼容，旧测试可继续读取。
+- `claim_evidence.json` 承载 v2 字段，audit 和 Phase 12 读取此文件。
+- `passage_index.json` 持久化 passage 构建结果，audit 和前端 evidence 跳转依赖此文件。
+- 旧 artifact 缺少 `schema_version` 时按 v1 读取。
+- additive 字段通过 Pydantic 默认值兼容。
 
 ## 7. 核心类和方法签名
 
+### Passage
+
 ```python
 class Passage(SenseiModel):
-    passage_id: str
-    block_ids: list[str]
-    section: str
-    text: str
-    normalized_text: str
+    passage_id: str              # p001, p002, ...
+    paper_id: str
+    block_ids: list[str]         # 包含的 block_id 列表
+    section: str                 # 所属 section
+    text: str                    # 合并后的文本
+    normalized_text: str         # text.lower().strip()
+    page_start: int | None = None
+    page_end: int | None = None
+    token_count: int = 0         # len(text.split())
+    evidence_refs: list[str] = []  # 保留 block 级 evidence_ref
+    source_block_types: list[str] = []  # block.type 列表
+```
+
+### PassageIndex
+
+```python
+class PassageIndexBuildConfig(SenseiModel):
+    min_passage_chars: int = 50
+    max_passage_chars: int = 2000
+    merge_same_section: bool = True
+    formula_standalone: bool = True
+    table_standalone: bool = True
+
+class PassageIndexStats(SenseiModel):
+    total_passages: int
+    total_blocks: int
+    skipped_short: int
+    split_long: int
+    sections_found: list[str]
 
 class PassageIndex(SenseiModel):
+    schema_version: str = "v2"
     paper_id: str
     passages: list[Passage]
     warnings: list[WarningItem] = []
+    build_config: PassageIndexBuildConfig = Field(default_factory=PassageIndexBuildConfig)
+    stats: PassageIndexStats | None = None
+```
 
+### ClaimEvidence
+
+```python
 class ClaimEvidence(SenseiModel):
     # v1 字段（不变）
     claim_id: str
@@ -88,12 +133,25 @@ class ClaimEvidence(SenseiModel):
     passage_id: str = ""
     claim_type: str = ""
     semantic_support: str = ""
+    source_sentence: str = ""    # 原文句子
+    generated_by: str = "rule"   # "rule" / "llm"
+```
 
+### ClaimExtractor / EvidenceRetriever
+
+```python
 class ClaimExtractor:
     def extract(self, passages: list[Passage]) -> list[ClaimEvidence]: ...
 
+class EvidenceRetrievalResult(SenseiModel):
+    passage_id: str
+    score: float
+    matched_terms: list[str] = []
+    evidence_ref: str = ""
+
 class EvidenceRetriever:
-    def retrieve(self, claim: str, index: PassageIndex) -> list[Passage]: ...
+    def __init__(self, k1: float = 1.5, b: float = 0.75, min_score: float = 0.5, top_k: int = 5): ...
+    def retrieve(self, claim_text: str, index: PassageIndex) -> list[EvidenceRetrievalResult]: ...
 ```
 
 ### claim_type 值
@@ -107,6 +165,17 @@ class EvidenceRetriever:
 | LIMITATION | 局限、假设或未来工作 |
 | FORMULA_CONTEXT | 公式的作用、变量来源、优化目标 |
 | DEFINITION | 术语或符号定义 |
+
+DATASET / METRIC 暂不作为独立 claim_type，先归入 RESULT 或后续扩展。
+
+### 命名规范
+
+| 标识 | 格式 | 示例 |
+|------|------|------|
+| passage_id | `p{nnn}` | p001, p002, p003 |
+| claim_id | `{paper_id}:claim:c{nnn}` | paper123:claim:c001 |
+| evidence_ref | 保留 block 级引用 | paper123:b003 |
+| ClaimEvidence | 同时保留 passage_id + evidence_ref | passage_id="p002", evidence_ref="paper123:b003" |
 
 ### semantic_support 值
 
@@ -125,13 +194,17 @@ class EvidenceRetriever:
 1. 遍历 blocks，按 section 分组
 2. heading blocks 不合并到 passage（只标记 section 边界）
 3. 同一 section 的连续 non-heading blocks 合并为一个 passage
-4. 空文本 blocks（text.strip() == ""）跳过
-5. 太短的 passage（< 50 chars）跳过，产生 `WarningItem(code="PASSAGE_TOO_SHORT", message="...")`
-6. 太长的 passage（> 2000 chars）按句子边界切分
-7. passage_id 按序分配（p001, p002, ...）
-8. block_ids 保存该 passage 包含的所有 block_id
-9. normalized_text = text.lower().strip()
-10. 如果无 passages 可提取，产生 `WarningItem(code="NO_PASSAGES", message="...")`
+4. formula block 单独成 passage（不混入段落）
+5. table block 单独成 passage（不混入段落）
+6. 空文本 blocks（text.strip() == ""）跳过
+7. 太短的 passage（< 50 chars）跳过，产生 `WarningItem(code="PASSAGE_TOO_SHORT", message="...")`
+8. 太长的 passage（> 2000 chars）按句子边界切分
+9. section 缺失时用 "unknown"，不直接阻断
+10. passage_id 按序分配（p001, p002, ...）
+11. block_ids 保存该 passage 包含的所有 block_id
+12. evidence_refs 保留所有 block 级 evidence_ref
+13. normalized_text = text.lower().strip()
+14. 如果无 passages 可提取，产生 `WarningItem(code="NO_PASSAGES", message="...")`
 
 **输出**: `PassageIndex`
 
@@ -160,14 +233,22 @@ class EvidenceRetriever:
 
 ## 10. Artifact 策略
 
-**选择**: 升级 `evidence_index.json`（向后兼容），不新增独立文件。
+**选择**: v2 新增 `passage_index.json` 和 `claim_evidence.json`，`evidence_index.json` 保留 v1 兼容 wrapper。
 
 **理由**:
-- 现有 `EvidenceIndex` schema 已有 `claims: list[ClaimEvidence]`
-- `ClaimEvidence` 新增 v2 可选字段（passage_id, claim_type, semantic_support）
-- v1 字段不变，现有测试不破坏
+- ResearchSensei 是 artifact-driven 系统，重要中间结果应可审计、可复现、可调试
+- audit 需要独立读取 passage 构建结果，不能依赖重跑算法
+- 前端 evidence 跳转需要 passage 层信息
+- `ClaimEvidence.passage_id` 不能指向不存在的运行时对象
+- 质量测试需要直接检查 passage 分段
+- `evidence_index.json` 保留 v1 兼容，旧测试不破坏
 - 下游（paper_card, formula_card, teaching_card）不需要改代码就能继续工作
-- PassageIndex 可以作为中间数据结构，不一定要持久化为独立 artifact
+- `claim_evidence.json` 承载 v2 字段，audit 和 Phase 12 读取此文件
+
+**artifact versioning**:
+- `passage_index.json` 和 `claim_evidence.json` 写 `schema_version="v2"`
+- `evidence_index.json` 保留 v1（无 schema_version 时默认 v1）
+- additive 字段通过 Pydantic 默认值兼容
 
 ## 10. 错误/失败策略
 
@@ -291,7 +372,7 @@ class EvidenceRetriever:
 
 - passage 分段策略（按 section 还是按 paragraph count）需要实测
 - claim_type 判断准确性（关键词匹配 vs 位置启发式）需要实测
-- BM25 阈值和 k1/b 参数需要实测调优
-- 是否需要把 PassageIndex 持久化为独立 artifact
-- passage_index.json 和 claim_evidence.json 是否作为独立 artifact
-- evidence_index.json 是否作为兼容 wrapper 保留
+- BM25 min_score 和 top_k 具体值需要实测调优
+- passage 切分的句子边界检测方案
+- ClaimExtractor 的规则复杂度需要实测
+- EvidenceRetriever 二次 validation 规则

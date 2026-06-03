@@ -81,6 +81,16 @@
 - 不新增 artifact
 - 不修改现有 artifact 格式
 - `parsed_document.json` 格式不变
+- v2 artifact 应显式写 `schema_version="v2"`（通过 Pydantic 默认值）
+- 旧 artifact 缺少 `schema_version` 时按 v1 读取
+- additive 字段通过默认值兼容，不需要 migration
+- breaking change 未来再讨论 migration 方案
+
+### 外部 parser 约束
+
+- 所有外部 parser 都必须通过 `ParserAdapter` 输出 `ParserResult`
+- 外部 parser 不能直接写 artifact，不能绕过 `DocumentIngestion`
+- 外部 parser 的结构化输出（bbox、table_html 等）通过 `DocumentBlock` 扩展字段保留
 
 ## 7. 核心类和方法签名
 
