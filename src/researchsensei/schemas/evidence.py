@@ -3,6 +3,7 @@ from __future__ import annotations
 from pydantic import Field, model_validator
 
 from researchsensei.schemas.base import SenseiModel
+from researchsensei.schemas.common import WarningItem
 from researchsensei.schemas.enums import EvidenceType
 
 
@@ -36,3 +37,42 @@ class EvidenceIndex(SenseiModel):
     paper_id: str
     claims: list[ClaimEvidence] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+
+
+class Passage(SenseiModel):
+    passage_id: str
+    paper_id: str
+    block_ids: list[str] = Field(default_factory=list)
+    section: str = ""
+    text: str = ""
+    normalized_text: str = ""
+    page_start: int | None = None
+    page_end: int | None = None
+    token_count: int = 0
+    evidence_refs: list[str] = Field(default_factory=list)
+    source_block_types: list[str] = Field(default_factory=list)
+
+
+class PassageIndexBuildConfig(SenseiModel):
+    min_passage_chars: int = 50
+    max_passage_chars: int = 2000
+    merge_same_section: bool = True
+    formula_standalone: bool = True
+    table_standalone: bool = True
+
+
+class PassageIndexStats(SenseiModel):
+    total_passages: int = 0
+    total_blocks: int = 0
+    skipped_short: int = 0
+    split_long: int = 0
+    sections_found: list[str] = Field(default_factory=list)
+
+
+class PassageIndex(SenseiModel):
+    schema_version: str = "v2"
+    paper_id: str
+    passages: list[Passage] = Field(default_factory=list)
+    warnings: list[WarningItem] = Field(default_factory=list)
+    build_config: PassageIndexBuildConfig = Field(default_factory=PassageIndexBuildConfig)
+    stats: PassageIndexStats | None = None

@@ -170,7 +170,7 @@ def test_runner_artifact_smoke_writes_real_json(tmp_path: Path) -> None:
     job = runner.run(source, job_id="runner-smoke")
 
     assert job.status == JobStatus.SUCCEEDED
-    assert len(job.artifacts) == 7
+    assert len(job.artifacts) == 8
 
     run_dir = tmp_path / "workspace" / "runs" / "runner-smoke"
     for artifact in job.artifacts:
@@ -182,4 +182,4 @@ def test_runner_artifact_smoke_writes_real_json(tmp_path: Path) -> None:
     # Verify job can be re-read from store
     reloaded = jobs.get("runner-smoke")
     assert reloaded.status == JobStatus.SUCCEEDED
-    assert len(reloaded.artifacts) == 7
+    assert len(reloaded.artifacts) == 8
