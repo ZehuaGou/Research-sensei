@@ -12,7 +12,7 @@ from researchsensei.jobs import JobStore
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.parser.adapter import ParserAdapter
-from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
+from researchsensei.schemas import DownstreamGates, JobRecord, JobStatus, SourceStatus, UnderstandingStatus, WarningItem, WorkspaceArtifact
 from researchsensei.teaching_card import build_teaching_cards
 from researchsensei.workspace import WorkspaceStore
 
@@ -69,6 +69,31 @@ class SinglePaperIngestionRunner:
             paper_card = build_paper_card(paper_skeleton, evidence_index)
             formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
             teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
+            understanding_status = UnderstandingStatus(
+                paper_id=actual_job_id,
+                status="BASELINE_ONLY",
+                blocking_reason="NO_LLM_CLIENT",
+                allowed_for_user_display=False,
+                allowed_downstream=DownstreamGates(),
+                component_status={
+                    "paper_card": "BASELINE",
+                    "formula_cards": "BASELINE",
+                    "teaching_cards": "BASELINE",
+                    "llm": "SKIPPED",
+                    "evidence_pack": "SKIPPED",
+                },
+                checked_artifacts=[
+                    "source_status",
+                    "parsed_document",
+                    "passage_index",
+                    "claim_evidence",
+                    "evidence_index",
+                    "paper_skeleton",
+                    "paper_card",
+                    "formula_cards",
+                    "teaching_cards",
+                ],
+            )
         except Exception as exc:
             error_summary = f"{type(exc).__name__}: {str(exc)[:200]}"
             return self.jobs.update(
@@ -87,6 +112,7 @@ class SinglePaperIngestionRunner:
         card_path = run_dir / "paper_card.json"
         formula_path = run_dir / "formula_cards.json"
         teaching_path = run_dir / "teaching_cards.json"
+        understanding_status_path = run_dir / "understanding_status.json"
         self.workspace.write_json(source_status_path, resolved_source_status)
         self.workspace.write_json(parsed_path, document)
         self.workspace.write_json(passage_index_path, passage_index)
@@ -96,6 +122,7 @@ class SinglePaperIngestionRunner:
         self.workspace.write_json(card_path, paper_card)
         self.workspace.write_json(formula_path, formula_cards)
         self.workspace.write_json(teaching_path, teaching_cards)
+        self.workspace.write_json(understanding_status_path, understanding_status)
 
         current_step = "ingestion_degraded" if document.degraded else "ingestion_completed"
         return self.jobs.update(
@@ -113,6 +140,7 @@ class SinglePaperIngestionRunner:
                 WorkspaceArtifact(artifact_type="paper_card", path=str(card_path)),
                 WorkspaceArtifact(artifact_type="formula_cards", path=str(formula_path)),
                 WorkspaceArtifact(artifact_type="teaching_cards", path=str(teaching_path)),
+                WorkspaceArtifact(artifact_type="understanding_status", path=str(understanding_status_path)),
             ],
         )
 

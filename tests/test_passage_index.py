@@ -258,10 +258,10 @@ def test_runner_artifact_count_includes_passage_index(tmp_path: Path) -> None:
 
     artifact_types = {a.artifact_type for a in job.artifacts}
     assert "passage_index" in artifact_types
-    assert len(job.artifacts) == 9
+    assert len(job.artifacts) == 10
     expected = {
         "source_status", "ingestion", "passage_index", "claim_evidence", "evidence_index",
-        "paper_skeleton", "paper_card", "formula_cards", "teaching_cards",
+        "paper_skeleton", "paper_card", "formula_cards", "teaching_cards", "understanding_status",
     }
     assert artifact_types == expected
 

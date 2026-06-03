@@ -8,6 +8,7 @@ from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
 from researchsensei.schemas.source import SourceStatus
+from researchsensei.schemas.status import DownstreamGates, EvidencePackSummary, UnderstandingStatus
 
 __all__ = [
     "BlockType",
@@ -18,6 +19,7 @@ __all__ = [
     "ClaimEvidenceBundle",
     "ClaimEvidenceV2",
     "DirectionBundle",
+    "DownstreamGates",
     "DocumentBlock",
     "DocumentIngestion",
     "ParseMetadata",
@@ -25,6 +27,7 @@ __all__ = [
     "ErrorItem",
     "EvidenceIndex",
     "EvidencePack",
+    "EvidencePackSummary",
     "EvidencePackItem",
     "EvidenceRetrievalResult",
     "EvidenceType",
@@ -56,6 +59,7 @@ __all__ = [
     "SourceStatus",
     "TeachingCard",
     "TeachingCardBundle",
+    "UnderstandingStatus",
     "WarningItem",
     "WorkspaceArtifact",
 ]
