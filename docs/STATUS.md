@@ -25,17 +25,26 @@
 
 ## 3. 当前任务
 
-- 第三批（Frontend/API + Engineering Reliability + Full Pipeline）同步完成
-- 全部模块开发文档同步完成
-- 尚未进入代码开发
-- 尚未进入 Phase 12
-- 下一步：整体检查正式开发文档一致性，确认无冲突后再考虑第一个代码任务
+- 第一个代码任务已完成：ParserAdapter 接口 + LightweightParserAdapter
+  - ParserAdapter 抽象接口（supports / parse）
+  - LightweightParserAdapter（包装 LightweightIngestionService）
+  - ParseMetadata / ParserResult schema
+  - DocumentBlock Optional 结构化字段（bbox / table_html / figure_caption / reference_entries）
+  - 292 tests passing（281 existing + 11 new）
+- 尚未完成：
+  - ParserAdapter 尚未接入 SinglePaperIngestionRunner
+  - Evidence / PassageIndex / ClaimEvidence v2 尚未实现
+  - Paper Understanding v2 尚未实现
+  - Audit / QualityReport / UnderstandingStatus 尚未实现
+  - Frontend/API gating 尚未实现
+- Phase 12 仍冻结
+- 下一步：规划"ParserAdapter 接入 pipeline"或"PassageIndex / ClaimEvidence v2"二选一
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 281 passed
+- pytest: 292 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
