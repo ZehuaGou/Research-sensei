@@ -99,3 +99,10 @@ class ClaimEvidenceBundle(SenseiModel):
     claims: list[ClaimEvidenceV2] = Field(default_factory=list)
     warnings: list[WarningItem] = Field(default_factory=list)
     source_artifacts: list[str] = Field(default_factory=list)
+
+
+class EvidenceRetrievalResult(SenseiModel):
+    passage_id: str
+    score: float
+    matched_terms: list[str] = Field(default_factory=list)
+    evidence_ref: str = ""

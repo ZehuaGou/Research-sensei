@@ -5,9 +5,9 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 335 tests passing
+- 350 tests passing
 - 当前代码仍不是最终论文理解系统
-- Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2
+- Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
 - Phase 11 是 direction pipeline v1，不是完整 literature review
 
@@ -25,30 +25,26 @@
 
 ## 3. 当前任务
 
-- ClaimEvidenceV2 + claim_evidence.json 已完成：
-  - ParserAdapter 已接入 pipeline
-  - PassageIndex 已完成并写入 passage_index.json
-  - ClaimEvidenceV2 独立 schema（不污染 v1）
-  - ClaimEvidenceBundle 已完成
-  - build_claim_evidence(document, passage_index) 已完成
-  - pipeline 写入 claim_evidence.json
-  - artifact 数量从 8 变 9
-  - METHOD / RESULT claim sentence selection 已修正，使用关键词匹配，命中时 DIRECT_QUOTE，未命中时 PARAPHRASE
+- BM25 / EvidenceRetriever 已完成：
+  - EvidenceRetrievalResult schema
+  - EvidenceRetriever class（top_k / min_score / k1 / b）
+  - tokenize / compute_idf / bm25_score 纯函数
+  - EvidenceRetriever 是运行时能力，未接入 pipeline
+  - 未改 claim_evidence.json，未新增 artifact
   - 旧 evidence_index.json 仍保留，build_evidence_index / ClaimEvidence v1 / EvidenceIndex v1 未修改
-  - 335 tests passing（313 existing + 22 new）
+  - 350 tests passing（335 existing + 15 new）
 - 尚未完成：
-  - BM25 / EvidenceRetriever 尚未实现
   - Paper Understanding v2 尚未实现
   - Audit / QualityReport / UnderstandingStatus 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：讨论 BM25 / EvidenceRetriever，不要直接进入 Paper Understanding
+- 下一步：讨论 Paper Understanding v2 / EvidencePack，不要直接进入 Audit 或 Frontend
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 335 passed
+- pytest: 350 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
