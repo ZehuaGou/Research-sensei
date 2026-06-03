@@ -16,6 +16,29 @@
 
 ---
 
+## 1b. Output Trust Policy
+
+论文理解失败时宁可停止并标记不可用，也不要生成垃圾解释。降级不是继续编一个低质量结果。
+
+### 四种输出状态
+
+| 状态 | 含义 | 可否输出用户可见解释 |
+|------|------|---------------------|
+| SUCCESS | 输出可作为用户可见结果。所有核心解释有 evidence_ref。audit/validation 通过。 | YES |
+| DEGRADED_STRUCTURAL | 只用于结构性问题（PDF 部分解析失败、元数据缺失）。可输出 artifact 但必须有 warning。不允许生成无证据解释。 | PARTIAL — 只有结构信息，无理解内容 |
+| BLOCKED_UNDERSTANDING | evidence 不足、LLM 输出无效、LLM 失败、核心解释无法验证。不生成最终 paper_card/formula_cards/teaching_cards。只输出 error/warning/diagnostic artifact。 | NO — 必须明确说明"无法可靠生成解释" |
+| FAILED | pipeline 失败或异常中断。job status 必须 FAILED。 | NO |
+
+### 核心规则
+
+- 不能把 DEGRADED_STRUCTURAL 当作内容理解成功。
+- 不能把 rule-based baseline 当最终导师级解释。
+- 没有 evidence 的内容不能出现在最终用户解释里。
+- LLM 失败默认进入 BLOCKED_UNDERSTANDING，不是自动 fallback 成 final card。
+- rule-based baseline 只能作为 diagnostic / baseline artifact，不能冒充最终导师级解释。
+
+---
+
 ## 2. Parser 模块
 
 ### 1. 模块目标
@@ -359,15 +382,15 @@ class EvidenceRetriever:
 
 | 错误 | 行为 |
 |------|------|
-| 无 passages 提取 | `warnings.append("NO_PASSAGES")` |
-| 无 claims 提取 | `warnings.append("NO_CLAIMS")` |
+| 无 passages 提取 | `warnings.append(WarningItem(code="NO_PASSAGES", message="No passages could be built from parsed document."))` |
+| 无 claims 提取 | `warnings.append(WarningItem(code="NO_CLAIMS", message="No semantic claims could be extracted from passages."))` |
 | claim 无匹配 passage | `evidence_type = INSUFFICIENT_EVIDENCE` |
 | passage 太短 (< 50 chars) | 跳过该 passage |
 
 ### 9. Artifact 影响
 
 - `evidence_index.json` 格式向后兼容（v1 字段不变，v2 字段可选）
-- 现有 grounding.py 保留为 fallback
+- 现有 grounding.py 保留为 baseline diagnostic，不是最终理解结果
 
 ### 10. 测试要求
 
@@ -477,7 +500,7 @@ class EvidencePackItem(SenseiModel):
     confidence: float
 ```
 
-**Pipeline 集成**:
+**Pipeline 集成** (fail-closed):
 ```python
 class SinglePaperIngestionRunner:
     def __init__(self, ..., llm_client: LLMClient | MockLLMClient | None = None):
@@ -485,14 +508,22 @@ class SinglePaperIngestionRunner:
 
     def run(self, ...):
         ...
-        if self.llm_client is not None:
-            try:
-                paper_card = build_paper_card_with_llm(skeleton, evidence_index, self.llm_client)
-            except Exception:
-                paper_card = build_paper_card(skeleton, evidence_index)  # fallback
-        else:
-            paper_card = build_paper_card(skeleton, evidence_index)
+        if self.llm_client is None:
+            return build_baseline_cards_with_status("BASELINE_ONLY")
+
+        try:
+            llm_cards = build_cards_with_llm(...)
+        except Exception:
+            return blocked_understanding("LLM_UNAVAILABLE")
+
+        validated = validate_evidence_refs(llm_cards, evidence_index)
+        if not validated.ok:
+            return blocked_understanding(validated.reason)
+
+        return llm_cards
 ```
+
+**注意**: 不再写 `except Exception: build_paper_card(...)` 这种兜底生成最终结果的模式。
 
 ### 7. 输入输出
 
@@ -503,14 +534,16 @@ class SinglePaperIngestionRunner:
 | LLM prompt 只能使用 | paper title/metadata, paper_skeleton, evidence_pack, existing baseline card |
 | 禁止 | 直接整篇论文全文塞入 prompt |
 
-### 8. 错误 / 降级策略
+### 8. LLM / Evidence Failure Policy
 
-| 错误 | 行为 |
+| 场景 | 行为 |
 |------|------|
-| LLM 输出 evidence_ref 不存在 | 丢弃该字段或 fallback |
-| LLM 输出无 evidence_ref | fallback |
-| LLM 异常 | fallback，warning code: `LLM_CARD_FALLBACK` |
-| fallback 到 rule-based | card warnings 中体现 `LLM_CARD_FALLBACK` |
+| LLM client 不存在 | 生成 BASELINE_ONLY artifact，quality_status = "BASELINE_ONLY"，不得标记为 v2 understanding，不得作为 Phase 12 输入 |
+| LLM 调用失败 | 输出 BLOCKED_UNDERSTANDING，warning code: "LLM_UNAVAILABLE"。不允许静默 fallback 成 final card |
+| LLM 输出 evidence_ref 不存在 | 丢弃该 LLM 输出。核心字段缺失 → BLOCKED_UNDERSTANDING，warning code: "INVALID_EVIDENCE_REF" |
+| LLM 输出无 evidence_ref | 丢弃该字段。核心解释无法补足 → BLOCKED_UNDERSTANDING，warning code: "MISSING_EVIDENCE_REF" |
+| evidence 不足 | 不生成解释。输出 INSUFFICIENT_EVIDENCE。不能用模板句硬凑 |
+| rule-based baseline | 只能作为 fallback diagnostic，不是最终理解结果。必须明确 BASELINE_ONLY |
 
 ### v2 质量门槛
 
@@ -518,6 +551,7 @@ class SinglePaperIngestionRunner:
 - formula symbol 必须来自论文上下文，不只是通用字典
 - `human_explanation` 不能是公式文本
 - generic symbol dict → `REASONABLE_INFERENCE`
+- BASELINE_ONLY artifact 不得作为 Phase 12 patterns/drill 的输入
 
 ### 禁止
 
@@ -525,6 +559,8 @@ class SinglePaperIngestionRunner:
 - 不能生成没有 evidence 的解释
 - 不能把原文复制成 human_explanation
 - 不能编造 dataset / metric / result
+- 不能把 LLM 失败 fallback 成最终 card
+- 不能把 rule-based baseline 当最终导师级解释
 
 ### 9. Artifact 影响
 
@@ -536,55 +572,72 @@ class SinglePaperIngestionRunner:
 **test_pipeline_accepts_optional_llm_client**
 - Arrange: create SinglePaperIngestionRunner with llm_client=None
 - Act: run()
-- Assert: no error, uses rule-based
+- Assert: no error, status is BASELINE_ONLY
 
-**test_no_llm_client_uses_rule_based_baseline**
+**test_no_llm_client_produces_baseline_only**
 - Arrange: create runner without llm_client
 - Act: run()
-- Assert: output matches direct rule-based call
+- Assert: quality_status == "BASELINE_ONLY", not marked as v2 understanding
 
 **test_mock_llm_client_produces_evidence_bound_card**
 - Arrange: create runner with MockLLMClient returning valid JSON with evidence_refs
 - Act: run()
-- Assert: card has evidence_refs from LLM output
+- Assert: card has evidence_refs from LLM output, status is SUCCESS
 
-**test_llm_failure_falls_back_with_warning**
-- Arrange: create runner with MockLLMClient that raises exception
+**test_llm_failure_blocks_understanding**
+- Arrange: create runner with MockLLMClient that raises RuntimeError
 - Act: run()
-- Assert: no crash, fallback to rule-based, warning contains "LLM_CARD_FALLBACK"
+- Assert: result status is BLOCKED_UNDERSTANDING, no final v2 paper_card produced, warning code includes "LLM_UNAVAILABLE", rule-based baseline is not marked as final
 
-**test_invalid_evidence_ref_rejected**
-- Arrange: create MockLLMClient returning card with non-existent evidence_ref
-- Act: run()
-- Assert: invalid ref rejected, fallback used
+**test_invalid_evidence_ref_blocks_core_fields**
+- Arrange: create MockLLMClient returning core_idea with fake evidence_ref
+- Act: run validation
+- Assert: core_idea is rejected, if no valid replacement exists → BLOCKED_UNDERSTANDING, warning code includes "INVALID_EVIDENCE_REF"
 
-**test_output_without_evidence_ref_rejected**
-- Arrange: create MockLLMClient returning card without evidence_ref
-- Act: run()
-- Assert: claim rejected or degraded
+**test_missing_evidence_ref_blocks_output**
+- Arrange: create MockLLMClient returning explanation without evidence_ref
+- Act: validate
+- Assert: explanation is rejected, no final teaching_card generated, warning code includes "MISSING_EVIDENCE_REF"
+
+**test_baseline_only_not_allowed_for_phase12_input**
+- Arrange: generate baseline-only cards
+- Act: attempt to use them as Phase 12 input
+- Assert: rejected, warning/error says "BASELINE_ONLY_NOT_ALLOWED"
+
+**test_degraded_structural_does_not_equal_understanding_success**
+- Arrange: parsed document has degraded=True due to PDF issue
+- Act: run understanding
+- Assert: understanding result is not SUCCESS, either BLOCKED_UNDERSTANDING or explicitly marked insufficient
 
 **test_core_idea_differs_from_method_overview**
 - Arrange: create runner with MockLLMClient
 - Act: run()
-- Assert: core_idea.text != method_overview.text, or degraded
+- Assert: core_idea.text != method_overview.text, or BLOCKED_UNDERSTANDING
 
 **test_human_explanation_not_raw_copy**
 - Arrange: create runner with MockLLMClient returning abstract text as human_explanation
 - Act: run()
-- Assert: warning or degradation
+- Assert: BLOCKED_UNDERSTANDING or warning with "RAW_COPY_DETECTED"
 
-**test_formula_symbol_from_context_or_degraded**
+**test_formula_symbol_from_context_or_reasonable_inference**
 - Arrange: create runner with formula-heavy input
 - Act: run()
 - Assert: symbols from paper context or evidence_type == REASONABLE_INFERENCE
 
 ### 11. Hard-Fail 条件
 
-- 默认测试真实 LLM
-- 无效 evidence_ref 被接受
-- 无 fallback
-- 现有测试破坏
-- 公式文本作为 human_explanation
+| ID | 条件 |
+|----|------|
+| HF-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE |
+| HF-2 | human_explanation 是公式文本 |
+| HF-3 | formula symbol 解释与论文矛盾 |
+| HF-4 | core_idea / problem 缺 evidence_ref |
+| HF-5 | 输出无论文特有术语 |
+| HF-6 | 输出与论文主题不符 |
+| HF-7 | LLM failure produces final-looking cards |
+| HF-8 | BASELINE_ONLY card used as v2/final understanding |
+| HF-9 | BLOCKED_UNDERSTANDING still contains user-facing explanation text |
+| HF-10 | warnings are strings instead of WarningItem |
 
 ---
 
@@ -681,9 +734,9 @@ relevance (0.36) + venue_prestige (0.22) + citation (0.14) + code (0.06) + metho
 
 - arXiv 失败不影响 OpenAlex
 - OpenAlex 失败不影响 arXiv
-- 单 source 失败写入 `candidate_pool.warnings`
+- 单 source 失败写入 `candidate_pool.warnings` (WarningItem)
 - `search_log` 写 `source: failed (ExceptionType)`
-- 所有 source 都失败，reading_plan 为空并 degraded/warning
+- 所有 source 都失败，reading_plan 为空并 BLOCKED_UNDERSTANDING
 - 不能静默失败
 
 ### 9. Artifact 影响
@@ -739,6 +792,7 @@ relevance (0.36) + venue_prestige (0.22) + citation (0.14) + code (0.06) + metho
 - adapter 失败静默吞掉
 - 去重不生效
 - reading_plan 无 scoring_breakdown
+- warnings 使用 str 而非 WarningItem
 
 ---
 
@@ -843,12 +897,16 @@ class QualityReport(SenseiModel):
 
 | ID | 条件 |
 |----|------|
-| HF-1 | 核心 claim 无 evidence_ref 且未降级 |
+| HF-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE |
 | HF-2 | human_explanation 是公式文本（formula char ratio ≥ 0.3） |
 | HF-3 | formula symbol 解释与论文矛盾 |
 | HF-4 | core_idea / problem 缺 evidence_ref |
 | HF-5 | 输出无论文特有术语 |
 | HF-6 | 输出与论文主题不符 |
+| HF-7 | LLM failure produces final-looking cards |
+| HF-8 | BASELINE_ONLY card used as v2/final understanding |
+| HF-9 | BLOCKED_UNDERSTANDING still contains user-facing explanation text |
+| HF-10 | warnings are strings instead of WarningItem |
 
 ---
 
