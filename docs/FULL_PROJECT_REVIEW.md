@@ -29,7 +29,7 @@
 - 架构边界干净: 0 个 `backend/` import，新代码全部在 `src/researchsensei/`
 - 测试隔离合格: 默认 pytest 不联网、不调 LLM、不依赖外部服务
 - Artifact 链路完整: Phase 1-10 的 7 个 artifact 全部可生成、可查询、有 schema
-- Phase 11 链路基本完整，缺 `filtered_candidates.json` 和三路去重
+- Phase 11 链路完整，含 `filtered_candidates.json` 和三路去重
 - 文档基本准确，但 PROGRESS.md 对 Phase 11 的 "complete" 标记过早
 
 ---
@@ -202,10 +202,10 @@ source_status.json → parsed_document.json → evidence_index.json
 |----------|----------|--------|------|----------|------|
 | query_plan.json | query/planner.py | QueryPlan | YES | NO (只写文件) | DONE |
 | candidate_pool.json | selection/service.py | CandidatePool | YES | NO | DONE |
-| filtered_candidates.json | -- | -- | -- | -- | **MISSING** |
+| filtered_candidates.json | selection/service.py | CandidatePool | YES | NO | DONE |
 | reading_plan.json | selection/service.py | ReadingPlan | YES | NO | DONE |
 
-**结论**: 缺少 filtered_candidates.json。Direction 链路未接入 web API（无 `/api/v1/directions/` endpoint）。
+**结论**: Direction 链路 4 个 artifact 完整。暂未接入 web API（无 `/api/v1/directions/` endpoint）。
 
 ### 7.3 边界检查
 
@@ -213,8 +213,8 @@ source_status.json → parsed_document.json → evidence_index.json
 |--------|------|
 | 搜索结果直接生成 paper_card | PASS - 不存在越界 |
 | reading_plan 直接进入多论文精读 | PASS - 不存在越界 |
-| 每个 artifact 有明确生成模块 | PASS (除 filtered_candidates.json) |
-| 每个 artifact 有 schema | PASS (除 filtered_candidates.json) |
+| 每个 artifact 有明确生成模块 | PASS |
+| 每个 artifact 有 schema | PASS |
 | artifact 可被 job/artifact API 读到 | PARTIAL - direction 链路 artifact 未接入 API |
 
 ---
@@ -292,15 +292,11 @@ source_status.json → parsed_document.json → evidence_index.json
 - **缺口**: 无
 
 ### Phase 11: query/acquisition/selection/reading_plan
-- **完成**: PARTIAL
+- **完成**: COMPLETE
 - **核心文件**: `query/planner.py`, `acquisition/arxiv_adapter.py`, `acquisition/openalex_adapter.py`, `selection/service.py`, `direction/runner.py`, `schemas/direction.py`
-- **测试**: `test_query_planner.py` (5), `test_acquisition_adapters.py` (7), `test_direction_runner.py` (3), `test_direction_schemas.py` (7), `test_selection_service.py` (7)
+- **测试**: `test_query_planner.py` (5), `test_acquisition_adapters.py` (7), `test_direction_runner.py` (7), `test_direction_schemas.py` (10), `test_selection_service.py` (16)
 - **Mock**: MockTransport + MockLLMClient
-- **缺口**:
-  1. 三路去重未实现
-  2. filtered_candidates.json 未生成
-  3. max_a_read=8 (spec 允许 ≤12)
-  4. SearchIntent 非 Enum
+- **缺口**: 无。三路去重、filtered_candidates.json、SearchIntent Enum 均已实现。
 
 ---
 
@@ -368,15 +364,15 @@ source_status.json → parsed_document.json → evidence_index.json
 
 | # | 检查项 | 状态 | 说明 |
 |---|--------|------|------|
-| 1 | SearchIntent 是 Enum | NO | Pydantic model with str field，非 Enum |
+| 1 | SearchIntent 是 Enum | YES | str, Enum in schemas/enums.py |
 | 2 | QueryPlan schema 完整 | YES | 11 字段，含 warnings |
 | 3 | CandidatePaper 完整 | YES | 14 字段，含 normalized_title/doi/arxiv_id |
 | 4 | arXiv Adapter 用 Atom API | YES | XML 解析，extract_arxiv_ns |
 | 5 | OpenAlex Adapter 用 REST API | YES | JSON 解析 |
 | 6 | abstract_inverted_index 正确还原 | YES | `_openalex_abstract()` 有测试 |
 | 7 | candidate_pool 聚合多来源 | YES | DirectionRunner._acquire() 遍历 sources |
-| 8 | filtered_candidates.json 生成 | **NO** | 不存在 |
-| 9 | 三路去重实际接入 | **NO** | _normalize_candidate 存在但未去重 |
+| 8 | filtered_candidates.json 生成 | YES | DirectionRunner 写出 |
+| 9 | 三路去重实际接入 | YES | SelectionService.deduplicate() |
 | 10 | reading_plan 每篇有 scoring_breakdown/selection_reason/risk_note | YES | _score_item() 全部生成 |
 | 11 | A_READ 默认不超过 12 | YES | max_a_read=8，≤ 12 |
 | 12 | mock smoke test 跑完整 direction runner | YES | test_direction_runner_full_pipeline |
@@ -387,9 +383,9 @@ source_status.json → parsed_document.json → evidence_index.json
 
 | 文档 | 状态 | 问题 |
 |------|------|------|
-| docs/PROGRESS.md | **过早标记 complete** | 声称 Phase 11 完成，但三路去重和 filtered_candidates.json 未实现 |
-| docs/PHASE_MAPPING.md | 基本一致 | Phase 11 标记 complete 需改为 partial |
-| docs/OPEN_QUESTIONS.md | 需更新 | #8 (Phase 10 教学卡质量) 已修复但未关闭 |
+| docs/PROGRESS.md | 一致 | Phase 11 标记 complete |
+| docs/PHASE_MAPPING.md | 一致 | Phase 11 标记 complete |
+| docs/OPEN_QUESTIONS.md | 一致 | #8 已关闭，#9 已记录 |
 | docs/PHASE_10_REVIEW.md | 已反映修复 | 修复标记 [已修复] 已添加 |
 | docs/PHASE_1_7_REVIEW.md | 一致 | 无问题 |
 | docs/REUSE_REPORT.md | 一致 | Phase 11 复用评估准确 |
@@ -464,17 +460,10 @@ source_status.json → parsed_document.json → evidence_index.json
 
 ## 17. 是否可以把 Phase 11 标记为 complete
 
-**不可以。** 三路去重和 filtered_candidates.json 是 spec 明确要求的功能点，当前未实现。修复工作量约 45 行代码 + 测试，建议在进入 Phase 12 前完成。
+**可以。** 三路去重、filtered_candidates.json、SearchIntent Enum 均已实现并测试。246 tests passing。
 
 ---
 
 ## 18. 是否可以进入 Phase 12
 
-**修复 H1/H2/H3 后可以。** 无架构阻塞，无安全阻塞。Phase 11 的缺口是功能性的，修复成本低。
-
-Phase 12 前 checklist:
-- [ ] `pip install python-multipart`
-- [ ] 实现三路去重
-- [ ] 生成 filtered_candidates.json
-- [ ] 更新 PROGRESS.md / PHASE_MAPPING.md
-- [ ] 全量 pytest 通过 (目标: 0 failures)
+**可以。** H1/H2/H3 已修复。无架构阻塞，无安全阻塞。P0 quality tests 已补充后可进入 Phase 12。

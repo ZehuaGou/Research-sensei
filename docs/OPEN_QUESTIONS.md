@@ -67,5 +67,4 @@
 
 - **问题**：`docs/PHASE_MAPPING.md` 建议 Phase 12 = patterns + drill（旧 Phase 6 子模块），但原始开发文档 `03_FULL_IMPLEMENTATION_PLAN.md` 定义 Phase 12 = 工程可靠性（断点续跑/日志/缓存/安全测试）。
 - **影响**：如果不确认范围，可能实现错误的模块。
-- **当前临时处理**：以 `docs/PHASE_MAPPING.md`（迁移路线权威文档）为准，Phase 12 建议为 patterns + drill。工程可靠性推迟到后续 Phase。
-- **需要用户确认**：Phase 12 是 patterns + drill，还是工程可靠性？
+- **当前处理结论**：以 `docs/PHASE_MAPPING.md`（迁移路线权威文档）为准，Phase 12 = patterns + drill。工程可靠性推迟到后续 Phase。Phase 12 reuse gate 已完成，P0 quality tests 已补充。进入代码开发前需最终确认范围。

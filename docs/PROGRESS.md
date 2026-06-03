@@ -152,8 +152,15 @@ Phase 12 not yet authorized.
 
 ## Not Started
 
-- [ ] Phase 12 reuse gate and scope confirmation (see `docs/PHASE_MAPPING.md`).
-- [ ] Phase mapping alignment with original dev docs (see `docs/PHASE_MAPPING.md`).
+- [ ] Phase 12 scope final confirmation (see `docs/PHASE_MAPPING.md`).
+- [ ] Phase 12 code development (patterns + drill).
+
+## Phase 12 Status
+
+- Phase 12 reuse gate completed (see `docs/REUSE_REPORT.md`).
+- Phase 12 scope: patterns + drill (per `docs/PHASE_MAPPING.md`).
+- Pre-Phase12 quality gate completed (see `docs/QUALITY_EVALUATION_SPEC.md`).
+- P0 quality tests implemented.
 
 ## Current Risks
 
@@ -166,10 +173,8 @@ Phase 12 not yet authorized.
 
 ## Next Safe Task
 
-Phase 12 is not authorized in the current run.
+Phase 12 reuse gate and quality gate completed. Ready for Phase 12 code development (patterns + drill).
 
-Before entering Phase 12, confirm the exact next scope explicitly.
-
-Before entering Phase 12, first update `docs/REUSE_REPORT.md` with Phase 12 reuse evaluation.
+Before entering Phase 12 code, confirm scope: patterns + drill (per `docs/PHASE_MAPPING.md`).
 
 Do not enter Phase 12 (patterns/drill/batch pipeline) without a separate reuse gate.
