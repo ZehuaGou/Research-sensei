@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 334 tests passing
+- 335 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -25,27 +25,30 @@
 
 ## 3. 当前任务
 
-- ClaimEvidenceV2 已完成：
+- ClaimEvidenceV2 + claim_evidence.json 已完成：
+  - ParserAdapter 已接入 pipeline
+  - PassageIndex 已完成并写入 passage_index.json
   - ClaimEvidenceV2 独立 schema（不污染 v1）
-  - ClaimEvidenceBundle schema
-  - build_claim_evidence(document, passage_index) extractor
+  - ClaimEvidenceBundle 已完成
+  - build_claim_evidence(document, passage_index) 已完成
   - pipeline 写入 claim_evidence.json
-  - artifact 数量从 8 变为 9
+  - artifact 数量从 8 变 9
+  - METHOD / RESULT claim sentence selection 已修正，使用关键词匹配，命中时 DIRECT_QUOTE，未命中时 PARAPHRASE
   - 旧 evidence_index.json 仍保留，build_evidence_index / ClaimEvidence v1 / EvidenceIndex v1 未修改
-  - 334 tests passing（313 existing + 21 new）
+  - 335 tests passing（313 existing + 22 new）
 - 尚未完成：
   - BM25 / EvidenceRetriever 尚未实现
   - Paper Understanding v2 尚未实现
   - Audit / QualityReport / UnderstandingStatus 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：规划 BM25 / EvidenceRetriever
+- 下一步：讨论 BM25 / EvidenceRetriever，不要直接进入 Paper Understanding
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 334 passed
+- pytest: 335 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
