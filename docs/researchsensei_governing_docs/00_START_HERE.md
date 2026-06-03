@@ -15,7 +15,7 @@
 | Phase 11.6-11.9 | **must complete first** | Upgrade paper understanding core before Phase 12 |
 | Phase 12 | **frozen** | Patterns + Drill code NOT authorized |
 
-**Next allowed task**: Phase 11.6 ParserAdapter Design — only after user confirms.
+**Next allowed task**: Phase 11.6 ParserAdapter Design — planning only. Code requires filling execution template + user confirmation.
 
 ---
 

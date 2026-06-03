@@ -1,7 +1,15 @@
 # Phase 11.6: ParserAdapter Design — Executable Spec
 
-> **Status**: Ready for user confirmation.
-> **This is the only phase currently authorized to begin.**
+> **Status**: Ready for planning, NOT authorized for code.
+> This is the only phase currently ready for planning.
+>
+> **Code development is NOT authorized until**:
+> 1. The agent fills `06_PHASE_EXECUTION_TEMPLATE.md` specifically for Phase 11.6.
+> 2. The filled execution plan is shown to the user.
+> 3. The user explicitly confirms.
+> 4. Then code may begin.
+>
+> This document is the next-phase **specification**, not a code authorization.
 
 ---
 
@@ -32,7 +40,7 @@ Current PDF parsing uses PyMuPDF as a fallback with low quality. We need a Parse
 | MinerU | OPTIONAL_ADAPTER (future) | Not this phase |
 
 New dependencies: NONE
-Code development authorized: YES (after user confirms)
+Code development authorized: NO — only after agent fills execution template and user confirms
 
 ---
 
