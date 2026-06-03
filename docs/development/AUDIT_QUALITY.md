@@ -92,40 +92,89 @@
 
 ## 7. 核心类和方法签名
 
+### AuditFinding
+
+使用统一 AuditFinding，而不是 hard_fails + warnings 两套结构。
+
+```python
+class AuditFinding(SenseiModel):
+    code: str           # F-1, F-2, ...
+    severity: str       # P0 / P1 / P2
+    effect: str         # BLOCK / WARNING
+    message: str
+    artifact: str = ""
+    field: str = ""
+```
+
+### ComponentAuditResult
+
+```python
+class ComponentAuditResult(SenseiModel):
+    component: str      # "paper_card" / "formula_cards" / "teaching_cards"
+    status: str         # "PASS" / "FAIL" / "SKIP"
+    findings: list[AuditFinding] = []
+```
+
 ### QualityReport
 
 ```python
 class QualityReport(SenseiModel):
+    schema_version: str = "v2"
     paper_id: str
-    score: float
-    hard_fails: list[str]
-    warnings: list[WarningItem]
-    checked_artifacts: list[str]
+    findings: list[AuditFinding] = []
+    component_results: list[ComponentAuditResult] = []
+    checked_artifacts: list[str] = []
+    audit_version: str = "v1"
+    created_at: str = ""
 ```
 
-### Auditor 接口（未来扩展）
+- QualityReport 是 audit 原始输出。
+- UnderstandingStatus 是 Runner 根据 QualityReport 生成的下游状态。
+- QualityReport 持久化为 `quality_report.json`。
+- 不保留 score / dimension_scores（rule-based auditor 给不出有意义的分数）。
+
+### Auditor 接口
 
 ```python
 from abc import ABC, abstractmethod
+
+class ArtifactBundle(SenseiModel):
+    """Audit 读取的 artifact 集合。纯数据，不含 IO。"""
+    paper_card: dict | None = None
+    formula_cards: dict | None = None
+    teaching_cards: dict | None = None
+    evidence_index: dict | None = None
+    claim_evidence: dict | None = None
+    passage_index: dict | None = None
+    paper_skeleton: dict | None = None
+    understanding_status: dict | None = None
 
 class Auditor(ABC):
     @abstractmethod
     def audit(self, artifacts: ArtifactBundle) -> AuditResult: ...
 ```
 
-初版 audit 倾向 rule-based。未来可预留 LLM-based auditor 实现同一接口。
+初版 audit 全部 rule-based。未来可预留 LLM-based auditor 实现同一接口。LLM auditor 必须默认 mock，不允许 pytest 真实调用 LLM。
 
 ### 可拆分子 Auditor
 
 | Auditor | 检查内容 |
 |---------|---------|
-| EvidenceAuditor | evidence_ref 有效性、claim-evidence binding |
+| EvidenceAuditor | evidence_ref 有效性、passage_id 存在性、claim-evidence binding |
 | FormulaAuditor | formula char ratio、symbol 解释一致性 |
 | GenericnessAuditor | paper-specific terms、通用性检测 |
 | CopyAuditor | token overlap、raw copy 检测 |
 | AdvisorReadinessAuditor | cards 是否足够支撑 Phase 12 drill |
 
-`QualityAuditor` 综合所有子 auditor 的结果，生成 `QualityReport`。
+`QualityAuditor` 作为 orchestrator / aggregator，综合所有子 auditor 的结果，生成 `QualityReport`。
+
+### Audit 约束
+
+- auditor 不能 import card builder
+- auditor 不能调用 card builder
+- auditor 不能写 artifact
+- auditor 不依赖 WorkspaceStore
+- auditor 只读取 artifacts 或序列化 JSON
 
 ## 8. 检测算法
 
@@ -145,8 +194,13 @@ ratio = formula_chars / len(text) if text else 0
 tokens_a = set(text_a.lower().split())
 tokens_b = set(text_b.lower().split())
 overlap = len(tokens_a & tokens_b) / max(len(tokens_a), 1)
-# High overlap → raw copy warning
+# High overlap → raw copy
 ```
+
+**raw copy 分类**:
+- core_idea / problem / method raw copy (overlap > 0.8) → **BLOCK**
+- limitations / quote 高重合 → **WARNING**
+- teaching analogy raw copy → **BLOCK**
 
 ### paper-specific terms 提取
 
@@ -192,29 +246,58 @@ if token_overlap(core_idea.text, method_overview.text) > 0.8:
 | test_invalid_evidence_ref_detected | hard_fail |
 | test_quality_report_json_round_trip | all fields preserved |
 
-## 11. Hard-Fail
+## 11. AuditFinding 规则
 
-| ID | 条件 |
-|----|------|
-| HF-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE |
-| HF-2 | human_explanation 是公式文本（formula char ratio >= 0.3） |
-| HF-3 | formula symbol 解释与论文矛盾 |
-| HF-4 | core_idea / problem 缺 evidence_ref |
-| HF-5 | 输出无论文特有术语 |
-| HF-6 | 输出与论文主题不符 |
-| HF-7 | LLM failure produces final-looking cards |
-| HF-8 | BASELINE_ONLY card used as v2/final understanding |
-| HF-9 | BLOCKED_UNDERSTANDING still contains user-facing explanation text |
-| HF-10 | warnings are strings instead of WarningItem |
+| ID | 条件 | severity | effect |
+|----|------|----------|--------|
+| F-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE | P0 | BLOCK |
+| F-2 | evidence_ref 在 evidence_index 中不存在 | P0 | BLOCK |
+| F-3 | LLM 输出包含 evidence pack 之外的 claim | P0 | BLOCK |
+| F-4 | teaching human_explanation formula-heavy (ratio >= 0.3) | P0 | BLOCK |
+| F-5 | BASELINE_ONLY 被当作 final understanding | P0 | BLOCK |
+| F-6 | BLOCKED_UNDERSTANDING 包含解释性内容 | P0 | BLOCK |
+| F-7 | warnings 不是 WarningItem | P0 | BLOCK |
+| F-8 | core_idea / problem / method raw copy (overlap > 0.8) | P0 | BLOCK |
+| F-9 | ClaimEvidence.passage_id 在 passage_index 中不存在 | P0 | BLOCK |
+| F-10 | component_status 与 status 矛盾 | P1 | BLOCK |
+| F-11 | generic output（无 paper-specific terms） | P1 | BLOCK |
+| F-12 | missing passage_id for claim_evidence v2 | P0 | BLOCK |
+| F-13 | limitations / quote 高重合 | P2 | WARNING |
+| F-14 | teaching analogy 与 source 中等重合 | P2 | WARNING |
+
+### severity / effect 规则
+
+- P0 一定 BLOCK
+- P1 可能 BLOCK，也可能 WARNING
+- P2 通常 WARNING
+
+### missing passage_id for claim_evidence v2
+
+倾向 BLOCK。原因：claim_evidence v2 依赖 passage_id，缺 passage_id 会破坏 passage 追踪链路，audit 无法确认 claim 是否有 passage 支持。
+
+### QualityReport → UnderstandingStatus 映射
+
+- findings 中存在 effect=BLOCK → BLOCKED_UNDERSTANDING
+- findings 只有 WARNING → 不阻断
+- teaching_cards FAILED → DEGRADED_STRUCTURAL
+- formula_cards FAILED 需要根据 formula 是否核心判断（formula_is_core 算法未决）
+- parser degraded 不是 hard-fail
+
+### test_quality_*.py 与 product auditor 边界
+
+- 现有 test_quality_*.py 继续作为 pytest 层质量门
+- 产品级 auditor 后续新增测试
+- 不能把 pytest quality tests 误当成产品级 audit
+- 未来需要新增：QualityReport round-trip、invalid evidence_ref finding、missing passage_id finding、status mapping tests
 
 ## 12. 当前未解决问题
 
 - QualityReport schema 未实现（只有测试中的检查逻辑）
 - formula char ratio 阈值是否需要调优
 - token overlap 阈值是否需要调优
-- 是否需要生成 audit report artifact
-- Audit 初版是否完全 rule-based（倾向是）
-- 是否预留 LLM-based auditor 接口
-- QualityReport 到 UnderstandingStatus 的映射规则
+- formula_is_core 的具体判断算法
+- AuditFinding 和 WarningItem 是否全局统一（QualityReport 内部用 AuditFinding，pipeline/job 层用 WarningItem，是否统一未决）
+- score / dimension_scores 未来 LLM auditor 是否引入
 - "讲得好"的自动检测边界
 - 是否需要人工评估集
+- QualityReport 是否需要脱敏版

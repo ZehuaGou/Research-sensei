@@ -62,20 +62,47 @@
 
 ### EvidencePack
 
+EvidencePack 是运行时对象，不持久化为独立 artifact。
+
 ```python
 class EvidencePackItem(SenseiModel):
     claim_id: str
     claim_type: str
     evidence_ref: str
+    passage_id: str = ""
     quote_or_summary: str
     passage_text: str
     confidence: float
+    retrieval_score: float = 0.0
+    token_count: int = 0
+    source_artifact: str = "evidence_index"
+```
+
+### EvidencePackSummary
+
+EvidencePackSummary 持久化在 UnderstandingStatus 中，记录 LLM 实际看到哪些 claim。
+
+```python
+class EvidencePackSummary(SenseiModel):
+    included_claim_ids: list[str] = []
+    excluded_claim_ids: list[str] = []
+    total_tokens: int = 0
+    claim_type_counts: dict[str, int] = {}
+    truncated_passage_ids: list[str] = []
 ```
 
 ### understanding_status.json
 
 ```python
+class DownstreamGates(SenseiModel):
+    reading_display: bool = False
+    phase12_patterns: bool = False
+    phase12_drill: bool = False
+    phase12_drill_degraded: bool = False
+    advisor_questions: bool = False
+
 class UnderstandingStatus(SenseiModel):
+    schema_version: str = "v2"
     paper_id: str
     status: str  # SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING / FAILED / BASELINE_ONLY
     blocking_reason: str = ""
@@ -83,15 +110,41 @@ class UnderstandingStatus(SenseiModel):
     allowed_for_user_display: bool
     allowed_for_phase12: bool
     checked_artifacts: list[str] = []
+    component_status: dict[str, str] = {}  # paper_card / formula_cards / teaching_cards / audit
+    evidence_pack_summary: EvidencePackSummary | None = None
+    allowed_downstream: DownstreamGates = Field(default_factory=DownstreamGates)
 ```
 
-| 状态 | allowed_for_user_display | allowed_for_phase12 |
-|------|--------------------------|---------------------|
-| SUCCESS | True | True |
-| DEGRADED_STRUCTURAL | False | False |
-| BLOCKED_UNDERSTANDING | False | False |
-| FAILED | False | False |
-| BASELINE_ONLY | False | False |
+### 主状态定义
+
+| 状态 | 含义 | allowed_for_user_display | allowed_for_phase12 |
+|------|------|--------------------------|---------------------|
+| SUCCESS | LLM cards 生成成功，audit 通过 | True | True |
+| DEGRADED_STRUCTURAL | 论文理解成功，但某些组件降级 | True | True |
+| BASELINE_ONLY | 无 LLM 或仅 rule-based baseline | False | False |
+| BLOCKED_UNDERSTANDING | evidence / LLM / audit 导致理解不可信 | False | False |
+| FAILED | 系统级异常（pipeline crash / 文件系统错误 / Pydantic 崩溃） | False | False |
+
+### component_status
+
+```
+component_status:
+  paper_card: SUCCESS / FAILED / BASELINE
+  formula_cards: SUCCESS / SKIPPED / FAILED / BASELINE
+  teaching_cards: SUCCESS / FAILED / BASELINE
+  audit: SUCCESS / FAILED
+```
+
+### DownstreamGates
+
+| 状态 | paper_card | teaching_cards | reading_display | phase12_patterns | phase12_drill | advisor_questions |
+|------|-----------|----------------|-----------------|-----------------|---------------|-------------------|
+| SUCCESS | SUCCESS | SUCCESS | True | True | True | True |
+| DEGRADED | SUCCESS | SUCCESS | True | True | True | True |
+| DEGRADED | SUCCESS | FAILED | True | True | True（降级） | False |
+| BASELINE | — | — | False | False | False | False |
+| BLOCKED | — | — | False | False | False | False |
+| FAILED | — | — | False | False | False | False |
 
 ### Pipeline 集成 (fail-closed 目标)
 
@@ -125,8 +178,17 @@ class SinglePaperIngestionRunner:
 | LLM 调用失败 | BLOCKED_UNDERSTANDING，warning: "LLM_UNAVAILABLE" |
 | LLM 输出 evidence_ref 不存在 | 丢弃，BLOCKED_UNDERSTANDING，warning: "INVALID_EVIDENCE_REF" |
 | LLM 输出无 evidence_ref | 丢弃，BLOCKED_UNDERSTANDING，warning: "MISSING_EVIDENCE_REF" |
+| LLM invalid JSON | BLOCKED_UNDERSTANDING，warning: "LLM_INVALID_JSON" |
+| LLM timeout | BLOCKED_UNDERSTANDING，warning: "LLM_TIMEOUT" |
 | evidence 不足 | INSUFFICIENT_EVIDENCE，不生成解释 |
 | rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
+| paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
+| paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
+| paper_card 成功 + formula_cards SKIPPED（无公式） | 不阻断 |
+| paper_card 失败 | BLOCKED |
+| audit hard-fail (effect=BLOCK) | BLOCKED_UNDERSTANDING |
+| audit warning only (effect=WARNING) | 不阻断，warning 写入 warnings |
+| parser degraded | 不是 hard-fail，DEGRADED_STRUCTURAL（如果理解成功） |
 
 BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic metadata，不能包含论文解释、教学内容、核心思想推断或公式讲解。
 
@@ -165,25 +227,20 @@ BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic me
 
 **算法**:
 1. 过滤 `semantic_support == INSUFFICIENT_EVIDENCE` 的 claim
-2. 按 claim_type 分组（PROBLEM / METHOD / RESULT / LIMITATION / FORMULA_CONTEXT）
-3. 每个 claim 构建一个 `EvidencePackItem`
-4. passage_text 从 PassageIndex 查找，截取前 500 chars
-5. token_count = len(passage_text.split())
-6. 按 token budget 截断（默认 4000 tokens）
-7. 如果 evidence_pack 为空 → BLOCKED_UNDERSTANDING
+2. 过滤 `confidence < 0.3` 的 claim
+3. 按 claim_type 分组（PROBLEM / METHOD / RESULT / LIMITATION / FORMULA_CONTEXT）
+4. 每个 claim 构建一个 `EvidencePackItem`
+5. passage_text 从 PassageIndex 查找，截取前 500 chars
+6. token_count = len(passage_text.split())
+7. 每类最多 3 个 claim
+8. 按 token budget 截断（默认 4000 tokens）
+9. priority: METHOD > RESULT > FORMULA_CONTEXT > PROBLEM > LIMITATION
+10. 如果 evidence_pack 为空 → BLOCKED_UNDERSTANDING
+11. 缺 METHOD → BLOCKED（METHOD 是理解核心）
+12. 缺 RESULT → 不阻断（部分论文确实没有实验）
 
 **Schema**:
 ```python
-class EvidencePackItem(SenseiModel):
-    claim_id: str
-    claim_type: str
-    evidence_ref: str
-    quote_or_summary: str
-    passage_text: str
-    confidence: float
-    source_artifact: str = "evidence_index"
-    token_count: int = 0
-
 class EvidencePack(SenseiModel):
     paper_id: str
     items: list[EvidencePackItem]
@@ -193,25 +250,71 @@ class EvidencePack(SenseiModel):
 
 ## 12. LLM Prompt 结构
 
-**system prompt**:
+### 三次调用策略
+
+LLM 生成采用三次独立调用：
+
+1. `paper_card` — 论文理解卡片
+2. `formula_cards` — 公式讲解卡片
+3. `teaching_cards` — 教学讲解卡片
+
+原因：不同 card 目标不同，失败粒度更细，paper_card 成功但 teaching_cards 失败时可以降级。
+
+### system prompt
+
 - 角色：论文研读导师
 - 约束：只能基于 evidence pack 回答，不能编造
 - 输出格式：JSON
 
-**user prompt**:
+### user prompt
+
 - paper title / metadata（从 paper_skeleton）
 - evidence pack（从 build_evidence_pack）
 - 要求：生成指定字段的 JSON
 
-**不允许**:
+### 不允许
+
 - 整篇论文全文塞入 prompt
 - 超出 token budget
 
-**输出 JSON schema**: 与 PaperCard / FormulaCard / TeachingCard schema 一致
+### 输出 schema
 
-**输出校验**:
-- 每个 evidence_ref 必须存在于 evidence_index
-- 无效 evidence_ref → 丢弃该字段
+```python
+class ClaimOutput(SenseiModel):
+    text: str
+    evidence_ref: str = ""
+
+class PaperCardLLMOutput(SenseiModel):
+    one_sentence_summary: str
+    problem: ClaimOutput
+    core_idea: ClaimOutput
+    method_overview: ClaimOutput
+    experiment_summary: ClaimOutput
+    limitations: ClaimOutput
+
+class FormulaCardLLMOutput(SenseiModel):
+    purpose: str
+    symbols: list[dict] = []
+    intuition: str = ""
+    numeric_example: str = ""
+    evidence_ref: str = ""
+
+class TeachingCardLLMOutput(SenseiModel):
+    human_explanation: str
+    analogy_explanation: str = ""
+    minimal_formula_explanation: str = ""
+    numeric_example: str = ""
+    paper_role_explanation: str = ""
+    evidence_ref: str = ""
+```
+
+### 输出校验
+
+- 每个核心 claim 的 evidence_ref 必须存在于 evidence_index
+- 无效 evidence_ref → BLOCKED_UNDERSTANDING
+- missing evidence_ref → BLOCKED_UNDERSTANDING
+- LLM invalid JSON → BLOCKED_UNDERSTANDING
+- LLM unavailable / timeout → BLOCKED_UNDERSTANDING
 - 核心字段无有效 evidence_ref → BLOCKED_UNDERSTANDING
 
 ## 13. understanding_status.json
@@ -285,7 +388,10 @@ if understanding_status.status != "SUCCESS":
 - understanding_status.json schema 未实现
 - LLM prompt 需要实际测试调优
 - 输出校验规则需要实现
-- QualityReport 到 UnderstandingStatus 的具体映射规则（多少 hard_fail → BLOCKED，多少 warning 仍算 SUCCESS）
-- LLM 输出 schema 是否拆成 PaperCardLLMOutput / FormulaCardsLLMOutput / TeachingCardsLLMOutput
-- 旧 Phase 8-10 代码如何迁移
-- 旧测试中 fallback 断言如何迁移
+- formula_is_core 的具体判断算法（规则？LLM？skeleton.formulas？formula purpose != UNKNOWN？）
+- EvidencePackSummary 是否足够复现 LLM 输入（裁剪后文本是否完全可重建）
+- component_status 的值是否还需要 DEGRADED
+- phase12_drill_degraded 是否需要单独 reason 字段
+- 旧 Phase 8-10 代码迁移细节
+- 旧测试中 fallback 断言迁移细节
+- DownstreamGates 的最终字段是否足够

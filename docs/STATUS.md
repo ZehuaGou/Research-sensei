@@ -27,9 +27,10 @@
 
 - 正在分批同步技术讨论共识到正式开发文档
 - 第一批（Parser + Evidence）已完成
+- 第二批（Paper Understanding + Audit / Quality）已完成
 - 尚未进入代码开发
 - 尚未进入 Phase 12
-- 下一批同步 Paper Understanding + Audit / Quality
+- 下一批同步 Frontend/API + Engineering Reliability + Full Pipeline
 
 ---
 
