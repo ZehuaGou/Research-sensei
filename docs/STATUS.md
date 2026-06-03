@@ -26,9 +26,10 @@
 ## 3. 当前任务
 
 - 继续全项目技术路线讨论
-- Evidence + Paper Understanding 已有第二批讨论共识
+- Audit / Quality + Frontend / API 已有第三批讨论共识
 - 尚未进入代码开发
 - 尚未进入 Phase 12
+- 下一轮讨论 Engineering Reliability
 
 ---
 

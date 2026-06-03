@@ -475,7 +475,146 @@ EvidencePackSummary:
 
 ---
 
-## 17. How to Use This Document
+## 17. Audit / Quality + Frontend / API Deep Discussion
+
+以下为第三批讨论结论，基于 Audit / Quality + Frontend / API 六大争议点辩论。
+
+### 17.1 新增倾向共识
+
+**1. QualityReport 使用统一 AuditFinding。**
+
+```python
+class AuditFinding(SenseiModel):
+    code: str           # F-1, F-2, ...
+    severity: str       # P0 / P1 / P2
+    effect: str         # BLOCK / WARNING
+    message: str
+    artifact: str = ""
+    field: str = ""
+```
+
+不使用 hard_fails + warnings 两套结构。
+
+**2. QualityReport 建议结构。**
+
+```python
+class QualityReport(SenseiModel):
+    paper_id: str
+    findings: list[AuditFinding] = []
+    component_results: list[ComponentAuditResult] = []
+    checked_artifacts: list[str] = []
+    audit_version: str = "v1"
+    created_at: str = ""
+```
+
+**3. QualityReport 应持久化为 quality_report.json。**
+
+**4. QualityReport 是 audit 原始输出；UnderstandingStatus 是 Runner 根据 QualityReport 生成的下游状态。**
+
+**5. AuditFinding 的 severity/effect 规则。**
+
+- P0 一定 BLOCK
+- P1 可能 BLOCK，也可能 WARNING
+- P2 通常 WARNING
+
+**6. raw copy 不能一刀切。**
+
+- core_idea / problem / method raw copy → BLOCK
+- limitations / quote 高重合 → WARNING
+- teaching analogy raw copy → BLOCK
+
+**7. missing passage_id for claim_evidence v2 倾向 BLOCK。** 因为会破坏 passage 追踪链路。
+
+**8. DEGRADED_STRUCTURAL 前端展示必须按 component_status 过滤。**
+
+- 成功组件可以展示
+- 失败组件不展示
+- 必须显示明显降级提示
+- 不能笼统称为"导师级解释"
+
+**9. "导师级解释"只有在 paper_card、formula_cards、teaching_cards 都成功时才成立。** 缺 teaching_cards 时，只能称为"论文理解"或"结构化理解"。
+
+**10. DownstreamGates 倾向替代 allowed_for_phase12。**
+
+```python
+class DownstreamGates(SenseiModel):
+    reading_display: bool = False
+    phase12_patterns: bool = False
+    phase12_drill: bool = False
+    phase12_drill_degraded: bool = False
+    advisor_questions: bool = False
+```
+
+**11. teaching_cards 失败时。**
+
+- reading_display 可以 True
+- phase12_patterns 可以 True
+- phase12_drill 可以降级运行
+- advisor_questions 不允许
+
+**12. formula_cards SKIPPED 不影响 drill。** 无公式论文不需要公式追问。
+
+**13. /cards API 应按 understanding_status + component_status 返回内容。**
+
+- SUCCESS：返回全部成功 cards
+- DEGRADED_STRUCTURAL：只返回成功组件，失败组件隐藏并给出降级提示
+- BASELINE_ONLY：普通用户不返回 cards，debug/admin 可查看 baseline cards
+- BLOCKED_UNDERSTANDING：不返回 card 内容，只返回 blocking_reason
+- FAILED：只返回系统错误
+
+**14. QualityReport 只给 debug/admin，不给普通用户。**
+
+**15. 现有 test_quality_*.py 继续作为 pytest 层质量门，同时新增产品级 auditor 测试。**
+
+### 17.2 重要修正 / 不能定死的点
+
+**1. /artifacts 是否过滤不能直接定死。**
+
+候选方案：
+
+- 方案 A：/cards 是用户端受控 API，按 status 过滤；/artifacts 是 debug/admin raw API，只给开发/管理端使用；普通前端不直接用 /artifacts 展示 cards。
+- 方案 B：/artifacts 也过滤 cards，避免 blocked cards 泄露；但这会让 artifacts API 语义变混。
+
+当前倾向：不要让普通用户直接访问 raw /artifacts；新增或约束 debug/admin 权限。此点仍列为未决。
+
+**2. debug=true 不能默认给所有用户使用。** 必须是 admin/dev only。认证方式未定。
+
+**3. AuditFinding 是否完全替代 WarningItem 未定。** QualityReport 内部倾向用 AuditFinding；其他模块 warnings 是否继续用 WarningItem 需要继续讨论。
+
+**4. score / dimension_scores 当前不放入 rule-based QualityReport。** 未来如果引入 LLM auditor，是否重新引入 score 仍未定。
+
+**5. QualityReport 暴露范围未定。** 普通用户是否完全不可见？debug/admin 如何鉴权？是否需要脱敏版本？
+
+### 17.3 仍未决问题
+
+1. AuditFinding 和 WarningItem 是否统一，还是各自保留边界。
+2. debug/admin 鉴权机制。
+3. /artifacts 是 raw debug API，还是 filtered user API。
+4. evidence_ref 跳转优先级。
+5. fake artifacts fixtures 的具体设计。
+6. DEGRADED_STRUCTURAL 的前端提示文案。
+7. DownstreamGates 的最终字段是否足够。
+8. phase12_drill_degraded 是否需要单独 reason 字段。
+9. QualityReport 是否需要脱敏版。
+10. 产品级 auditor 和 pytest quality tests 的边界。
+
+### 17.4 下一轮讨论建议
+
+最后一轮讨论 Engineering Reliability，重点：
+
+- artifact versioning
+- artifact schema migration
+- rerun / resume
+- cache strategy
+- CI no-network / no-real-LLM
+- secret scanning
+- debug/admin API 权限
+- raw artifacts access policy
+- live smoke test 隔离
+
+---
+
+## 18. How to Use This Document
 
 - 本文档保存讨论，不直接作为开发依据。
 - 达成稳定共识后，再同步到 DESIGN.md、DEVELOPMENT.md 或 docs/development/*.md。
