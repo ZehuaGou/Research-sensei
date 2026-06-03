@@ -1,6 +1,6 @@
 # ResearchSensei Reuse Report
 
-> **Canonical docs**: See `docs/DESIGN.md` and `docs/DEVELOPMENT.md`.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, `docs/development/`.
 
 Last updated: 2026-06-03
 

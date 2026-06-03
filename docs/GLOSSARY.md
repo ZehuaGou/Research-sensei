@@ -1,6 +1,6 @@
 # ResearchSensei Glossary
 
-> **Canonical docs**: See `docs/DESIGN.md` and `docs/DEVELOPMENT.md`.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/STATUS.md`, `docs/DEVELOPMENT.md`.
 
 ## Core Terms
 

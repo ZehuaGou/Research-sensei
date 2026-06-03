@@ -1,6 +1,6 @@
 # ResearchSensei Review Checklist
 
-> **Canonical docs**: See `docs/DEVELOPMENT.md` and `docs/STATUS.md`.
+> **Canonical docs**: See `docs/DEVELOPMENT.md`, `docs/STATUS.md`, `docs/development/`.
 
 ## Pre-Commit Checklist
 

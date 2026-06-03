@@ -1,6 +1,6 @@
 # ResearchSensei Module Contracts
 
-> **Canonical docs**: See `docs/DESIGN.md` and `docs/DEVELOPMENT.md`.
+> **Canonical docs**: See `docs/DEVELOPMENT.md` and `docs/development/`.
 
 ## query
 

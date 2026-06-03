@@ -1,6 +1,6 @@
 # ResearchSensei Acceptance Criteria
 
-> **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, and `docs/STATUS.md`.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/STATUS.md`, `docs/DEVELOPMENT.md`, `docs/development/`.
 
 ## Global Criteria
 

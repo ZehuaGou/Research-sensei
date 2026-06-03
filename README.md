@@ -5,8 +5,13 @@
 ## 文档
 
 - [docs/DESIGN.md](docs/DESIGN.md) — 项目设计
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规范
 - [docs/STATUS.md](docs/STATUS.md) — 当前进度
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规范总入口
+- [docs/development/PARSER.md](docs/development/PARSER.md) — Parser 模块
+- [docs/development/EVIDENCE.md](docs/development/EVIDENCE.md) — Evidence 模块
+- [docs/development/PAPER_UNDERSTANDING.md](docs/development/PAPER_UNDERSTANDING.md) — Paper Understanding 模块
+- [docs/development/LITERATURE_SEARCH.md](docs/development/LITERATURE_SEARCH.md) — Literature Search 模块
+- [docs/development/AUDIT_QUALITY.md](docs/development/AUDIT_QUALITY.md) — Audit / Quality 模块
 
 ## 安装
 

@@ -6,41 +6,32 @@
 
 - Phase 1-11 baseline complete
 - 281 tests passing
-- 当前重点：Paper Understanding 核心升级
-- Phase 12 暂不开发
-
----
-
-## 2. 当前下一步
-
-Paper Understanding 核心升级，按以下顺序：
-
-1. ParserAdapter — 设计 interface，包装现有 parser
-2. PassageIndex + ClaimEvidence — 升级 evidence 到 passage/claim-level
-3. Evidence-constrained LLM — LLM card builder 接入主 pipeline
-4. Quality Benchmark — 质量审计和 hard-fail 测试
-
----
-
-## 3. 当前限制
-
-- Phase 6 evidence 仍是 block-level，不是 claim-level
-- Phase 8-10 仍是 rule-based baseline，不是导师级讲解
+- 当前代码仍不是最终论文理解系统
+- Phase 6 evidence 是 block-level，不是 claim-level
+- Phase 8-10 是 rule-based baseline，不是导师级讲解
 - Phase 11 是 direction pipeline v1，不是完整 literature review
-- 这些限制会影响最终"讲得好"
 
 ---
 
-## 4. 当前测试结果
+## 2. 当前主要差距
+
+- fail-closed 策略已写入 DEVELOPMENT，但当前代码还未完全实现
+- understanding_status.json 还未实现
+- 当前 card builders 仍使用 rule-based baseline 作为 fallback
+- 外部项目复用（Docling/PaperQA/ARIS audit）还需要真实调研
+- Paper Understanding 质量仍未达到导师级
+
+---
+
+## 3. 当前下一步
+
+- 先完成文档模块化与外部项目调研
+- 之后再决定第一个代码任务
+- 不直接进入 Phase 12
+
+---
+
+## 4. 测试和 commit
 
 - pytest: 281 passed
-- 最近 commit: `c4c6ae6 organize development docs by major modules`
-
----
-
-## 5. 当前禁止事项
-
-- 不进入 Phase 12
-- 不新增依赖
-- 不真实联网测试
-- 不真实调用 LLM 测试
+- 最近 commit: `6eac044`
