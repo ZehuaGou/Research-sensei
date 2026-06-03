@@ -5,6 +5,7 @@ from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, Pa
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
 from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, SearchIntent
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
+from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
 from researchsensei.schemas.source import SourceStatus
 
@@ -35,8 +36,14 @@ __all__ = [
     "FormulaCardBundle",
     "FormulaSymbol",
     "FormulaTerm",
+    "ClaimLLMOutput",
+    "FormulaCardLLMOutput",
+    "FormulaCardsLLMOutput",
     "GeneratedMetadata",
     "JobRecord",
+    "PaperCardLLMOutput",
+    "TeachingCardLLMOutput",
+    "TeachingCardsLLMOutput",
     "JobStatus",
     "PaperCard",
     "PaperSkeleton",

@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 369 tests passing
+- 400 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever + EvidencePack
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -25,33 +25,31 @@
 
 ## 3. 当前任务
 
-- EvidencePack runtime builder 已完成：
-  - ParserAdapter 已接入 pipeline
-  - PassageIndex 已完成并写入 passage_index.json
-  - ClaimEvidenceV2 + ClaimEvidenceBundle 已完成
-  - build_claim_evidence(document, passage_index) 已完成
-  - pipeline 写入 claim_evidence.json
-  - BM25 / EvidenceRetriever 已完成，runtime only
-  - EvidencePackItem / EvidencePack 已完成
-  - build_evidence_pack 已完成，runtime only
-  - EvidencePack 未接 pipeline，未写 artifact
-  - token budget enforcement 已修正：append item 前检查 total_tokens + token_count，pack.total_tokens 不超过 max_total_tokens
-  - 369 tests passing（350 existing + 19 new）
+- Isolated LLM v2 card builders 已完成：
+  - LLM output schemas（PaperCardLLMOutput / FormulaCardsLLMOutput / TeachingCardsLLMOutput）
+  - LLM output validator（evidence_ref 校验）
+  - isolated PaperCard v2 builder（fail-closed，不 fallback）
+  - isolated FormulaCards v2 builder（fail-closed，不 fallback）
+  - isolated TeachingCards v2 builder（fail-closed，不 fallback）
+  - v2 builders 未接 pipeline
+  - 未改旧 rule-based builders
+  - 未改旧 with_llm builders
+  - 400 tests passing（369 existing + 31 new）
 - 尚未完成：
   - EvidencePackSummary 尚未实现
-  - LLM v2 card builder 尚未实现
-  - fail-closed runtime status 尚未实现
+  - UnderstandingStatus 尚未实现
   - BASELINE_ONLY 尚未实现
-  - Audit / QualityReport / UnderstandingStatus 尚未实现
+  - pipeline v2 path 尚未实现
+  - Audit / QualityReport 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：讨论 LLM v2 card builder + fail-closed，不要直接进入 Audit 或 Frontend
+- 下一步：讨论 UnderstandingStatus + BASELINE_ONLY + pipeline v2 gating
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 369 passed
+- pytest: 400 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
