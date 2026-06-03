@@ -54,17 +54,21 @@ def test_formula_cards_have_symbols() -> None:
 
 
 def test_formula_cards_have_purpose_or_degraded() -> None:
-    """Formula cards must have purpose or be properly degraded."""
+    """Formula cards must have purpose or be properly degraded.
+
+    If purpose is UNKNOWN, the card must have degraded confidence or warnings.
+    """
     data = _build_from_fixture("fixture_formula_heavy.md")
     for fc in data["formula_cards"].formula_cards:
         if fc.formula_raw and fc.formula_raw != "UNKNOWN":
             has_purpose = fc.purpose and fc.purpose not in ("UNKNOWN", "")
+            # UNKNOWN purpose IS degradation - confidence should reflect this
             is_degraded = fc.confidence < 0.5 or any(
-                "NEEDS" in w or "UNKNOWN" in w for w in fc.warnings
+                "NEEDS" in w for w in fc.warnings
             )
-            # Rule-based builder may not infer purpose; that's acceptable if degraded
-            assert has_purpose or is_degraded or fc.purpose == "UNKNOWN", (
-                f"Formula card '{fc.formula_id}' has no purpose and is not degraded"
+            assert has_purpose or is_degraded, (
+                f"Formula card '{fc.formula_id}' has purpose='{fc.purpose}' "
+                f"but confidence={fc.confidence} and warnings={fc.warnings}"
             )
 
 

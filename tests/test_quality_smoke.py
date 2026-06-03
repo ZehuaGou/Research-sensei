@@ -15,6 +15,8 @@ from pathlib import Path
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
+from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
+from researchsensei.jobs import JobStore
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.schemas import (
@@ -24,7 +26,9 @@ from researchsensei.schemas import (
     PaperSkeleton,
     TeachingCardBundle,
 )
+from researchsensei.schemas.enums import JobStatus
 from researchsensei.teaching_card import build_teaching_cards
+from researchsensei.workspace import WorkspaceStore
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "quality"
 
@@ -150,3 +154,32 @@ def test_chain_no_real_network() -> None:
     # rule-based builders).
     data = _build_chain("fixture_method_paper.md")
     assert data["paper_card"] is not None
+
+
+def test_runner_artifact_smoke_writes_real_json(tmp_path: Path) -> None:
+    """SinglePaperIngestionRunner writes real JSON artifacts to disk.
+
+    This is the true artifact smoke test - uses the actual pipeline runner,
+    not an in-memory chain.
+    """
+    workspace = WorkspaceStore(tmp_path / "workspace")
+    jobs = JobStore(tmp_path / "jobs.sqlite3")
+    runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
+
+    source = FIXTURE_DIR / "fixture_method_paper.md"
+    job = runner.run(source, job_id="runner-smoke")
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert len(job.artifacts) == 7
+
+    run_dir = tmp_path / "workspace" / "runs" / "runner-smoke"
+    for artifact in job.artifacts:
+        path = Path(artifact.path)
+        assert path.exists(), f"Missing artifact: {artifact.artifact_type}"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert isinstance(data, dict), f"{artifact.artifact_type} is not valid JSON"
+
+    # Verify job can be re-read from store
+    reloaded = jobs.get("runner-smoke")
+    assert reloaded.status == JobStatus.SUCCEEDED
+    assert len(reloaded.artifacts) == 7

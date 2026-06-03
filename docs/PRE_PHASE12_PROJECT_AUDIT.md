@@ -137,5 +137,20 @@
 ## 测试结果
 
 - P0 quality tests: 23 passed
-- Full pytest: 269 passed
+- Deep audit fix tests: 11 passed
+- Full pytest: 281 passed
 - 0 failures
+
+---
+
+## Deep Audit Fixes 2 (2026-06-03)
+
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | SinglePaperIngestionRunner 失败路径用 list[str] 而非 WarningItem | 改用 WarningItem(code="PIPELINE_FAILED")，error 字段写异常摘要 |
+| 2 | test_runner_marks_job_failed_on_card_error 是伪测试 | 重写：monkeypatch build_paper_card 抛异常，断言 FAILED + WarningItem + 无 card artifact |
+| 3 | acquisition warnings 不在 candidate_pool.json | candidate_pool.warnings 和 search_log 现在记录 source failure |
+| 4 | 中文 fallback 不降级 | 添加 EN_QUERY_UNAVAILABLE warning，明确 direction_en 仍为中文 |
+| 5 | arXiv ID 去重未规范化 | 实现 _normalize_arxiv_id()，剥离 arXiv: 前缀和 vN 版本号 |
+| 6 | P0 测试有宽松断言 | 删除 startswith("b") 和 purpose=="UNKNOWN" 逃逸 |
+| 7 | formula purpose=UNKNOWN 不降级 | UNKNOWN purpose 时 confidence ≤ 0.3 + warning |

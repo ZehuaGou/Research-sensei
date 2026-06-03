@@ -81,9 +81,9 @@ class QueryPlanner:
         direction_en = user_query
         if is_zh:
             warnings.append("CHINESE_QUERY_NO_LLM_FALLBACK")
-            # For Chinese queries without LLM, pass raw query but warn that
-            # search engines may not handle Chinese terms well
-            direction_en = user_query
+            warnings.append("EN_QUERY_UNAVAILABLE")
+            # Chinese queries without LLM cannot produce English search terms.
+            # direction_en stays as Chinese - search engines may return poor results.
 
         return QueryPlan(
             user_query=user_query,

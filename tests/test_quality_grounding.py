@@ -86,8 +86,8 @@ def test_all_evidence_refs_exist_in_index() -> None:
         parts = ref.split(":", 1)
         if len(parts) == 2:
             block_id = parts[1]
-            assert block_id in valid_block_ids or block_id.startswith("b"), (
-                f"evidence_ref '{ref}' references non-existent block"
+            assert block_id in valid_block_ids, (
+                f"evidence_ref '{ref}' references non-existent block '{block_id}'"
             )
 
 

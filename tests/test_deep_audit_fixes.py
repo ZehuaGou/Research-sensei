@@ -65,24 +65,48 @@ def test_llm_client_config_affects_payload() -> None:
 # Test 2: SinglePaperIngestionRunner marks job FAILED on exception
 # ---------------------------------------------------------------------------
 
-def test_runner_marks_job_failed_on_card_error(tmp_path: Path) -> None:
-    """If card building raises, job must be marked FAILED, not crash."""
+def test_runner_marks_job_failed_on_card_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If card building raises, job must be marked FAILED with WarningItem."""
+    from researchsensei.schemas.common import WarningItem
+
     workspace = WorkspaceStore(tmp_path / "workspace")
     jobs = JobStore(tmp_path / "jobs.sqlite3")
 
-    # Create a minimal valid markdown file
     source = tmp_path / "test.md"
     source.write_text("# Test Paper\n\n## Abstract\nThis is a test.\n", encoding="utf-8")
 
-    runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
-    job = runner.run(source, job_id="test-job")
+    # Monkeypatch build_paper_card to raise
+    def _fail_build_paper_card(*args, **kwargs):
+        raise RuntimeError("Simulated card build failure")
 
-    # The job should succeed (rule-based builders shouldn't crash on valid input)
-    assert job.status in (JobStatus.SUCCEEDED, JobStatus.FAILED)
-    # If it succeeded, verify artifacts exist
-    if job.status == JobStatus.SUCCEEDED:
-        run_dir = tmp_path / "workspace" / "runs" / "test-job"
-        assert (run_dir / "paper_card.json").exists()
+    monkeypatch.setattr(
+        "researchsensei.ingestion.pipeline.build_paper_card",
+        _fail_build_paper_card,
+    )
+
+    runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
+    job = runner.run(source, job_id="fail-job")
+
+    # Must be FAILED
+    assert job.status == JobStatus.FAILED
+    assert job.current_step == "pipeline_error"
+    assert "Simulated card build failure" in job.error
+
+    # Must have WarningItem, not str
+    assert len(job.warnings) > 0
+    assert isinstance(job.warnings[0], WarningItem)
+    assert job.warnings[0].code == "PIPELINE_FAILED"
+
+    # Must be re-readable from store
+    reloaded = jobs.get("fail-job")
+    assert reloaded.status == JobStatus.FAILED
+    assert isinstance(reloaded.warnings[0], WarningItem)
+
+    # Must NOT have written card artifacts
+    run_dir = tmp_path / "workspace" / "runs" / "fail-job"
+    assert not (run_dir / "paper_card.json").exists()
+    assert not (run_dir / "formula_cards.json").exists()
+    assert not (run_dir / "teaching_cards.json").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -167,10 +191,20 @@ async def test_direction_runner_records_adapter_failure_warning(tmp_path: Path) 
 
     bundle = await runner.run("test query", direction_id="fail-test")
 
-    # Must have acquisition failure warning
+    # Must have acquisition failure warning in bundle
     has_failure_warning = any("ACQUISITION_FAILED" in w for w in bundle.warnings)
     assert has_failure_warning, (
         f"Expected ACQUISITION_FAILED warning, got: {bundle.warnings}"
+    )
+
+    # Warning must also be in candidate_pool.json artifact
+    assert any("ACQUISITION_FAILED" in w for w in bundle.candidate_pool.warnings), (
+        f"candidate_pool.warnings missing failure: {bundle.candidate_pool.warnings}"
+    )
+
+    # search_log must record the failure
+    assert any("failed" in entry for entry in bundle.candidate_pool.search_log), (
+        f"search_log missing failure entry: {bundle.candidate_pool.search_log}"
     )
 
 
@@ -180,14 +214,41 @@ async def test_direction_runner_records_adapter_failure_warning(tmp_path: Path) 
 
 @pytest.mark.asyncio
 async def test_query_planner_chinese_fallback_warns() -> None:
-    """Chinese query without LLM must produce CHINESE_QUERY_NO_LLM_FALLBACK warning."""
+    """Chinese query without LLM must produce degraded warnings."""
     planner = QueryPlanner()  # No LLM client → fallback
     plan = await planner.plan("时间序列异常检测")
 
     assert "CHINESE_QUERY_NO_LLM_FALLBACK" in plan.warnings, (
         f"Expected CHINESE_QUERY_NO_LLM_FALLBACK warning, got: {plan.warnings}"
     )
+    assert "EN_QUERY_UNAVAILABLE" in plan.warnings, (
+        f"Expected EN_QUERY_UNAVAILABLE warning, got: {plan.warnings}"
+    )
     assert plan.language == "zh"
+
+
+@pytest.mark.asyncio
+async def test_chinese_fallback_warning_in_bundle(tmp_path: Path) -> None:
+    """Chinese fallback warnings must appear in DirectionBundle.warnings."""
+    workspace = WorkspaceStore(tmp_path / "workspace")
+
+    def _empty_arxiv(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text='<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>')
+
+    def _empty_openalex(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, text=json.dumps({"results": []}), headers={"content-type": "application/json"})
+
+    runner = DirectionRunner(
+        workspace=workspace,
+        query_planner=QueryPlanner(),
+        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_arxiv))),
+        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_openalex))),
+    )
+
+    bundle = await runner.run("时间序列异常检测", direction_id="zh-test")
+
+    assert "CHINESE_QUERY_NO_LLM_FALLBACK" in bundle.warnings
+    assert "EN_QUERY_UNAVAILABLE" in bundle.warnings
 
 
 # ---------------------------------------------------------------------------
@@ -226,8 +287,8 @@ def test_dedup_normalizes_doi_case() -> None:
     assert len(result) == 1, f"DOI case normalization failed: {len(result)} papers"
 
 
-def test_dedup_keeps_different_arxiv_versions() -> None:
-    """Different arXiv versions are different papers and should not be merged."""
+def test_dedup_merges_different_arxiv_versions() -> None:
+    """Different arXiv versions of the same paper should be merged for reading plan."""
     service = SelectionService()
 
     candidates = [
@@ -236,4 +297,18 @@ def test_dedup_keeps_different_arxiv_versions() -> None:
     ]
 
     result = service.deduplicate(candidates)
-    assert len(result) == 2, f"Different arXiv versions should be kept: {len(result)} papers"
+    # After normalization (strip vN), both have arxiv_id="2301.12345" → merged
+    assert len(result) == 1, f"ArXiv versions should be merged: {len(result)} papers"
+
+
+def test_dedup_merges_arxiv_prefix_variants() -> None:
+    """'arXiv:2301.12345' and '2301.12345v1' should be merged."""
+    service = SelectionService()
+
+    candidates = [
+        CandidatePaper(paper_id="p1", title="Paper A", arxiv_id="arXiv:2301.12345"),
+        CandidatePaper(paper_id="p2", title="Paper A v1", arxiv_id="2301.12345v1"),
+    ]
+
+    result = service.deduplicate(candidates)
+    assert len(result) == 1, f"arXiv prefix variants should be merged: {len(result)} papers"

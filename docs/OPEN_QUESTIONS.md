@@ -68,3 +68,11 @@
 - **问题**：`docs/PHASE_MAPPING.md` 建议 Phase 12 = patterns + drill（旧 Phase 6 子模块），但原始开发文档 `03_FULL_IMPLEMENTATION_PLAN.md` 定义 Phase 12 = 工程可靠性（断点续跑/日志/缓存/安全测试）。
 - **影响**：如果不确认范围，可能实现错误的模块。
 - **当前处理结论**：以 `docs/PHASE_MAPPING.md`（迁移路线权威文档）为准，Phase 12 = patterns + drill。工程可靠性推迟到后续 Phase。Phase 12 reuse gate 已完成，P0 quality tests 已补充。进入代码开发前需最终确认范围。
+
+## 10. arXiv ID 去重规则
+
+- **问题**：arXiv ID `2301.12345v1` 和 `2301.12345v2` 是否应视为同一篇论文？
+- **当前实现**：`_normalize_arxiv_id()` 剥离 `arXiv:` 前缀和 `vN` 版本后缀，不同版本合并为同一篇论文。保留先出现或元数据更完整者。
+- **理由**：阅读计划场景下，同一论文的不同版本（v1/v2）通常是小修，用户不需要分别阅读。
+- **风险**：如果 v1 和 v2 有重大内容差异（如新增实验），合并可能丢失信息。
+- **状态**：已实现，已测试。如需调整可修改 `_normalize_arxiv_id()`。

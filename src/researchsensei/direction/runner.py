@@ -42,13 +42,14 @@ class DirectionRunner:
         query_plan = await self.query_planner.plan(user_query)
 
         # Step 2: Acquisition
-        candidates, acquisition_warnings = self._acquire(query_plan)
+        candidates, acquisition_warnings, search_log = self._acquire(query_plan)
 
         # Step 3: Build candidate pool (raw, before dedup)
         candidate_pool = self.selection_service.build_candidate_pool(
             query=query_plan.direction_en or query_plan.user_query,
             candidates=candidates,
-            search_log=[f"{source}: searched" for source in self.sources],
+            search_log=search_log,
+            warnings=acquisition_warnings,
         )
 
         # Step 4: Deduplicate → filtered candidates
@@ -56,7 +57,8 @@ class DirectionRunner:
         filtered_candidates = self.selection_service.build_candidate_pool(
             query=query_plan.direction_en or query_plan.user_query,
             candidates=filtered_items,
-            search_log=candidate_pool.search_log + ["dedup: applied"],
+            search_log=search_log + ["dedup: applied"],
+            warnings=acquisition_warnings,
         )
         filtered_candidates = filtered_candidates.model_copy(
             update={
@@ -82,14 +84,15 @@ class DirectionRunner:
             warnings=query_plan.warnings + acquisition_warnings + reading_plan.warnings,
         )
 
-    def _acquire(self, query_plan: QueryPlan) -> tuple[list[CandidatePaper], list[str]]:
+    def _acquire(self, query_plan: QueryPlan) -> tuple[list[CandidatePaper], list[str], list[str]]:
         """Acquire candidate papers from configured sources.
 
-        Returns (candidates, warnings) where warnings records any adapter failures.
+        Returns (candidates, warnings, search_log).
         """
         query = query_plan.direction_en or query_plan.user_query
         candidates: list[CandidatePaper] = []
         warnings: list[str] = []
+        search_log: list[str] = []
 
         for source in self.sources:
             try:
@@ -101,14 +104,17 @@ class DirectionRunner:
                     msg = f"Unknown source: {source}"
                     logger.warning(msg)
                     warnings.append(msg)
+                    search_log.append(f"{source}: unknown")
                     continue
                 candidates.extend(results)
+                search_log.append(f"{source}: searched ({len(results)} results)")
             except Exception as exc:
                 msg = f"ACQUISITION_FAILED:{source}: {type(exc).__name__}: {str(exc)[:100]}"
                 logger.warning(msg)
                 warnings.append(msg)
+                search_log.append(f"{source}: failed ({type(exc).__name__})")
 
-        return candidates, warnings
+        return candidates, warnings, search_log
 
 
 def _slugify(text: str) -> str:

@@ -34,6 +34,23 @@ def _normalize_doi(doi: str) -> str:
     return normalized
 
 
+def _normalize_arxiv_id(arxiv_id: str) -> str:
+    """Normalize arXiv ID by stripping 'arXiv:' prefix and 'vN' version suffix.
+
+    For reading plan dedup, different versions of the same paper (e.g. 2301.12345v1
+    and 2301.12345v2) are considered the same paper. We keep the first occurrence
+    or the one with more complete metadata.
+    """
+    normalized = arxiv_id.strip()
+    # Strip "arXiv:" prefix (case-insensitive)
+    if normalized.lower().startswith("arxiv:"):
+        normalized = normalized[6:]
+    # Strip version suffix (e.g. "v1", "v2")
+    import re
+    normalized = re.sub(r"v\d+$", "", normalized)
+    return normalized
+
+
 class SelectionService:
     """Scores, deduplicates, and ranks candidate papers into a reading plan."""
 
@@ -86,6 +103,7 @@ class SelectionService:
         query: str,
         candidates: list[CandidatePaper],
         search_log: list[str] | None = None,
+        warnings: list[str] | None = None,
     ) -> CandidatePool:
         """Build a candidate pool from search results."""
         return CandidatePool(
@@ -95,6 +113,7 @@ class SelectionService:
             strong_related_count=0,
             items=candidates,
             search_log=search_log or [],
+            warnings=warnings or [],
         )
 
     def deduplicate(self, candidates: list[CandidatePaper]) -> list[CandidatePaper]:
@@ -121,8 +140,8 @@ class SelectionService:
                 result[seen_doi[doi_key]] = self._merge_paper(result[seen_doi[doi_key]], paper)
                 continue
 
-            # Check arXiv ID match
-            arxiv_key = paper.arxiv_id.strip() if paper.arxiv_id else ""
+            # Check arXiv ID match (normalize: strip arXiv: prefix, strip vN version)
+            arxiv_key = _normalize_arxiv_id(paper.arxiv_id) if paper.arxiv_id else ""
             if arxiv_key and arxiv_key in seen_arxiv:
                 result[seen_arxiv[arxiv_key]] = self._merge_paper(result[seen_arxiv[arxiv_key]], paper)
                 continue

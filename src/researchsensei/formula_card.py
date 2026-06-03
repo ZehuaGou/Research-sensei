@@ -115,6 +115,9 @@ def _build_single_rule(
     warnings: list[str] = []
     if not nearby:
         warnings.append("NO_NEARBY_TEXT")
+    if purpose == "UNKNOWN":
+        warnings.append("PURPOSE_UNKNOWN_NEEDS_HUMAN_CHECK")
+        confidence = min(confidence, 0.3)
 
     return FormulaCard(
         formula_id=f"{document.paper_id}:eq:{block.block_id}",

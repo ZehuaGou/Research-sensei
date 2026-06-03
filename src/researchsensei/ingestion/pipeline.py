@@ -9,7 +9,7 @@ from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.jobs import JobStore
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_skeleton import build_paper_skeleton
-from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WorkspaceArtifact
+from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.teaching_card import build_teaching_cards
 from researchsensei.workspace import WorkspaceStore
 
@@ -55,11 +55,13 @@ class SinglePaperIngestionRunner:
             formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
             teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
         except Exception as exc:
+            error_summary = f"{type(exc).__name__}: {str(exc)[:200]}"
             return self.jobs.update(
                 actual_job_id,
                 status=JobStatus.FAILED,
                 current_step="pipeline_error",
-                warnings=[f"Pipeline failed: {type(exc).__name__}: {str(exc)[:200]}"],
+                error=error_summary,
+                warnings=[WarningItem(code="PIPELINE_FAILED", message=error_summary)],
             )
         source_status_path = run_dir / "source_status.json"
         parsed_path = run_dir / "parsed_document.json"
