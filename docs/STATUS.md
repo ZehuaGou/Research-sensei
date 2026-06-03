@@ -5,9 +5,9 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 298 tests passing
+- 313 tests passing
 - 当前代码仍不是最终论文理解系统
-- Phase 6 evidence 是 block-level，不是 claim-level
+- Phase 6 evidence 已有 PassageIndex，但 ClaimEvidence 仍是 block-level
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
 - Phase 11 是 direction pipeline v1，不是完整 literature review
 
@@ -25,31 +25,29 @@
 
 ## 3. 当前任务
 
-- ParserAdapter 已完成并接入 pipeline：
-  - ParserAdapter 抽象接口（supports / parse）
-  - LightweightParserAdapter（包装 LightweightIngestionService）
-  - ParseMetadata / ParserResult schema
-  - DocumentBlock Optional 结构化字段（bbox / table_html / figure_caption / reference_entries）
-  - ParserAdapter 已接入 SinglePaperIngestionRunner
-  - parser_adapter=None 时仍走 LightweightIngestionService
-  - 注入 parser_adapter 时使用 ParserResult.document
-  - parsed_document.json 仍是 DocumentIngestion shape
-  - 298 tests passing（292 existing + 6 new）
+- PassageIndex 第一小批已完成：
+  - Passage / PassageIndex / PassageIndexBuildConfig / PassageIndexStats schema
+  - build_passage_index(document) builder
+  - pipeline 写入 passage_index.json
+  - artifact 数量从 7 变为 8
+  - 旧 evidence_index.json 仍保留，build_evidence_index / ClaimEvidence / EvidenceIndex v1 未修改
+  - 313 tests passing（298 existing + 15 new）
 - 尚未完成：
-  - PassageIndex / passage_index.json 尚未实现
-  - ClaimEvidence v2 / claim_evidence.json 尚未实现
-  - evidence_index.json v1 wrapper 尚未升级
+  - ClaimEvidence v2 字段尚未实现
+  - ClaimEvidenceBundle 尚未实现
+  - claim_evidence.json 尚未实现
+  - BM25 / EvidenceRetriever 尚未实现
   - Paper Understanding v2 尚未实现
   - Audit / QualityReport / UnderstandingStatus 尚未实现
   - Frontend/API gating 尚未实现
 - Phase 12 仍冻结
-- 下一步：规划 PassageIndex + ClaimEvidence v2，不要直接大改
+- 下一步：规划 ClaimEvidence v2 + claim_evidence.json，不要直接大改
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 298 passed
+- pytest: 313 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
