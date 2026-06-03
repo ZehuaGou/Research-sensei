@@ -112,7 +112,7 @@ class AuditFinding(SenseiModel):
 class ComponentAuditResult(SenseiModel):
     component: str      # "paper_card" / "formula_cards" / "teaching_cards"
     status: str         # "PASS" / "FAIL" / "SKIP"
-    findings: list[AuditFinding] = []
+    findings: list[AuditFinding] = Field(default_factory=list)
 ```
 
 ### QualityReport
@@ -121,9 +121,9 @@ class ComponentAuditResult(SenseiModel):
 class QualityReport(SenseiModel):
     schema_version: str = "v2"
     paper_id: str
-    findings: list[AuditFinding] = []
-    component_results: list[ComponentAuditResult] = []
-    checked_artifacts: list[str] = []
+    findings: list[AuditFinding] = Field(default_factory=list)
+    component_results: list[ComponentAuditResult] = Field(default_factory=list)
+    checked_artifacts: list[str] = Field(default_factory=list)
     audit_version: str = "v1"
     created_at: str = ""
 ```
