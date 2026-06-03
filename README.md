@@ -2,16 +2,18 @@
 
 科研论文理解与思维框架训练系统。不是论文摘要器，而是帮助用户真正读懂论文、理解公式、形成科研思维、回答导师追问的学习工作台。
 
-## 当前状态
-
-- Phase 1-11 baseline complete (281 tests passing)
-- Phase 12 (patterns + drill) frozen
-- 下一步：Phase 11.6 ParserAdapter（待用户确认）
-
 ## 主要文档
 
-- [docs/DESIGN.md](docs/DESIGN.md) — 产品定位、架构、artifact 链路、技术路线
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规则、Phase 1-11 baseline、Phase 11.6 开发说明
+- [docs/DESIGN.md](docs/DESIGN.md) — 产品定位、架构、技术路线
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规则、入口
+- [docs/development/PAPER_UNDERSTANDING.md](docs/development/PAPER_UNDERSTANDING.md) — ParserAdapter / Evidence / LLM / Quality
+- [docs/development/LITERATURE_SEARCH.md](docs/development/LITERATURE_SEARCH.md) — Query / Acquisition / Selection / Reading Plan
+
+## 当前状态
+
+- Phase 1-11 baseline complete (281 tests)
+- Phase 12 (patterns + drill) frozen
+- 下一步：Paper Understanding 升级
 
 ## 安装
 
@@ -51,7 +53,7 @@ src/researchsensei/
   teaching_card.py — 教学卡
   source_resolver.py — 来源解析
 
-backend/         — 旧版代码（冻结，仅作迁移参考）
-frontend/        — Vue 3 前端（保留，未重写）
+backend/         — 旧版代码（冻结）
+frontend/        — Vue 3 前端（保留）
 tests/           — 测试
 ```

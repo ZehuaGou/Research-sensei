@@ -1,6 +1,6 @@
 # ResearchSensei Acceptance Criteria
 
-> **Canonical docs**: See `docs/DESIGN.md` for quality standards and `docs/DEVELOPMENT.md` for phase completion criteria.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, and `docs/development/PAPER_UNDERSTANDING.md`.
 
 ## Global Criteria
 

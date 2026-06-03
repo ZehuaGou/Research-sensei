@@ -1,6 +1,6 @@
 # ResearchSensei Reuse Report
 
-> **Canonical docs**: See `docs/DESIGN.md` section "External Project Reuse Principles" for current decisions.
+> **Canonical docs**: See `docs/DESIGN.md` and `docs/development/PAPER_UNDERSTANDING.md`.
 
 Last updated: 2026-06-03
 

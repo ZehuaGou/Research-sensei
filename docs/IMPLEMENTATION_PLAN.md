@@ -1,6 +1,6 @@
 # ResearchSensei Implementation Plan
 
-> **Canonical docs**: See `docs/DESIGN.md` for current route and `docs/DEVELOPMENT.md` for phase details.
+> **Canonical docs**: See `docs/DESIGN.md` and `docs/DEVELOPMENT.md`.
 
 ## Completed Phases
 
