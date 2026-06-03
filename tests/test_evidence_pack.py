@@ -268,9 +268,25 @@ def test_token_budget_exceeded_warning() -> None:
     bundle = _make_bundle(claims)
     index = _make_index(passages)
 
-    pack = build_evidence_pack(bundle, index, max_total_tokens=5, max_items_per_type=10)
+    pack = build_evidence_pack(bundle, index, max_total_tokens=20, max_items_per_type=10)
 
     assert any(w.code == "TOKEN_BUDGET_EXCEEDED" for w in pack.warnings)
+    assert pack.total_tokens <= 20
+
+
+def test_single_item_exceeds_budget_not_added() -> None:
+    """If a single item's token_count exceeds max_total_tokens, it should not be added."""
+    long_text = "word " * 500  # ~500 tokens
+    claim = _make_claim("c001", "METHOD", "p001")
+    bundle = _make_bundle([claim])
+    index = _make_index([_make_passage("p001", long_text)])
+
+    pack = build_evidence_pack(bundle, index, max_total_tokens=10, max_passage_chars=10000)
+
+    assert len(pack.items) == 0
+    assert pack.total_tokens == 0
+    assert any(w.code == "TOKEN_BUDGET_EXCEEDED" for w in pack.warnings)
+    assert any(w.code == "EMPTY_EVIDENCE_PACK" for w in pack.warnings)
 
 
 # ---------------------------------------------------------------------------

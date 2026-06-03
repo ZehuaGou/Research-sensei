@@ -51,23 +51,15 @@ def build_evidence_pack(
         by_type.setdefault(claim.claim_type, []).append(claim)
 
     # Process by priority
+    budget_exceeded = False
     for claim_type in CLAIM_TYPE_PRIORITY:
         claims_of_type = by_type.get(claim_type, [])
         count = 0
         for claim in claims_of_type:
             if count >= max_items_per_type:
                 break
-            if total_tokens >= max_total_tokens:
-                warnings.append(WarningItem(
-                    code="TOKEN_BUDGET_EXCEEDED",
-                    message=f"Token budget ({max_total_tokens}) exceeded, remaining items skipped.",
-                ))
-                return EvidencePack(
-                    paper_id=paper_id,
-                    items=items,
-                    warnings=warnings,
-                    total_tokens=total_tokens,
-                )
+            if budget_exceeded:
+                break
 
             # Find supporting passage
             passage_text = ""
@@ -108,6 +100,16 @@ def build_evidence_pack(
                 passage_text = passage_text[:max_passage_chars]
 
             token_count = len(passage_text.split())
+
+            # Check budget AFTER computing token_count
+            if total_tokens + token_count > max_total_tokens:
+                warnings.append(WarningItem(
+                    code="TOKEN_BUDGET_EXCEEDED",
+                    message=f"Token budget ({max_total_tokens}) exceeded, remaining items skipped.",
+                ))
+                budget_exceeded = True
+                break
+
             total_tokens += token_count
 
             items.append(EvidencePackItem(
@@ -123,6 +125,8 @@ def build_evidence_pack(
                 source_artifact="claim_evidence",
             ))
             count += 1
+        if budget_exceeded:
+            break
 
     if not items:
         warnings.append(WarningItem(
