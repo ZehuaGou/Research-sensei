@@ -17,22 +17,31 @@
 ### PaperQA / PaperQA2
 
 - **GitHub**: `Future-House/paper-qa`
-- **机制**: 将论文切分为 passages → embedding → 检索相关 passages → 基于 passages 生成 citation-backed answer
-- **对本模块的用处**: passage retrieval 的 chunk/retrieve 思路可借鉴；citation-backed answer 的 prompt 结构可参考
-- **当前是否直接接入**: 否 — PaperQA 是 QA 系统，不是教学系统；依赖较重（需要 embedding model）
-- **借鉴的设计**: passage 分段策略、relevance ranking、citation 注入 prompt
-
-### OpenScholar
-
-- **机制**: passage-level retrieval + citation accuracy 评估
-- **对本模块的用处**: citation accuracy 评估方法可参考
-- **当前是否直接接入**: 否 — 主要是 benchmark，不是工具
+- **机制**: scientific literature RAG，支持 grounded responses with in-text citations，使用 embeddings / vector DB 检索文档
+- **对本模块的用处**: passage retrieval 的 chunk/retrieve 思路可借鉴
+- **当前是否直接接入**: 否 — 不想默认引入 embedding model / vector DB
+- **借鉴流程**:
+  1. `DocumentIngestion.blocks` → `PassageIndex.passages`
+  2. simple lexical retrieval first
+  3. later optional embedding retriever
+  4. retrieved passages → `EvidencePackItem`
+  5. `EvidencePackItem` → LLM prompt
+  6. LLM output → evidence_ref validation
 
 ### ARIS result-to-claim / paper-claim-audit
 
 - **机制**: result-to-claim 判断实验结果是否支持论文声明；paper-claim-audit 用零上下文审计验证论文数字
-- **对本模块的用处**: claim extraction 的分类思想可借鉴；evidence_ref 校验规则可参考
-- **当前是否直接接入**: 否 — 只参考设计
+- **对本模块的用处**: 借鉴两个核心思想：
+  - claim 必须有 evidence
+  - audit 独立读取 artifact，不能让生成器自我放行
+- **当前是否直接接入**: 否 — 不整包接入，只借鉴设计
+
+### OpenScholar
+
+- **机制**: passage-level retrieval + citation accuracy 评估
+- **GitHub repo**: 未验证；保持 REFERENCE_ONLY 直到 repo/paper 实现确认
+- **对本模块的用处**: citation accuracy 评估方法可参考
+- **当前是否直接接入**: 否
 
 ## 4. 当前代码位置
 
@@ -157,8 +166,18 @@ class EvidenceRetriever:
 - 真实网络 / LLM 在默认测试
 - 现有测试破坏
 
-## 13. 当前未解决问题
+## 13. EvidenceRetriever 初版策略
+
+- 当前不使用向量库
+- 初版用 lexical scoring：
+  - tokenize claim
+  - tokenize passage
+  - score = overlap / claim_token_count
+  - 返回 score > threshold 的 passages
+- 如果无 passage 命中，返回空，不编造 evidence
+
+## 14. 当前未解决问题
 
 - passage 分段策略（按 section 还是按 paragraph count）
 - claim_type 判断准确性（关键词匹配 vs 位置启发式）
-- EvidenceRetriever 是否用 TF-IDF 还是更简单的关键词匹配
+- EvidenceRetriever 阈值和评分策略需要实测调优

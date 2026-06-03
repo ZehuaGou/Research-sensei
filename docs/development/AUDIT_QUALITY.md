@@ -31,12 +31,21 @@
 - **机制**: Thread 1 写最强 200 字拒稿理由；Thread 2 独立逐点辩护；第三个线程评分
 - **对本模块的用处**: advisor question 质量评估可参考对抗思路
 - **当前是否接入**: 否 — 参考设计
+- **落地方式**: 后续 advisor/drill 可以用"最强反对意见 → 逐点回应 → 未解决问题"结构。当前阶段只记录为未来扩展，不写代码。
+
+### ARIS → ResearchSensei 审计独立性落地
+
+- Audit 函数不能调用 card builder
+- Audit 输入只能是 artifacts 路径或已序列化 JSON
+- Audit 不接收生成器的自然语言解释
+- Audit 输出 `QualityReport`
 
 ### OpenScholar citation accuracy
 
 - **机制**: 评估 citation 是否准确支持 claim
+- **GitHub repo**: 未验证；保持 REFERENCE_ONLY 直到 repo/paper 实现确认
 - **对本模块的用处**: evidence_ref 有效性评估可参考
-- **当前是否接入**: 否 — REFERENCE_ONLY
+- **当前是否接入**: 否
 
 ### PaperQA citation/provenance
 

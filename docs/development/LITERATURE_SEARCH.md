@@ -31,41 +31,42 @@
 - **类型**: public API
 - **能力**: citation count / venue metadata / TLDR
 - **当前是否接入**: 否 — OPTIONAL_ADAPTER
-- **未来接入**: 通过 adapter 接口，补充 citation 数据
+- **未来接入**: 通过 adapter 接口，补充 citation 数据。接入前必须看 API rate limit、schema、许可。
 
 ### Crossref
 
 - **类型**: public API
 - **能力**: DOI metadata
 - **当前是否接入**: 否 — OPTIONAL_ADAPTER
-- **未来接入**: 通过 adapter 接口，补充 DOI 解析
+- **未来接入**: 通过 adapter 接口，补充 DOI 解析。接入前必须看 API rate limit、schema、许可。
 
 ### PaperQA
 
 - **GitHub**: `Future-House/paper-qa`
 - **能力**: literature QA / passage retrieval
 - **对本模块的用处**: passage retrieval 的检索思路可参考
-- **当前是否接入**: 否 — OPTIONAL_ADAPTER 候选
+- **当前是否接入**: 否 — 不用于搜索源，而是可能用于文献 QA / evidence retrieval
 
 ### ResearchPilot
 
 - **能力**: research question → retrieval → structured findings → cross-paper patterns
+- **GitHub repo**: 未验证；保持 REFERENCE_ONLY 直到 repo 实现确认
 - **对本模块的用处**: structured findings 的设计可参考
-- **当前是否接入**: 否 — REFERENCE_ONLY
+- **当前是否接入**: 否
 
 ### STORM
 
 - **GitHub**: `stanford-oval/storm`
 - **能力**: outline-guided synthesis / multi-perspective questioning
 - **对本模块的用处**: multi-perspective questioning 可借鉴到 advisor/drill
-- **当前是否接入**: 否 — REFERENCE_ONLY
+- **当前是否接入**: 否 — 可参考 outline/multi-perspective，但不是当前搜索 adapter
 
 ### ARIS research-lit
 
 - **GitHub**: `wanshuiyin/Auto-claude-code-research-in-sleep`
 - **能力**: 多源检索 + novelty-check workflow
 - **对本模块的用处**: 多源聚合和去重思路可参考
-- **当前是否接入**: 否 — REFERENCE_ONLY
+- **当前是否接入**: 否 — 可参考多源检索和去重，但不直接迁移
 
 ## 4. 当前代码位置
 

@@ -18,7 +18,7 @@
 - fail-closed 策略已写入 DEVELOPMENT，但当前代码还未完全实现
 - understanding_status.json 还未实现
 - 当前 card builders 仍使用 rule-based baseline 作为 fallback
-- 外部项目复用（Docling/PaperQA/ARIS audit）还需要真实调研
+- 外部项目已完成初步 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
 - Paper Understanding 质量仍未达到导师级
 
 ---
@@ -34,4 +34,4 @@
 ## 4. 测试和 commit
 
 - pytest: 281 passed
-- 最近 commit: `6eac044`
+- 最近 commit: `214d020`

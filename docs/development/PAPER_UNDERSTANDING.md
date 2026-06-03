@@ -19,18 +19,20 @@
 - **机制**: evidence-constrained answer — 将 passages 注入 prompt，要求 LLM 在 passages 范围内回答并 cite
 - **对本模块的用处**: evidence pack 注入 prompt 的方式可参考；citation-backed answer 的 prompt 结构可借鉴
 - **当前是否直接接入**: 否 — PaperQA 是 QA 系统，不是教学系统
-
-### OpenScholar
-
-- **机制**: citation-backed response + citation accuracy 评估
-- **对本模块的用处**: citation accuracy 的评估标准可参考
-- **当前是否直接接入**: 否
+- **借鉴落地**: evidence pack 必须像 citation-backed answer 一样只包含可引用 passage；LLM 只能基于 EvidencePackItem 输出；输出必须携带 evidence_ref
 
 ### ARIS
 
 - **机制**: reviewer independence（只传文件路径，不传摘要）；kill-argument（两线程对抗）；claim audit（零上下文验证）
 - **对本模块的用处**: reviewer independence 原则可直接应用（审计者独立于生成者）；claim audit 的零上下文思路可借鉴
 - **当前是否直接接入**: 否 — 只参考设计
+- **借鉴落地**: card builder 只负责生成；audit 模块独立读取 card + evidence + source artifact；audit 不接收 card builder 的解释；audit 结果决定 understanding_status
+
+### OpenScholar
+
+- **机制**: citation-backed response + citation accuracy 评估
+- **对本模块的用处**: citation accuracy 的评估标准可参考
+- **当前是否直接接入**: 否
 
 ## 4. 当前代码位置
 
@@ -157,10 +159,17 @@ BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic me
 | HF-9 | BLOCKED_UNDERSTANDING still contains user-facing explanation text |
 | HF-10 | warnings are strings instead of WarningItem |
 
-## 11. 当前未解决问题
+## 11. EvidencePack 构建流程
+
+- 输入：`ClaimEvidence` + `PassageIndex` + `paper_skeleton`
+- 过滤 `semantic_support == INSUFFICIENT_EVIDENCE` 的 claim
+- 每个 `EvidencePackItem` 必须包含：`claim_id`, `claim_type`, `evidence_ref`, `quote_or_summary`, `passage_text`, `confidence`
+- 如果 `evidence_pack` 为空，直接 `BLOCKED_UNDERSTANDING`
+
+## 12. 当前未解决问题
 
 - 当前代码仍有 baseline/fallback 模式，fail-closed 还未实现
 - understanding_status.json 还未实现
-- EvidencePack 怎么从 evidence_index 构建
 - LLM prompt 结构怎么设计
+- 输出校验规则怎么实现
 - 输出校验规则怎么实现

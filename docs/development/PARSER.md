@@ -17,39 +17,43 @@
 
 ### Docling
 
-- **GitHub**: `ds4sd/docling`
-- **主要能力**: PDF/layout/table/structured document conversion，支持多种文档格式
-- **输出格式**: 结构化 JSON（pages, blocks, tables, figures）
-- **安装复杂度**: 中等（pip install docling）
-- **是否适合当前接入**: 否 — 依赖较重，当前只需 Markdown/TXT/PDF fallback
-- **未来接入方式**: 通过 ParserAdapter 接口，`DoclingParserAdapter(ParserAdapter)` 实现 `supports()` 和 `parse()`
+- **GitHub**: `docling-project/docling`
+- **主要能力**: 多格式文档解析，支持 PDF/DOCX/PPTX/XLSX/HTML/images/LaTeX/plain text
+- **核心表示**: 统一 `DoclingDocument` 表示
+- **导出格式**: Markdown / HTML / DocTags / lossless JSON
+- **典型调用**: `DocumentConverter().convert(source)` → `result.document.export_to_markdown()`
+- **安装复杂度**: 中等（`pip install docling`）
+- **是否适合当前接入**: 否 — 依赖和集成面较大，先保持 optional adapter
+- **未来 adapter 映射**: `DoclingDocument` / Markdown / JSON → `DocumentIngestion.blocks`
 
 ### Marker
 
-- **GitHub**: `VikParuchuri/marker`
-- **主要能力**: PDF/Markdown 转换，速度较快
-- **输出格式**: Markdown 文本
-- **安装复杂度**: 较轻量
-- **是否适合当前接入**: 否 — 输出是 Markdown，需要额外解析成 blocks
-- **未来接入方式**: 通过 ParserAdapter 接口
+- **GitHub**: `datalab-to/marker`
+- **主要能力**: PDF 转 Markdown / JSON / chunks / HTML，支持 tables / forms / equations / inline math / links / references / code blocks
+- **输出格式**: Markdown / JSON / chunks / HTML
+- **可选 LLM 模式**: 有，但默认测试不能用真实 LLM
+- **许可证风险**: 代码 GPL-3.0，模型许可另有限制，商用/分发前必须确认
+- **是否适合当前接入**: 否 — 许可证和依赖风险，不适合默认依赖
+- **未来 adapter 映射**: Marker JSON / chunks → `DocumentIngestion.blocks`
 
 ### MinerU
 
 - **GitHub**: `opendatalab/MinerU`
-- **主要能力**: PDF 解析/OCR/layout 分析
-- **输出格式**: 结构化 JSON
+- **主要能力**: PDF/image/DOCX/PPTX/XLSX 解析，公式转 LaTeX、表格转 HTML、OCR、FastAPI/Gradio、CPU/GPU/MPS
+- **输出格式**: Markdown、按阅读顺序排序的 JSON、中间格式
 - **安装复杂度**: 较重
-- **是否适合当前接入**: 否 — 依赖重
-- **未来接入方式**: 通过 ParserAdapter 接口
+- **是否适合当前接入**: 否 — 能力强但系统复杂，先作为 optional parser backend
+- **未来 adapter 映射**: MinerU JSON / Markdown → `DocumentIngestion.blocks`
 
 ### Nougat
 
 - **GitHub**: `facebookresearch/nougat`
-- **主要能力**: scientific PDF / math-aware parsing
-- **输出格式**: Markdown（含 LaTeX 公式）
-- **安装复杂度**: 需要 GPU
+- **主要能力**: academic document PDF parser，擅长 LaTeX math 和 tables
+- **输出格式**: `.mmd` / Mathpix Markdown 风格
+- **安装**: `pip install nougat-ocr`
+- **风险**: GPU / PyTorch / 模型依赖，失败检测有不稳定可能
 - **是否适合当前接入**: 否 — 需要 GPU，不适合默认安装
-- **未来接入方式**: 通过 ParserAdapter 接口
+- **未来 adapter 映射**: `.mmd` → `DocumentIngestion.blocks`，公式块尽量保留
 
 ## 4. 当前代码位置
 
@@ -135,5 +139,5 @@ class LightweightParserAdapter(ParserAdapter):
 
 ## 11. 当前未解决问题
 
-- 外部 parser 项目未真正调研安装方式和输出格式
+- 已完成初步 GitHub README 级调研；正式接入前仍需本地安装验证和样例 PDF 对比
 - ParserAdapter 接口是否需要 `supports()` 还是只靠构造函数选择
