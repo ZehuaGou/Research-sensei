@@ -29,7 +29,7 @@
   - pipeline 新增 llm_client 可选参数
   - baseline path 仍为 BASELINE_ONLY
   - v2 path 构建 EvidencePack 并调用 isolated v2 builders
-  - v2 SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTADING 状态映射已实现
+  - v2 SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING 状态映射已实现
   - BLOCKED 不写 card artifacts
   - DEGRADED 不写 failed teaching artifact
   - job.status 区分 FAILED（系统异常）和 BLOCKED（理解失败）

@@ -100,12 +100,19 @@ def test_run_async_builder_sync_context() -> None:
 
 
 def test_run_async_builder_active_event_loop_raises() -> None:
+    import warnings
+
     async def coro():
         return 42
 
     async def run_inside_loop():
-        with pytest.raises(RuntimeError, match="active event loop"):
-            _run_async_builder(coro())
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            with pytest.raises(RuntimeError, match="active event loop"):
+                _run_async_builder(coro())
+        # Verify no "was never awaited" warning
+        unawaited = [w for w in caught if "was never awaited" in str(w.message)]
+        assert len(unawaited) == 0, f"Got unawaited coroutine warning: {unawaited}"
 
     asyncio.run(run_inside_loop())
 

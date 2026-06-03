@@ -48,6 +48,9 @@ def _run_async_builder(coro):
     except RuntimeError:
         # No running loop — safe to use asyncio.run
         return asyncio.run(coro)
+    # Close coroutine to avoid "was never awaited" warning
+    if hasattr(coro, "close"):
+        coro.close()
     raise RuntimeError(
         "SinglePaperIngestionRunner.run cannot execute async LLM builders "
         "inside an active event loop"
