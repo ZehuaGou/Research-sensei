@@ -1,6 +1,6 @@
 # ResearchSensei Product Requirements
 
-> **Canonical docs**: See `docs/DESIGN.md` and `docs/DEVELOPMENT.md`.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, `docs/STATUS.md`.
 
 ResearchSensei is a paper reading tutor system for graduate students and junior researchers. It helps users truly understand papers, not just skim them.
 
