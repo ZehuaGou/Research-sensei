@@ -14,8 +14,8 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 
 | 维度 | 定义 | 自动检测方法 | hard-fail 条件 |
 |------|------|-------------|----------------|
-| groundedness | 每个解释可追踪到论文证据 | evidence_ref 存在且有效 | 核心 claim 无 evidence_ref (F-1, F-4) |
-| faithfulness | 不编造贡献/实验/结论 | token overlap + paper-specific terms | 输出与论文主题不符 (F-6) |
+| groundedness | 每个解释可追踪到论文证据 | evidence_ref 存在且有效 | 核心 claim 无 evidence_ref (F-1) |
+| faithfulness | 不编造贡献/实验/结论 | token overlap + paper-specific terms | 输出与论文主题不符 (F-9, 未实现) |
 | explainability | 用人话解释，不是复制原文 | formula char ratio + raw copy detection | human_explanation 是公式文本 (F-10, 未实现) |
 | formula teaching quality | 符号有依据，作用有解释 | symbol 来自上下文或 REASONABLE_INFERENCE | symbol 解释与论文矛盾 |
 | research thinking | 讲清假设/创新点/代价/边界 | claim_type 覆盖 PROBLEM/METHOD/LIMITATION | — |
@@ -262,7 +262,7 @@ paper_terms = title_words | abstract_words
 |------|------|
 | test_hard_fail_core_claim_without_evidence | F-1 triggered |
 | test_hard_fail_formula_text_as_explanation | F-10 (formula char ratio >= 0.3, 未实现) |
-| test_hard_fail_generic_output | F-3 (no paper-specific terms) |
+| test_hard_fail_generic_output | F-9 (generic-output / no paper-specific terms, 未实现) |
 | test_raw_abstract_copy_detected | F-8 warning or block |
 | test_invalid_evidence_ref_detected | F-2 |
 | test_quality_report_json_round_trip | all fields preserved |
