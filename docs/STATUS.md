@@ -26,7 +26,7 @@
 | M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
 | M2.1 | 解析 | ✅ M2_1_PARSER.md | ✅ ParserAdapter + LightweightParser | ✅ | 已阶段完成 | Docling adapter 后补 |
 | M2.2 | 证据链路 | ✅ M2_2_EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ✅ | 已阶段完成 | evidence_ref 跳转后补 |
-| M2.3 | 讲解生成 | ✅ M2_3_PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders | ✅ | 已阶段完成 | Real LLM smoke 后补 |
+| M2.3 | 讲解生成 | ✅ M2_3_PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders + live smoke | ✅ | 已阶段完成；real LLM smoke 入口已实现 | 持续扩大真实样例 |
 | M2.4 | 质量审计 | ✅ M2_4_AUDIT_QUALITY.md | ✅ QualityAuditor F-1 到 F-6 | ✅ | 已阶段完成 | 质量规则增强后补 |
 | M2.5 | 状态门控 | ✅ M2_5_FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ✅ | 已阶段完成 | — |
 | M3 | 接口与前端展示 | ✅ M3_FRONTEND_RENDER.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | 页面级测试补完 |
@@ -45,7 +45,7 @@
 | M5 | 工程可靠性与测试保障 | ✅ M5_ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
 | M5.1 | 后端测试 | ✅ | ✅ 481 tests | ✅ | 已阶段完成 | — |
 | M5.2 | 前端测试 | ✅ | ⚠️ StatusBanner only | ⚠️ | 部分完成 | 补页面级测试 |
-| M5.3 | LLM smoke / 成本 | ✅ | ❌ | ❌ | 文档已补齐，代码未实现 | 实现 opt-in real LLM smoke |
+| M5.3 | LLM smoke / 成本 | ✅ | ✅ tests_live + scripts/run_live_eval.py | ✅ opt-in | 已实现受控 live eval；不进入默认 pytest | 增加更多真实样例和定价配置 |
 | M5.4 | 缓存 | ✅ | ✅ ResponseCache | ✅ | 已阶段完成 | — |
 | M5.5 | 安全 | ✅ | ❌ | ❌ | 文档已补齐，secret scan 工具未接入 | 接入 gitleaks / pre-commit |
 | M5.6 | Debug/admin | ⚠️ | ⚠️ SENSEI_DEBUG only | ⚠️ | 部分完成 | 鉴权后补 |
@@ -56,7 +56,7 @@
 ## 3. 当前主要差距
 
 - M4 互动式学习文档已设计、代码未实现
-- Real LLM smoke 未做
+- Real LLM smoke 已有受控入口，但真实样例数量仍少
 - Docling parser adapter 未做
 - evidence_ref 原文跳转未做
 - Frontend 页面级测试不足
@@ -78,10 +78,10 @@
 
 ### M2 单篇论文解析、精读与可信讲解
 
-- 检查 M2.1-M2.5 开发文档是否完整
-- 检查每个子模块测试要求是否完整
-- 检查验收标准是否完整
-- 不直接写代码
+- M2.3 已接入 real LLM smoke：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
+- 默认测试仍不真实调用 LLM；live eval 必须显式设置 `RUN_LLM_TESTS=1` 和 `RESEARCHSENSEI_LIVE_EVAL=1`
+- 当前 live smoke 使用小型 synthetic paper，验证 parser/evidence/v2 builders/QualityAuditor/UnderstandingStatus
+- 真实模型输出可能触发 DEGRADED_STRUCTURAL；必须以 live report 为准，不得伪装 SUCCESS
 
 ### M3 接口与前端展示
 
@@ -98,8 +98,9 @@
 
 ### M5 工程可靠性与测试保障
 
-- 检查 M5.1-M5.7 文档是否完整
-- 明确 M5 是全局工程保障，不替代 M1-M4 子模块测试
+- M5.3 已实现 opt-in live eval，输出 `reports/live_eval/live_eval_report.json`
+- `reports/live_eval/` 已加入 `.gitignore`，报告、工作目录、下载物不得提交
+- M5 仍是全局工程保障，不替代 M1-M4 子模块测试
 
 ---
 

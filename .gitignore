@@ -16,6 +16,7 @@ config/local.toml
 /workspace/
 /runs/
 /outputs/
+/reports/live_eval/
 /artifacts/
 /tmp/
 *.ckpt

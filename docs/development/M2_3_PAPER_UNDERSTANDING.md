@@ -50,6 +50,7 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 - `src/researchsensei/teaching_card.py` — `build_teaching_card()` (rule-based baseline)
 - `src/researchsensei/teaching_card_v2.py` — v2 LLM builder (fail-closed)
 - `src/researchsensei/llm/validator.py` — LLM output validators
+- `src/researchsensei/live_eval.py` — opt-in real LLM smoke / live eval helper
 - `src/researchsensei/schemas/llm_output.py` — PaperCardLLMOutput, FormulaCardLLMOutput, TeachingCardLLMOutput
 - `src/researchsensei/schemas/status.py` — UnderstandingStatus, DownstreamGates, EvidencePackSummary
 - `src/researchsensei/ingestion/pipeline.py` — SinglePaperIngestionRunner (v2 path integration)
@@ -62,6 +63,13 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 | 输出 | paper_card.json, formula_cards.json, teaching_cards.json, understanding_status.json |
 | LLM prompt 只能使用 | paper title/metadata, paper_skeleton, evidence_pack, existing baseline card |
 | 禁止 | 直接整篇论文全文塞入 prompt |
+
+v2 prompt 额外约束：
+
+- prompt 中必须列出 Allowed evidence_ref values。
+- LLM 输出的 evidence_ref 必须从 Allowed evidence_ref values 中精确选择一个。
+- 不允许把多个 evidence_ref 用逗号、空格或列表拼接。
+- 如果证据不足，文本写 `INSUFFICIENT_EVIDENCE` 或不生成对应 card，不能编造 evidence_ref。
 
 ## 8. Artifact
 
@@ -290,12 +298,14 @@ if not understanding_status.allowed_downstream.advisor_questions:
 | test_pipeline_v2_blocked_artifacts | BLOCKED → no card artifacts written |
 | test_blocked_understanding_no_user_facing_content | no paper explanation text in blocked output |
 | test_success_status_for_final_display | status == "SUCCESS", allowed_for_user_display is True |
+| test_m2_real_llm_smoke | opt-in real LLM 生成可解析输出，并验证 evidence_ref 可追溯 |
 
 ### 全局规则
 
 - 默认不真实调用 LLM
 - 不联网
 - 不新增依赖
+- real LLM smoke 只在 `tests_live/` 中显式开启，不进入默认 pytest
 
 ## 14. 验收标准
 
@@ -305,6 +315,8 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - baseline path 输出 BASELINE_ONLY
 - v2 path fail-closed，不 fallback
 - 默认测试不真实调用 LLM
+- real LLM smoke 必须记录 model、prompt version、schema version、token、cost、latency、失败原因
+- real LLM smoke 失败不能伪装成普通 mock 测试通过
 
 ## 15. 当前实现状态
 
@@ -318,7 +330,8 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - QualityAuditor 已接入
 - understanding_status.json / quality_report.json 已写入
 - 测试已覆盖：15+ tests
-- Real LLM smoke 未做
+- Real LLM smoke 已实现 opt-in 入口：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
+- v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
 - formula_is_core 判断未实现
 
 ## 16. 当前未解决问题
@@ -328,3 +341,5 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - component_status 的值是否还需要 DEGRADED
 - 旧 rule-based baseline builders 与 v2 builders 的边界仍需确认（old `*_with_llm` 函数可能仍有 fallback，但 pipeline 不走它们）
 - DownstreamGates 的最终字段是否足够
+- 当前 real LLM smoke 只有一个 synthetic paper 样例，不能代表真实论文质量
+- 当前成本估算依赖价格环境变量；未配置时报告 cost=0，但 token limit 仍生效

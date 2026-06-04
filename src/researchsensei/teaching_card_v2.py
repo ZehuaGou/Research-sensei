@@ -27,6 +27,7 @@ async def build_teaching_cards_v2(
     """
     prompt_builder = PromptBuilder()
     evidence_text = _format_evidence_for_prompt(evidence_pack)
+    allowed_refs = _format_allowed_refs(evidence_pack)
 
     concepts = []
     if paper_card.core_idea.text != "UNKNOWN":
@@ -51,6 +52,14 @@ async def build_teaching_cards_v2(
 
 Evidence Pack:
 {evidence_text}
+
+Allowed evidence_ref values:
+{allowed_refs}
+
+重要约束：
+- evidence_ref 必须从上面的 Allowed evidence_ref values 中精确选择一个。
+- 不要把多个 evidence_ref 用逗号、空格或列表拼在一起。
+- 如果证据不足，不要生成该 teaching_card。
 
 要求输出 JSON:
 {{
@@ -152,3 +161,8 @@ def _format_evidence_for_prompt(evidence_pack: EvidencePack) -> str:
             f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:200]}"
         )
     return "\n".join(lines)
+
+
+def _format_allowed_refs(evidence_pack: EvidencePack) -> str:
+    refs = [item.evidence_ref for item in evidence_pack.items[:20] if item.evidence_ref]
+    return "\n".join(f"- {ref}" for ref in refs) or "- NONE"
