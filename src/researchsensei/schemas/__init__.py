@@ -7,14 +7,18 @@ from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, Sea
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
+from researchsensei.schemas.audit import ArtifactBundle, AuditFinding, ComponentAuditResult, QualityReport
 from researchsensei.schemas.source import SourceStatus
 from researchsensei.schemas.status import DownstreamGates, EvidencePackSummary, UnderstandingStatus
 
 __all__ = [
+    "ArtifactBundle",
+    "AuditFinding",
     "BlockType",
     "CandidatePaper",
     "CandidatePool",
     "CardClaim",
+    "ComponentAuditResult",
     "ClaimEvidence",
     "ClaimEvidenceBundle",
     "ClaimEvidenceV2",
@@ -50,6 +54,7 @@ __all__ = [
     "JobStatus",
     "PaperCard",
     "PaperSkeleton",
+    "QualityReport",
     "QueryPlan",
     "ReadingPlan",
     "ReadingPlanItem",

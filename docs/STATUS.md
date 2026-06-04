@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 427 tests passing
+- 447 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever + EvidencePack
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -25,30 +25,29 @@
 
 ## 3. 当前任务
 
-- Pipeline v2 path 已接入：
-  - pipeline 新增 llm_client 可选参数
-  - baseline path 仍为 BASELINE_ONLY
-  - v2 path 构建 EvidencePack 并调用 isolated v2 builders
-  - v2 SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING 状态映射已实现
-  - BLOCKED 不写 card artifacts
-  - DEGRADED 不写 failed teaching artifact
-  - job.status 区分 FAILED（系统异常）和 BLOCKED（理解失败）
-  - EvidencePackSummary 写入 UnderstandingStatus
-  - _run_async_builder 处理 sync pipeline 调用 async v2 builders
-  - 427 tests passing（410 existing + 17 new）
+- Isolated QualityAuditor 已完成：
+  - AuditFinding / ComponentAuditResult / QualityReport / ArtifactBundle schema 已完成
+  - isolated QualityAuditor 已完成
+  - 初版结构性 audit 规则 F-1 到 F-6 已完成
+  - Audit 当前不接 pipeline
+  - Audit 当前不写 quality_report.json
+  - Audit 当前不改变 UnderstandingStatus
+  - 447 tests passing（427 existing + 20 new）
 - 尚未完成：
-  - Audit / QualityReport 尚未实现
+  - pipeline audit 接入尚未实现
+  - quality_report.json artifact 尚未实现
+  - formula-heavy / raw-copy / generic-output audit 尚未实现
   - Frontend/API gating 尚未实现
   - formula_is_core 判断尚未实现
   - real LLM integration 尚未验证
 - Phase 12 仍冻结
-- 下一步：讨论 Audit / QualityReport
+- 下一步：讨论是否将 QualityAuditor 接入 pipeline
 
 ---
 
 ## 4. 测试和 commit
 
-- pytest: 427 passed
+- pytest: 447 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---
