@@ -173,6 +173,21 @@ npm test
 - 不允许默认真实调用 LLM
 - 不进入普通 pytest
 
+### mock 测试 vs real LLM 效果评测
+
+默认 pytest 不真实调用 LLM，并不代表项目不做真实 LLM 效果评测。两者定位不同：
+
+| 维度 | mock/fake 测试 (M5.1) | real LLM smoke / quality eval (M5.3) |
+|------|----------------------|--------------------------------------|
+| 目的 | 测系统稳定性、pipeline 逻辑、artifact 正确性 | 测真实模型效果、输出质量、evidence binding |
+| 默认执行 | 是 | 否（opt-in） |
+| 调用 LLM | 否（fake/mock client） | 是（真实 API） |
+| 进入普通 pytest | 是 | 否 |
+| 进入普通 CI | 是 | 否 |
+| 成本控制 | 无成本 | 必须有 token/cost limit |
+
+real LLM smoke / quality eval 通过 `RUN_LLM_TESTS=1` 等显式开关手动运行，记录 token、cost、模型名、样例集、prompt version、schema version 和失败原因。
+
 ### 输入
 
 - 环境变量（显式开启）

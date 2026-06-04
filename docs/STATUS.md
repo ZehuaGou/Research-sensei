@@ -45,17 +45,17 @@
 | M5 | 工程可靠性与测试保障 | ✅ M5_ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
 | M5.1 | 后端测试 | ✅ | ✅ 481 tests | ✅ | 已阶段完成 | — |
 | M5.2 | 前端测试 | ✅ | ⚠️ StatusBanner only | ⚠️ | 部分完成 | 补页面级测试 |
-| M5.3 | LLM smoke / 成本 | ⚠️ | ❌ | ❌ | 文档待设计 | 先讨论方案 |
+| M5.3 | LLM smoke / 成本 | ✅ | ❌ | ❌ | 文档已补齐，代码未实现 | 实现 opt-in real LLM smoke |
 | M5.4 | 缓存 | ✅ | ✅ ResponseCache | ✅ | 已阶段完成 | — |
-| M5.5 | 安全 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M5.5 | 安全 | ✅ | ❌ | ❌ | 文档已补齐，secret scan 工具未接入 | 接入 gitleaks / pre-commit |
 | M5.6 | Debug/admin | ⚠️ | ⚠️ SENSEI_DEBUG only | ⚠️ | 部分完成 | 鉴权后补 |
-| M5.7 | CI | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M5.7 | CI | ✅ | ❌ | ❌ | 文档已补齐，CI 未配置 | 配置 CI / release check |
 
 ---
 
 ## 3. 当前主要差距
 
-- M4 互动式学习文档待设计、代码未实现
+- M4 互动式学习文档已设计、代码未实现
 - Real LLM smoke 未做
 - Docling parser adapter 未做
 - evidence_ref 原文跳转未做
