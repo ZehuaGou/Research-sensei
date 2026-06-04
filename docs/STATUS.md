@@ -28,25 +28,10 @@
 
 ## 3. 当前任务
 
-- Frontend API 对齐第一批已完成：
-  - UploadView 已改用 /api/v1/documents/parse
-  - LearningWorkspaceView 已改用 /understanding_status + /cards
-  - BASELINE_ONLY / BLOCKED 不展示 cards
-  - DEGRADED 显示部分讲解不可用
-  - 前端不再依赖不存在的 /api/learn/{id}/bundle
-  - 前端不再依赖不存在的 /api/papers/upload
-  - StatusBanner 组件已实现
-  - patterns/drill tab 标记为 Phase 12 未开放
-  - 前端公式卡已兼容后端 FormulaCard schema（formula_raw/purpose/location 等字段映射）
-  - frontend npm run build 成功
-  - 481 tests passing（后端测试未变）
-- 尚未完成：
-  - frontend 自动化测试尚未引入
-  - evidence_ref 跳转尚未实现
-  - quality_report debug UI 尚未实现
-  - Phase 12 patterns/drill 仍冻结
-  - 正式鉴权系统尚未实现
-- 下一步：讨论后续方向（audit 规则补充 / evidence_ref 跳转 / frontend 测试）
+- 主链路 v1 已阶段性封版（详见 docs/MAIN_CHAIN_V1_REVIEW.md）
+- 当前下一步推荐：前端自动化测试 / real LLM smoke 方案讨论
+- Phase 12 仍冻结
+- 不建议继续扩展新功能前忽略测试缺口
 
 ---
 
