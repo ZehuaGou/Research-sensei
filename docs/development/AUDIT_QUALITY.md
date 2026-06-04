@@ -90,6 +90,23 @@
 - Audit 不写 artifact，只读取
 - Runner 负责把 QualityReport 映射为 UnderstandingStatus 并写 understanding_status.json
 
+### Candidate Audit 语义
+
+QualityReport 当前审计的是 **candidate artifacts**，即 pipeline 写盘前的内存对象。
+
+当 audit BLOCK v2 SUCCESS / DEGRADED 时：
+- `quality_report.json` 记录 candidate audit finding；
+- final `understanding_status` 改为 `BLOCKED_UNDERSTANDING`；
+- final artifacts **不写** `paper_card` / `formula_cards` / `teaching_cards`；
+- **不会**重新审 final artifacts。
+
+这样设计的理由：
+- 避免写入不可信 card artifacts；
+- 避免删除已写文件；
+- 保留审计证据，说明 candidate 为什么被阻断。
+
+**后续开发者注意**：`quality_report.json` 记录的是 candidate 阶段的审计结果，不一定等于 final written artifacts 的审计结果。例如，candidate 有 paper_card 但 audit BLOCK 后 final artifacts 不含 paper_card，此时 quality_report 中的 findings 仍引用 candidate 阶段的 paper_card。
+
 ## 7. 核心类和方法签名
 
 ### AuditFinding

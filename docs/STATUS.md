@@ -15,11 +15,14 @@
 
 ## 2. 当前主要差距
 
-- fail-closed 策略已写入 DEVELOPMENT，但当前代码还未完全实现
-- understanding_status.json 还未实现
-- 当前 card builders 仍使用 rule-based baseline 作为 fallback
+- old builders / old with_llm builders 仍保留 rule-based fallback；pipeline baseline path 使用 old rule-based builders
+- pipeline v2 path 使用 isolated v2 builders，fail-closed，不 fallback
+- Frontend/API gating 尚未实现
+- QualityReport debug/admin 权限尚未实现
+- formula-heavy / raw-copy / generic-output audit 尚未实现
 - 外部项目已完成 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
 - Paper Understanding 质量仍未达到导师级
+- Phase 12 仍冻结
 
 ---
 
