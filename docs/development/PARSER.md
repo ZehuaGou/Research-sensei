@@ -1,4 +1,4 @@
-# Parser 模块
+# Parser 模块（M2.1）
 
 ---
 
@@ -13,7 +13,22 @@
 - 不改变现有 parser 行为
 - 不改 pipeline / web / frontend / backend
 
-## 3. 外部项目调研
+## 3. 产品流程位置
+
+M2.1 是单篇论文理解的第一步：用户上传论文 → M2.1 解析为结构化文档 → M2.2 构建证据链路。
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| Docling | 多格式文档解析 | github.com/docling-project/docling | OPTIONAL_ADAPTER | 否 | 依赖较重 | 第一个候选外部 parser |
+| MinerU | PDF/image 解析 | github.com/opendatalab/MinerU | OPTIONAL_ADAPTER | 否 | 依赖重 | 暂不接入 |
+| Marker | PDF 转 Markdown | github.com/datalab-to/marker | OPTIONAL_ADAPTER | 否 | GPL-3.0 license | 暂不接入 |
+| Nougat | 学术 PDF 解析 | github.com/facebookresearch/nougat | OPTIONAL_ADAPTER | 否 | GPU 依赖 | 暂不接入 |
+
+未完成调研不得进入代码开发。
+
+## 5. 外部项目调研（详细）
 
 ### Docling
 
@@ -234,7 +249,24 @@ class LightweightParserAdapter(ParserAdapter):
 - 测试只测字段存在、不比较内容
 - 默认 pytest 真实联网 / LLM
 
-## 11. 当前未解决问题
+## 12. 验收标准
+
+- ParserAdapter 接口抽象，不绑定具体 parser
+- LightweightParserAdapter 输出与原 LightweightIngestionService 一致
+- ParserResult 包含 DocumentIngestion + ParseMetadata
+- DocumentBlock 扩展字段向后兼容
+- 外部 parser 不能直接写 artifact
+- 默认测试不联网、不真实调用外部 parser
+
+## 13. 当前实现状态
+
+- 代码已实现：ParserAdapter, LightweightParserAdapter, ParserResult, ParseMetadata
+- DocumentBlock 已扩展 Optional 字段
+- pipeline 已接入
+- 测试已覆盖：11+ tests
+- Docling adapter 未实现
+
+## 14. 当前未解决问题
 
 - 已完成初步 GitHub README 级调研；正式接入前仍需本地安装验证和样例 PDF 对比
 - ParserAdapter 接口是否需要 `supports()` 还是只靠构造函数选择

@@ -1,10 +1,14 @@
-# Audit / Quality 模块
+# Audit / Quality 模块（M2.4）
 
 ---
 
 ## 1. 模块目标
 
 判断"讲得好"，不只是 schema 通过。
+
+## 产品流程位置
+
+M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → QualityAuditor → QualityReport → 状态覆盖。
 
 ### "讲得好"的可检查维度
 
@@ -307,13 +311,27 @@ if token_overlap(core_idea.text, method_overview.text) > 0.8:
 - 不能把 pytest quality tests 误当成产品级 audit
 - 未来需要新增：QualityReport round-trip、invalid evidence_ref finding、missing passage_id finding、status mapping tests
 
-## 12. 当前未解决问题
+## 13. 验收标准
 
-- QualityReport schema 未实现（只有测试中的检查逻辑）
+- QualityAuditor 只读 artifacts，不写 artifact
+- 不 import card builder
+- F-1 到 F-6 正确触发
+- candidate audit 语义正确
+- 默认测试不真实调用 LLM
+
+## 14. 当前实现状态
+
+- 代码已实现：QualityAuditor, QualityReport, AuditFinding, F-1 到 F-6
+- pipeline 已接入
+- 测试已覆盖：20+ tests
+- formula-heavy / raw-copy / generic-output 未实现
+
+## 15. 当前未解决问题
+
 - formula char ratio 阈值是否需要调优
 - token overlap 阈值是否需要调优
 - formula_is_core 的具体判断算法
-- AuditFinding 和 WarningItem 是否全局统一（QualityReport 内部用 AuditFinding，pipeline/job 层用 WarningItem，是否统一未决）
+- AuditFinding 和 WarningItem 是否全局统一
 - score / dimension_scores 未来 LLM auditor 是否引入
 - "讲得好"的自动检测边界
 - 是否需要人工评估集

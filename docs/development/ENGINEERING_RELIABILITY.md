@@ -1,4 +1,4 @@
-# Engineering Reliability 模块
+# Engineering Reliability 模块（M5）
 
 ---
 
@@ -11,7 +11,19 @@
 - 不实现 Parser / Evidence / LLM 业务逻辑
 - 不改 frontend
 
-## 3. Artifact Versioning
+## 3. 产品流程位置
+
+M5 是横切支撑模块，保障 M1-M4 的可靠性、安全性、可测试性。
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| Vitest | 前端测试 | vitest.dev | devDependency | 否 | 无 | ✅ 已引入 |
+| pytest | 后端测试 | pytest.org | devDependency | 是 | 无 | ✅ 已使用 |
+| gitleaks | secret scanning | github.com/gitleaks/gitleaks | CI tool | 否 | — | 待引入 |
+
+## 5. Artifact Versioning
 
 - 每个 v2 artifact 顶层应显式写 `schema_version="v2"`。
 - 旧 artifact 没有 `schema_version` 时按 v1 读取。
@@ -154,7 +166,23 @@
 - e2e 测试后置
 - 新增依赖必须先讨论
 
-## 13. 当前未解决问题
+## 14. 验收标准
+
+- 默认 pytest 不联网、不真实调用 LLM
+- 前端测试通过 Vitest
+- secret scanning 覆盖常见 key pattern
+- artifact versioning 正确
+- cache 不进 Git
+
+## 15. 当前实现状态
+
+- 代码已实现：481 backend tests, 7 frontend tests, ResponseCache, Vitest 基础
+- 测试已覆盖：后端充分，前端 StatusBanner only
+- Real LLM smoke 未做
+- Debug/admin 鉴权未做
+- CI 未配置
+
+## 16. 当前未解决问题
 
 - artifact_manifest 是否未来需要。
 - content_hash 是否在 v2 初版加入。

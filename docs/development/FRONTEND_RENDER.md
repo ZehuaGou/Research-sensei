@@ -1,4 +1,4 @@
-# Frontend Render 模块
+# Frontend Render 模块（M3）
 
 ---
 
@@ -12,7 +12,19 @@
 - 不实现 evidence 内部实现
 - 不改 backend 核心逻辑
 
-## 3. 核心原则
+## 3. 产品流程位置
+
+M3 是用户界面层：M2 生成卡片 → M3 API gating → 前端展示。
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| Vue 3 | 前端框架 | vuejs.org | 已使用 | 是 | 无 | ✅ 已使用 |
+| Vitest | 前端测试 | vitest.dev | devDependency | 否 | 无 | ✅ 已引入 |
+| Vue Test Utils | 组件测试 | test-utils.vuejs.org | devDependency | 否 | 无 | ✅ 已引入 |
+
+## 5. 核心原则
 
 - 前端/API 必须先读取 understanding_status。
 - 普通用户不能绕过 understanding_status 直接展示 card。
@@ -120,7 +132,16 @@ component_status:
 - Phase 12 tabs 显示"未开放"
 - LearningWorkspaceView / UploadView 页面级测试尚未完成
 
-## 12. 当前未解决问题
+## 13. 验收标准
+
+- 普通用户不能绕过 understanding_status 获取 cards
+- BASELINE_ONLY / BLOCKED 不展示 cards
+- DEGRADED 显示降级提示
+- /artifacts 默认 403
+- 前端不直接调用 /artifacts
+- StatusBanner 有测试
+
+## 14. 当前未解决问题
 
 - debug/admin 具体鉴权机制。
 - `/artifacts` 是否需要脱敏版本。

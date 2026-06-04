@@ -1,10 +1,14 @@
-# Full Pipeline 模块
+# Full Pipeline 模块（M2.5）
 
 ---
 
 ## 1. 模块目标
 
 定义单篇论文和研究方向两条完整链路的输入输出、失败传递、状态约束。
+
+## 产品流程位置
+
+M2.5 是 M2 的编排层：串联 M2.1-M2.4，管理 artifact 流转和状态门控。
 
 ## 2. 非目标
 
@@ -137,13 +141,22 @@ user_query
 - 下游：frontend（消费 artifact JSON）
 - 下游：Phase 12 patterns/drill/advisor（通过 DownstreamGates 判断可用性；SUCCESS 通常全部可用，DEGRADED_STRUCTURAL 可能只允许部分下游能力）
 
-## 7. 当前未解决问题
+## 8. 验收标准
 
-- understanding_status.json 未实现
-- fail-closed 策略代码未完全落地
-- 单篇链路和方向链路的连接点（A_READ → source_resolver）未实现自动化
-- QualityReport 到 UnderstandingStatus 的映射规则
-- Phase 12 gating 代码未实现
+- 单篇链路 10 个 artifact 正确写入
+- 不同状态 artifact 数量正确
+- 状态传递规则正确
+- 默认测试不联网、不真实调用 LLM
+
+## 9. 当前实现状态
+
+- 代码已实现：SinglePaperIngestionRunner, baseline + v2 path, 10 artifacts
+- 测试已覆盖：15+ tests
+- understanding_status.json 已实现
+- QualityReport 已实现
+
+## 10. 当前未解决问题
+
 - formula_is_core 的具体判断算法
 - DownstreamGates 的最终字段是否足够
 - passage_index.json 和 claim_evidence.json 的生成顺序细节

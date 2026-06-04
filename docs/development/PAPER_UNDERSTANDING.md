@@ -1,4 +1,4 @@
-# Paper Understanding 模块
+# Paper Understanding 模块（M2.3）
 
 ---
 
@@ -12,7 +12,20 @@
 - 不新增依赖
 - 不改 frontend
 
-## 3. 外部项目调研
+## 3. 产品流程位置
+
+M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM → paper_card / formula_cards / teaching_cards。
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| PaperQA | evidence-constrained answer | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 参考 prompt 结构 |
+| ARIS | reviewer independence | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFREFERENCE_ONLY | 否 | — | 参考 audit 思想 |
+
+未完成调研不得进入代码开发。
+
+## 5. 外部项目调研（详细）
 
 ### PaperQA
 
@@ -366,14 +379,27 @@ if not understanding_status.allowed_downstream.advisor_questions:
     raise Phase12GatingError("advisor_questions not allowed")
 ```
 
-## 14. 当前未解决问题
+## 15. 验收标准
 
-- 当前代码仍有 baseline/fallback 模式，fail-closed 还未实现
-- understanding_status.json schema 未实现
-- LLM prompt 需要实际测试调优
-- 输出校验规则需要实现
-- formula_is_core 的具体判断算法（规则？LLM？skeleton.formulas？formula purpose != UNKNOWN？）
-- EvidencePackSummary 是否足够复现 LLM 输入（裁剪后文本是否完全可重建）
+- LLM 输出必须绑定 evidence_ref
+- 无效 evidence_ref → BLOCKED
+- empty evidence_pack → BLOCKED
+- baseline path 输出 BASELINE_ONLY
+- v2 path fail-closed，不 fallback
+- 默认测试不真实调用 LLM
+
+## 16. 当前实现状态
+
+- 代码已实现：baseline builders, isolated v2 builders, EvidencePack, UnderstandingStatus
+- pipeline v2 path 已接入
+- 测试已覆盖：15+ tests
+- Real LLM smoke 未做
+- formula_is_core 判断未实现
+
+## 17. 当前未解决问题
+
+- formula_is_core 的具体判断算法
+- EvidencePackSummary 是否足够复现 LLM 输入
 - component_status 的值是否还需要 DEGRADED
 - phase12_drill_degraded 是否需要单独 reason 字段
 - 旧 Phase 8-10 代码迁移细节

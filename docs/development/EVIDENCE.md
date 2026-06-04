@@ -1,4 +1,4 @@
-# Evidence 模块
+# Evidence 模块（M2.2）
 
 ---
 
@@ -12,7 +12,21 @@
 - 不用向量数据库
 - 不新增依赖
 
-## 3. 外部项目调研
+## 3. 产品流程位置
+
+M2.2 承接 M2.1 的解析结果，构建证据链路：parsed_document → PassageIndex → ClaimEvidence → EvidencePack → LLM。
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| PaperQA | passage retrieval | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 参考 chunk/retrieve 思路 |
+| ARIS result-to-claim | claim audit | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 参考 claim-evidence binding |
+| OpenScholar | citation accuracy | 未确认 repo | REFERENCE_ONLY | 否 | — | 参考 citation accuracy |
+
+未完成调研不得进入代码开发。
+
+## 5. 外部项目调研（详细）
 
 ### PaperQA / PaperQA2
 
@@ -368,7 +382,22 @@ class EvidenceRetriever:
 | test_bm25_length_normalization | 长 passage 不因长度获得不公平高分 |
 | test_bm25_empty_query_returns_empty | 空 query 返回空列表 |
 
-## 15. 当前未解决问题
+## 16. 验收标准
+
+- PassageIndex 正确构建 passages
+- ClaimEvidenceV2 正确提取 claims
+- BM25 能检索到相关 passages
+- evidence_index.json v1 兼容
+- 默认测试不联网、不真实调用 LLM
+
+## 17. 当前实现状态
+
+- 代码已实现：PassageIndex, ClaimEvidenceV2, BM25 EvidenceRetriever, EvidencePack
+- pipeline 已写入 passage_index.json + claim_evidence.json
+- 测试已覆盖：30+ tests
+- evidence_ref 跳转未实现
+
+## 18. 当前未解决问题
 
 - passage 分段策略（按 section 还是按 paragraph count）需要实测
 - claim_type 判断准确性（关键词匹配 vs 位置启发式）需要实测

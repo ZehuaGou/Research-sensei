@@ -1,4 +1,4 @@
-# Literature Search 模块
+# Literature Search 模块（M1）
 
 ---
 
@@ -12,7 +12,31 @@
 - 不做 cross-paper synthesis（后续）
 - 不做真实联网测试
 
-## 3. 外部项目调研
+## 3. 产品流程位置
+
+M1 是用户研究的入口：用户输入研究方向 → M1 搜索论文 → 生成阅读计划 → M2 逐篇精读。
+
+```
+用户输入研究方向 → M1 搜索论文 → 生成阅读计划
+                                    ↓
+                            M2 单篇论文精读
+```
+
+## 4. 可复用开源项目 / 外部服务调研
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| arXiv Atom API | 论文搜索 | arxiv.org | DIRECT_ADAPTER | 是 | 无 | ✅ 已接入 ArxivAdapter |
+| OpenAlex REST API | 论文搜索/元数据 | openalex.org | DIRECT_ADAPTER | 是 | 无 | ✅ 已接入 OpenAlexAdapter |
+| Semantic Scholar | citation count / venue metadata | api.semanticscholar.org | OPTIONAL_ADAPTER | 否 | rate limit | 待接入 |
+| Crossref | DOI metadata | api.crossref.org | OPTIONAL_ADAPTER | 否 | rate limit | 待接入 |
+| PaperQA | passage retrieval | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 参考检索思路 |
+| STORM | multi-perspective questioning | github.com/stanford-oval/storm | REFERENCE_ONLY | 否 | — | 参考 M4 导师追问 |
+| ARIS research-lit | 多源检索 + 去重 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 参考去重思路 |
+
+未完成调研不得进入代码开发。
+
+## 5. 外部项目调研（详细）
 
 ### arXiv Atom API
 
@@ -152,7 +176,42 @@ relevance (0.36) + venue_prestige (0.22) + citation (0.14) + code (0.06) + metho
 - reading_plan 无 scoring_breakdown
 - warnings 使用 str 而非 WarningItem
 
-## 11. 当前未解决问题
+## 11. Schema / 数据结构
+
+| Schema | 用途 |
+|--------|------|
+| QueryPlan | 用户查询规划 |
+| CandidatePaper | 单篇候选论文 |
+| CandidatePool | 候选论文池 |
+| ReadingPlan | 阅读计划 |
+| ScoringBreakdown | 评分明细 |
+| DirectionBundle | 研究方向结果包 |
+
+## 12. 测试要求
+
+- 默认 pytest 不联网、不真实调用 LLM
+- HTTP 测试用 `httpx.MockTransport`
+- adapter 失败必须写入 warnings，不能静默吞掉
+- 去重必须有独立测试
+- reading_plan 必须有 scoring_breakdown 测试
+
+## 13. 验收标准
+
+- 用户输入查询后能生成 reading_plan
+- arXiv 和 OpenAlex 双源检索
+- 去重正确（DOI / arXiv ID / title）
+- 评分有 breakdown
+- A_READ 不超过 12 篇
+- 单源失败不阻断整体
+
+## 14. 当前实现状态
+
+- 代码已实现：QueryPlanner, ArxivAdapter, OpenAlexAdapter, SelectionService, DirectionRunner
+- 测试已覆盖：298+ tests including acquisition/selection/direction
+- Semantic Scholar / Crossref 未实现
+- cross-paper synthesis 未实现
+
+## 15. 当前未解决问题
 
 - Semantic Scholar / Crossref adapter 未实现
 - 中文 query fallback 降级策略（direction_en 仍为中文）
