@@ -256,23 +256,7 @@ class QualityAuditor:
     def _check_card_refs(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
         findings: list[AuditFinding] = []
 
-        # Collect all valid evidence_refs
-        valid_refs: set[str] = set()
-        if artifacts.evidence_index:
-            for claim in artifacts.evidence_index.get("claims", []):
-                ref = claim.get("evidence_ref", "")
-                if ref:
-                    valid_refs.add(ref)
-        if artifacts.claim_evidence:
-            for claim in artifacts.claim_evidence.get("claims", []):
-                ref = claim.get("evidence_ref", "")
-                if ref:
-                    valid_refs.add(ref)
-
-        if not valid_refs:
-            return findings
-
-        # F-1: core paper_card fields missing evidence_ref
+        # F-1: core paper_card fields missing evidence_ref (always checked)
         if artifacts.paper_card:
             us_status = ""
             if artifacts.understanding_status:
@@ -293,6 +277,23 @@ class QualityAuditor:
                             artifact="paper_card",
                             field=f"{field_name}.evidence_ref",
                         ))
+
+        # Collect all valid evidence_refs for F-2
+        valid_refs: set[str] = set()
+        if artifacts.evidence_index:
+            for claim in artifacts.evidence_index.get("claims", []):
+                ref = claim.get("evidence_ref", "")
+                if ref:
+                    valid_refs.add(ref)
+        if artifacts.claim_evidence:
+            for claim in artifacts.claim_evidence.get("claims", []):
+                ref = claim.get("evidence_ref", "")
+                if ref:
+                    valid_refs.add(ref)
+
+        if not valid_refs:
+            # No evidence sources available — skip F-2 but F-1 already checked
+            return findings
 
         # F-2: evidence_ref not in valid set
         if artifacts.paper_card:

@@ -306,6 +306,25 @@ def test_missing_core_paper_card_evidence_ref_produces_f1() -> None:
     assert "problem" in f1[0].field
 
 
+def test_missing_core_evidence_ref_without_evidence_sources_still_produces_f1() -> None:
+    """F-1 should fire even when no evidence_index or claim_evidence is provided."""
+    card = _make_paper_card()
+    card["problem"]["evidence_ref"] = ""
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        paper_card=card,
+        understanding_status=_make_success_status(),
+        # No evidence_index, no claim_evidence
+    )
+    report = auditor.audit(bundle)
+    f1 = [f for f in report.findings if f.code == "F-1"]
+    assert len(f1) >= 1
+    assert "problem" in f1[0].field
+    # F-2 should not fire since no valid_refs to check against
+    f2 = [f for f in report.findings if f.code == "F-2"]
+    assert len(f2) == 0
+
+
 def test_invalid_evidence_ref_produces_f2() -> None:
     card = _make_paper_card()
     card["problem"]["evidence_ref"] = "INVALID:ref"
