@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from pydantic import Field
 
 from researchsensei.schemas.base import SenseiModel
-from researchsensei.schemas.enums import SearchIntent
+from researchsensei.schemas.common import WarningItem
+from researchsensei.schemas.enums import PaperSourceStatus, PaperSourceType, SearchIntent
 
 
 class QueryPlan(SenseiModel):
@@ -80,6 +81,36 @@ class CandidatePool(SenseiModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class ResolvedPaperSource(SenseiModel):
+    """M1.3 source acquisition result for one candidate paper.
+
+    This records source material availability only. It must not contain parsed
+    paper content; parsing belongs to M2.
+    """
+
+    paper_id: str
+    title: str
+    doi: str = ""
+    arxiv_id: str = ""
+    source_url: str = ""
+    pdf_url: str = ""
+    landing_url: str = ""
+    source_type: PaperSourceType = PaperSourceType.METADATA_ONLY
+    status: PaperSourceStatus = PaperSourceStatus.NOT_FOUND
+    warnings: list[WarningItem] = Field(default_factory=list)
+    error: str = ""
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class SourceResolutionResult(SenseiModel):
+    """M1.3 source acquisition artifact for a candidate pool."""
+
+    query: str
+    items: list[ResolvedPaperSource] = Field(default_factory=list)
+    warnings: list[WarningItem] = Field(default_factory=list)
+    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
 class ReadingPlan(SenseiModel):
     """Structured reading plan with prioritized papers."""
 
@@ -94,6 +125,7 @@ class DirectionBundle(SenseiModel):
 
     query_plan: QueryPlan
     candidate_pool: CandidatePool
+    source_resolution: SourceResolutionResult = Field(default_factory=lambda: SourceResolutionResult(query=""))
     filtered_candidates: CandidatePool
     reading_plan: ReadingPlan
     warnings: list[str] = Field(default_factory=list)

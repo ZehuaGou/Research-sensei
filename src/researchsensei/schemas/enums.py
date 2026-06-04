@@ -14,6 +14,21 @@ class SearchIntent(str, Enum):
     CODE = "CODE"
 
 
+class PaperSourceStatus(str, Enum):
+    RESOLVED = "RESOLVED"
+    PARTIAL = "PARTIAL"
+    NOT_FOUND = "NOT_FOUND"
+    FAILED = "FAILED"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+class PaperSourceType(str, Enum):
+    ARXIV_SOURCE = "ARXIV_SOURCE"
+    PDF = "PDF"
+    LANDING_PAGE = "LANDING_PAGE"
+    METADATA_ONLY = "METADATA_ONLY"
+
+
 class JobStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"

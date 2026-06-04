@@ -1,9 +1,9 @@
 from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBundle, FormulaSymbol, FormulaTerm, PaperCard, TeachingCard, TeachingCardBundle
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
-from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ScoringBreakdown
+from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, SearchIntent
+from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
@@ -54,14 +54,18 @@ __all__ = [
     "JobStatus",
     "PaperCard",
     "PaperSkeleton",
+    "PaperSourceStatus",
+    "PaperSourceType",
     "QualityReport",
     "QueryPlan",
     "ReadingPlan",
     "ReadingPlanItem",
+    "ResolvedPaperSource",
     "ScoringBreakdown",
     "SearchIntent",
     "StatusEnvelope",
     "SourceStatus",
+    "SourceResolutionResult",
     "TeachingCard",
     "TeachingCardBundle",
     "UnderstandingStatus",

@@ -17,10 +17,10 @@
 
 | 编号 | 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 下一步 |
 |------|------|---------|---------|---------|---------|--------|
-| M1 | 论文搜索、获取与阅读计划 | ✅ M1_LITERATURE_SEARCH.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | M1.3 实现 |
+| M1 | 论文搜索、获取与阅读计划 | ✅ M1_LITERATURE_SEARCH.md | ✅ 基础闭环完成 | ✅ 已测试 | M1.1-M1.5 基础闭环已打通 | Semantic Scholar / Crossref 后补 |
 | M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | 已阶段完成 | — |
 | M1.2 | 多源检索 | ✅ | ⚠️ arXiv/OpenAlex 已实现 | ⚠️ | 部分完成 | Semantic Scholar / Crossref 后补 |
-| M1.3 | 论文原始材料获取 | ✅ | ❌ 未实现 | ❌ | 文档已设计，代码未实现 | 实现代码 |
+| M1.3 | 论文原始材料获取 | ✅ | ✅ PaperSourceResolver | ✅ | 基础 source resolution 已实现；不解析论文内容 | 真实 source/PDF 获取 adapter 后补 |
 | M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 已阶段完成 | — |
 | M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 已阶段完成 | — |
 | M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
@@ -72,10 +72,9 @@
 
 ### M1 论文搜索、获取与阅读计划
 
-- 检查 M1.1-M1.5 开发文档是否完整
-- 检查每个子模块测试要求是否完整
-- 检查验收标准是否完整
-- 不直接写代码
+- M1.1-M1.5 基础闭环已打通：query_plan → candidate_pool → source_resolution → filtered_candidates → reading_plan
+- M1.3 当前只做候选论文 source metadata/status resolution，不做 M2 论文解析
+- Semantic Scholar / Crossref、真实联网 source 获取、实际下载策略仍按后续 adapter 补充
 
 ### M2 单篇论文解析、精读与可信讲解
 

@@ -4,17 +4,167 @@ import logging
 import re
 import shutil
 from pathlib import Path
+from typing import Callable
 from urllib.parse import urlparse
 
 import httpx
 
-from researchsensei.schemas import SourceStatus
+from researchsensei.schemas import (
+    CandidatePaper,
+    PaperSourceStatus,
+    PaperSourceType,
+    ResolvedPaperSource,
+    SourceResolutionResult,
+    SourceStatus,
+    WarningItem,
+)
 
 logger = logging.getLogger(__name__)
 
 
 SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf"}
 PDF_BYTES = b"%PDF"
+
+
+class PaperSourceResolver:
+    """M1.3 resolver for candidate-paper source material metadata.
+
+    This resolver does not download or parse paper content. It only records
+    source URLs, fallback status, warnings, and metadata needed by later modules.
+    """
+
+    def __init__(
+        self,
+        *,
+        network_enabled: bool = False,
+        external_resolver: Callable[[CandidatePaper], ResolvedPaperSource | None] | None = None,
+    ) -> None:
+        self.network_enabled = network_enabled
+        self.external_resolver = external_resolver
+
+    def resolve_many(self, query: str, candidates: list[CandidatePaper]) -> SourceResolutionResult:
+        items = [self.resolve_one(candidate) for candidate in candidates]
+        warnings: list[WarningItem] = []
+        if any(item.status in {PaperSourceStatus.PARTIAL, PaperSourceStatus.NOT_FOUND, PaperSourceStatus.FAILED} for item in items):
+            warnings.append(
+                WarningItem(
+                    code="PARTIAL_SOURCE_RESOLUTION",
+                    message="Some candidate papers could not be fully resolved to source material.",
+                )
+            )
+        return SourceResolutionResult(query=query, items=items, warnings=warnings)
+
+    def resolve_one(self, paper: CandidatePaper) -> ResolvedPaperSource:
+        try:
+            if self.network_enabled and self.external_resolver is not None:
+                resolved = self.external_resolver(paper)
+                if resolved is not None:
+                    return resolved
+        except Exception as exc:
+            logger.warning("M1 paper source resolver failed for %s: %s", paper.paper_id, exc)
+            return self._base_result(
+                paper,
+                status=PaperSourceStatus.FAILED,
+                source_type=PaperSourceType.METADATA_ONLY,
+                warnings=[WarningItem(code="RESOLVER_FAILED", message="External source resolver failed.")],
+                error=str(exc)[:300],
+            )
+
+        if paper.arxiv_id:
+            pdf_url = SourceResolver.arxiv_to_pdf_url(arxiv_id=paper.arxiv_id)
+            source_url = self.arxiv_to_source_url(paper.arxiv_id)
+            if source_url and pdf_url:
+                metadata = {"resolution_strategy": "arxiv_source_first"}
+                if paper.pdf_url and paper.pdf_url != pdf_url:
+                    metadata["fallback_pdf_url"] = paper.pdf_url
+                return self._base_result(
+                    paper,
+                    status=PaperSourceStatus.RESOLVED,
+                    source_type=PaperSourceType.ARXIV_SOURCE,
+                    source_url=source_url,
+                    pdf_url=pdf_url,
+                    landing_url=paper.url or self.arxiv_to_abs_url(paper.arxiv_id),
+                    metadata=metadata,
+                )
+
+        if paper.pdf_url:
+            return self._base_result(
+                paper,
+                status=PaperSourceStatus.RESOLVED,
+                source_type=PaperSourceType.PDF,
+                pdf_url=paper.pdf_url,
+                landing_url=paper.url or _doi_url(paper.doi),
+                source_url=paper.pdf_url,
+                metadata={"resolution_strategy": "candidate_pdf_url"},
+            )
+
+        explicit_landing_url = bool(paper.url)
+        landing_url = paper.url or _doi_url(paper.doi)
+        if landing_url:
+            warnings = [WarningItem(code="PDF_URL_MISSING", message="No PDF URL is available for this candidate.")]
+            if not self.network_enabled:
+                network_warning = WarningItem(code="NETWORK_DISABLED", message="Network resolver is disabled.")
+                if explicit_landing_url:
+                    warnings.append(network_warning)
+                else:
+                    warnings.insert(0, network_warning)
+            return self._base_result(
+                paper,
+                status=PaperSourceStatus.PARTIAL,
+                source_type=PaperSourceType.LANDING_PAGE,
+                landing_url=landing_url,
+                warnings=warnings,
+                metadata={"resolution_strategy": "landing_page_only"},
+            )
+
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.NOT_FOUND,
+            source_type=PaperSourceType.METADATA_ONLY,
+            warnings=[
+                WarningItem(code="NO_SOURCE_URL", message="No source, landing, DOI, arXiv, or PDF URL found."),
+                WarningItem(code="PDF_URL_MISSING", message="No PDF URL is available for this candidate."),
+            ],
+            metadata={"resolution_strategy": "metadata_only"},
+        )
+
+    def _base_result(
+        self,
+        paper: CandidatePaper,
+        *,
+        status: PaperSourceStatus,
+        source_type: PaperSourceType,
+        source_url: str = "",
+        pdf_url: str = "",
+        landing_url: str = "",
+        warnings: list[WarningItem] | None = None,
+        error: str = "",
+        metadata: dict[str, str] | None = None,
+    ) -> ResolvedPaperSource:
+        return ResolvedPaperSource(
+            paper_id=paper.paper_id,
+            title=paper.title,
+            doi=paper.doi,
+            arxiv_id=paper.arxiv_id,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            landing_url=landing_url,
+            source_type=source_type,
+            status=status,
+            warnings=warnings or [],
+            error=error,
+            metadata=metadata or {},
+        )
+
+    @staticmethod
+    def arxiv_to_source_url(arxiv_id: str) -> str:
+        clean = arxiv_id.strip().removeprefix("arXiv:").removeprefix("arxiv:")
+        return f"https://arxiv.org/e-print/{clean}" if _is_valid_arxiv_id(clean) else ""
+
+    @staticmethod
+    def arxiv_to_abs_url(arxiv_id: str) -> str:
+        clean = arxiv_id.strip().removeprefix("arXiv:").removeprefix("arxiv:")
+        return f"https://arxiv.org/abs/{clean}" if _is_valid_arxiv_id(clean) else ""
 
 
 class SourceResolver:
@@ -229,6 +379,16 @@ def _status(
 
 def _is_valid_arxiv_id(value: str) -> bool:
     return bool(re.fullmatch(r"\d{4}\.\d{4,5}(?:v\d+)?", value))
+
+
+def _doi_url(doi: str) -> str:
+    clean = doi.strip()
+    if not clean:
+        return ""
+    if clean.lower().startswith(("http://", "https://")):
+        return clean
+    clean = clean.removeprefix("doi:").removeprefix("DOI:")
+    return f"https://doi.org/{clean}"
 
 
 def _content_type_for_suffix(suffix: str) -> str:
