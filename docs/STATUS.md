@@ -66,26 +66,41 @@
 
 ---
 
-## 4. 下一阶段推荐
+## 4. 下一步推进顺序
 
-### P0：先做
+按 M1 → M2 → M3 → M4 → M5 推进。每个模块先检查文档完整性，再考虑代码。
 
-1. **M3 页面级测试** — LearningWorkspaceView status gating 测试 + UploadView upload flow 测试
-2. **M5.3 Real LLM smoke 方案讨论** — 先讨论 env / model / cost / failure handling
+### M1 论文搜索、获取与阅读计划
 
-### P1：近期做
+- 检查 M1.1-M1.5 开发文档是否完整
+- 检查每个子模块测试要求是否完整
+- 检查验收标准是否完整
+- 不直接写代码
 
-- Real LLM smoke 实现
-- M2.1 DoclingParserAdapter
-- M2.4 Audit 质量规则增强
-- M3.1 /quality_report debug endpoint
-- M5.6 Debug/admin 鉴权
+### M2 单篇论文解析、精读与可信讲解
 
-### P2：后置
+- 检查 M2.1-M2.5 开发文档是否完整
+- 检查每个子模块测试要求是否完整
+- 检查验收标准是否完整
+- 不直接写代码
 
-- M2.2 evidence_ref 跳转
-- M5.2 e2e 测试
-- M4 开发文档设计
+### M3 接口与前端展示
+
+- 检查 M3.1-M3.5 开发文档是否完整
+- 特别检查 UploadView / LearningWorkspaceView 页面级测试要求
+- 不直接写代码
+
+### M4 互动式学习与长期记忆
+
+- M4 是正式一级模块
+- 当前文档待完善，代码未实现
+- 先完善 M4.1-M4.6 开发文档、测试要求、验收标准
+- 当前不进入代码实现
+
+### M5 工程可靠性与测试保障
+
+- 检查 M5.1-M5.7 文档是否完整
+- 明确 M5 是全局工程保障，不替代 M1-M4 子模块测试
 
 ---
 
