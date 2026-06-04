@@ -28,7 +28,7 @@
 
 ### M4 — Interactive Learning
 
-- [docs/development/INTERACTIVE_LEARNING.md](docs/development/INTERACTIVE_LEARNING.md) — 方向图谱、模式提取、追问训练、交互问答
+- [docs/development/INTERACTIVE_LEARNING.md](docs/development/INTERACTIVE_LEARNING.md) — 选中内容解释、符号与公式解释、导师式追问、研究训练、论文知识库、长期记忆、memory-first retrieval、token 节省
 
 ### M5 — Engineering Reliability
 

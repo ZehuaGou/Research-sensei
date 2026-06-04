@@ -6,6 +6,8 @@
 
 ## M1 — Literature Search
 
+**测试边界**: 每个 search/download/selection 子模块必须有 mock external tests。adapter 默认用 MockTransport。
+
 ### query
 
 Input: user_query
@@ -27,6 +29,8 @@ Boundary: Does not download full text. Does not generate paper cards.
 ---
 
 ## M2 — Single Paper Understanding
+
+**测试边界**: 每个 parser/evidence/understanding/audit/gating 子模块必须有 schema/artifact/failure tests。LLM 默认用 fake/mock client。
 
 ### source_resolver (M2.0)
 
@@ -92,61 +96,130 @@ Boundary: Orchestration only. Does not contain business logic.
 
 ## M3 — API / Frontend
 
-### api
+**测试边界**: API 和前端子模块必须有 endpoint / component tests。前端 fetch 默认用 mock。
+
+### api (M3.1)
 
 Input: job_id
 Output: /understanding_status, /cards
 Boundary: /artifacts debug-only. Normal frontend must not use /artifacts.
 
-### frontend
+### upload_page (M3.2)
+
+Input: user file upload
+Output: parse job creation
+Boundary: Does not parse content itself. Delegates to api.
+
+### learning_workspace (M3.3)
 
 Input: /understanding_status + /cards
 Output: User page display
 Boundary: Does not read /artifacts directly. Does not display BASELINE/BLOCKED cards.
 
+### status_banner (M3.4)
+
+Input: understanding_status
+Output: Status banner UI
+Boundary: Displays status, does not modify data.
+
+### debug_entry (M3.5)
+
+Input: debug signal (SENSEI_DEBUG)
+Output: raw artifact access
+Boundary: Debug/admin only. Production must have auth.
+
 ---
 
 ## M4 — Interactive Learning
 
-### direction
+**测试边界**: 互动和记忆子模块必须有 context / memory / no-duplicate-LLM-call tests。
 
-Input: reading_plan.json, paper_skeleton.json
-Output: direction_map.json (not yet implemented)
-Boundary: Must be problem-driven, not just paper list.
+### direction / selection_explanation (M4.1)
 
-### patterns
+Input: selected text, paper context
+Output: explanation for selected content
+Boundary: Must use paper context, not generic knowledge.
 
-Input: paper_skeleton.json
-Output: pattern_cards.json (not yet implemented)
-Boundary: Not all papers are "method innovation."
+### patterns / symbol_formula_explanation (M4.2)
 
-### drill
+Input: formula/symbol, paper context
+Output: symbol/formula breakdown
+Boundary: Must bind to paper evidence, not fabricate meanings.
 
-Input: paper_card.json, formula_cards.json, pattern_cards.json
-Output: drill_cards.json (not yet implemented)
-Boundary: Must not only ask "what method did the paper propose?"
+### interactive / context_qa (M4.3)
 
-### interactive
-
-Input: user_question, card_id, selected_text, session_id
-Output: interactive_answer.json (not yet implemented)
+Input: user question, session context, cards
+Output: interactive_answer.json
 Boundary: Must not send entire paper to prompt.
 
-### context
+### drill / advisor_drill (M4.4)
 
-Input: session state, user question, cards, blocks
-Output: context_pack.json (not yet implemented)
-Boundary: Must not grow prompt without limit.
+Input: paper_card, formula_cards, pattern_cards
+Output: advisor questions and evaluations
+Boundary: Questions must be paper-specific, not generic.
+
+### context / paper_memory (M4.5)
+
+Input: reading sessions, user interactions
+Output: PaperMemory / SessionContext
+Boundary: Memory is structured, not raw chat history.
+
+### memory_first_retrieval (M4.6)
+
+Input: user question, PaperMemory, paper context
+Output: retrieved context for answer
+Boundary: Must check memory before calling LLM. No duplicate LLM calls for same question.
 
 ---
 
 ## M5 — Engineering Reliability
 
-### llm
+> M5 是**横切工程保障模块**，负责测试基础设施、CI、安全、smoke、成本控制和发布门槛。
+> M1-M4 的业务测试必须在各自模块内完成，M5 不替代模块验收。
 
-Input: messages
-Output: response
-Boundary: All LLM calls through llm/client.py. No direct API calls in business modules.
+**测试边界**: M5 负责测试基础设施和全局回归，不替代 M1-M4 子模块测试。
+
+### backend_tests (M5.1)
+
+Input: tests/, src/, pytest config
+Output: pytest result
+Boundary: 默认不联网。默认不真实调用 LLM。不依赖外部 API。
+
+### frontend_tests (M5.2)
+
+Input: frontend/src/, Vitest specs
+Output: npm test result
+Boundary: 不启动真实后端。fetch 使用 mock。组件测试不代替 e2e。
+
+### llm_smoke_and_cost (M5.3)
+
+Input: explicit env flags, model config, smoke prompt
+Output: live smoke report
+Boundary: 默认不执行。必须显式开启。必须控制 token 和成本。不进入普通 pytest。所有 LLM 调用通过 llm/client.py。
+
+### cache (M5.4)
+
+Input: prompt hash, model config, schema version
+Output: cached LLM response
+Boundary: cache 不进 Git。测试默认关闭。cache 不等于长期记忆。
+
+### secret_scan (M5.5)
+
+Input: repo files, commit diff
+Output: secret scan result
+Boundary: 不允许提交 .env、API key、cache、大文件。不在日志打印 key。
+
+### debug_admin (M5.6)
+
+Input: admin/debug auth signal, request path
+Output: allow/deny debug API access
+Boundary: /artifacts 是 debug/admin raw API。/quality_report 是 debug/admin API。SENSEI_DEBUG 只适合本地开发。生产环境必须有正式鉴权。
+
+### ci_release_check (M5.7)
+
+Input: test commands, build commands, secret scan
+Output: release readiness result
+Boundary: 不真实联网。不真实调用 LLM。失败时不得发布。
 
 ### render
 

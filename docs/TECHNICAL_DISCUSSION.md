@@ -36,16 +36,19 @@
 
 ---
 
-## 2. Current Project Facts
+## 2. Historical Snapshot / 早期讨论快照
+
+> 本节记录早期讨论时的项目状态，**已过时**，不代表当前项目状态。
+> 当前状态以 docs/STATUS.md 和 M1-M5 模块文档为准。
 
 - ResearchSensei 是论文研读导师系统。
-- 当前 Phase 1-11 是 baseline，不是最终导师级论文理解。
-- 当前 evidence 仍偏 block-level。
-- 当前 card builders 仍存在 rule-based fallback。
-- 当前尚未实现 understanding_status.json。
-- 当前尚未实现 QualityReport。
-- 当前尚未实现独立 audit。
-- 当前 pipeline 在 LLM 失败时 fallback 到 rule-based，而不是 fail-closed。
+- 当时 Phase 1-11 是 baseline，不是最终导师级论文理解。
+- 当时 evidence 仍偏 block-level。
+- 当时 card builders 仍存在 rule-based fallback。
+- 当时尚未实现 understanding_status.json。
+- 当时尚未实现 QualityReport。
+- 当时尚未实现独立 audit。
+- 当时 pipeline 在 LLM 失败时 fallback 到 rule-based，而不是 fail-closed。
 - Phase 12 暂不进入。
 
 ---

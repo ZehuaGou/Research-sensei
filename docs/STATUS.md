@@ -89,7 +89,18 @@
 
 ---
 
-## 5. 当前禁止事项
+## 5. 开发与测试规则
+
+- 后续按 M1 → M5 推进
+- 每个 Mx.y 子模块都必须独立测试（unit + failure-path + schema/artifact）
+- 一级模块完成后必须做集成测试
+- 每次提交后必须跑全项目基础回归（pytest + frontend build + frontend test）
+- M5 是全局测试与工程保障模块，不是"最后测试模块"
+- 不允许跳过子模块测试进入下一个子模块
+
+---
+
+## 6. 当前禁止事项
 
 - M4 当前不进入代码开发
 - 不再碎片化一个小点一个 commit，除非是 bugfix
@@ -101,7 +112,7 @@
 
 ---
 
-## 6. 测试和 commit
+## 7. 测试和 commit
 
 - backend pytest: 481 passed
 - frontend npm test: 7 passed (StatusBanner)
