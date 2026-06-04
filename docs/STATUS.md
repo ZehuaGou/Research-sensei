@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 476 tests passing
+- 481 tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever + EvidencePack
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -30,12 +30,16 @@
 
 - API gating 第一批已完成：
   - /understanding_status endpoint 已完成
-  - /cards endpoint 已完成（status gating）
+  - /cards endpoint 已完成（status gating + card artifact 一致性校验）
+  - SUCCESS 缺 cards 返回 409
+  - DEGRADED 缺 paper_card/formula_cards 返回 409
+  - DEGRADED 缺 teaching_cards 返回 200 + degraded 标记
   - /artifacts 默认 403，SENSEI_DEBUG=1 时返回 raw artifacts
   - quality_report 不通过普通 /artifacts 暴露
   - BASELINE_ONLY cards 不通过普通 /artifacts 暴露
+  - API gating 基础测试已覆盖 SUCCESS / DEGRADED / BLOCKED
   - Frontend UI 尚未适配新 endpoint
-  - 476 tests passing（466 existing + 10 new）
+  - 481 tests passing（476 existing + 5 new）
 - 尚未完成：
   - /quality_report debug/admin endpoint 尚未实现
   - 正式鉴权系统尚未实现
@@ -47,7 +51,7 @@
 
 ## 4. 测试和 commit
 
-- pytest: 476 passed
+- pytest: 481 passed
 - commit: 以 `git rev-parse --short HEAD` 为准，不在 STATUS.md 固化记录
 
 ---

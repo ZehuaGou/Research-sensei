@@ -181,3 +181,180 @@ def test_health_endpoint_still_works(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "researchsensei"}
+
+
+# ---------------------------------------------------------------------------
+# Helpers for constructing test jobs
+# ---------------------------------------------------------------------------
+
+from researchsensei.jobs import JobStore
+from researchsensei.schemas import JobRecord, JobStatus, WorkspaceArtifact
+from researchsensei.workspace import WorkspaceStore
+
+
+def _write_json(workspace: WorkspaceStore, run_dir: Path, name: str, data: dict) -> Path:
+    path = run_dir / name
+    workspace.write_json(path, data)
+    return path
+
+
+def _create_job_with_cards(
+    tmp_path: Path,
+    job_id: str,
+    status: str,
+    *,
+    include_paper_card: bool = True,
+    include_formula_cards: bool = True,
+    include_teaching_cards: bool = True,
+) -> TestClient:
+    """Create a test app with a job that has specific card artifacts."""
+    workspace_root = tmp_path / "workspace"
+    db_path = tmp_path / "jobs.sqlite3"
+    workspace = WorkspaceStore(workspace_root)
+    jobs = JobStore(db_path)
+
+    run_dir = workspace.new_run_dir(job_id)
+
+    # Always write understanding_status
+    us_path = _write_json(workspace, run_dir, "understanding_status.json", {
+        "paper_id": job_id,
+        "status": status,
+        "blocking_reason": "",
+        "allowed_for_user_display": status in ("SUCCESS", "DEGRADED_STRUCTURAL"),
+        "allowed_downstream": {"reading_display": True},
+        "component_status": {},
+    })
+
+    artifacts = [WorkspaceArtifact(artifact_type="understanding_status", path=str(us_path))]
+
+    if include_paper_card:
+        p = _write_json(workspace, run_dir, "paper_card.json", {"paper_id": job_id, "title": "Test"})
+        artifacts.append(WorkspaceArtifact(artifact_type="paper_card", path=str(p)))
+
+    if include_formula_cards:
+        f = _write_json(workspace, run_dir, "formula_cards.json", {"paper_id": job_id, "formula_cards": []})
+        artifacts.append(WorkspaceArtifact(artifact_type="formula_cards", path=str(f)))
+
+    if include_teaching_cards:
+        t = _write_json(workspace, run_dir, "teaching_cards.json", {"paper_id": job_id, "teaching_cards": []})
+        artifacts.append(WorkspaceArtifact(artifact_type="teaching_cards", path=str(t)))
+
+    jobs.create(JobRecord(
+        job_id=job_id,
+        source_path="",
+        run_dir=str(run_dir),
+        status=JobStatus.SUCCEEDED,
+        current_step="ingestion_completed",
+        artifacts=artifacts,
+    ))
+
+    return TestClient(create_app(workspace_root=workspace_root, job_db_path=db_path))
+
+
+# ---------------------------------------------------------------------------
+# cards endpoint — SUCCESS
+# ---------------------------------------------------------------------------
+
+
+def test_cards_endpoint_success_returns_all_cards(tmp_path: Path) -> None:
+    client = _create_job_with_cards(tmp_path, "job-success", "SUCCESS")
+
+    response = client.get("/api/v1/jobs/job-success/cards")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert "paper_card" in data["cards"]
+    assert "formula_cards" in data["cards"]
+    assert "teaching_cards" in data["cards"]
+
+
+def test_cards_endpoint_success_missing_card_returns_409(tmp_path: Path) -> None:
+    client = _create_job_with_cards(
+        tmp_path, "job-success-missing", "SUCCESS",
+        include_teaching_cards=False,
+    )
+
+    response = client.get("/api/v1/jobs/job-success-missing/cards")
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["status"] == "SUCCESS"
+    assert "teaching_cards" in detail["missing_components"]
+
+
+# ---------------------------------------------------------------------------
+# cards endpoint — DEGRADED_STRUCTURAL
+# ---------------------------------------------------------------------------
+
+
+def test_cards_endpoint_degraded_omits_failed_teaching(tmp_path: Path) -> None:
+    client = _create_job_with_cards(
+        tmp_path, "job-degraded", "DEGRADED_STRUCTURAL",
+        include_teaching_cards=False,
+    )
+
+    response = client.get("/api/v1/jobs/job-degraded/cards")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED_STRUCTURAL"
+    assert data["degraded"] is True
+    assert "paper_card" in data["cards"]
+    assert "formula_cards" in data["cards"]
+    assert "teaching_cards" not in data["cards"]
+    assert "teaching_cards" in data["missing_components"]
+
+
+def test_cards_endpoint_degraded_missing_required_card_returns_409(tmp_path: Path) -> None:
+    client = _create_job_with_cards(
+        tmp_path, "job-degraded-bad", "DEGRADED_STRUCTURAL",
+        include_paper_card=False,
+    )
+
+    response = client.get("/api/v1/jobs/job-degraded-bad/cards")
+
+    assert response.status_code == 409
+    detail = response.json()["detail"]
+    assert detail["status"] == "DEGRADED_STRUCTURAL"
+    assert "paper_card" in detail["missing_components"]
+
+
+# ---------------------------------------------------------------------------
+# cards endpoint — BLOCKED
+# ---------------------------------------------------------------------------
+
+
+def test_cards_endpoint_blocked_returns_403(tmp_path: Path) -> None:
+    workspace_root = tmp_path / "workspace"
+    db_path = tmp_path / "jobs.sqlite3"
+    workspace = WorkspaceStore(workspace_root)
+    jobs = JobStore(db_path)
+
+    run_dir = workspace.new_run_dir("job-blocked")
+    us_path = _write_json(workspace, run_dir, "understanding_status.json", {
+        "paper_id": "job-blocked",
+        "status": "BLOCKED_UNDERSTANDING",
+        "blocking_reason": "LLM_FAILED",
+        "allowed_for_user_display": False,
+        "allowed_downstream": {},
+        "component_status": {},
+    })
+
+    jobs.create(JobRecord(
+        job_id="job-blocked",
+        source_path="",
+        run_dir=str(run_dir),
+        status=JobStatus.SUCCEEDED,
+        current_step="ingestion_completed",
+        artifacts=[WorkspaceArtifact(artifact_type="understanding_status", path=str(us_path))],
+    ))
+
+    client = TestClient(create_app(workspace_root=workspace_root, job_db_path=db_path))
+
+    response = client.get("/api/v1/jobs/job-blocked/cards")
+
+    assert response.status_code == 403
+    detail = response.json()["detail"]
+    assert detail["status"] == "BLOCKED_UNDERSTANDING"
+    assert detail["blocking_reason"] == "LLM_FAILED"

@@ -177,7 +177,7 @@ def create_app(
                 },
             )
 
-        # SUCCESS or DEGRADED_STRUCTURAL: return available card artifacts
+        # SUCCESS or DEGRADED_STRUCTURAL: check card artifacts
         card_types = ["paper_card", "formula_cards", "teaching_cards"]
         cards: dict[str, object] = {}
         missing: list[str] = []
@@ -188,6 +188,30 @@ def create_app(
                 cards[card_type] = _read_artifact_content(job, artifact.path)
             else:
                 missing.append(card_type)
+
+        # SUCCESS requires all cards
+        if status == "SUCCESS" and missing:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "status": "SUCCESS",
+                    "message": "SUCCESS status requires all card artifacts.",
+                    "missing_components": missing,
+                },
+            )
+
+        # DEGRADED requires paper_card + formula_cards; teaching_cards may be missing
+        if status == "DEGRADED_STRUCTURAL":
+            required_missing = [m for m in missing if m != "teaching_cards"]
+            if required_missing:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "status": "DEGRADED_STRUCTURAL",
+                        "message": "DEGRADED status requires paper_card and formula_cards.",
+                        "missing_components": missing,
+                    },
+                )
 
         result: dict[str, object] = {
             "job_id": job.job_id,
