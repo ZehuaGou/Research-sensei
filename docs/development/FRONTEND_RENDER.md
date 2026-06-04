@@ -204,7 +204,7 @@ component_status:
 | DEGRADED_STRUCTURAL | 只返回成功组件 cards，返回 `degraded: true` + `missing_components` |
 | BASELINE_ONLY | 普通用户返回 403；debug/admin 可返回 baseline cards |
 | BLOCKED_UNDERSTANDING | 返回 403 + blocking_reason + warnings |
-| FAILED | 返回 500/failed status |
+| FAILED | 返回 403，不返回 card 内容 |
 
 ## 11. /artifacts 权限与 /quality_report 状态
 
