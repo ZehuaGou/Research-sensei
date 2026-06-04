@@ -331,7 +331,7 @@ component_status:
 
 - M3.2 UploadView 页面级测试
 - M3.3 LearningWorkspaceView 页面级测试
-- M4 互动式学习 tabs（显示"未开放"）
+- M4 互动式学习 tabs（显示"未开放"，后续归 M4）
 - /quality_report debug endpoint（当前未实现，quality_report.json 只能通过 /artifacts 查看）
 - debug/admin 鉴权机制
 - evidence_ref 跳转

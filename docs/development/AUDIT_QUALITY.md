@@ -221,11 +221,11 @@ paper_terms = title_words | abstract_words
 
 | ID | 条件 | severity | effect |
 |----|------|----------|--------|
-| F-1 | 核心 paper_card 字段（problem / core_idea / method_overview / experiment_summary）缺 evidence_ref | P0 | BLOCK |
+| F-1 | 核心 paper_card 字段（problem / core_idea / method_overview / experiment_summary）缺 evidence_ref（仅当 status 为 SUCCESS 或 DEGRADED_STRUCTURAL 时检查） | P0 | BLOCK |
 | F-2 | card 中的 evidence_ref 不存在于 evidence_index / claim_evidence | P0 | BLOCK |
 | F-3 | BLOCKED_UNDERSTANDING 状态下仍存在 paper_card / formula_cards / teaching_cards artifact | P0 | BLOCK |
 | F-4 | BASELINE_ONLY 状态却 allowed_for_user_display=True | P0 | BLOCK |
-| F-5 | component_status / allowed_downstream 与 status 矛盾 | P1 | BLOCK |
+| F-5 | component_status / allowed_downstream 与 status 矛盾（含 DEGRADED_STRUCTURAL 时 allowed_for_user_display 必须为 True、advisor_questions 必须为 False） | P1 | BLOCK |
 | F-6 | ClaimEvidence.passage_id 不存在于 PassageIndex | P0 | BLOCK |
 
 ### 设计中 / 未实现（F-7 以后）
@@ -283,7 +283,7 @@ paper_terms = title_words | abstract_words
 
 | 测试 | 断言 |
 |------|------|
-| test_f1_core_field_missing_evidence_ref | F-1 triggered when paper_card problem/core_idea/method_overview/experiment_summary has no evidence_ref |
+| test_f1_core_field_missing_evidence_ref | F-1 triggered when status is SUCCESS/DEGRADED and paper_card problem/core_idea/method_overview/experiment_summary has no evidence_ref |
 | test_f2_evidence_ref_not_in_sources | F-2 triggered when evidence_ref not in evidence_index or claim_evidence |
 | test_f3_blocked_has_card_artifact | F-3 triggered when BLOCKED_UNDERSTANDING but paper_card/formula_cards/teaching_cards exists |
 | test_f4_baseline_user_display_true | F-4 triggered when BASELINE_ONLY but allowed_for_user_display=True |
