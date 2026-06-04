@@ -36,7 +36,7 @@ external = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "tests_live"]
 pythonpath = [".", "src"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
@@ -49,7 +49,6 @@ markers = [
 addopts = [
   "--ignore=legacy_tests",
   "--ignore=tests_e2e",
-  "--ignore=tests_live",
 ]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",

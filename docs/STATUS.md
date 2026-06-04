@@ -2,9 +2,11 @@
 
 ## Current Gate
 
-本文件只记录真实工程状态。mock/unit tests 可以证明局部逻辑没有坏，但不能证明模块完成，也不能替代 live validation。
+本文件只记录真实工程状态。
 
-当前整改重点：M1 Literature Search 必须从“模拟/薄 wrapper”升级为真实链路：
+M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex、真实 Semantic Scholar、真实 Crossref、真实 PDF 下载。mock/fake/skip 不作为有效测试。缺 key、缺网络、API 限流、PDF 下载失败均视为失败。
+
+当前整改重点：M1 Literature Search 必须从”模拟/薄 wrapper”升级为真实链路：
 
 `real LLM query planning -> mature source adapters -> metadata merge/dedup -> real PDF download/validation -> A_READ reading plan gate`
 
@@ -45,8 +47,7 @@
 
 ## Current Test Results
 
-- Default backend regression: `python -m pytest -q` -> `485 passed`.
-- Opt-in live tests without live env: `python -m pytest -q tests_live` -> `1 passed, 2 skipped`.
+- `python -m pytest -q` 现在默认运行 tests_live。缺 env/key/network 时 tests_live 会失败，不会 skip。
 - Required real validation command:
 
 ```powershell
@@ -70,7 +71,8 @@ Latest live result:
 ## Hard Rules
 
 - Do not count mock, MockTransport, MockLLMClient, synthetic markdown, or local fixture-only paths as module completion.
-- Network tests are opt-in and must not be part of default pytest.
+- M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
+- `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Third-party tools must be isolated behind adapters.
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item cleared for M2.

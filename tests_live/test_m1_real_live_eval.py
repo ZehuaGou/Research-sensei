@@ -34,8 +34,11 @@ def test_live_config_defaults_do_not_enable_network(monkeypatch: pytest.MonkeyPa
 @pytest.mark.llm
 @pytest.mark.network
 def test_m1_real_llm_multisource_pdf_acquisition_and_report(tmp_path) -> None:
-    if not _live_m1_enabled():
-        pytest.skip("Set RUN_LIVE_TESTS=1, RUN_LLM_TESTS=1, and RESEARCHSENSEI_LIVE_EVAL=1 to run M1 live eval.")
+    assert _live_m1_enabled(), (
+        "RUN_LIVE_TESTS=1, RUN_LLM_TESTS=1, RESEARCHSENSEI_LIVE_EVAL=1 are required. "
+        "M1 tests must run with real LLM, real network, real PDF download. "
+        "Missing env vars = test failure, not skip."
+    )
 
     config = LiveEvalConfig.from_env(report_dir=tmp_path)
     report = run_full_live_eval(config=config, work_dir=tmp_path / "work")

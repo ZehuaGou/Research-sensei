@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from researchsensei.llm.client import LLMClient, MockLLMClient, parse_llm_json
+from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.schemas import QueryPlan
 from researchsensei.schemas.enums import SearchIntent
@@ -17,7 +17,7 @@ class QueryPlanningError(RuntimeError):
 class QueryPlanner:
     """Generates structured query plans from user direction input."""
 
-    def __init__(self, llm_client: LLMClient | MockLLMClient | None = None) -> None:
+    def __init__(self, llm_client: LLMClient | None = None) -> None:
         self.llm = llm_client
 
     async def plan(self, user_query: str) -> QueryPlan:

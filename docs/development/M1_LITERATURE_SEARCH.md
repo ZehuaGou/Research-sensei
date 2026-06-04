@@ -15,8 +15,9 @@ M1 does not teach the paper, parse the full paper, or generate paper/formula/dri
 - arXiv and OpenAlex must not be implemented through self-written HTTP/XML/JSON wrappers.
 - Semantic Scholar and Crossref are adapter-backed sources.
 - A_READ papers must be cleared for M2, which currently means a validated PDF was downloaded and has a local path, file size, and sha256.
-- Mock tests are allowed for unit coverage only. They are not acceptance evidence.
-- Live tests must be opt-in and never part of default pytest.
+- M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
+- `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
+- Mock/fake/skip are not valid test outcomes for M1.
 
 ## Reused Components
 
