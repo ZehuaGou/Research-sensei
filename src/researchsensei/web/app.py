@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import uuid
 import json
+import os
+import uuid
 from pathlib import Path
 
 import httpx
@@ -15,6 +16,10 @@ from researchsensei.workspace import WorkspaceStore
 
 
 SUPPORTED_PARSE_SUFFIXES = {".md", ".txt", ".pdf"}
+
+
+def _debug_enabled() -> bool:
+    return os.getenv("SENSEI_DEBUG", "").lower() in {"1", "true", "yes"}
 
 
 def create_app(
@@ -98,6 +103,11 @@ def create_app(
 
     @app.get("/api/v1/jobs/{job_id}/artifacts")
     def get_job_artifacts(job_id: str) -> dict[str, object]:
+        if not _debug_enabled():
+            raise HTTPException(
+                status_code=403,
+                detail={"message": "Raw artifacts are debug-only. Use /understanding_status or /cards."},
+            )
         try:
             job = jobs.get(job_id)
         except KeyError as error:
@@ -107,7 +117,116 @@ def create_app(
             "artifacts": [_artifact_response(job, artifact.path, artifact.artifact_type) for artifact in job.artifacts],
         }
 
+    @app.get("/api/v1/jobs/{job_id}/understanding_status")
+    def get_understanding_status(job_id: str) -> dict[str, object]:
+        try:
+            job = jobs.get(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Job not found.") from error
+
+        artifact = _find_artifact(job, "understanding_status")
+        if artifact is None:
+            raise HTTPException(status_code=404, detail="understanding_status not found.")
+
+        content = _read_artifact_content(job, artifact.path)
+        return {"job_id": job.job_id, "understanding_status": content}
+
+    @app.get("/api/v1/jobs/{job_id}/cards")
+    def get_cards(job_id: str) -> dict[str, object]:
+        try:
+            job = jobs.get(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Job not found.") from error
+
+        # Read understanding_status
+        us_artifact = _find_artifact(job, "understanding_status")
+        if us_artifact is None:
+            raise HTTPException(status_code=404, detail="understanding_status not found.")
+
+        status_content = _read_artifact_content(job, us_artifact.path)
+        status = status_content.get("status", "")
+        blocking_reason = status_content.get("blocking_reason", "")
+
+        # Gating by status
+        if status == "BASELINE_ONLY":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "BASELINE_ONLY",
+                    "blocking_reason": blocking_reason,
+                    "message": "Baseline artifacts are not final understanding cards.",
+                },
+            )
+
+        if status == "BLOCKED_UNDERSTANDING":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "BLOCKED_UNDERSTANDING",
+                    "blocking_reason": blocking_reason,
+                    "warnings": [w.model_dump(mode="json") for w in job.warnings],
+                },
+            )
+
+        if status == "FAILED":
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "status": "FAILED",
+                    "message": "Pipeline failed. No cards available.",
+                },
+            )
+
+        # SUCCESS or DEGRADED_STRUCTURAL: return available card artifacts
+        card_types = ["paper_card", "formula_cards", "teaching_cards"]
+        cards: dict[str, object] = {}
+        missing: list[str] = []
+
+        for card_type in card_types:
+            artifact = _find_artifact(job, card_type)
+            if artifact is not None:
+                cards[card_type] = _read_artifact_content(job, artifact.path)
+            else:
+                missing.append(card_type)
+
+        result: dict[str, object] = {
+            "job_id": job.job_id,
+            "status": status,
+            "cards": cards,
+        }
+
+        if status == "DEGRADED_STRUCTURAL":
+            result["degraded"] = True
+            result["missing_components"] = missing
+
+        return result
+
     return app
+
+
+def _find_artifact(job: JobRecord, artifact_type: str) -> WorkspaceArtifact | None:
+    for artifact in job.artifacts:
+        if artifact.artifact_type == artifact_type:
+            return artifact
+    return None
+
+
+def _read_artifact_content(job: JobRecord, artifact_path: str) -> object:
+    path = Path(artifact_path)
+    run_dir = Path(job.run_dir)
+    try:
+        resolved_path = path.resolve()
+        resolved_run_dir = run_dir.resolve()
+        resolved_path.relative_to(resolved_run_dir)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail="Unsafe artifact path.") from error
+    if not resolved_path.exists():
+        raise HTTPException(status_code=404, detail="Artifact not found.")
+    content = resolved_path.read_text(encoding="utf-8")
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return content
 
 
 def _resolve_source(
@@ -186,24 +305,9 @@ def _job_response(job: JobRecord) -> dict[str, object]:
 
 
 def _artifact_response(job: JobRecord, artifact_path: str, artifact_type: str) -> dict[str, object]:
-    path = Path(artifact_path)
-    run_dir = Path(job.run_dir)
-    try:
-        resolved_path = path.resolve()
-        resolved_run_dir = run_dir.resolve()
-        resolved_path.relative_to(resolved_run_dir)
-    except ValueError as error:
-        raise HTTPException(status_code=400, detail="Unsafe artifact path.") from error
-    if not resolved_path.exists():
-        raise HTTPException(status_code=404, detail="Artifact not found.")
-    content = resolved_path.read_text(encoding="utf-8")
-    parsed_content: object
-    try:
-        parsed_content = json.loads(content)
-    except json.JSONDecodeError:
-        parsed_content = content
+    content = _read_artifact_content(job, artifact_path)
     return {
         "artifact_type": artifact_type,
-        "path": str(resolved_path),
-        "content": parsed_content,
+        "path": str(Path(artifact_path).resolve()),
+        "content": content,
     }

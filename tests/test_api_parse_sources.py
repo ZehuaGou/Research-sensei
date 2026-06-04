@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import httpx
@@ -17,12 +18,20 @@ def _pdf_response(content: bytes = b"%PDF-1.4\nminimal") -> httpx.Response:
 
 
 def _source_status_artifact(client: TestClient, job_id: str) -> dict:
-    response = client.get(f"/api/v1/jobs/{job_id}/artifacts")
-    assert response.status_code == 200
-    artifacts = response.json()["artifacts"]
-    matches = [artifact for artifact in artifacts if artifact["artifact_type"] == "source_status"]
-    assert matches
-    return matches[0]
+    old_debug = os.environ.get("SENSEI_DEBUG")
+    os.environ["SENSEI_DEBUG"] = "1"
+    try:
+        response = client.get(f"/api/v1/jobs/{job_id}/artifacts")
+        assert response.status_code == 200
+        artifacts = response.json()["artifacts"]
+        matches = [artifact for artifact in artifacts if artifact["artifact_type"] == "source_status"]
+        assert matches
+        return matches[0]
+    finally:
+        if old_debug is None:
+            os.environ.pop("SENSEI_DEBUG", None)
+        else:
+            os.environ["SENSEI_DEBUG"] = old_debug
 
 
 def test_parse_api_accepts_local_path_txt_and_writes_source_status(tmp_path: Path) -> None:

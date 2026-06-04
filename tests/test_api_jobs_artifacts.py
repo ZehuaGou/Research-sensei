@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from starlette.testclient import TestClient
@@ -35,17 +36,25 @@ def test_get_job_artifacts_reads_json_content_safely(tmp_path: Path) -> None:
     client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
     job_id = _parse_sample(client)
 
-    response = client.get(f"/api/v1/jobs/{job_id}/artifacts")
-
-    assert response.status_code == 200
-    artifacts = response.json()["artifacts"]
-    by_type = {artifact["artifact_type"]: artifact for artifact in artifacts}
-    assert by_type["ingestion"]["content"]["paper_id"] == job_id
-    assert by_type["evidence_index"]["content"]["paper_id"] == job_id
-    assert by_type["paper_skeleton"]["content"]["paper_id"] == job_id
-    assert by_type["paper_card"]["content"]["paper_id"] == job_id
-    assert by_type["formula_cards"]["content"]["paper_id"] == job_id
-    assert by_type["teaching_cards"]["content"]["paper_id"] == job_id
+    # Enable debug mode for artifacts access
+    old_debug = os.environ.get("SENSEI_DEBUG")
+    os.environ["SENSEI_DEBUG"] = "1"
+    try:
+        response = client.get(f"/api/v1/jobs/{job_id}/artifacts")
+        assert response.status_code == 200
+        artifacts = response.json()["artifacts"]
+        by_type = {artifact["artifact_type"]: artifact for artifact in artifacts}
+        assert by_type["ingestion"]["content"]["paper_id"] == job_id
+        assert by_type["evidence_index"]["content"]["paper_id"] == job_id
+        assert by_type["paper_skeleton"]["content"]["paper_id"] == job_id
+        assert by_type["paper_card"]["content"]["paper_id"] == job_id
+        assert by_type["formula_cards"]["content"]["paper_id"] == job_id
+        assert by_type["teaching_cards"]["content"]["paper_id"] == job_id
+    finally:
+        if old_debug is None:
+            os.environ.pop("SENSEI_DEBUG", None)
+        else:
+            os.environ["SENSEI_DEBUG"] = old_debug
 
 
 def test_get_missing_job_returns_404(tmp_path: Path) -> None:
@@ -75,7 +84,15 @@ def test_artifact_query_rejects_path_traversal(tmp_path: Path) -> None:
     )
     client = TestClient(create_app(workspace_root=workspace_root, job_db_path=db_path))
 
-    response = client.get("/api/v1/jobs/bad-job/artifacts")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Unsafe artifact path."
+    # Enable debug mode to test path traversal protection
+    old_debug = os.environ.get("SENSEI_DEBUG")
+    os.environ["SENSEI_DEBUG"] = "1"
+    try:
+        response = client.get("/api/v1/jobs/bad-job/artifacts")
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Unsafe artifact path."
+    finally:
+        if old_debug is None:
+            os.environ.pop("SENSEI_DEBUG", None)
+        else:
+            os.environ["SENSEI_DEBUG"] = old_debug
