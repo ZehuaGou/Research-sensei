@@ -1,62 +1,62 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from researchsensei.llm.client import MockLLMClient
-from researchsensei.query.planner import QueryPlanner
+from researchsensei.query.planner import QueryPlanner, QueryPlanningError
 
 
 @pytest.mark.asyncio
-async def test_query_planner_fallback_with_chinese() -> None:
+async def test_query_planner_requires_llm() -> None:
     planner = QueryPlanner()
-    plan = await planner.plan("时间序列异常检测")
 
-    assert plan.user_query == "时间序列异常检测"
-    assert plan.language == "zh"
-    assert plan.direction_zh == "时间序列异常检测"
-    assert len(plan.core_terms) > 0
-    assert "RULE_BASED_FALLBACK" in plan.warnings
-
-
-@pytest.mark.asyncio
-async def test_query_planner_fallback_with_english() -> None:
-    planner = QueryPlanner()
-    plan = await planner.plan("time series anomaly detection")
-
-    assert plan.user_query == "time series anomaly detection"
-    assert plan.language == "en"
-    assert plan.direction_en == "time series anomaly detection"
-    assert len(plan.core_terms) > 0
-
-
-@pytest.mark.asyncio
-async def test_query_planner_fallback_with_comma_separated() -> None:
-    planner = QueryPlanner()
-    plan = await planner.plan("anomaly detection, time series, deep learning")
-
-    assert len(plan.core_terms) == 3
-    assert "anomaly detection" in plan.core_terms
+    with pytest.raises(QueryPlanningError, match="REQUIRES_REAL_LLM"):
+        await planner.plan("time series anomaly detection")
 
 
 @pytest.mark.asyncio
 async def test_query_planner_llm_enhanced() -> None:
-    mock_response = '{"direction_zh": "时间序列异常检测", "direction_en": "Time Series Anomaly Detection", "core_terms": ["time series", "anomaly detection"], "related_terms": ["outlier detection"], "exclude_terms": [], "search_intents": ["SURVEY", "SOTA"], "sub_directions": [], "is_cross_domain": false, "domain_components": []}'
+    mock_response = json.dumps(
+        {
+            "direction_zh": "时间序列异常检测",
+            "direction_en": "Time Series Anomaly Detection",
+            "english_query": "time series anomaly detection transformer",
+            "query_variants": ["multivariate time series anomaly detection"],
+            "core_terms": ["time series", "anomaly detection"],
+            "related_terms": ["outlier detection"],
+            "exclude_terms": ["forecasting only"],
+            "search_intents": ["SURVEY", "SOTA"],
+            "sub_directions": [],
+            "is_cross_domain": False,
+            "domain_components": [],
+        }
+    )
     mock = MockLLMClient(response=mock_response)
     planner = QueryPlanner(llm_client=mock)
 
     plan = await planner.plan("时间序列异常检测")
 
     assert plan.direction_en == "Time Series Anomaly Detection"
+    assert plan.english_query == "time series anomaly detection transformer"
     assert "time series" in plan.core_terms
-    assert "SURVEY" in plan.search_intents
+    assert plan.search_intents[0].value == "SURVEY"
 
 
 @pytest.mark.asyncio
-async def test_query_planner_llm_failure_falls_back() -> None:
+async def test_query_planner_llm_failure_does_not_fall_back() -> None:
     mock = MockLLMClient(response="not valid json")
     planner = QueryPlanner(llm_client=mock)
 
-    plan = await planner.plan("test query")
+    with pytest.raises(QueryPlanningError, match="QUERY_PLANNING_FAILED"):
+        await planner.plan("test query")
 
-    assert plan.user_query == "test query"
-    assert "RULE_BASED_FALLBACK" in plan.warnings
+
+@pytest.mark.asyncio
+async def test_query_planner_missing_english_query_fails() -> None:
+    mock = MockLLMClient(response=json.dumps({"direction_zh": "时间序列异常检测"}))
+    planner = QueryPlanner(llm_client=mock)
+
+    with pytest.raises(QueryPlanningError, match="missing english_query"):
+        await planner.plan("时间序列异常检测")

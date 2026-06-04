@@ -9,19 +9,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from researchsensei.acquisition import ArxivAdapter, OpenAlexAdapter
-from researchsensei.source_resolver import SourceResolver
 from researchsensei.core.config import ConfigService, ModelProviderConfig
-from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
-from researchsensei.jobs import JobStore
+from researchsensei.direction import DirectionRunner
 from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
-from researchsensei.schemas import JobStatus
+from researchsensei.query import QueryPlanner
+from researchsensei.schemas import PaperSourceStatus
 from researchsensei.source_resolver import PaperSourceResolver
 from researchsensei.workspace import WorkspaceStore
 
-
-LIVE_QUERY = "time series anomaly detection transformer"
+LIVE_QUERY = "时间序列异常检测 transformer 方法"
 DEFAULT_REPORT_DIR = Path("reports/live_eval")
 
 
@@ -216,279 +213,134 @@ def run_m1_live_search(
     config: LiveEvalConfig,
     *,
     query: str = LIVE_QUERY,
+    work_dir: str | Path | None = None,
 ) -> dict[str, Any]:
-    reason = config.live_skip_reason()
-    if reason:
-        return _failed_result("m1_live_search", reason, skipped=True)
+    live_reason = config.live_skip_reason()
+    if live_reason:
+        return _failed_result("m1_live_search", live_reason, skipped=True)
+    llm_reason = config.llm_skip_reason()
+    if llm_reason:
+        return _failed_result("m1_live_search", llm_reason)
 
-    candidates = []
-    source_log: list[dict[str, Any]] = []
-    max_results = max(1, min(config.max_live_cases, 10))
-    for source_name, adapter in (
-        ("arxiv", ArxivAdapter()),
-        ("openalex", OpenAlexAdapter()),
-    ):
-        try:
-            results = adapter.search(query, max_results=max_results)
-            candidates.extend(results)
-            source_log.append({"source": source_name, "status": "passed", "count": len(results)})
-        except Exception as exc:
-            source_log.append({
-                "source": source_name,
-                "status": "failed",
-                "reason": f"{type(exc).__name__}: {str(exc)[:200]}",
-            })
+    work_root = Path(work_dir or config.report_dir / "work" / "m1")
+    workspace = WorkspaceStore(work_root / "workspace")
+    llm_client = build_live_llm_client(config)
+    source_resolver = PaperSourceResolver(
+        network_enabled=True,
+        download_dir=work_root / "downloads",
+        timeout_seconds=12.0,
+        max_download_bytes=80 * 1024 * 1024,
+    )
+    runner = DirectionRunner(
+        workspace=workspace,
+        query_planner=QueryPlanner(llm_client=llm_client),
+        source_resolver=source_resolver,
+        max_results_per_source=max(1, min(config.max_live_cases, 5)),
+    )
+    started = time.perf_counter()
+    try:
+        bundle = run_async(runner.run(query, direction_id="m1-live"))
+    except Exception as exc:
+        return _failed_result(
+            "m1_live_search",
+            f"{type(exc).__name__}: {str(exc)[:300]}",
+            extra={
+                "real_llm_query_planning": llm_client.usage.call_count > 0,
+                "token_usage": llm_client.usage.as_dict(),
+                "query": query,
+            },
+        )
 
-    limited_candidates = candidates[: config.max_live_cases]
-    resolver = PaperSourceResolver(network_enabled=False)
-    source_resolution = resolver.resolve_many(query=query, candidates=limited_candidates)
-    counts = _source_resolution_counts(source_resolution.items)
-    status = "passed" if limited_candidates else "failed"
+    latency_ms = int((time.perf_counter() - started) * 1000)
+    source_metrics = bundle.candidate_pool.source_metrics
+    counts_by_source = {str(metric["source"]): int(metric.get("count", 0)) for metric in source_metrics}
+    sources_success = [str(metric["source"]) for metric in source_metrics if metric.get("success")]
+    pdf_url_count = sum(1 for paper in bundle.filtered_candidates.items if paper.pdf_url or paper.pdf_available)
+    pdf_download_success_count = sum(
+        1 for item in bundle.source_resolution.items if item.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    )
+    a_read_items = [item for item in bundle.reading_plan.items if item.priority == "A_READ"]
+    a_read_can_enter_m2 = [item.paper.paper_id for item in a_read_items if item.can_enter_m2 and item.paper.can_enter_m2]
+    downloaded = [item for item in bundle.source_resolution.items if item.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED]
+
+    failure_reasons: list[str] = []
+    if llm_client.usage.call_count <= 0:
+        failure_reasons.append("No real LLM query-planning call was made.")
+    if not bundle.query_plan.english_query:
+        failure_reasons.append("Query plan did not produce english_query.")
+    if not sources_success:
+        failure_reasons.append("No mature search source returned candidates.")
+    if bundle.candidate_pool.retrieved_count <= 0:
+        failure_reasons.append("No candidate papers were retrieved.")
+    if pdf_download_success_count <= 0:
+        failure_reasons.append("No real PDF was downloaded and validated.")
+    if not a_read_items:
+        failure_reasons.append("No A_READ item was selected.")
+    if a_read_items and len(a_read_can_enter_m2) != len(a_read_items):
+        failure_reasons.append("Some A_READ papers are not cleared for M2.")
+
+    status = "failed" if failure_reasons else "passed"
+    sample_a_read = [
+        {
+            "paper_id": item.paper.paper_id,
+            "title": item.paper.title,
+            "sources": item.paper.sources,
+            "role": item.role,
+            "can_enter_m2": item.can_enter_m2 and item.paper.can_enter_m2,
+            "pdf_downloaded": item.paper.pdf_downloaded,
+            "score": item.scoring_breakdown.weighted_total,
+        }
+        for item in a_read_items[: config.max_live_cases]
+    ]
+
+    run_dir = workspace.root / "runs" / "m1-live"
     return {
         "name": "m1_live_search",
         "status": status,
+        "failure_reason": "; ".join(failure_reasons),
         "real_network": True,
+        "real_llm_query_planning": llm_client.usage.call_count > 0,
         "query": query,
-        "candidate_count": len(limited_candidates),
-        "source_log": source_log,
-        "source_resolution": counts,
-        "sample_candidates": [
+        "english_query": bundle.query_plan.english_query,
+        "query_variants": bundle.query_plan.query_variants,
+        "sources_attempted": [str(metric["source"]) for metric in source_metrics],
+        "sources_success": sources_success,
+        "source_metrics": source_metrics,
+        "arxiv_count": counts_by_source.get("arxiv", 0),
+        "openalex_count": counts_by_source.get("openalex", 0),
+        "semantic_scholar_count": counts_by_source.get("semantic_scholar", 0),
+        "crossref_count": counts_by_source.get("crossref", 0),
+        "candidate_count": bundle.candidate_pool.retrieved_count,
+        "dedup_before": bundle.candidate_pool.retrieved_count,
+        "dedup_after": bundle.filtered_candidates.deduplicated_count,
+        "pdf_url_count": pdf_url_count,
+        "pdf_download_success_count": pdf_download_success_count,
+        "downloaded_sources": [
             {
-                "paper_id": paper.paper_id,
-                "title": paper.title,
-                "source": paper.source,
-                "arxiv_id": paper.arxiv_id,
-                "doi": paper.doi,
-                "pdf_url_present": bool(paper.pdf_url),
+                "paper_id": item.paper_id,
+                "title": item.title,
+                "file_size": item.file_size,
+                "sha256": item.sha256,
+                "local_path": item.local_path,
             }
-            for paper in limited_candidates
+            for item in downloaded[: config.max_live_cases]
         ],
-        "semantic_scholar_status": "not_implemented",
-        "crossref_status": "not_implemented",
-        "failure_reason": "" if limited_candidates else "No candidates returned from live arXiv/OpenAlex search.",
-    }
-
-
-def run_m2_real_llm_smoke(config: LiveEvalConfig, *, work_dir: str | Path) -> dict[str, Any]:
-    reason = config.llm_skip_reason()
-    if reason:
-        return _failed_result("m2_real_llm_smoke", reason, skipped=True)
-
-    work_root = Path(work_dir)
-    work_root.mkdir(parents=True, exist_ok=True)
-    source = _sample_paper_path(work_root)
-    llm_client = build_live_llm_client(config)
-    workspace = WorkspaceStore(work_root / "workspace")
-    jobs = JobStore(work_root / "jobs.sqlite")
-    job_id = f"live-llm-smoke-{int(time.time() * 1000)}"
-    started = time.perf_counter()
-    try:
-        job = SinglePaperIngestionRunner(
-            workspace=workspace,
-            jobs=jobs,
-            llm_client=llm_client,
-        ).run(source, job_id=job_id)
-        latency_ms = int((time.perf_counter() - started) * 1000)
-        if job.status != JobStatus.SUCCEEDED:
-            return _failed_result(
-                "m2_real_llm_smoke",
-                job.error or "SinglePaperIngestionRunner did not succeed.",
-                extra={"job_status": job.status.value, "token_usage": llm_client.usage.as_dict()},
-            )
-        return _summarize_m2_job(job, llm_client, latency_ms)
-    except Exception as exc:
-        return _failed_result(
-            "m2_real_llm_smoke",
-            f"{type(exc).__name__}: {str(exc)[:300]}",
-            extra={"token_usage": llm_client.usage.as_dict(), "model": llm_client.usage.model},
-        )
-
-
-def run_real_pdf_end_to_end_eval(
-    config: LiveEvalConfig,
-    *,
-    work_dir: str | Path,
-    query: str = LIVE_QUERY,
-) -> dict[str, Any]:
-    """End-to-end: real search → real PDF download → real parser → real LLM → audit → status."""
-    live_reason = config.live_skip_reason()
-    if live_reason:
-        return _failed_result("real_pdf_e2e", live_reason, skipped=True)
-    llm_reason = config.llm_skip_reason()
-    if llm_reason:
-        return _failed_result("real_pdf_e2e", llm_reason, skipped=True)
-
-    work_root = Path(work_dir)
-    work_root.mkdir(parents=True, exist_ok=True)
-    pdf_dir = work_root / "pdf"
-    pdf_dir.mkdir(parents=True, exist_ok=True)
-
-    # Step 1: real search
-    max_results = max(1, min(config.max_live_cases, 5))
-    candidates: list = []
-    for adapter in (ArxivAdapter(), OpenAlexAdapter()):
-        try:
-            candidates.extend(adapter.search(query, max_results=max_results))
-        except Exception:
-            pass
-
-    if not candidates:
-        return _failed_result("real_pdf_e2e", "No candidates returned from live search.", extra={"real_network": True})
-
-    # Step 2: find candidate with pdf_url or arxiv_id
-    pdf_candidate = None
-    for c in candidates:
-        if c.pdf_url:
-            pdf_candidate = c
-            break
-        if c.arxiv_id:
-            pdf_candidate = c
-            break
-
-    if pdf_candidate is None:
-        return _failed_result(
-            "real_pdf_e2e",
-            "No candidate with pdf_url or arxiv_id found.",
-            extra={"real_network": True, "candidate_count": len(candidates)},
-        )
-
-    # Step 3: download real PDF
-    resolver = SourceResolver()
-    run_dir = pdf_dir / "run"
-    run_dir.mkdir(parents=True, exist_ok=True)
-
-    source_status = None
-    if pdf_candidate.pdf_url:
-        source_status = resolver.resolve_pdf_url(pdf_candidate.pdf_url, run_dir)
-    elif pdf_candidate.arxiv_id:
-        source_status = resolver.resolve_arxiv_id(pdf_candidate.arxiv_id, run_dir)
-
-    if source_status is None or source_status.status != "resolved":
-        reason = "PDF download failed."
-        if source_status:
-            reason = f"PDF download failed: status={source_status.status}, warnings={[w.message for w in source_status.warnings]}"
-        return _failed_result(
-            "real_pdf_e2e",
-            reason,
-            extra={
-                "real_network": True,
-                "real_pdf_download": False,
-                "candidate_paper_id": pdf_candidate.paper_id,
-                "candidate_title": pdf_candidate.title,
-            },
-        )
-
-    # Find the downloaded file
-    pdf_files = list(run_dir.glob("source.*"))
-    if not pdf_files:
-        return _failed_result(
-            "real_pdf_e2e",
-            "PDF resolved but source file not found in run_dir.",
-            extra={"real_network": True, "real_pdf_download": True},
-        )
-    source_path = pdf_files[0]
-
-    # Step 4: run full pipeline with real LLM
-    llm_client = build_live_llm_client(config)
-    pipeline_work = work_root / "pipeline"
-    pipeline_work.mkdir(parents=True, exist_ok=True)
-    workspace = WorkspaceStore(pipeline_work / "workspace")
-    jobs = JobStore(pipeline_work / "jobs.sqlite")
-    job_id = f"live-pdf-e2e-{int(time.time() * 1000)}"
-
-    started = time.perf_counter()
-    try:
-        job = SinglePaperIngestionRunner(
-            workspace=workspace,
-            jobs=jobs,
-            llm_client=llm_client,
-        ).run(str(source_path), job_id=job_id)
-        latency_ms = int((time.perf_counter() - started) * 1000)
-    except Exception as exc:
-        return _failed_result(
-            "real_pdf_e2e",
-            f"Pipeline exception: {type(exc).__name__}: {str(exc)[:300]}",
-            extra={
-                "real_network": True,
-                "real_pdf_download": True,
-                "real_llm": True,
-                "token_usage": llm_client.usage.as_dict(),
-            },
-        )
-
-    if job.status != JobStatus.SUCCEEDED:
-        return _failed_result(
-            "real_pdf_e2e",
-            job.error or "Pipeline did not succeed.",
-            extra={
-                "real_network": True,
-                "real_pdf_download": True,
-                "real_llm": True,
-                "job_status": job.status.value,
-                "token_usage": llm_client.usage.as_dict(),
-            },
-        )
-
-    # Step 5: verify artifacts
-    run_dir_path = Path(job.run_dir)
-    artifacts = {a.artifact_type: Path(a.path) for a in job.artifacts}
-    quality_report = _load_json(artifacts.get("quality_report")) or {}
-    understanding_status = _load_json(artifacts.get("understanding_status")) or {}
-    paper_card = _load_json(artifacts.get("paper_card"))
-    evidence_index = _load_json(artifacts.get("evidence_index")) or {}
-
-    evidence_refs = _collect_card_evidence_refs(paper_card)
-    traceable_refs = _evidence_refs(evidence_index)
-    evidence_ref_traceable = bool(evidence_refs) and all(ref in traceable_refs for ref in evidence_refs)
-
-    real_llm_called = llm_client.usage.call_count > 0
-    has_quality_report = bool(quality_report)
-    has_understanding_status = bool(understanding_status)
-
-    failure_reasons: list[str] = []
-    if not real_llm_called:
-        failure_reasons.append("No real LLM call was made.")
-    if not has_quality_report:
-        failure_reasons.append("quality_report.json not generated.")
-    if not has_understanding_status:
-        failure_reasons.append("understanding_status.json not generated.")
-
-    us_status = understanding_status.get("status", "")
-    if us_status in ("BLOCKED_UNDERSTANDING", "FAILED"):
-        failure_reasons.append(f"understanding_status is {us_status}.")
-
-    status = "failed" if failure_reasons else "passed"
-
-    return {
-        "name": "real_pdf_e2e",
-        "status": status,
-        "real_network": True,
-        "real_pdf_download": True,
-        "real_llm": real_llm_called,
-        "query": query,
-        "candidate_paper_id": pdf_candidate.paper_id,
-        "candidate_title": pdf_candidate.title,
-        "candidate_source": pdf_candidate.source,
-        "pdf_source": str(source_path),
-        "model": llm_client.usage.model,
-        "prompt_version": "paper_card_v2/formula_card_v2/teaching_card_v2",
-        "schema_version": "v1",
+        "a_read_count": len(a_read_items),
+        "a_read_can_enter_m2_count": len(a_read_can_enter_m2),
+        "reading_plan_status": bundle.reading_plan.status,
+        "sample_a_read": sample_a_read,
+        "warnings": bundle.warnings,
         "latency_ms": latency_ms,
         "token_usage": llm_client.usage.as_dict(),
         "estimated_cost_usd": round(llm_client.usage.estimated_cost_usd, 6),
         "artifacts": {
-            "run_dir": str(run_dir_path),
-            "quality_report": str(artifacts.get("quality_report", "")),
-            "understanding_status": str(artifacts.get("understanding_status", "")),
-            "paper_card": str(artifacts.get("paper_card", "")),
+            "run_dir": str(run_dir),
+            "query_plan": str(run_dir / "query_plan.json"),
+            "candidate_pool": str(run_dir / "candidate_pool.json"),
+            "source_resolution": str(run_dir / "source_resolution.json"),
+            "filtered_candidates": str(run_dir / "filtered_candidates.json"),
+            "reading_plan": str(run_dir / "reading_plan.json"),
         },
-        "understanding_status": us_status,
-        "allowed_for_user_display": bool(understanding_status.get("allowed_for_user_display", False)),
-        "quality_findings": len(quality_report.get("findings", [])),
-        "has_evidence_ref": bool(evidence_refs),
-        "evidence_ref_traceable": evidence_ref_traceable,
-        "total_tokens": llm_client.usage.total_tokens,
-        "failure_reason": "; ".join(failure_reasons),
     }
 
 
@@ -502,7 +354,7 @@ def run_full_live_eval(
     report_dir.mkdir(parents=True, exist_ok=True)
     work_root = Path(work_dir or report_dir / "work")
     report: dict[str, Any] = {
-        "schema_version": "v1",
+        "schema_version": "v2-m1-real",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "live_eval": {
             "enabled": actual_config.live_eval_enabled,
@@ -520,133 +372,12 @@ def run_full_live_eval(
             "base_url": actual_config.provider.base_url,
             "credential_env": actual_config.provider.api_key_env,
         },
-        "m1_live": run_m1_live_search(actual_config),
-        "m2_real_llm": {},
-        "real_pdf_e2e": {},
+        "m1_live": run_m1_live_search(actual_config, work_dir=work_root / "m1"),
     }
-    report["m2_real_llm"] = run_m2_real_llm_smoke(actual_config, work_dir=work_root)
-    report["real_pdf_e2e"] = run_real_pdf_end_to_end_eval(actual_config, work_dir=work_root)
     report_path = report_dir / "live_eval_report.json"
     report["report_path"] = str(report_path)
     report_path.write_text(json.dumps(_redact_report(report), ensure_ascii=False, indent=2), encoding="utf-8")
     return report
-
-
-def _summarize_m2_job(job, llm_client: MeteredLLMClient, latency_ms: int) -> dict[str, Any]:
-    run_dir = Path(job.run_dir)
-    artifacts = {artifact.artifact_type: Path(artifact.path) for artifact in job.artifacts}
-    quality_report_path = artifacts.get("quality_report")
-    understanding_status_path = artifacts.get("understanding_status")
-    paper_card = _load_json(artifacts.get("paper_card"))
-    evidence_index = _load_json(artifacts.get("evidence_index")) or {}
-    understanding_status = _load_json(understanding_status_path) or {}
-    quality_report = _load_json(quality_report_path) or {}
-    common_extra = {
-        "real_llm": True,
-        "model": llm_client.usage.model,
-        "token_usage": llm_client.usage.as_dict(),
-        "estimated_cost_usd": round(llm_client.usage.estimated_cost_usd, 6),
-        "artifacts": {
-            "run_dir": str(run_dir),
-            "quality_report": str(quality_report_path) if quality_report_path else "",
-            "understanding_status": str(understanding_status_path) if understanding_status_path else "",
-            "paper_card": str(artifacts.get("paper_card", "")),
-        },
-        "understanding_status": understanding_status.get("status", ""),
-        "allowed_for_user_display": bool(understanding_status.get("allowed_for_user_display", False)),
-    }
-    if llm_client.usage.call_count == 0:
-        return _failed_result(
-            "m2_real_llm_smoke",
-            "Pipeline completed without making a real LLM call.",
-            extra=common_extra,
-        )
-
-    evidence_refs = _collect_card_evidence_refs(paper_card)
-    traceable_refs = _evidence_refs(evidence_index)
-    evidence_ref_traceable = bool(evidence_refs) and all(ref in traceable_refs for ref in evidence_refs)
-
-    return {
-        "name": "m2_real_llm_smoke",
-        "status": "passed",
-        "real_llm": True,
-        "model": llm_client.usage.model,
-        "prompt_version": "paper_card_v2/formula_card_v2/teaching_card_v2",
-        "schema_version": "v1",
-        "latency_ms": latency_ms,
-        "token_usage": llm_client.usage.as_dict(),
-        "estimated_cost_usd": round(llm_client.usage.estimated_cost_usd, 6),
-        "artifacts": common_extra["artifacts"],
-        "has_evidence_ref": bool(evidence_refs),
-        "evidence_ref_traceable": evidence_ref_traceable,
-        "allowed_for_user_display": bool(understanding_status.get("allowed_for_user_display", False)),
-        "understanding_status": understanding_status.get("status", ""),
-        "quality_findings": len(quality_report.get("findings", [])),
-        "failure_reason": "",
-    }
-
-
-def _source_resolution_counts(items) -> dict[str, int]:
-    counts = {"total": len(items), "resolved": 0, "partial": 0, "failed": 0, "not_found": 0}
-    for item in items:
-        status = item.status.value
-        if status == "RESOLVED":
-            counts["resolved"] += 1
-        elif status == "PARTIAL":
-            counts["partial"] += 1
-        elif status == "FAILED":
-            counts["failed"] += 1
-        elif status == "NOT_FOUND":
-            counts["not_found"] += 1
-    return counts
-
-
-def _sample_paper_path(work_root: Path) -> Path:
-    sample = work_root / "synthetic_live_paper.md"
-    sample.write_text(
-        """# Synthetic GraphAD Paper
-
-## Abstract
-We propose a graph model for anomaly detection in multivariate time series.
-
-## Method
-We propose a method that builds a sensor graph and uses reconstruction error.
-The loss is L = L_rec + lambda L_graph.
-
-## Experiments
-The method is evaluated on a small synthetic benchmark and reports F1 score.
-
-## Limitations
-The method assumes a fixed graph structure.
-""",
-        encoding="utf-8",
-    )
-    return sample
-
-
-def _load_json(path: Path | None) -> dict[str, Any] | None:
-    if not path or not path.exists():
-        return None
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _collect_card_evidence_refs(paper_card: dict[str, Any] | None) -> list[str]:
-    if not paper_card:
-        return []
-    refs = list(paper_card.get("evidence_refs", []))
-    for field in ("problem", "core_idea", "method_overview", "experiment_summary", "limitations"):
-        value = paper_card.get(field)
-        if isinstance(value, dict) and value.get("evidence_ref"):
-            refs.append(value["evidence_ref"])
-    return sorted({ref for ref in refs if ref})
-
-
-def _evidence_refs(evidence_index: dict[str, Any]) -> set[str]:
-    return {
-        claim.get("evidence_ref", "")
-        for claim in evidence_index.get("claims", [])
-        if claim.get("evidence_ref")
-    }
 
 
 def _failed_result(
@@ -656,7 +387,7 @@ def _failed_result(
     skipped: bool = False,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    result = {
+    result: dict[str, Any] = {
         "name": name,
         "status": "skipped" if skipped else "failed",
         "failure_reason": reason,
@@ -702,7 +433,7 @@ def _redact_report(value: Any) -> Any:
 
 def _redact_secret_like_text(value: str) -> str:
     redacted = value
-    for secret_name in ("DEEPSEEK_API_KEY", "MIMO_API_KEY", "OPENAI_COMPATIBLE_API_KEY"):
+    for secret_name in ("DEEPSEEK_API_KEY", "MIMO_API_KEY", "OPENAI_COMPATIBLE_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"):
         secret = os.getenv(secret_name, "")
         if secret:
             redacted = redacted.replace(secret, "[REDACTED]")

@@ -10,6 +10,10 @@ from researchsensei.schemas.enums import SearchIntent
 logger = logging.getLogger(__name__)
 
 
+class QueryPlanningError(RuntimeError):
+    """Raised when M1 cannot produce a real LLM query plan."""
+
+
 class QueryPlanner:
     """Generates structured query plans from user direction input."""
 
@@ -17,35 +21,52 @@ class QueryPlanner:
         self.llm = llm_client
 
     async def plan(self, user_query: str) -> QueryPlan:
-        """Generate a query plan from user input."""
-        if self.llm is not None:
-            try:
-                return await self._plan_with_llm(user_query)
-            except Exception as exc:
-                logger.warning("LLM query planning failed, using fallback: %s", exc)
+        """Generate a query plan from user input.
 
-        return self._plan_fallback(user_query)
+        M1 must not silently fall back to heuristic query planning. A missing or
+        invalid LLM plan is a real blocker because Chinese research directions
+        often need precise English academic query terms.
+        """
+        if self.llm is None:
+            raise QueryPlanningError("M1_QUERY_PLANNING_REQUIRES_REAL_LLM")
+
+        try:
+            return await self._plan_with_llm(user_query)
+        except Exception as exc:
+            logger.warning("LLM query planning failed: %s", exc)
+            raise QueryPlanningError(f"M1_QUERY_PLANNING_FAILED: {type(exc).__name__}: {exc}") from exc
 
     async def _plan_with_llm(self, user_query: str) -> QueryPlan:
-        """Generate query plan using LLM."""
         prompt_builder = PromptBuilder()
         messages = prompt_builder.build_simple(
             system=(
-                "你是 ResearchSensei 的方向分析引擎。\n"
-                "分析用户的研究方向，生成结构化查询计划。\n"
-                "输出 JSON 格式。"
+                "You are ResearchSensei's research-query planning engine.\n"
+                "Convert the user's research direction into precise English academic search terms.\n"
+                "Preserve every core constraint in the user's query: data type, task, method family, and application domain.\n"
+                "Do not broaden the query by dropping task/domain terms. If the user writes Chinese, translate the full phrase.\n"
+                "Return strict JSON only. Do not include markdown."
             ),
-            user=f"""分析这个研究方向: "{user_query}"
+            user=f"""Analyze this research direction: "{user_query}"
 
-输出 JSON 格式:
+Examples:
+- 用户输入: "时间序列异常检测 transformer 方法"
+  english_query: "time series anomaly detection transformer methods"
+  core_terms: ["time series", "anomaly detection", "transformer"]
+- 用户输入: "图神经网络用于根因分析"
+  english_query: "graph neural networks for root cause analysis"
+  core_terms: ["graph neural networks", "root cause analysis"]
+
+Return JSON with this schema:
 {{
-  "direction_zh": "中文方向名",
+  "direction_zh": "Chinese direction name, if applicable",
   "direction_en": "English direction name",
-  "core_terms": ["核心术语1", "core term 2"],
-  "related_terms": ["相关术语"],
-  "exclude_terms": ["应排除的噪声"],
+  "english_query": "best single English academic search query",
+  "query_variants": ["variant query 1", "variant query 2"],
+  "core_terms": ["core term 1", "core term 2"],
+  "related_terms": ["related term"],
+  "exclude_terms": ["noise term to exclude"],
   "search_intents": ["SURVEY", "FOUNDATIONAL", "SOTA"],
-  "sub_directions": ["子方向1"],
+  "sub_directions": ["sub direction"],
   "is_cross_domain": false,
   "domain_components": []
 }}""",
@@ -54,55 +75,29 @@ class QueryPlanner:
         response = await self.llm.chat(messages)
         data = parse_llm_json(response.content)
 
+        direction_en = str(data.get("direction_en") or data.get("english_query") or "").strip()
+        english_query = str(data.get("english_query") or direction_en).strip()
+        if not english_query:
+            raise QueryPlanningError("LLM query plan missing english_query/direction_en")
+
         return QueryPlan(
             user_query=user_query,
             language="zh" if _is_chinese(user_query) else "en",
-            direction_zh=data.get("direction_zh", user_query),
-            direction_en=data.get("direction_en", user_query),
-            core_terms=data.get("core_terms", []),
-            related_terms=data.get("related_terms", []),
-            exclude_terms=data.get("exclude_terms", []),
-            search_intents=_parse_intents(data.get("search_intents", ["GENERAL"])),
-            sub_directions=data.get("sub_directions", []),
-            is_cross_domain=data.get("is_cross_domain", False),
-            domain_components=data.get("domain_components", []),
-        )
-
-    def _plan_fallback(self, user_query: str) -> QueryPlan:
-        """Generate a conservative fallback query plan without LLM."""
-        is_zh = _is_chinese(user_query)
-
-        # Extract core terms by splitting on common separators
-        terms = [t.strip() for t in user_query.replace("，", ",").replace("、", ",").split(",") if t.strip()]
-        if not terms:
-            terms = [user_query]
-
-        warnings = ["RULE_BASED_FALLBACK"]
-        direction_en = user_query
-        if is_zh:
-            warnings.append("CHINESE_QUERY_NO_LLM_FALLBACK")
-            warnings.append("EN_QUERY_UNAVAILABLE")
-            # Chinese queries without LLM cannot produce English search terms.
-            # direction_en stays as Chinese - search engines may return poor results.
-
-        return QueryPlan(
-            user_query=user_query,
-            language="zh" if is_zh else "en",
-            direction_zh=user_query if is_zh else "",
-            direction_en=direction_en,
-            core_terms=terms,
-            related_terms=[],
-            exclude_terms=[],
-            search_intents=[SearchIntent.SURVEY, SearchIntent.SOTA],
-            sub_directions=[],
-            is_cross_domain=False,
-            domain_components=[],
-            warnings=warnings,
+            direction_zh=str(data.get("direction_zh") or (user_query if _is_chinese(user_query) else "")),
+            direction_en=direction_en or english_query,
+            english_query=english_query,
+            query_variants=_list_of_str(data.get("query_variants")),
+            core_terms=_list_of_str(data.get("core_terms")),
+            related_terms=_list_of_str(data.get("related_terms")),
+            exclude_terms=_list_of_str(data.get("exclude_terms")),
+            search_intents=_parse_intents(_list_of_str(data.get("search_intents")) or ["GENERAL"]),
+            sub_directions=_list_of_str(data.get("sub_directions")),
+            is_cross_domain=bool(data.get("is_cross_domain", False)),
+            domain_components=_list_of_str(data.get("domain_components")),
         )
 
 
 def _parse_intents(raw: list[str]) -> list[SearchIntent]:
-    """Convert raw string list to SearchIntent list, skipping unknown values."""
     result: list[SearchIntent] = []
     for item in raw:
         try:
@@ -112,6 +107,11 @@ def _parse_intents(raw: list[str]) -> list[SearchIntent]:
     return result or [SearchIntent.GENERAL]
 
 
+def _list_of_str(raw: object) -> list[str]:
+    if not isinstance(raw, list):
+        return []
+    return [str(item).strip() for item in raw if str(item).strip()]
+
+
 def _is_chinese(text: str) -> bool:
-    """Check if text contains Chinese characters."""
-    return any("一" <= c <= "鿿" for c in text)
+    return any("\u4e00" <= c <= "\u9fff" for c in text)

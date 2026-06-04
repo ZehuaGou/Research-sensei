@@ -16,6 +16,8 @@ class QueryPlan(SenseiModel):
     language: str = "zh"
     direction_zh: str = ""
     direction_en: str = ""
+    english_query: str = ""
+    query_variants: list[str] = Field(default_factory=list)
     core_terms: list[str] = Field(default_factory=list)
     related_terms: list[str] = Field(default_factory=list)
     exclude_terms: list[str] = Field(default_factory=list)
@@ -36,13 +38,26 @@ class CandidatePaper(SenseiModel):
     year: int | None = None
     venue: str = ""
     source: str = ""  # arxiv, openalex, etc.
+    sources: list[str] = Field(default_factory=list)
+    source_ids: dict[str, str] = Field(default_factory=dict)
     url: str = ""
+    landing_url: str = ""
     doi: str = ""
     arxiv_id: str = ""
+    semantic_scholar_id: str = ""
     abstract: str = ""
+    tldr: str = ""
     citation_count: int | None = None
     pdf_url: str = ""
+    source_url: str = ""
     code_url: str = ""
+    open_access: bool = False
+    pdf_available: bool = False
+    pdf_downloaded: bool = False
+    can_enter_m2: bool = False
+    source_confidence: str = "low"
+    metadata_confidence: str = "low"
+    raw_source_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class ScoringBreakdown(SenseiModel):
@@ -53,6 +68,10 @@ class ScoringBreakdown(SenseiModel):
     citation_score: float = 0.0
     code_availability: float = 0.0
     method_representativeness: float = 0.0
+    source_reliability: float = 0.0
+    open_access_score: float = 0.0
+    pdf_available_score: float = 0.0
+    metadata_completeness: float = 0.0
     recency_bonus: float = 0.0
     penalty_noise: float = 0.0
     weighted_total: float = 0.0
@@ -67,6 +86,7 @@ class ReadingPlanItem(SenseiModel):
     scoring_breakdown: ScoringBreakdown = Field(default_factory=ScoringBreakdown)
     selection_reason: str = ""
     risk_note: str = ""
+    can_enter_m2: bool = False
 
 
 class CandidatePool(SenseiModel):
@@ -79,6 +99,7 @@ class CandidatePool(SenseiModel):
     items: list[CandidatePaper] = Field(default_factory=list)
     search_log: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    source_metrics: list[dict[str, object]] = Field(default_factory=list)
 
 
 class ResolvedPaperSource(SenseiModel):
@@ -97,6 +118,13 @@ class ResolvedPaperSource(SenseiModel):
     landing_url: str = ""
     source_type: PaperSourceType = PaperSourceType.METADATA_ONLY
     status: PaperSourceStatus = PaperSourceStatus.NOT_FOUND
+    download_status: str = ""
+    final_url: str = ""
+    content_type: str = ""
+    file_size: int = 0
+    sha256: str = ""
+    local_path: str = ""
+    error_code: str = ""
     warnings: list[WarningItem] = Field(default_factory=list)
     error: str = ""
     metadata: dict[str, str] = Field(default_factory=dict)
@@ -116,6 +144,7 @@ class ReadingPlan(SenseiModel):
 
     topic: str
     items: list[ReadingPlanItem] = Field(default_factory=list)
+    status: str = "OK"
     generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     warnings: list[str] = Field(default_factory=list)
 

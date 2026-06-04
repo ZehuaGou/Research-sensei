@@ -15,6 +15,10 @@ dependencies = [
   "pydantic>=2.0",
   "uvicorn>=0.27",
   "aiosqlite>=0.19",
+  "arxiv>=2.1",
+  "pyalex>=0.15",
+  "semanticscholar>=0.8",
+  "habanero>=1.2",
 ]
 
 [project.optional-dependencies]

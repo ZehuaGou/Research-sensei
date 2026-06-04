@@ -11,7 +11,6 @@ from pathlib import Path
 import httpx
 import pytest
 
-from researchsensei.acquisition import ArxivAdapter, OpenAlexAdapter
 from researchsensei.direction import DirectionRunner
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
@@ -20,7 +19,7 @@ from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient, MockLLMClient
 from researchsensei.llm.types import ChatMessage, LLMConfig
-from researchsensei.query.planner import QueryPlanner
+from researchsensei.query.planner import QueryPlanner, QueryPlanningError
 from researchsensei.schemas import CandidatePaper, QueryPlan
 from researchsensei.schemas.enums import EvidenceType, JobStatus
 from researchsensei.selection import SelectionService
@@ -175,17 +174,32 @@ async def test_direction_runner_records_adapter_failure_warning(tmp_path: Path) 
     """When an adapter fails, the failure must appear in bundle warnings."""
     workspace = WorkspaceStore(tmp_path / "workspace")
 
-    def _fail_arxiv(request: httpx.Request) -> httpx.Response:
-        raise httpx.ConnectError("Connection refused")
+    class _FailingAdapter:
+        def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+            raise RuntimeError("Connection refused")
 
-    def _empty_openalex(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=json.dumps({"results": []}), headers={"content-type": "application/json"})
+    class _EmptyAdapter:
+        def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+            return []
+
+    planner = QueryPlanner(
+        MockLLMClient(
+            response=json.dumps(
+                {
+                    "direction_en": "test query",
+                    "english_query": "test query",
+                    "core_terms": ["test"],
+                    "search_intents": ["GENERAL"],
+                }
+            )
+        )
+    )
 
     runner = DirectionRunner(
         workspace=workspace,
-        query_planner=QueryPlanner(),
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_fail_arxiv))),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_openalex))),
+        query_planner=planner,
+        arxiv_adapter=_FailingAdapter(),
+        openalex_adapter=_EmptyAdapter(),
         sources=["arxiv", "openalex"],
     )
 
@@ -209,46 +223,30 @@ async def test_direction_runner_records_adapter_failure_warning(tmp_path: Path) 
 
 
 # ---------------------------------------------------------------------------
-# Test 6: Chinese query fallback warns
+# Test 6: M1 query planning requires LLM
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_query_planner_chinese_fallback_warns() -> None:
-    """Chinese query without LLM must produce degraded warnings."""
-    planner = QueryPlanner()  # No LLM client → fallback
-    plan = await planner.plan("时间序列异常检测")
+async def test_query_planner_without_llm_blocks_m1() -> None:
+    """Chinese query without LLM must not silently use a heuristic fallback."""
+    planner = QueryPlanner()
 
-    assert "CHINESE_QUERY_NO_LLM_FALLBACK" in plan.warnings, (
-        f"Expected CHINESE_QUERY_NO_LLM_FALLBACK warning, got: {plan.warnings}"
-    )
-    assert "EN_QUERY_UNAVAILABLE" in plan.warnings, (
-        f"Expected EN_QUERY_UNAVAILABLE warning, got: {plan.warnings}"
-    )
-    assert plan.language == "zh"
+    with pytest.raises(QueryPlanningError, match="REQUIRES_REAL_LLM"):
+        await planner.plan("时间序列异常检测")
 
 
 @pytest.mark.asyncio
-async def test_chinese_fallback_warning_in_bundle(tmp_path: Path) -> None:
-    """Chinese fallback warnings must appear in DirectionBundle.warnings."""
+async def test_direction_runner_without_llm_blocks_before_search(tmp_path: Path) -> None:
+    """DirectionRunner should fail at query planning instead of searching with a bad query."""
     workspace = WorkspaceStore(tmp_path / "workspace")
-
-    def _empty_arxiv(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text='<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>')
-
-    def _empty_openalex(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=json.dumps({"results": []}), headers={"content-type": "application/json"})
-
     runner = DirectionRunner(
         workspace=workspace,
         query_planner=QueryPlanner(),
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_arxiv))),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_openalex))),
+        sources=[],
     )
 
-    bundle = await runner.run("时间序列异常检测", direction_id="zh-test")
-
-    assert "CHINESE_QUERY_NO_LLM_FALLBACK" in bundle.warnings
-    assert "EN_QUERY_UNAVAILABLE" in bundle.warnings
+    with pytest.raises(QueryPlanningError, match="REQUIRES_REAL_LLM"):
+        await runner.run("时间序列异常检测", direction_id="zh-test")
 
 
 # ---------------------------------------------------------------------------

@@ -6,236 +6,206 @@ from pathlib import Path
 import httpx
 import pytest
 
-from researchsensei.acquisition import ArxivAdapter, OpenAlexAdapter
 from researchsensei.direction import DirectionRunner
+from researchsensei.llm.client import MockLLMClient
 from researchsensei.query import QueryPlanner
-from researchsensei.selection import SelectionService
+from researchsensei.schemas import CandidatePaper
+from researchsensei.source_resolver import PaperSourceResolver
 from researchsensei.workspace import WorkspaceStore
 
-# Sample arXiv XML
-ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry>
-    <id>http://arxiv.org/abs/2301.12345v1</id>
-    <title>Time Series Anomaly Detection</title>
-    <summary>We detect anomalies in time series data.</summary>
-    <published>2023-01-30T00:00:00Z</published>
-    <author><name>John Doe</name></author>
-  </entry>
-</feed>
-"""
 
-OPENALEX_JSON = json.dumps({
-    "results": [
-        {
-            "id": "https://openalex.org/W123",
-            "title": "Deep Learning for Anomaly Detection",
-            "publication_year": 2023,
-            "cited_by_count": 50,
-            "primary_location": {"source": {"display_name": "ICML"}},
-            "authorships": [{"author": {"display_name": "Alice"}}],
-            "abstract_inverted_index": {"anomaly": [0], "detection": [1]},
-        }
-    ]
-})
+def _query_planner() -> QueryPlanner:
+    return QueryPlanner(
+        MockLLMClient(
+            response=json.dumps(
+                {
+                    "direction_zh": "时间序列异常检测",
+                    "direction_en": "Time Series Anomaly Detection",
+                    "english_query": "time series anomaly detection",
+                    "query_variants": ["multivariate time series anomaly detection"],
+                    "core_terms": ["time series", "anomaly detection"],
+                    "related_terms": ["outlier detection"],
+                    "exclude_terms": ["forecasting only"],
+                    "search_intents": ["SURVEY", "SOTA"],
+                    "sub_directions": [],
+                    "is_cross_domain": False,
+                    "domain_components": [],
+                }
+            )
+        )
+    )
 
 
-def _mock_arxiv(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(200, text=ARXIV_XML)
+def _paper(
+    paper_id: str,
+    title: str,
+    *,
+    source: str = "arxiv",
+    doi: str = "",
+    arxiv_id: str = "",
+    pdf_url: str = "https://example.org/paper.pdf",
+    citation_count: int | None = 20,
+) -> CandidatePaper:
+    return CandidatePaper(
+        paper_id=paper_id,
+        title=title,
+        year=2023,
+        venue="arXiv" if source == "arxiv" else "ICML 2023",
+        source=source,
+        sources=[source],
+        source_ids={source: paper_id},
+        doi=doi,
+        arxiv_id=arxiv_id,
+        abstract="We study anomaly detection in time series data.",
+        citation_count=citation_count,
+        pdf_url=pdf_url,
+        pdf_available=bool(pdf_url),
+        source_confidence="medium",
+        metadata_confidence="medium",
+    )
 
 
-def _mock_openalex(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(200, text=OPENALEX_JSON, headers={"content-type": "application/json"})
+class _FakeAdapter:
+    def __init__(self, results: list[CandidatePaper], *, fail: bool = False) -> None:
+        self.results = results
+        self.fail = fail
+
+    def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        if self.fail:
+            raise RuntimeError("adapter failed")
+        return self.results[:max_results]
+
+
+def _pdf_resolver(tmp_path: Path) -> PaperSourceResolver:
+    def _mock_download(request: httpx.Request) -> httpx.Response:
+        content = b"%PDF-1.4\nfake\n"
+        return httpx.Response(
+            200,
+            content=content,
+            headers={"content-type": "application/pdf", "content-length": str(len(content))},
+            request=request,
+        )
+
+    return PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(_mock_download)),
+        download_dir=tmp_path / "downloads",
+    )
 
 
 @pytest.mark.asyncio
 async def test_direction_runner_full_pipeline(tmp_path: Path) -> None:
     workspace = WorkspaceStore(tmp_path / "workspace")
-
-    # Create mock adapters
-    arxiv_transport = httpx.MockTransport(_mock_arxiv)
-    openalex_transport = httpx.MockTransport(_mock_openalex)
-
     runner = DirectionRunner(
         workspace=workspace,
-        query_planner=QueryPlanner(),
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=arxiv_transport)),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=openalex_transport)),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([_paper("2301.12345v1", "Time Series Anomaly Detection", arxiv_id="2301.12345v1")]),
+        openalex_adapter=_FakeAdapter([_paper("W123", "Deep Learning for Anomaly Detection", source="openalex")]),
         sources=["arxiv", "openalex"],
+        source_resolver=_pdf_resolver(tmp_path),
     )
 
-    bundle = await runner.run("time series anomaly detection", direction_id="test-dir")
+    bundle = await runner.run("时间序列异常检测", direction_id="test-dir")
 
-    # Check query plan
-    assert bundle.query_plan.user_query == "time series anomaly detection"
-    assert len(bundle.query_plan.core_terms) > 0
-
-    # Check candidate pool
+    assert bundle.query_plan.english_query == "time series anomaly detection"
     assert bundle.candidate_pool.retrieved_count == 2
-    assert len(bundle.candidate_pool.items) == 2
+    assert bundle.filtered_candidates.deduplicated_count == 2
+    assert bundle.reading_plan.status == "OK"
+    assert any(item.priority == "A_READ" and item.can_enter_m2 for item in bundle.reading_plan.items)
 
-    # Check reading plan
-    assert len(bundle.reading_plan.items) > 0
-    assert bundle.reading_plan.topic == "time series anomaly detection"
-
-    # Check artifacts written
     run_dir = tmp_path / "workspace" / "runs" / "test-dir"
     assert (run_dir / "query_plan.json").exists()
     assert (run_dir / "candidate_pool.json").exists()
+    assert (run_dir / "source_resolution.json").exists()
+    assert (run_dir / "filtered_candidates.json").exists()
     assert (run_dir / "reading_plan.json").exists()
 
 
 @pytest.mark.asyncio
 async def test_direction_runner_with_no_candidates(tmp_path: Path) -> None:
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
-    def _empty_arxiv(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text='<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>')
-
-    def _empty_openalex(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=json.dumps({"results": []}))
-
     runner = DirectionRunner(
-        workspace=workspace,
-        query_planner=QueryPlanner(),
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_arxiv))),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_empty_openalex))),
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([]),
+        openalex_adapter=_FakeAdapter([]),
+        sources=["arxiv", "openalex"],
+        source_resolver=PaperSourceResolver(network_enabled=False),
     )
 
     bundle = await runner.run("nonexistent topic", direction_id="empty-dir")
 
     assert bundle.candidate_pool.retrieved_count == 0
-    assert len(bundle.reading_plan.items) == 0
+    assert bundle.reading_plan.status == "FAILED"
     assert "NO_CANDIDATES" in bundle.reading_plan.warnings
 
 
 @pytest.mark.asyncio
 async def test_direction_runner_artifacts_are_valid_json(tmp_path: Path) -> None:
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
-    arxiv_transport = httpx.MockTransport(_mock_arxiv)
     runner = DirectionRunner(
-        workspace=workspace,
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=arxiv_transport)),
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([_paper("p1", "Time Series Anomaly Detection")]),
         sources=["arxiv"],
+        source_resolver=PaperSourceResolver(network_enabled=False),
     )
 
     await runner.run("test query", direction_id="json-test")
 
     run_dir = tmp_path / "workspace" / "runs" / "json-test"
-
-    # All artifacts should be valid JSON
-    for filename in ["query_plan.json", "candidate_pool.json", "filtered_candidates.json", "reading_plan.json"]:
-        content = (run_dir / filename).read_text(encoding="utf-8")
-        data = json.loads(content)
+    for filename in [
+        "query_plan.json",
+        "candidate_pool.json",
+        "source_resolution.json",
+        "filtered_candidates.json",
+        "reading_plan.json",
+    ]:
+        data = json.loads((run_dir / filename).read_text(encoding="utf-8"))
         assert isinstance(data, dict)
 
 
 @pytest.mark.asyncio
-async def test_direction_runner_writes_filtered_candidates_json(tmp_path: Path) -> None:
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
-    runner = DirectionRunner(
-        workspace=workspace,
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_mock_arxiv))),
-        sources=["arxiv"],
-    )
-
-    bundle = await runner.run("test query", direction_id="fc-test")
-
-    run_dir = tmp_path / "workspace" / "runs" / "fc-test"
-    assert (run_dir / "filtered_candidates.json").exists()
-
-    # filtered_candidates should be present in the bundle
-    assert bundle.filtered_candidates is not None
-    assert bundle.filtered_candidates.deduplicated_count <= bundle.candidate_pool.retrieved_count
-
-
-# Duplicate arXiv XML: same paper from two sources
-DUP_ARXIV_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry>
-    <id>http://arxiv.org/abs/2301.12345v1</id>
-    <title>Time Series Anomaly Detection</title>
-    <summary>We detect anomalies in time series data.</summary>
-    <published>2023-01-30T00:00:00Z</published>
-    <author><name>John Doe</name></author>
-  </entry>
-</feed>
-"""
-
-DUP_OPENALEX_JSON = json.dumps({
-    "results": [
-        {
-            "id": "https://openalex.org/W999",
-            "title": "Time Series Anomaly Detection",
-            "publication_year": 2023,
-            "doi": "https://doi.org/10.1234/tsad",
-            "cited_by_count": 100,
-            "primary_location": {"source": {"display_name": "ICML"}},
-            "authorships": [{"author": {"display_name": "John Doe"}}],
-            "abstract_inverted_index": {"We": [0], "detect": [1], "anomalies": [2]},
-        }
-    ]
-})
-
-
-@pytest.mark.asyncio
 async def test_direction_runner_deduplicates_across_sources(tmp_path: Path) -> None:
-    """Same paper from arXiv and OpenAlex should be deduplicated."""
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
-    def _dup_arxiv(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=DUP_ARXIV_XML)
-
-    def _dup_openalex(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=DUP_OPENALEX_JSON, headers={"content-type": "application/json"})
-
     runner = DirectionRunner(
-        workspace=workspace,
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_dup_arxiv))),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_dup_openalex))),
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([_paper("a1", "Time Series Anomaly Detection", doi="10.1234/tsad")]),
+        openalex_adapter=_FakeAdapter([_paper("oa1", "Time Series Anomaly Detection", source="openalex", doi="10.1234/TSAD")]),
         sources=["arxiv", "openalex"],
+        source_resolver=PaperSourceResolver(network_enabled=False),
     )
 
     bundle = await runner.run("time series anomaly detection", direction_id="dedup-test")
 
-    # Raw pool has 2 papers (one from each source)
     assert bundle.candidate_pool.retrieved_count == 2
-    # Filtered candidates should have 1 (deduplicated)
     assert bundle.filtered_candidates.deduplicated_count == 1
     assert len(bundle.filtered_candidates.items) == 1
-    # Reading plan should be based on filtered (1 paper)
-    assert len(bundle.reading_plan.items) <= 1
+    assert bundle.filtered_candidates.items[0].sources == ["arxiv", "openalex"]
 
 
 @pytest.mark.asyncio
-async def test_direction_runner_reading_plan_uses_filtered_candidates(tmp_path: Path) -> None:
-    """Reading plan should be built from filtered candidates, not raw pool."""
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
+async def test_direction_runner_records_adapter_failure_in_source_metrics(tmp_path: Path) -> None:
     runner = DirectionRunner(
-        workspace=workspace,
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_mock_arxiv))),
-        openalex_adapter=OpenAlexAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_mock_openalex))),
-        sources=["arxiv", "openalex"],
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([], fail=True),
+        sources=["arxiv"],
+        source_resolver=PaperSourceResolver(network_enabled=False),
     )
 
-    bundle = await runner.run("test query", direction_id="rp-test")
+    bundle = await runner.run("time series anomaly detection", direction_id="failure-test")
 
-    # Reading plan items should not exceed filtered candidate count
-    assert len(bundle.reading_plan.items) <= len(bundle.filtered_candidates.items)
+    assert bundle.candidate_pool.source_metrics[0]["success"] is False
+    assert any("ACQUISITION_FAILED:arxiv" in warning for warning in bundle.warnings)
 
 
 @pytest.mark.asyncio
 async def test_direction_runner_no_paper_card_artifact(tmp_path: Path) -> None:
-    """Direction runner should NOT generate paper_card.json."""
-    workspace = WorkspaceStore(tmp_path / "workspace")
-
     runner = DirectionRunner(
-        workspace=workspace,
-        arxiv_adapter=ArxivAdapter(http_client=httpx.Client(transport=httpx.MockTransport(_mock_arxiv))),
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        query_planner=_query_planner(),
+        arxiv_adapter=_FakeAdapter([_paper("p1", "Time Series Anomaly Detection")]),
         sources=["arxiv"],
+        source_resolver=PaperSourceResolver(network_enabled=False),
     )
 
     await runner.run("test query", direction_id="no-pc-test")

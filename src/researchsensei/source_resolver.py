@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import shutil
@@ -21,40 +22,59 @@ from researchsensei.schemas import (
 
 logger = logging.getLogger(__name__)
 
-
 SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf"}
 PDF_BYTES = b"%PDF"
 
 
 class PaperSourceResolver:
-    """M1.3 resolver for candidate-paper source material metadata.
+    """M1 resolver for candidate-paper source acquisition.
 
-    This resolver does not download or parse paper content. It only records
-    source URLs, fallback status, warnings, and metadata needed by later modules.
+    M1 must distinguish metadata-only candidates from papers whose full-text PDF
+    was actually downloaded and validated. Parsing still belongs to M2.
     """
 
     def __init__(
         self,
         *,
         network_enabled: bool = False,
+        download_dir: str | Path | None = None,
+        http_client: httpx.Client | None = None,
+        timeout_seconds: float = 30.0,
+        max_download_bytes: int = 80 * 1024 * 1024,
         external_resolver: Callable[[CandidatePaper], ResolvedPaperSource | None] | None = None,
     ) -> None:
         self.network_enabled = network_enabled
+        self.download_dir = Path(download_dir).resolve() if download_dir else None
+        self.http_client = http_client or httpx.Client()
+        self.timeout_seconds = timeout_seconds
+        self.max_download_bytes = max_download_bytes
         self.external_resolver = external_resolver
 
-    def resolve_many(self, query: str, candidates: list[CandidatePaper]) -> SourceResolutionResult:
-        items = [self.resolve_one(candidate) for candidate in candidates]
+    def resolve_many(
+        self,
+        query: str,
+        candidates: list[CandidatePaper],
+        *,
+        download_dir: str | Path | None = None,
+    ) -> SourceResolutionResult:
+        actual_download_dir = Path(download_dir).resolve() if download_dir else self.download_dir
+        items = [self.resolve_one(candidate, download_dir=actual_download_dir) for candidate in candidates]
         warnings: list[WarningItem] = []
-        if any(item.status in {PaperSourceStatus.PARTIAL, PaperSourceStatus.NOT_FOUND, PaperSourceStatus.FAILED} for item in items):
+        if any(item.status != PaperSourceStatus.RESOLVED_PDF_DOWNLOADED for item in items):
             warnings.append(
                 WarningItem(
                     code="PARTIAL_SOURCE_RESOLUTION",
-                    message="Some candidate papers could not be fully resolved to source material.",
+                    message="Some candidates were not downloaded as validated PDFs.",
                 )
             )
         return SourceResolutionResult(query=query, items=items, warnings=warnings)
 
-    def resolve_one(self, paper: CandidatePaper) -> ResolvedPaperSource:
+    def resolve_one(
+        self,
+        paper: CandidatePaper,
+        *,
+        download_dir: str | Path | None = None,
+    ) -> ResolvedPaperSource:
         try:
             if self.network_enabled and self.external_resolver is not None:
                 resolved = self.external_resolver(paper)
@@ -64,68 +84,182 @@ class PaperSourceResolver:
             logger.warning("M1 paper source resolver failed for %s: %s", paper.paper_id, exc)
             return self._base_result(
                 paper,
-                status=PaperSourceStatus.FAILED,
+                status=PaperSourceStatus.FAILED_DOWNLOAD,
                 source_type=PaperSourceType.METADATA_ONLY,
                 warnings=[WarningItem(code="RESOLVER_FAILED", message="External source resolver failed.")],
                 error=str(exc)[:300],
+                error_code="RESOLVER_FAILED",
             )
+
+        source_url = ""
+        pdf_url = paper.pdf_url
+        landing_url = paper.landing_url or paper.url or _doi_url(paper.doi)
+        source_type = PaperSourceType.PDF if pdf_url else PaperSourceType.METADATA_ONLY
 
         if paper.arxiv_id:
-            pdf_url = SourceResolver.arxiv_to_pdf_url(arxiv_id=paper.arxiv_id)
+            arxiv_pdf = SourceResolver.arxiv_to_pdf_url(arxiv_id=paper.arxiv_id)
+            pdf_url = pdf_url or arxiv_pdf
             source_url = self.arxiv_to_source_url(paper.arxiv_id)
-            if source_url and pdf_url:
-                metadata = {"resolution_strategy": "arxiv_source_first"}
-                if paper.pdf_url and paper.pdf_url != pdf_url:
-                    metadata["fallback_pdf_url"] = paper.pdf_url
-                return self._base_result(
-                    paper,
-                    status=PaperSourceStatus.RESOLVED,
-                    source_type=PaperSourceType.ARXIV_SOURCE,
-                    source_url=source_url,
-                    pdf_url=pdf_url,
-                    landing_url=paper.url or self.arxiv_to_abs_url(paper.arxiv_id),
-                    metadata=metadata,
-                )
+            landing_url = landing_url or self.arxiv_to_abs_url(paper.arxiv_id)
+            source_type = PaperSourceType.ARXIV_SOURCE
 
-        if paper.pdf_url:
+        if pdf_url:
+            if self.network_enabled and (download_dir or self.download_dir):
+                return self._download_pdf(
+                    paper,
+                    pdf_url=pdf_url,
+                    source_url=source_url or pdf_url,
+                    landing_url=landing_url,
+                    source_type=source_type,
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
             return self._base_result(
                 paper,
-                status=PaperSourceStatus.RESOLVED,
-                source_type=PaperSourceType.PDF,
-                pdf_url=paper.pdf_url,
-                landing_url=paper.url or _doi_url(paper.doi),
-                source_url=paper.pdf_url,
-                metadata={"resolution_strategy": "candidate_pdf_url"},
+                status=PaperSourceStatus.RESOLVED_PDF_URL_ONLY,
+                source_type=source_type,
+                source_url=source_url or pdf_url,
+                pdf_url=pdf_url,
+                landing_url=landing_url,
+                download_status="not_downloaded",
+                warnings=[WarningItem(code="PDF_NOT_DOWNLOADED", message="PDF URL is available but was not downloaded.")],
+                metadata={"resolution_strategy": "pdf_url_only"},
             )
 
-        explicit_landing_url = bool(paper.url)
-        landing_url = paper.url or _doi_url(paper.doi)
         if landing_url:
-            warnings = [WarningItem(code="PDF_URL_MISSING", message="No PDF URL is available for this candidate.")]
-            if not self.network_enabled:
-                network_warning = WarningItem(code="NETWORK_DISABLED", message="Network resolver is disabled.")
-                if explicit_landing_url:
-                    warnings.append(network_warning)
-                else:
-                    warnings.insert(0, network_warning)
             return self._base_result(
                 paper,
-                status=PaperSourceStatus.PARTIAL,
+                status=PaperSourceStatus.RESOLVED_LANDING_ONLY,
                 source_type=PaperSourceType.LANDING_PAGE,
                 landing_url=landing_url,
-                warnings=warnings,
+                download_status="not_available",
+                warnings=[WarningItem(code="PDF_URL_MISSING", message="No PDF URL is available for this candidate.")],
                 metadata={"resolution_strategy": "landing_page_only"},
             )
 
         return self._base_result(
             paper,
-            status=PaperSourceStatus.NOT_FOUND,
+            status=PaperSourceStatus.NO_SOURCE_FOUND,
             source_type=PaperSourceType.METADATA_ONLY,
+            download_status="not_available",
             warnings=[
                 WarningItem(code="NO_SOURCE_URL", message="No source, landing, DOI, arXiv, or PDF URL found."),
                 WarningItem(code="PDF_URL_MISSING", message="No PDF URL is available for this candidate."),
             ],
+            error_code="NO_SOURCE_FOUND",
             metadata={"resolution_strategy": "metadata_only"},
+        )
+
+    def _download_pdf(
+        self,
+        paper: CandidatePaper,
+        *,
+        pdf_url: str,
+        source_url: str,
+        landing_url: str,
+        source_type: PaperSourceType,
+        download_dir: Path,
+    ) -> ResolvedPaperSource:
+        parsed = urlparse(pdf_url)
+        if parsed.scheme not in {"http", "https"}:
+            return self._download_failed(
+                paper,
+                pdf_url=pdf_url,
+                source_url=source_url,
+                landing_url=landing_url,
+                source_type=source_type,
+                code="INVALID_URL",
+                message="PDF URL must use http/https.",
+            )
+        try:
+            response = self.http_client.get(pdf_url, timeout=self.timeout_seconds, follow_redirects=True)
+            response.raise_for_status()
+        except Exception as exc:
+            return self._download_failed(
+                paper,
+                pdf_url=pdf_url,
+                source_url=source_url,
+                landing_url=landing_url,
+                source_type=source_type,
+                code="DOWNLOAD_FAILED",
+                message=str(exc)[:300],
+            )
+
+        content = response.content
+        content_length = int(response.headers.get("content-length") or len(content))
+        content_type = response.headers.get("content-type", "")
+        if content_length > self.max_download_bytes or len(content) > self.max_download_bytes:
+            return self._download_failed(
+                paper,
+                pdf_url=pdf_url,
+                source_url=source_url,
+                landing_url=landing_url,
+                source_type=source_type,
+                code="FILE_TOO_LARGE",
+                message="Downloaded PDF exceeds configured size limit.",
+                content_type=content_type,
+                file_size=max(content_length, len(content)),
+            )
+        if "pdf" not in content_type.lower() and not content.startswith(PDF_BYTES):
+            return self._download_failed(
+                paper,
+                pdf_url=pdf_url,
+                source_url=source_url,
+                landing_url=landing_url,
+                source_type=source_type,
+                code="UNSUPPORTED_SOURCE",
+                message="Downloaded content is not a PDF.",
+                content_type=content_type,
+                file_size=len(content),
+            )
+
+        paper_dir = download_dir / _safe_name(paper.paper_id or paper.title)
+        paper_dir.mkdir(parents=True, exist_ok=True)
+        target = paper_dir / "source.pdf"
+        target.write_bytes(content)
+        sha256 = hashlib.sha256(content).hexdigest()
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
+            source_type=source_type,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            landing_url=landing_url,
+            download_status="downloaded",
+            final_url=str(response.url),
+            content_type=content_type or "application/pdf",
+            file_size=target.stat().st_size,
+            sha256=sha256,
+            local_path=str(target),
+            metadata={"resolution_strategy": "downloaded_validated_pdf"},
+        )
+
+    def _download_failed(
+        self,
+        paper: CandidatePaper,
+        *,
+        pdf_url: str,
+        source_url: str,
+        landing_url: str,
+        source_type: PaperSourceType,
+        code: str,
+        message: str,
+        content_type: str = "",
+        file_size: int = 0,
+    ) -> ResolvedPaperSource:
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.FAILED_DOWNLOAD,
+            source_type=source_type,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            landing_url=landing_url,
+            download_status="failed",
+            content_type=content_type,
+            file_size=file_size,
+            warnings=[WarningItem(code=code, message=message)],
+            error=message,
+            error_code=code,
+            metadata={"resolution_strategy": "download_failed"},
         )
 
     def _base_result(
@@ -137,8 +271,15 @@ class PaperSourceResolver:
         source_url: str = "",
         pdf_url: str = "",
         landing_url: str = "",
+        download_status: str = "",
+        final_url: str = "",
+        content_type: str = "",
+        file_size: int = 0,
+        sha256: str = "",
+        local_path: str = "",
         warnings: list[WarningItem] | None = None,
         error: str = "",
+        error_code: str = "",
         metadata: dict[str, str] | None = None,
     ) -> ResolvedPaperSource:
         return ResolvedPaperSource(
@@ -151,6 +292,13 @@ class PaperSourceResolver:
             landing_url=landing_url,
             source_type=source_type,
             status=status,
+            download_status=download_status,
+            final_url=final_url,
+            content_type=content_type,
+            file_size=file_size,
+            sha256=sha256,
+            local_path=local_path,
+            error_code=error_code,
             warnings=warnings or [],
             error=error,
             metadata=metadata or {},
@@ -168,6 +316,8 @@ class PaperSourceResolver:
 
 
 class SourceResolver:
+    """Phase 5 source resolver for upload/local/pdf-url/arXiv input parsing."""
+
     def __init__(
         self,
         *,
@@ -397,3 +547,8 @@ def _content_type_for_suffix(suffix: str) -> str:
         ".txt": "text/plain",
         ".pdf": "application/pdf",
     }.get(suffix, "")
+
+
+def _safe_name(value: str) -> str:
+    safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", value).strip("._")
+    return safe[:80] or "paper"

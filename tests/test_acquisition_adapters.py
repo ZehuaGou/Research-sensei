@@ -1,138 +1,151 @@
 from __future__ import annotations
 
-import httpx
+from datetime import datetime, timezone
 
-from researchsensei.acquisition.arxiv_adapter import ArxivAdapter
-from researchsensei.acquisition.openalex_adapter import OpenAlexAdapter
+from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, OpenAlexAdapter, SemanticScholarAdapter
 
-# Sample arXiv Atom XML response
-ARXIV_SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry>
-    <id>http://arxiv.org/abs/2301.12345v1</id>
-    <title>Time Series Anomaly Detection with Transformers</title>
-    <summary>We propose a transformer-based approach for detecting anomalies in multivariate time series data.</summary>
-    <published>2023-01-30T00:00:00Z</published>
-    <author><name>John Doe</name></author>
-    <author><name>Jane Smith</name></author>
-    <link title="pdf" href="http://arxiv.org/pdf/2301.12345v1"/>
-  </entry>
-  <entry>
-    <id>http://arxiv.org/abs/2302.67890v1</id>
-    <title>A Survey of Anomaly Detection Methods</title>
-    <summary>This paper surveys modern anomaly detection techniques.</summary>
-    <published>2022-06-15T00:00:00Z</published>
-    <author><name>Alice Johnson</name></author>
-  </entry>
-</feed>
-"""
 
-# Sample OpenAlex JSON response
-OPENALEX_SAMPLE_JSON = {
-    "results": [
-        {
-            "id": "https://openalex.org/W1234567890",
-            "title": "Deep Learning for Time Series Anomaly Detection",
-            "publication_year": 2023,
-            "doi": "https://doi.org/10.1234/example",
-            "cited_by_count": 150,
-            "primary_location": {
-                "source": {"display_name": "ICML 2023"}
-            },
-            "authorships": [
-                {"author": {"display_name": "Bob Wilson"}},
-                {"author": {"display_name": "Carol Lee"}},
-            ],
-            "abstract_inverted_index": {
-                "We": [0],
-                "study": [1],
-                "anomaly": [2],
-                "detection": [3],
-                "in": [4],
-                "time": [5],
-                "series": [6],
-            },
+class _Author:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+
+class _ArxivResult:
+    title = "Time Series Anomaly Detection with Transformers"
+    summary = "We propose a transformer approach for anomaly detection in time series."
+    entry_id = "https://arxiv.org/abs/2301.12345v1"
+    pdf_url = "https://arxiv.org/pdf/2301.12345v1.pdf"
+    published = datetime(2023, 1, 1, tzinfo=timezone.utc)
+    updated = datetime(2023, 1, 2, tzinfo=timezone.utc)
+    authors = [_Author("John Doe"), _Author("Jane Smith")]
+
+    def get_short_id(self) -> str:
+        return "2301.12345v1"
+
+
+class _ArxivClient:
+    def results(self, search):
+        assert search.query == "time series anomaly detection"
+        return [_ArxivResult()]
+
+
+def test_arxiv_adapter_uses_arxiv_package_client() -> None:
+    results = ArxivAdapter(client=_ArxivClient()).search("time series anomaly detection", max_results=1)
+
+    assert len(results) == 1
+    paper = results[0]
+    assert paper.source == "arxiv"
+    assert paper.sources == ["arxiv"]
+    assert paper.arxiv_id == "2301.12345v1"
+    assert paper.pdf_available is True
+    assert paper.source_url == "https://arxiv.org/e-print/2301.12345v1"
+
+
+class _OpenAlexQuery:
+    def get(self, per_page: int):
+        assert per_page == 1
+        return [
+            {
+                "id": "https://openalex.org/W123",
+                "title": "Deep Learning for Time Series Anomaly Detection",
+                "publication_year": 2023,
+                "doi": "https://doi.org/10.1234/example",
+                "cited_by_count": 150,
+                "primary_location": {
+                    "source": {"display_name": "ICML 2023"},
+                    "landing_page_url": "https://example.org/paper",
+                },
+                "best_oa_location": {
+                    "pdf_url": "https://example.org/paper.pdf",
+                    "landing_page_url": "https://example.org/paper",
+                },
+                "open_access": {"is_oa": True, "oa_status": "gold"},
+                "authorships": [{"author": {"display_name": "Bob Wilson"}}],
+                "abstract_inverted_index": {"We": [0], "study": [1], "anomaly": [2], "detection": [3]},
+            }
+        ]
+
+
+class _OpenAlexWorks:
+    def search(self, query: str):
+        assert query == "time series anomaly detection"
+        return _OpenAlexQuery()
+
+
+def test_openalex_adapter_uses_pyalex_works() -> None:
+    results = OpenAlexAdapter(works=_OpenAlexWorks()).search("time series anomaly detection", max_results=1)
+
+    assert len(results) == 1
+    paper = results[0]
+    assert paper.source == "openalex"
+    assert paper.doi == "https://doi.org/10.1234/example"
+    assert paper.venue == "ICML 2023"
+    assert paper.citation_count == 150
+    assert paper.pdf_available is True
+
+
+class _SemanticScholarClient:
+    def search_paper(self, query: str, *, limit: int, fields: list[str]):
+        assert query == "time series anomaly detection"
+        assert limit == 1
+        assert "paperId" in fields
+        return [
+            {
+                "paperId": "S2-123",
+                "title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+                "authors": [{"name": "Alice"}],
+                "year": 2021,
+                "venue": "AAAI",
+                "abstract": "Graph anomaly detection for multivariate time series.",
+                "tldr": {"text": "GNN for TSAD."},
+                "citationCount": 200,
+                "externalIds": {"DOI": "10.5555/tsad", "ArXiv": "2101.00001"},
+                "openAccessPdf": {"url": "https://example.org/gdn.pdf"},
+                "url": "https://semanticscholar.org/paper/S2-123",
+            }
+        ]
+
+
+def test_semantic_scholar_adapter_uses_package_client() -> None:
+    results = SemanticScholarAdapter(client=_SemanticScholarClient()).search("time series anomaly detection", max_results=1)
+
+    assert len(results) == 1
+    paper = results[0]
+    assert paper.source == "semantic_scholar"
+    assert paper.semantic_scholar_id == "S2-123"
+    assert paper.arxiv_id == "2101.00001"
+    assert paper.pdf_available is True
+
+
+class _CrossrefClient:
+    def works(self, *, query: str, limit: int):
+        assert query == "time series anomaly detection"
+        assert limit == 1
+        return {
+            "message": {
+                "items": [
+                    {
+                        "DOI": "10.1000/example",
+                        "title": ["A Survey of Time Series Anomaly Detection"],
+                        "container-title": ["Proceedings of the IEEE"],
+                        "author": [{"given": "Carol", "family": "Lee"}],
+                        "issued": {"date-parts": [[2022]]},
+                        "URL": "https://doi.org/10.1000/example",
+                        "abstract": "Survey abstract.",
+                        "type": "journal-article",
+                        "publisher": "IEEE",
+                    }
+                ]
+            }
         }
-    ]
-}
 
 
-def test_arxiv_adapter_parses_xml() -> None:
-    adapter = ArxivAdapter()
-    results = adapter._parse_response(ARXIV_SAMPLE_XML)
-
-    assert len(results) == 2
-    assert results[0].title == "Time Series Anomaly Detection with Transformers"
-    assert results[0].arxiv_id == "2301.12345v1"
-    assert results[0].year == 2023
-    assert results[0].venue == "arXiv"
-    assert len(results[0].authors) == 2
-    assert results[0].pdf_url == "http://arxiv.org/pdf/2301.12345v1"
-    assert "transformer" in results[0].abstract.lower()
-
-
-def test_arxiv_adapter_handles_empty_xml() -> None:
-    adapter = ArxivAdapter()
-    results = adapter._parse_response('<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"></feed>')
-
-    assert len(results) == 0
-
-
-def test_arxiv_adapter_handles_invalid_xml() -> None:
-    adapter = ArxivAdapter()
-    results = adapter._parse_response("not xml at all")
-
-    assert len(results) == 0
-
-
-def test_arxiv_adapter_mock_transport() -> None:
-    """Test arXiv adapter with mocked HTTP transport."""
-
-    def _mock_request(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=ARXIV_SAMPLE_XML, headers={"content-type": "application/atom+xml"})
-
-    transport = httpx.MockTransport(_mock_request)
-    client = httpx.Client(transport=transport)
-    adapter = ArxivAdapter(http_client=client)
-
-    results = adapter.search("time series anomaly detection")
-
-    assert len(results) == 2
-    assert results[0].source == "arxiv"
-
-
-def test_openalex_adapter_parses_json() -> None:
-    adapter = OpenAlexAdapter()
-    results = adapter._parse_response(OPENALEX_SAMPLE_JSON)
+def test_crossref_adapter_uses_habanero_client() -> None:
+    results = CrossrefAdapter(client=_CrossrefClient()).search("time series anomaly detection", max_results=1)
 
     assert len(results) == 1
-    assert results[0].title == "Deep Learning for Time Series Anomaly Detection"
-    assert results[0].year == 2023
-    assert results[0].venue == "ICML 2023"
-    assert results[0].citation_count == 150
-    assert len(results[0].authors) == 2
-    assert "anomaly" in results[0].abstract.lower()
-
-
-def test_openalex_adapter_handles_empty_results() -> None:
-    adapter = OpenAlexAdapter()
-    results = adapter._parse_response({"results": []})
-
-    assert len(results) == 0
-
-
-def test_openalex_adapter_mock_transport() -> None:
-    """Test OpenAlex adapter with mocked HTTP transport."""
-    import json
-
-    def _mock_request(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, text=json.dumps(OPENALEX_SAMPLE_JSON), headers={"content-type": "application/json"})
-
-    transport = httpx.MockTransport(_mock_request)
-    client = httpx.Client(transport=transport)
-    adapter = OpenAlexAdapter(http_client=client)
-
-    results = adapter.search("time series anomaly detection")
-
-    assert len(results) == 1
-    assert results[0].source == "openalex"
+    paper = results[0]
+    assert paper.source == "crossref"
+    assert paper.doi == "10.1000/example"
+    assert paper.venue == "Proceedings of the IEEE"
+    assert paper.year == 2022
