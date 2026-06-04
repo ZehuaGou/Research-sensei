@@ -77,14 +77,49 @@ Audit / Quality     → explanation audit, formula audit, evidence audit, review
 
 ---
 
-## 6. Artifact 链路
+## 6. 用户流程
 
-### 单篇论文
+用户上传论文 PDF → 系统解析为结构化文档 → 构建 passage 和 claim evidence → 生成 evidence pack → LLM 生成卡片 → 审计 → 前端根据状态展示结果。
+
+不同状态用户看到什么：
+
+| status | 用户看到 |
+|--------|---------|
+| SUCCESS | 完整论文卡片、公式卡片、教学讲解 |
+| DEGRADED_STRUCTURAL | 部分卡片 + "部分讲解暂不可用" 提示 |
+| BASELINE_ONLY | "当前为基线解析结果，不是最终导师级理解"，不展示卡片 |
+| BLOCKED_UNDERSTANDING | 阻断原因 + 警告，不展示卡片 |
+| FAILED | 系统错误 |
+
+BASELINE_ONLY 不是最终导师级理解。DEGRADED_STRUCTURAL 不是完整导师级解释。
+
+---
+
+## 7. Artifact 链路
+
+### 单篇论文（v2）
 
 ```
-source_status.json → parsed_document.json → evidence_index.json
-→ paper_skeleton.json → paper_card.json → formula_cards.json → teaching_cards.json
+source_status.json
+→ parsed_document.json
+→ passage_index.json
+→ claim_evidence.json
+→ evidence_index.json (v1 兼容)
+→ paper_skeleton.json
+→ paper_card.json / formula_cards.json / teaching_cards.json
+→ understanding_status.json
+→ quality_report.json
 ```
+
+不同状态 artifact 数量：
+
+| 状态 | artifact 数量 |
+|------|--------------|
+| BASELINE_ONLY | 11 |
+| SUCCESS | 11 |
+| DEGRADED_STRUCTURAL | 10 |
+| BLOCKED_UNDERSTANDING | 8 |
+| FAILED | 不保证完整 |
 
 ### 研究方向
 
@@ -93,3 +128,12 @@ query_plan.json → candidate_pool.json → filtered_candidates.json → reading
 ```
 
 每个 artifact 有明确的生成者和消费者，JSON 可序列化/反序列化，失败时阻断而非编造。
+
+---
+
+## 8. 产品边界
+
+- v1 主链路已阶段性封版
+- 不是最终产品
+- Real LLM smoke、Docling parser、evidence_ref 跳转、debug/admin 鉴权、Phase 12 都是后续能力
+- Phase 12（patterns / drill / advisor questions）当前冻结

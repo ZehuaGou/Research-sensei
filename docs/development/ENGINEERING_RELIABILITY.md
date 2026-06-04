@@ -146,7 +146,15 @@
 - 需要记录外部项目版本和验证日期。
 - 样例 PDF 来源和版权仍未决。
 
-## 12. 当前未解决问题
+## 12. 前端测试策略
+
+- 已引入：Vitest + Vue Test Utils + jsdom
+- StatusBanner 组件测试已完成（7 tests）
+- 后续仍需：LearningWorkspaceView gating 测试、UploadView upload flow 测试
+- e2e 测试后置
+- 新增依赖必须先讨论
+
+## 13. 当前未解决问题
 
 - artifact_manifest 是否未来需要。
 - content_hash 是否在 v2 初版加入。
@@ -157,3 +165,4 @@
 - secret scan 工具选型。
 - live smoke 样例 PDF 来源。
 - CI 是否强制 no-network monkeypatch。
+- LearningWorkspaceView / UploadView 页面级测试。

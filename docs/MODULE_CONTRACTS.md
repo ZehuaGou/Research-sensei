@@ -32,29 +32,71 @@ Input: source file
 Output: parsed_document.json
 Boundary: Does not explain papers. Does not generate paper_skeleton.
 
+## passage_index
+
+Input: parsed_document.json
+Output: passage_index.json
+Boundary: Only builds passages. Does not judge claims.
+
+## claim_evidence
+
+Input: passage_index.json
+Output: claim_evidence.json
+Boundary: Only extracts claim evidence. Does not generate final explanations.
+
 ## grounding
 
 Input: parsed_document.json
 Output: evidence_index.json
-Boundary: Does not generate teaching text. Block-level evidence only (v1).
+Boundary: Block-level evidence (v1 compatibility). Does not generate teaching text.
+
+## evidence_retriever
+
+Input: claim_evidence.json + passage_index.json
+Output: EvidenceRetrievalResult (runtime, not persisted)
+Boundary: BM25 retrieval only. Does not generate cards.
+
+## evidence_pack
+
+Input: claim_evidence.json + passage_index.json + optional retriever
+Output: EvidencePack + EvidencePackSummary (runtime, not persisted)
+Boundary: Filters and prioritizes evidence for LLM. Not persisted.
 
 ## understanding
 
-Input: parsed_document.json, evidence_index.json
-Output: paper_skeleton.json
-Boundary: Does not copy abstract as understanding.
+Input: EvidencePack + paper_skeleton.json
+Output: paper_card.json / formula_cards.json / teaching_cards.json / understanding_status.json
+Boundary: Fail-closed. Unreliable → BLOCKED_UNDERSTANDING.
 
 ## teaching
 
-Input: paper_skeleton.json
+Input: paper_skeleton.json, paper_card, formula_cards
 Output: teaching_cards.json
-Boundary: Does not output empty explanations. Rule-based baseline only (v1).
+Boundary: Does not output empty explanations. Rule-based baseline (v1) or LLM v2 (fail-closed).
 
 ## formula
 
 Input: formula blocks, paper_skeleton.json
 Output: formula_cards.json
 Boundary: Does not fabricate symbol meanings. Generic dictionary as REASONABLE_INFERENCE.
+
+## audit
+
+Input: candidate artifacts (in-memory dicts)
+Output: quality_report.json
+Boundary: Reads candidate artifacts, does not regenerate cards. Does not write artifacts. Pure logic.
+
+## api
+
+Input: job_id
+Output: /understanding_status, /cards
+Boundary: /artifacts debug-only. Normal frontend must not use /artifacts.
+
+## frontend
+
+Input: /understanding_status + /cards
+Output: User page display
+Boundary: Does not read /artifacts directly. Does not display BASELINE/BLOCKED cards.
 
 ## direction
 

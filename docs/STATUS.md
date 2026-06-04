@@ -138,15 +138,12 @@
 
 ---
 
-## 7. 下一步唯一建议
+## 7. 下一步建议
 
-下一步建议不是继续加新功能，而是完成 Frontend Testing 模块闭环：
-
-- LearningWorkspaceView status gating 测试
-- UploadView upload flow 测试
-- npm test / npm build
-- pytest
-- 模块 review
+- P0 文档补齐正在进行中（DESIGN / DEVELOPMENT / GLOSSARY / MODULE_CONTRACTS / IMPLEMENTATION_PLAN / FRONTEND_RENDER / ENGINEERING_RELIABILITY）
+- 文档补齐完成后，再决定是否恢复代码开发
+- 下一步代码开发方向：Frontend Testing 模块闭环（LearningWorkspaceView / UploadView 测试）
+- Phase 12 仍冻结
 
 ---
 

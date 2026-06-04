@@ -109,10 +109,22 @@ component_status:
 - debug/admin 鉴权机制未决。
 - 原则：`debug=true` admin/dev only。
 
-## 11. 当前未解决问题
+## 11. 当前实现状态
+
+- `/understanding_status` endpoint 已存在
+- `/cards` endpoint 已存在（status gating + card artifact 一致性校验）
+- `/artifacts` 默认 403，SENSEI_DEBUG=1 时返回 raw artifacts
+- StatusBanner 组件已实现（BASELINE_ONLY / BLOCKED / DEGRADED / FAILED）
+- UploadView 已对齐 /api/v1/documents/parse
+- LearningWorkspaceView 已对齐 /understanding_status + /cards
+- Phase 12 tabs 显示"未开放"
+- LearningWorkspaceView / UploadView 页面级测试尚未完成
+
+## 12. 当前未解决问题
 
 - debug/admin 具体鉴权机制。
 - `/artifacts` 是否需要脱敏版本。
-- DEGRADED_STRUCTURAL 的前端提示文案。
 - evidence_ref 跳转的实现优先级（v1 还是 v2）。
 - `debug=true` 的认证方式。
+- LearningWorkspaceView status gating 测试。
+- UploadView upload flow 测试。
