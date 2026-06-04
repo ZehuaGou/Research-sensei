@@ -39,6 +39,19 @@ const formulaCardsList = computed(() => {
   return []
 })
 
+function normalizeFormulaCard(card: any): any {
+  if (!card) return card
+  return {
+    ...card,
+    formula_latex: card.formula_latex || card.formula_raw || '',
+    problem: card.problem || card.purpose || card.intuition || '公式说明',
+    formula_ref: card.formula_ref || card.location || card.formula_id || '',
+    remove_effect: card.remove_effect || card.what_if_removed || '',
+    weight_change_effect: card.weight_change_effect || card.weight_sensitivity || '',
+    plain_summary: card.plain_summary || card.intuition || '',
+  }
+}
+
 function normalizePaperCard(card: any): any {
   if (!card) return null
   return {
@@ -170,7 +183,7 @@ onMounted(async () => {
               </div>
             </template>
             <template v-else-if="activeTab === 'formulas'">
-              <FormulaCard v-for="(fc, i) in formulaCardsList" :key="i" :card="fc" />
+              <FormulaCard v-for="(fc, i) in formulaCardsList" :key="i" :card="normalizeFormulaCard(fc)" />
               <div v-if="!formulaCardsList.length" class="text-center py-20">
                 <div class="text-3xl mb-3">🔢</div>
                 <div class="text-sm" style="color: var(--text-muted);">暂无公式卡片</div>

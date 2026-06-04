@@ -37,6 +37,7 @@
   - 前端不再依赖不存在的 /api/papers/upload
   - StatusBanner 组件已实现
   - patterns/drill tab 标记为 Phase 12 未开放
+  - 前端公式卡已兼容后端 FormulaCard schema（formula_raw/purpose/location 等字段映射）
   - frontend npm run build 成功
   - 481 tests passing（后端测试未变）
 - 尚未完成：
