@@ -4,25 +4,23 @@
 
 ## 1. 模块目标
 
-定义单篇论文和研究方向两条完整链路的输入输出、失败传递、状态约束。
+定义单篇论文完整链路的输入输出、失败传递、状态约束。
 
-## 产品流程位置
+## 2. 产品流程位置
 
 M2.5 是 M2 的编排层：串联 M2.1-M2.4，管理 artifact 流转和状态门控。
 
-## 2. 非目标
+## 3. 非目标
 
 - 不实现新功能
 - 不改现有代码
 
-## 3. 当前代码事实
+## 4. 当前代码位置
 
-- `SinglePaperIngestionRunner.run()` 编排单篇链路
-- `DirectionRunner.run()` 编排方向链路
-- 两条链路不交叉：direction 链路不生成 paper_card，单篇链路不生成 reading_plan
-- 未来连接点：reading_plan 的 A_READ 论文 → source_resolver → 单篇精读
+- `src/researchsensei/ingestion/pipeline.py` — `SinglePaperIngestionRunner`
+- `src/researchsensei/direction/runner.py` — `DirectionRunner`（M1 编排器）
 
-## 4. 单篇论文链路
+## 5. 单篇论文链路
 
 ```
 source (PDF/MD/TXT)
@@ -45,7 +43,7 @@ source (PDF/MD/TXT)
                               → Runner maps to UnderstandingStatus
                                 → understanding_status.json
                                   → /cards API → frontend display
-                                  → DownstreamGates
+                                  → DownstreamGates (M4)
 ```
 
 ### 每步输入输出
@@ -86,76 +84,124 @@ source (PDF/MD/TXT)
 | audit finding effect=BLOCK | BLOCKED_UNDERSTANDING |
 | audit finding effect=WARNING only | 不阻断，warning 写入 warnings |
 
+### Artifact 数量按状态
+
+| 状态 | artifact 数量 | 包含 |
+|------|--------------|------|
+| BASELINE_ONLY | 11 | source_status, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, paper_card, formula_cards, teaching_cards, understanding_status, quality_report |
+| SUCCESS | 11 | 同上（card 内容为 LLM 生成） |
+| DEGRADED_STRUCTURAL | 10 | 同上但 teaching_cards 不写（或标记 BASELINE） |
+| BLOCKED_UNDERSTANDING | 8 | source_status, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, understanding_status, quality_report |
+| FAILED | 0-3 | 取决于失败点，可能只有 source_status |
+
 ### 下游判断规则
 
 - `allowed_for_phase12` 是 legacy 字段，新代码使用 `allowed_downstream`（DownstreamGates）
-- Phase 12 patterns 需要 `allowed_downstream.phase12_patterns == True`
-- Phase 12 drill 需要 `allowed_downstream.phase12_drill == True`（或 `phase12_drill_degraded == True`）
-- advisor 需要 `allowed_downstream.advisor_questions == True`
+- M4 patterns 需要 `allowed_downstream.phase12_patterns == True`
+- M4 drill 需要 `allowed_downstream.phase12_drill == True`（或 `phase12_drill_degraded == True`）
+- M4 advisor 需要 `allowed_downstream.advisor_questions == True`
 - UI 只能展示 `allowed_for_user_display == True` 的结果
 - 用户端走 `/cards` API，debug/admin 走 `/artifacts` / `/quality_report`
 - BLOCKED 不展示 card 内容
 - BASELINE_ONLY 只能作为 diagnostic artifact
+- API/frontend gating 详见 M3 FRONTEND_RENDER.md
 
-## 5. 研究方向链路
+## 6. 研究方向链路（M1 连接点）
+
+研究方向链路属于 M1，此处只写连接点：
 
 ```
-user_query
-  → QueryPlanner.plan()
-    → query_plan.json (QueryPlan)
-      → ArxivAdapter.search() + OpenAlexAdapter.search()
-        → candidate_pool.json (CandidatePool)
-          → SelectionService.deduplicate()
-            → filtered_candidates.json (CandidatePool)
-              → SelectionService.build_reading_plan()
-                → reading_plan.json (ReadingPlan)
-                  → A_READ papers → source_resolver → 单篇链路
+M1 reading_plan.json
+  → A_READ papers
+    → M1.3 原始材料获取
+      → M2 单篇精读链路
 ```
 
-### 每步输入输出
+M1 链路由 `DirectionRunner` 编排，详见 LITERATURE_SEARCH.md。
 
-| 步骤 | 输入 | 输出 | 失败行为 |
-|------|------|------|----------|
-| QueryPlanner.plan | user_query | QueryPlan | LLM 失败 → fallback rules + warning |
-| adapter.search | query string | CandidatePaper[] | 抛异常 → runner 捕获写 warning |
-| build_candidate_pool | candidates | CandidatePool | — |
-| deduplicate | candidates | deduplicated list | 三路去重 |
-| build_reading_plan | candidates + QueryPlan | ReadingPlan | 无相关论文 → NO_RELEVANT_PAPERS |
+## 7. 与上下游模块接口
 
-### 状态传递规则
+- 上游：M1.3 原始材料获取（提供源文件）
+- 下游：M3 frontend（消费 artifact JSON）
+- 下游：M4 interactive / drill / advisor（通过 DownstreamGates 判断可用性）
 
-| 上游状态 | 下游行为 |
-|----------|----------|
-| 单 adapter 失败 | 其他 adapter 继续，warning 写入 candidate_pool |
-| 所有 adapter 失败 | reading_plan 为空 + SEARCH_FAILED warning |
-| 中文无 LLM | CHINESE_QUERY_NO_LLM_FALLBACK + EN_QUERY_UNAVAILABLE |
+## 8. 测试要求
 
-### 下游判断规则
+### BASELINE_ONLY 路径测试
 
-- A_READ 论文进入单篇精读链路
-- reading_plan 为空不阻止用户重试
+| 测试 | 断言 |
+|------|------|
+| test_no_llm_client_baseline_only | status == "BASELINE_ONLY" |
+| test_baseline_artifact_count | 11 artifacts written |
+| test_baseline_no_user_display | allowed_for_user_display is False |
 
-## 6. 与上下游模块接口
+### SUCCESS 路径测试
 
-- 上游：source_resolver（提供源文件）
-- 下游：frontend（消费 artifact JSON）
-- 下游：Phase 12 patterns/drill/advisor（通过 DownstreamGates 判断可用性；SUCCESS 通常全部可用，DEGRADED_STRUCTURAL 可能只允许部分下游能力）
+| 测试 | 断言 |
+|------|------|
+| test_v2_success_status | status == "SUCCESS" |
+| test_v2_success_artifact_count | 11 artifacts written |
+| test_v2_success_cards_present | paper_card + formula_cards + teaching_cards written |
+| test_v2_success_user_display | allowed_for_user_display is True |
 
-## 8. 验收标准
+### DEGRADED 路径测试
 
-- 单篇链路 10 个 artifact 正确写入
-- 不同状态 artifact 数量正确
+| 测试 | 断言 |
+|------|------|
+| test_degraded_teaching_failed | teaching_cards not written (or BASELINE) |
+| test_degraded_artifact_count | 10 artifacts written |
+| test_degraded_user_display | allowed_for_user_display is True (successful components only) |
+
+### BLOCKED 路径测试
+
+| 测试 | 断言 |
+|------|------|
+| test_blocked_no_card_artifacts | paper_card / formula_cards / teaching_cards NOT written |
+| test_blocked_artifact_count | 8 artifacts written |
+| test_blocked_no_user_display | allowed_for_user_display is False |
+| test_blocked_has_blocking_reason | blocking_reason is non-empty |
+
+### FAILED 路径测试
+
+| 测试 | 断言 |
+|------|------|
+| test_parser_system_failure | job status FAILED |
+| test_failed_artifact_count | 0-3 artifacts (depends on failure point) |
+
+### Audit override 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_audit_block_overrides_success | v2 SUCCESS + audit BLOCK → BLOCKED |
+| test_audit_block_overrides_degraded | DEGRADED + audit BLOCK → BLOCKED |
+| test_audit_warning_does_not_block | WARNING only → not blocked |
+
+### 全局规则
+
+- 默认不真实调用 LLM
+- 不联网
+- 不新增依赖
+
+## 9. 验收标准
+
+- 单篇链路不同状态 artifact 数量正确
 - 状态传递规则正确
+- DownstreamGates 正确
 - 默认测试不联网、不真实调用 LLM
 
-## 9. 当前实现状态
+## 10. 当前实现状态
 
-- 代码已实现：SinglePaperIngestionRunner, baseline + v2 path, 10 artifacts
+- SinglePaperIngestionRunner 已实现
+- ParserAdapter 已接入
+- PassageIndex / ClaimEvidence / EvidencePack 已接入
+- baseline path 已实现
+- v2 path 已实现（SUCCESS / DEGRADED / BLOCKED）
+- QualityAuditor 已接入
+- understanding_status.json / quality_report.json 已写入
+- DownstreamGates 已实现
 - 测试已覆盖：15+ tests
-- understanding_status.json 已实现
-- QualityReport 已实现
 
-## 10. 当前未解决问题
+## 11. 当前未解决问题
 
 - formula_is_core 的具体判断算法
 - DownstreamGates 的最终字段是否足够

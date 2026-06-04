@@ -20,8 +20,8 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 
 | 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
 |------|------|---------------|----------|--------------|------|----------|
-| PaperQA | evidence-constrained answer | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 参考 prompt 结构 |
-| ARIS | reviewer independence | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFREFERENCE_ONLY | 否 | — | 参考 audit 思想 |
+| PaperQA | evidence-constrained answer | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 只借鉴 prompt 结构 |
+| ARIS | reviewer independence | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 只借鉴 audit 思想 |
 
 未完成调研不得进入代码开发。
 
@@ -41,41 +41,38 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 - **当前是否直接接入**: 否 — 只参考设计
 - **借鉴落地**: card builder 只负责生成；audit 模块独立读取 card + evidence + source artifact；audit 不接收 card builder 的解释；audit 结果决定 understanding_status
 
-### OpenScholar
+## 6. 当前代码位置
 
-- **机制**: citation-backed response + citation accuracy 评估
-- **对本模块的用处**: citation accuracy 的评估标准可参考
-- **当前是否直接接入**: 否
+- `src/researchsensei/paper_card.py` — `build_paper_card()` (rule-based baseline)
+- `src/researchsensei/paper_card_v2.py` — v2 LLM builder (fail-closed)
+- `src/researchsensei/formula_card.py` — `build_formula_card()` (rule-based baseline)
+- `src/researchsensei/formula_card_v2.py` — v2 LLM builder (fail-closed)
+- `src/researchsensei/teaching_card.py` — `build_teaching_card()` (rule-based baseline)
+- `src/researchsensei/teaching_card_v2.py` — v2 LLM builder (fail-closed)
+- `src/researchsensei/llm/validator.py` — LLM output validators
+- `src/researchsensei/schemas/llm_output.py` — PaperCardLLMOutput, FormulaCardLLMOutput, TeachingCardLLMOutput
+- `src/researchsensei/schemas/status.py` — UnderstandingStatus, DownstreamGates, EvidencePackSummary
+- `src/researchsensei/ingestion/pipeline.py` — SinglePaperIngestionRunner (v2 path integration)
 
-## 4. 当前代码位置
-
-- `src/researchsensei/paper_card.py` — `build_paper_card()` (rule-based), `build_paper_card_with_llm()` (LLM-enhanced)
-- `src/researchsensei/formula_card.py` — 同上
-- `src/researchsensei/teaching_card.py` — 同上
-- `src/researchsensei/ingestion/pipeline.py` — `SinglePaperIngestionRunner` 当前只用 rule-based
-
-**当前现实**: 代码仍然是 fallback 模式（LLM 失败时 fallback 到 rule-based）。DEVELOPMENT.md 中的 fail-closed 策略是未来目标，当前代码还未完全实现。
-
-## 5. 输入输出
+## 7. 输入输出
 
 | 项 | 值 |
 |----|-----|
 | 输入 | paper_skeleton.json, evidence_pack, existing card baseline |
-| 输出 | paper_card.json, formula_cards.json, teaching_cards.json |
+| 输出 | paper_card.json, formula_cards.json, teaching_cards.json, understanding_status.json |
 | LLM prompt 只能使用 | paper title/metadata, paper_skeleton, evidence_pack, existing baseline card |
 | 禁止 | 直接整篇论文全文塞入 prompt |
 
-## 6. Artifact
+## 8. Artifact
 
 - `paper_card.json`, `formula_cards.json`, `teaching_cards.json` 格式不变
-- 新增 `understanding_status.json` 承载理解状态（未来实现）
+- `understanding_status.json` 承载理解状态
+- `quality_report.json` 承载审计结果
 - 如果状态不是 SUCCESS，不得把 card 当最终用户结果
 
-## 7. 核心类和方法签名
+## 9. Schema / 数据结构
 
-### EvidencePack
-
-EvidencePack 是运行时对象，不持久化为独立 artifact。
+### EvidencePack（运行时对象，不持久化）
 
 ```python
 class EvidencePackItem(SenseiModel):
@@ -91,9 +88,7 @@ class EvidencePackItem(SenseiModel):
     source_artifact: str = "evidence_index"
 ```
 
-### EvidencePackSummary
-
-EvidencePackSummary 持久化在 UnderstandingStatus 中，记录 LLM 实际看到哪些 claim。
+### EvidencePackSummary（持久化在 UnderstandingStatus 中）
 
 ```python
 class EvidencePackSummary(SenseiModel):
@@ -104,14 +99,14 @@ class EvidencePackSummary(SenseiModel):
     truncated_passage_ids: list[str] = Field(default_factory=list)
 ```
 
-### understanding_status.json
+### UnderstandingStatus
 
 ```python
 class DownstreamGates(SenseiModel):
     reading_display: bool = False
-    phase12_patterns: bool = False
-    phase12_drill: bool = False
-    phase12_drill_degraded: bool = False
+    phase12_patterns: bool = False       # legacy field name, 语义归属 M4
+    phase12_drill: bool = False          # legacy field name, 语义归属 M4
+    phase12_drill_degraded: bool = False # legacy field name, 语义归属 M4
     advisor_questions: bool = False
 
 class UnderstandingStatus(SenseiModel):
@@ -121,9 +116,9 @@ class UnderstandingStatus(SenseiModel):
     blocking_reason: str = ""
     warnings: list[WarningItem] = Field(default_factory=list)
     allowed_for_user_display: bool
-    allowed_for_phase12: bool  # legacy field, do not use for new gating; use allowed_downstream instead
+    allowed_for_phase12: bool  # legacy field, use allowed_downstream instead
     checked_artifacts: list[str] = Field(default_factory=list)
-    component_status: dict[str, str] = Field(default_factory=dict)  # paper_card / formula_cards / teaching_cards / audit
+    component_status: dict[str, str] = Field(default_factory=dict)
     evidence_pack_summary: EvidencePackSummary | None = None
     allowed_downstream: DownstreamGates = Field(default_factory=DownstreamGates)
 ```
@@ -133,12 +128,10 @@ class UnderstandingStatus(SenseiModel):
 | 状态 | 含义 | allowed_for_user_display | downstream gating |
 |------|------|--------------------------|-------------------|
 | SUCCESS | LLM cards 生成成功，audit 通过 | True | 由 DownstreamGates 决定（全部 True） |
-| DEGRADED_STRUCTURAL | 论文理解成功，但某些组件降级 | True | 由 DownstreamGates 决定（因组件状态不同） |
+| DEGRADED_STRUCTURAL | 论文理解成功，但某些组件降级 | True | 由 DownstreamGates 决定 |
 | BASELINE_ONLY | 无 LLM 或仅 rule-based baseline | False | 全部 False |
 | BLOCKED_UNDERSTANDING | evidence / LLM / audit 导致理解不可信 | False | 全部 False |
-| FAILED | 系统级异常（pipeline crash / 文件系统错误 / Pydantic 崩溃） | False | 全部 False |
-
-DEGRADED_STRUCTURAL 的下游能力由 DownstreamGates 决定，不同组件状态可能导致不同 gate 值。例如 teaching_cards FAILED 时，phase12_patterns 可以 True，phase12_drill 可以 degraded，advisor_questions 应 False。
+| FAILED | 系统级异常（pipeline crash / 文件系统错误） | False | 全部 False |
 
 ### component_status
 
@@ -150,149 +143,7 @@ component_status:
   audit: SUCCESS / FAILED
 ```
 
-### DownstreamGates
-
-| 状态 | paper_card | teaching_cards | reading_display | phase12_patterns | phase12_drill | advisor_questions |
-|------|-----------|----------------|-----------------|-----------------|---------------|-------------------|
-| SUCCESS | SUCCESS | SUCCESS | True | True | True | True |
-| DEGRADED | SUCCESS | SUCCESS | True | True | True | True |
-| DEGRADED | SUCCESS | FAILED | True | True | True（降级） | False |
-| BASELINE | — | — | False | False | False | False |
-| BLOCKED | — | — | False | False | False | False |
-| FAILED | — | — | False | False | False | False |
-
-### Pipeline 集成 (fail-closed 目标)
-
-```python
-class SinglePaperIngestionRunner:
-    def __init__(self, ..., llm_client: LLMClient | MockLLMClient | None = None):
-        self.llm_client = llm_client
-
-    def run(self, ...):
-        ...
-        if self.llm_client is None:
-            return build_baseline_cards_with_status("BASELINE_ONLY")
-
-        try:
-            llm_cards = build_cards_with_llm(...)
-        except Exception:
-            return blocked_understanding("LLM_UNAVAILABLE")
-
-        validated = validate_evidence_refs(llm_cards, evidence_index)
-        if not validated.ok:
-            return blocked_understanding(validated.reason)
-
-        return llm_cards
-```
-
-## 8. 错误/失败策略
-
-| 场景 | 行为 |
-|------|------|
-| LLM client 不存在 | BASELINE_ONLY，不得标记为 v2 understanding |
-| LLM 调用失败 | BLOCKED_UNDERSTANDING，warning: "LLM_UNAVAILABLE" |
-| LLM 输出 evidence_ref 不存在 | 丢弃，BLOCKED_UNDERSTANDING，warning: "INVALID_EVIDENCE_REF" |
-| LLM 输出无 evidence_ref | 丢弃，BLOCKED_UNDERSTANDING，warning: "MISSING_EVIDENCE_REF" |
-| LLM invalid JSON | BLOCKED_UNDERSTANDING，warning: "LLM_INVALID_JSON" |
-| LLM timeout | BLOCKED_UNDERSTANDING，warning: "LLM_TIMEOUT" |
-| evidence 不足 | INSUFFICIENT_EVIDENCE，不生成解释 |
-| rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
-| paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
-| paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
-| paper_card 成功 + formula_cards SKIPPED（无公式） | 不阻断 |
-| paper_card 失败 | BLOCKED |
-| audit hard-fail (effect=BLOCK) | BLOCKED_UNDERSTANDING |
-| audit warning only (effect=WARNING) | 不阻断，warning 写入 warnings |
-| parser degraded | 不是 hard-fail，DEGRADED_STRUCTURAL（如果理解成功） |
-
-BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic metadata，不能包含论文解释、教学内容、核心思想推断或公式讲解。
-
-## 9. 测试断言
-
-| 测试 | 断言 |
-|------|------|
-| test_pipeline_accepts_optional_llm_client | no error, status is BASELINE_ONLY |
-| test_no_llm_client_produces_baseline_only | understanding_status.status == "BASELINE_ONLY" |
-| test_mock_llm_client_produces_evidence_bound_card | card has evidence_refs, status is SUCCESS |
-| test_llm_failure_blocks_understanding | BLOCKED_UNDERSTANDING, warning "LLM_UNAVAILABLE" |
-| test_invalid_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "INVALID_EVIDENCE_REF" |
-| test_missing_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "MISSING_EVIDENCE_REF" |
-| test_baseline_only_not_allowed_for_phase12 | allowed_for_phase12 is False |
-| test_blocked_understanding_no_user_facing_content | no paper explanation text |
-| test_success_status_for_final_display | status == "SUCCESS", allowed_for_user_display is True |
-
-## 10. Hard-Fail
-
-| ID | 条件 |
-|----|------|
-| HF-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE |
-| HF-2 | human_explanation 是公式文本 |
-| HF-3 | formula symbol 解释与论文矛盾 |
-| HF-4 | core_idea / problem 缺 evidence_ref |
-| HF-5 | 输出无论文特有术语 |
-| HF-6 | 输出与论文主题不符 |
-| HF-7 | LLM failure produces final-looking cards |
-| HF-8 | BASELINE_ONLY card used as v2/final understanding |
-| HF-9 | BLOCKED_UNDERSTANDING still contains user-facing explanation text |
-| HF-10 | warnings are strings instead of WarningItem |
-
-## 11. EvidencePack 构建流程
-
-**输入**: `ClaimEvidence` + `PassageIndex` + `paper_skeleton`
-
-**算法**:
-1. 过滤 `semantic_support == INSUFFICIENT_EVIDENCE` 的 claim
-2. 过滤 `confidence < 0.3` 的 claim
-3. 按 claim_type 分组（PROBLEM / METHOD / RESULT / LIMITATION / FORMULA_CONTEXT）
-4. 每个 claim 构建一个 `EvidencePackItem`
-5. passage_text 从 PassageIndex 查找，截取前 500 chars
-6. token_count = len(passage_text.split())
-7. 每类最多 3 个 claim
-8. 按 token budget 截断（默认 4000 tokens）
-9. priority: METHOD > RESULT > FORMULA_CONTEXT > PROBLEM > LIMITATION
-10. 如果 evidence_pack 为空 → BLOCKED_UNDERSTANDING
-11. 缺 METHOD → BLOCKED（METHOD 是理解核心）
-12. 缺 RESULT → 不阻断（部分论文确实没有实验）
-
-**Schema**:
-```python
-class EvidencePack(SenseiModel):
-    paper_id: str
-    items: list[EvidencePackItem]
-    total_tokens: int = 0
-    warnings: list[WarningItem] = Field(default_factory=list)
-```
-
-## 12. LLM Prompt 结构
-
-### 三次调用策略
-
-LLM 生成采用三次独立调用：
-
-1. `paper_card` — 论文理解卡片
-2. `formula_cards` — 公式讲解卡片
-3. `teaching_cards` — 教学讲解卡片
-
-原因：不同 card 目标不同，失败粒度更细，paper_card 成功但 teaching_cards 失败时可以降级。
-
-### system prompt
-
-- 角色：论文研读导师
-- 约束：只能基于 evidence pack 回答，不能编造
-- 输出格式：JSON
-
-### user prompt
-
-- paper title / metadata（从 paper_skeleton）
-- evidence pack（从 build_evidence_pack）
-- 要求：生成指定字段的 JSON
-
-### 不允许
-
-- 整篇论文全文塞入 prompt
-- 超出 token budget
-
-### 输出 schema
+### LLM 输出 schema
 
 ```python
 class ClaimOutput(SenseiModel):
@@ -323,63 +174,130 @@ class TeachingCardLLMOutput(SenseiModel):
     evidence_ref: str = ""
 ```
 
-### 输出校验
+## 10. 核心类和方法签名
 
-- 每个核心 claim 的 evidence_ref 必须存在于 evidence_index
-- 无效 evidence_ref → BLOCKED_UNDERSTANDING
-- missing evidence_ref → BLOCKED_UNDERSTANDING
-- LLM invalid JSON → BLOCKED_UNDERSTANDING
-- LLM unavailable / timeout → BLOCKED_UNDERSTANDING
-- 核心字段无有效 evidence_ref → BLOCKED_UNDERSTANDING
+### Pipeline 集成 (fail-closed)
 
-## 13. understanding_status.json
+```python
+class SinglePaperIngestionRunner:
+    def __init__(self, ..., llm_client: LLMClient | MockLLMClient | None = None):
+        self.llm_client = llm_client
 
-**Schema**: 放在 `src/researchsensei/schemas/understanding.py`。完整 schema 定义见 §7。
+    def run(self, ...):
+        ...
+        if self.llm_client is None:
+            return build_baseline_cards_with_status("BASELINE_ONLY")
 
-**由 SinglePaperIngestionRunner 根据 QualityReport 生成**，写入 `understanding_status.json`
+        try:
+            llm_cards = build_cards_with_llm(...)
+        except Exception:
+            return blocked_understanding("LLM_UNAVAILABLE")
 
-**职责划分**:
-- Card builder 只生成 card，不写 understanding_status。
-- Audit (QualityAuditor) 是纯逻辑，输出 QualityReport，不写 artifact。
-- Runner 读取 QualityReport，映射成 UnderstandingStatus，写 understanding_status.json。
-- Card builder 不能参与 understanding_status 生成（reviewer independence）。
+        validated = validate_evidence_refs(llm_cards, evidence_index)
+        if not validated.ok:
+            return blocked_understanding(validated.reason)
 
-### BASELINE_ONLY 策略
+        return llm_cards
+```
 
-- BASELINE_ONLY 时仍然写 paper_card.json / formula_cards.json / teaching_cards.json。
-- 这些 card 是有用的结构化数据，可用于 debug 和 diagnostic。
-- `allowed_for_user_display = False`。
-- `allowed_downstream` 全部 False。
-- 普通用户不能当最终理解展示。
-- Phase 12 / advisor 是否允许必须看 `allowed_downstream`，不再用 `status != SUCCESS` 简单判断。
+## 11. 错误/失败策略
 
-### 前端/API 展示规则
+| 场景 | 行为 |
+|------|------|
+| LLM client 不存在 | BASELINE_ONLY，不得标记为 v2 understanding |
+| LLM 调用失败 | BLOCKED_UNDERSTANDING，warning: "LLM_UNAVAILABLE" |
+| LLM 输出 evidence_ref 不存在 | 丢弃，BLOCKED_UNDERSTANDING，warning: "INVALID_EVIDENCE_REF" |
+| LLM 输出无 evidence_ref | 丢弃，BLOCKED_UNDERSTANDING，warning: "MISSING_EVIDENCE_REF" |
+| LLM invalid JSON | BLOCKED_UNDERSTANDING，warning: "LLM_INVALID_JSON" |
+| LLM timeout | BLOCKED_UNDERSTANDING，warning: "LLM_TIMEOUT" |
+| evidence 不足 | INSUFFICIENT_EVIDENCE，不生成解释 |
+| rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
+| paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
+| paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
+| paper_card 成功 + formula_cards SKIPPED（无公式） | 不阻断 |
+| paper_card 失败 | BLOCKED |
+| audit hard-fail (effect=BLOCK) | BLOCKED_UNDERSTANDING |
+| audit warning only (effect=WARNING) | 不阻断，warning 写入 warnings |
+| parser degraded | 不是 hard-fail，DEGRADED_STRUCTURAL（如果理解成功） |
 
-详细规则见 FRONTEND_RENDER.md。摘要：
+BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic metadata，不能包含论文解释、教学内容、核心思想推断或公式讲解。
 
-- **SUCCESS**: 展示成功组件。
-- **DEGRADED_STRUCTURAL**: 按 component_status 展示成功组件，失败组件隐藏并提示降级。
-- **BASELINE_ONLY**: 普通用户不展示 cards。
-- **BLOCKED_UNDERSTANDING**: 不展示解释性 card。
-- **FAILED**: 展示系统错误。
+## 12. M4 Downstream Gates
 
-### Phase 12 Gating
+DownstreamGates 控制下游 M4 互动式学习的访问权限，不再用 `status != SUCCESS` 作为唯一判断。
 
-使用 DownstreamGates，不再用 `status != SUCCESS` 作为唯一判断。
+> 注意：DownstreamGates 字段名 `phase12_patterns` / `phase12_drill` 等是 legacy 命名，语义归属 M4 互动式学习。
+
+| 状态 | paper_card | teaching_cards | reading_display | phase12_patterns | phase12_drill | advisor_questions |
+|------|-----------|----------------|-----------------|-----------------|---------------|-------------------|
+| SUCCESS | SUCCESS | SUCCESS | True | True | True | True |
+| DEGRADED | SUCCESS | SUCCESS | True | True | True | True |
+| DEGRADED | SUCCESS | FAILED | True | True | True（降级） | False |
+| BASELINE | — | — | False | False | False | False |
+| BLOCKED | — | — | False | False | False | False |
+| FAILED | — | — | False | False | False | False |
 
 ```python
 if not understanding_status.allowed_downstream.phase12_patterns:
-    raise Phase12GatingError("phase12_patterns not allowed")
+    raise GatingError("M4 patterns not allowed")
 
 if not understanding_status.allowed_downstream.phase12_drill:
     if not understanding_status.allowed_downstream.phase12_drill_degraded:
-        raise Phase12GatingError("phase12_drill not allowed")
+        raise GatingError("M4 drill not allowed")
 
 if not understanding_status.allowed_downstream.advisor_questions:
-    raise Phase12GatingError("advisor_questions not allowed")
+    raise GatingError("M4 advisor_questions not allowed")
 ```
 
-## 15. 验收标准
+## 13. 测试要求
+
+### Baseline builder 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_baseline_paper_card | paper_card fields populated |
+| test_baseline_formula_cards | formula_cards fields populated |
+| test_baseline_teaching_cards | teaching_cards fields populated |
+
+### v2 builder fail-closed 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_no_llm_client_produces_baseline_only | status == "BASELINE_ONLY" |
+| test_mock_llm_client_produces_evidence_bound_card | card has evidence_refs, status is SUCCESS |
+| test_llm_failure_blocks_understanding | BLOCKED_UNDERSTANDING, warning "LLM_UNAVAILABLE" |
+| test_invalid_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "INVALID_EVIDENCE_REF" |
+| test_missing_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "MISSING_EVIDENCE_REF" |
+| test_baseline_only_not_allowed_for_downstream | allowed_for_user_display is False |
+
+### LLM output validator 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_validate_paper_card_llm_output_valid | valid output passes |
+| test_validate_paper_card_llm_output_missing_evidence_ref | missing evidence_ref → BLOCKED |
+| test_validate_formula_cards_llm_output_valid | valid output passes |
+| test_validate_teaching_cards_llm_output_valid | valid output passes |
+| test_llm_invalid_json_blocks | invalid JSON → BLOCKED_UNDERSTANDING |
+
+### Pipeline v2 路径测试
+
+| 测试 | 断言 |
+|------|------|
+| test_pipeline_accepts_optional_llm_client | no error, status is BASELINE_ONLY |
+| test_pipeline_v2_success_artifacts | SUCCESS → paper_card + formula_cards + teaching_cards + understanding_status + quality_report written |
+| test_pipeline_v2_degraded_artifacts | DEGRADED → teaching_cards not written |
+| test_pipeline_v2_blocked_artifacts | BLOCKED → no card artifacts written |
+| test_blocked_understanding_no_user_facing_content | no paper explanation text in blocked output |
+| test_success_status_for_final_display | status == "SUCCESS", allowed_for_user_display is True |
+
+### 全局规则
+
+- 默认不真实调用 LLM
+- 不联网
+- 不新增依赖
+
+## 14. 验收标准
 
 - LLM 输出必须绑定 evidence_ref
 - 无效 evidence_ref → BLOCKED
@@ -388,20 +306,25 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - v2 path fail-closed，不 fallback
 - 默认测试不真实调用 LLM
 
-## 16. 当前实现状态
+## 15. 当前实现状态
 
-- 代码已实现：baseline builders, isolated v2 builders, EvidencePack, UnderstandingStatus
-- pipeline v2 path 已接入
+- baseline builders 已实现（paper_card.py, formula_card.py, teaching_card.py）
+- v2 LLM output schema 已实现（schemas/llm_output.py）
+- v2 builders 已实现（paper_card_v2.py, formula_card_v2.py, teaching_card_v2.py）
+- LLM output validator 已实现（llm/validator.py）
+- pipeline v2 path 已接入（SUCCESS / DEGRADED / BLOCKED）
+- EvidencePack 已实现
+- UnderstandingStatus / DownstreamGates 已实现
+- QualityAuditor 已接入
+- understanding_status.json / quality_report.json 已写入
 - 测试已覆盖：15+ tests
 - Real LLM smoke 未做
 - formula_is_core 判断未实现
 
-## 17. 当前未解决问题
+## 16. 当前未解决问题
 
 - formula_is_core 的具体判断算法
 - EvidencePackSummary 是否足够复现 LLM 输入
 - component_status 的值是否还需要 DEGRADED
-- phase12_drill_degraded 是否需要单独 reason 字段
-- 旧 Phase 8-10 代码迁移细节
-- 旧测试中 fallback 断言迁移细节
+- 旧 Phase 8-10 rule-based builders 迁移细节（old `*_with_llm` 函数可能仍有 fallback，但 pipeline 不走它们）
 - DownstreamGates 的最终字段是否足够
