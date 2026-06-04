@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.llm.client import LLMClient, MockLLMClient
+from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.validator import validate_teaching_cards_llm_output
 from researchsensei.schemas import (
@@ -18,7 +18,7 @@ async def build_teaching_cards_v2(
     evidence_pack: EvidencePack,
     paper_card: PaperCard,
     skeleton: PaperSkeleton,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> TeachingCardBundle:
     """Build teaching cards using LLM with evidence constraints (fail-closed).
 

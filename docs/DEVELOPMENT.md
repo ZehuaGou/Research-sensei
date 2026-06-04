@@ -14,23 +14,13 @@
 
 ### 测试体系
 
-测试分为两类：
+全项目测试策略：真实优先。mock/fake/skip 不是有效测试。缺 key、缺网络、额度不足、API 限流、PDF 下载失败均视为失败。
 
-1. **快速回归测试**（unit / failure-path / schema round-trip）：
-   - 可使用 mock / fake
-   - 只用于验证局部逻辑、schema、失败路径
-   - 不作为模块完成验收依据
-   - 命令：`python -m pytest -q`
+`python -m pytest -q` 默认运行所有测试，包括 tests_live。不再有 `--ignore=tests_live`。
 
-2. **真实验收测试**（live eval / real LLM / real PDF）：
-   - 涉及外部服务的模块必须真实联网
-   - 涉及 LLM 的模块必须真实调用 LLM
-   - 涉及 PDF 的模块必须真实读取 PDF
-   - 模块完成必须提供真实验收报告
-   - 命令：`RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python -m pytest -q tests_live`
-   - 或：`RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
+涉及 LLM 的测试必须真实调用 LLM。涉及搜索的测试必须真实联网。涉及 PDF 的测试必须真实下载/解析。涉及前后端的测试必须真实 API / 真实联调。
 
-**模块完成 = 快速回归通过 + 真实验收通过。** mock 测试只能证明代码局部逻辑没坏，不能证明产品可用。不允许把 mock 测试通过写成模块完成。不允许把 skip 写成 pass。不允许缺 API key / 缺网络时仍然汇报"真实验收通过"。
+**模块完成 = 真实验收通过。** 不允许把 mock 测试通过写成模块完成。不允许把 skip 写成 pass。不允许缺 API key / 缺网络时仍然汇报"真实验收通过"。
 
 ---
 
@@ -113,12 +103,10 @@
 子模块文档 → 子模块代码 → 子模块单元测试 → 子模块失败路径测试 → 子模块验收 → 再进入下一个子模块
 
 每个子模块必须有：
-- unit tests（可 mock）
-- failure-path tests（可 mock）
-- schema/artifact round-trip tests（如果涉及）
-- API tests（如果涉及 API）
-- Vitest tests（如果涉及 frontend）
+- schema/artifact round-trip tests
 - 真实验收测试（涉及外部服务 / LLM / PDF 的模块必须有）
+- API tests（如果涉及 API）
+- Vitest tests（如果涉及 frontend，必须真实后端联调）
 
 每个子模块完成后必须跑：
 - 快速回归：`python -m pytest -q`

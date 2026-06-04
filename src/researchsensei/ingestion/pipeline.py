@@ -15,7 +15,7 @@ from researchsensei.formula_card_v2 import build_formula_cards_v2
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.jobs import JobStore
-from researchsensei.llm.client import LLMClient, MockLLMClient
+from researchsensei.llm.client import LLMClient
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_card_v2 import build_paper_card_v2
 from researchsensei.paper_skeleton import build_paper_skeleton
@@ -67,7 +67,7 @@ class SinglePaperIngestionRunner:
         jobs: JobStore,
         ingestion: LightweightIngestionService | None = None,
         parser_adapter: ParserAdapter | None = None,
-        llm_client: LLMClient | MockLLMClient | None = None,
+        llm_client: LLMClient | None = None,
         quality_auditor: QualityAuditor | None = None,
     ) -> None:
         self.workspace = workspace

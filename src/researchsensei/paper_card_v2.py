@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.llm.client import LLMClient, MockLLMClient
+from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.validator import validate_paper_card_llm_output
 from researchsensei.schemas import (
@@ -16,7 +16,7 @@ from researchsensei.schemas.llm_output import PaperCardLLMOutput
 async def build_paper_card_v2(
     evidence_pack: EvidencePack,
     skeleton: PaperSkeleton,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> PaperCard:
     """Build a paper card using LLM with evidence constraints (fail-closed).
 

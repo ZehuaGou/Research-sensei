@@ -32,7 +32,7 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1.3 Source Acquisition | implemented | unit tested | REAL_PDF_VERIFIED | live eval 下载并校验 2 个 PDF，记录 sha256/local_path |
 | M1.4 Selection | implemented | unit tested | M1_REAL_VERIFIED | dedup/score 使用真实 metadata 字段；A_READ 受 PDF/M2 gate 约束 |
 | M1.5 Reading Plan | implemented | unit tested | M1_REAL_VERIFIED | live eval 产生 2 个 A_READ，均 `can_enter_m2=true` |
-| M2+ | unchanged | existing tests | not part of current gate | 本轮不把 synthetic markdown 或 M2 smoke 作为 M1 完成依据 |
+| M2+ | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收，mock 测试已删除 |
 
 ## Completed In This Pass
 
@@ -70,9 +70,10 @@ Latest live result:
 
 ## Hard Rules
 
-- Do not count mock, MockTransport, MockLLMClient, synthetic markdown, or local fixture-only paths as module completion.
-- M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
-- `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
-- Third-party tools must be isolated behind adapters.
+- mock/fake/skip 不是有效测试。全项目测试策略：真实优先。
+- `python -m pytest -q` 默认运行所有测试，包括 tests_live。
+- 缺 key / 缺网络 / 额度不足 / API 限流 / PDF 下载失败 = 测试失败。
+- MockLLMClient 已从 src/ 和 tests/ 中删除。
+- M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item cleared for M2.

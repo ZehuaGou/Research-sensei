@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.llm.client import LLMClient, MockLLMClient
+from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.validator import validate_formula_cards_llm_output
 from researchsensei.schemas import (
@@ -16,7 +16,7 @@ from researchsensei.schemas.llm_output import FormulaCardsLLMOutput
 async def build_formula_cards_v2(
     evidence_pack: EvidencePack,
     skeleton: PaperSkeleton,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> FormulaCardBundle:
     """Build formula cards using LLM with evidence constraints (fail-closed).
 

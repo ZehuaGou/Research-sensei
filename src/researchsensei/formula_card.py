@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 
-from researchsensei.llm.client import LLMClient, LLMResponseError, MockLLMClient, parse_llm_json
+from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.types import ChatMessage
 from researchsensei.schemas import (
@@ -45,7 +45,7 @@ async def build_formula_cards_with_llm(
     document: DocumentIngestion,
     evidence_index: EvidenceIndex,
     skeleton: PaperSkeleton,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> FormulaCardBundle:
     """Build formula cards with LLM enhancement. Falls back to rule-based on failure."""
     formula_blocks = [b for b in document.blocks if b.type == BlockType.FORMULA]
@@ -144,7 +144,7 @@ async def _build_single_llm(
     evidence_index: EvidenceIndex,
     skeleton: PaperSkeleton,
     block,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> FormulaCard:
     """LLM-enhanced formula card: uses LLM for explanations within evidence constraints."""
     rule_card = _build_single_rule(document, evidence_index, block)

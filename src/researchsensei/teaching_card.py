@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from researchsensei.llm.client import LLMClient, LLMResponseError, MockLLMClient, parse_llm_json
+from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.schemas import (
     EvidenceIndex,
@@ -79,7 +79,7 @@ async def build_teaching_cards_with_llm(
     formula_bundle: FormulaCardBundle,
     skeleton: PaperSkeleton,
     evidence_index: EvidenceIndex,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> TeachingCardBundle:
     """Build teaching cards with LLM enhancement. Falls back to rule-based on failure."""
     cards: list[TeachingCard] = []
@@ -261,7 +261,7 @@ async def _build_concept_card_llm(
     target_type: str,
     title: str,
     evidence_index: EvidenceIndex,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> TeachingCard:
     """Build an LLM-enhanced teaching card for a concept."""
     claim = getattr(paper_card, claim_attr)
@@ -316,7 +316,7 @@ async def _build_formula_teaching_card_llm(
     paper_card: PaperCard,
     formula_card,
     evidence_index: EvidenceIndex,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> TeachingCard:
     """Build an LLM-enhanced teaching card for a formula."""
     evidence_text = _format_evidence_for_prompt(evidence_index, formula_card.evidence_ref)

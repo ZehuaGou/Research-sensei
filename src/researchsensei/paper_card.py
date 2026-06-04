@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from researchsensei.llm.client import LLMClient, LLMResponseError, MockLLMClient, parse_llm_json
+from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.llm.types import ChatMessage
 from researchsensei.schemas import (
@@ -35,7 +35,7 @@ def build_paper_card(
 async def build_paper_card_with_llm(
     skeleton: PaperSkeleton,
     evidence_index: EvidenceIndex,
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> PaperCard:
     """Build a paper card with optional LLM enhancement.
 
@@ -99,7 +99,7 @@ async def _build_llm_enhanced(
     skeleton: PaperSkeleton,
     evidence_index: EvidenceIndex,
     claims_by_section: dict[str, list[ClaimEvidence]],
-    llm_client: LLMClient | MockLLMClient,
+    llm_client: LLMClient,
 ) -> PaperCard:
     """LLM-enhanced card builder: uses LLM for summaries within evidence constraints."""
     rule_card = _build_rule_based(skeleton, evidence_index, claims_by_section)

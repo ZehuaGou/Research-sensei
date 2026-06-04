@@ -41,10 +41,10 @@ pythonpath = [".", "src"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
 markers = [
-  "live: real external service tests (default excluded)",
-  "network: tests requiring network (default excluded)",
-  "llm: real LLM call tests (default excluded)",
-  "slow: slow tests (default excluded)",
+  "live: real external service tests",
+  "network: tests requiring network",
+  "llm: real LLM call tests",
+  "slow: slow tests",
 ]
 addopts = [
   "--ignore=legacy_tests",
