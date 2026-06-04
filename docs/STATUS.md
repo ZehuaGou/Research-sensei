@@ -5,7 +5,7 @@
 ## 1. 当前状态
 
 - Phase 1-11 baseline complete
-- 481 tests passing
+- 481 backend tests passing + 7 frontend tests passing
 - 当前代码仍不是最终论文理解系统
 - Phase 6 evidence 已有 PassageIndex + ClaimEvidenceV2 + BM25 EvidenceRetriever + EvidencePack
 - Phase 8-10 是 rule-based baseline，不是导师级讲解
@@ -19,7 +19,7 @@
 - pipeline v2 path 使用 isolated v2 builders，fail-closed，不 fallback
 - QualityReport debug/admin endpoint 尚未实现
 - formula-heavy / raw-copy / generic-output audit 尚未实现
-- frontend 自动化测试尚未引入
+- LearningWorkspaceView / UploadView 测试尚未实现
 - 外部项目已完成 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
 - Paper Understanding 质量仍未达到导师级
 - Phase 12 仍冻结
@@ -28,10 +28,17 @@
 
 ## 3. 当前任务
 
-- 主链路 v1 已阶段性封版（详见 docs/MAIN_CHAIN_V1_REVIEW.md）
-- 当前下一步推荐：前端自动化测试 / real LLM smoke 方案讨论
-- Phase 12 仍冻结
-- 不建议继续扩展新功能前忽略测试缺口
+- 前端测试基础已引入：
+  - Vitest + Vue Test Utils + jsdom 已安装
+  - StatusBanner 组件测试已覆盖 BASELINE_ONLY / BLOCKED / DEGRADED / FAILED / SUCCESS
+  - npm test 通过（7 tests）
+  - npm run build 通过
+  - 481 backend tests + 7 frontend tests
+- 尚未完成：
+  - LearningWorkspaceView / UploadView 测试尚未实现
+  - real LLM smoke 方案尚未讨论
+  - Phase 12 仍冻结
+- 下一步：第二批前端测试（LearningWorkspaceView status gating）或 real LLM smoke 方案讨论
 
 ---
 
