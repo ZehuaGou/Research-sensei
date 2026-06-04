@@ -17,32 +17,32 @@
 
 | 编号 | 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 下一步 |
 |------|------|---------|---------|---------|---------|--------|
-| M1 | 论文搜索、获取与阅读计划 | ✅ LITERATURE_SEARCH.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | M1.3 实现 |
+| M1 | 论文搜索、获取与阅读计划 | ✅ M1_LITERATURE_SEARCH.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | M1.3 实现 |
 | M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | 已阶段完成 | — |
 | M1.2 | 多源检索 | ✅ | ⚠️ arXiv/OpenAlex 已实现 | ⚠️ | 部分完成 | Semantic Scholar / Crossref 后补 |
 | M1.3 | 论文原始材料获取 | ✅ | ❌ 未实现 | ❌ | 文档已设计，代码未实现 | 实现代码 |
 | M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 已阶段完成 | — |
 | M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 已阶段完成 | — |
 | M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
-| M2.1 | 解析 | ✅ PARSER.md | ✅ ParserAdapter + LightweightParser | ✅ | 已阶段完成 | Docling adapter 后补 |
-| M2.2 | 证据链路 | ✅ EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ✅ | 已阶段完成 | evidence_ref 跳转后补 |
-| M2.3 | 讲解生成 | ✅ PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders | ✅ | 已阶段完成 | Real LLM smoke 后补 |
-| M2.4 | 质量审计 | ✅ AUDIT_QUALITY.md | ✅ QualityAuditor F-1 到 F-6 | ✅ | 已阶段完成 | 质量规则增强后补 |
-| M2.5 | 状态门控 | ✅ FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ✅ | 已阶段完成 | — |
-| M3 | 接口与前端展示 | ✅ FRONTEND_RENDER.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | 页面级测试补完 |
+| M2.1 | 解析 | ✅ M2_1_PARSER.md | ✅ ParserAdapter + LightweightParser | ✅ | 已阶段完成 | Docling adapter 后补 |
+| M2.2 | 证据链路 | ✅ M2_2_EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ✅ | 已阶段完成 | evidence_ref 跳转后补 |
+| M2.3 | 讲解生成 | ✅ M2_3_PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders | ✅ | 已阶段完成 | Real LLM smoke 后补 |
+| M2.4 | 质量审计 | ✅ M2_4_AUDIT_QUALITY.md | ✅ QualityAuditor F-1 到 F-6 | ✅ | 已阶段完成 | 质量规则增强后补 |
+| M2.5 | 状态门控 | ✅ M2_5_FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ✅ | 已阶段完成 | — |
+| M3 | 接口与前端展示 | ✅ M3_FRONTEND_RENDER.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | 页面级测试补完 |
 | M3.1 | 后端 API | ✅ | ✅ /understanding_status + /cards | ✅ | 已阶段完成 | /quality_report 后补 |
 | M3.2 | 上传页面 | ✅ | ✅ UploadView | ❌ 缺测试 | 部分完成 | 补 UploadView 测试 |
 | M3.3 | 学习工作区 | ✅ | ✅ LearningWorkspaceView | ❌ 缺测试 | 部分完成 | 补 LearningWorkspaceView 测试 |
 | M3.4 | 状态提示 | ✅ | ✅ StatusBanner | ✅ 7 tests | 已阶段完成 | — |
 | M3.5 | 调试入口 | ✅ | ✅ /artifacts debug-only | ✅ | 已阶段完成 | debug 鉴权后补 |
-| M4 | 互动式学习与长期记忆 | ✅ INTERACTIVE_LEARNING.md | ❌ 未实现 | ❌ 未测试 | 文档已设计，代码未实现 | — |
+| M4 | 互动式学习与长期记忆 | ✅ M4_INTERACTIVE_LEARNING.md | ❌ 未实现 | ❌ 未测试 | 文档已设计，代码未实现 | — |
 | M4.1 | 选中内容解释 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.2 | 符号与公式解释 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.3 | 上下文追问 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.4 | 导师式追问与研究训练 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.5 | 知识库与长期记忆 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.6 | 记忆优先检索 | ✅ | ❌ | ❌ | 文档已设计 | — |
-| M5 | 工程可靠性与测试保障 | ✅ ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
+| M5 | 工程可靠性与测试保障 | ✅ M5_ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
 | M5.1 | 后端测试 | ✅ | ✅ 481 tests | ✅ | 已阶段完成 | — |
 | M5.2 | 前端测试 | ✅ | ⚠️ StatusBanner only | ⚠️ | 部分完成 | 补页面级测试 |
 | M5.3 | LLM smoke / 成本 | ⚠️ | ❌ | ❌ | 文档待设计 | 先讨论方案 |

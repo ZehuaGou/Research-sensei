@@ -104,7 +104,7 @@ source (PDF/MD/TXT)
 - 用户端走 `/cards` API，debug/admin 走 `/artifacts` / `/quality_report`
 - BLOCKED 不展示 card 内容
 - BASELINE_ONLY 只能作为 diagnostic artifact
-- API/frontend gating 详见 M3 FRONTEND_RENDER.md
+- API/frontend gating 详见 M3 M3_FRONTEND_RENDER.md
 
 ## 6. 研究方向链路（M1 连接点）
 
@@ -117,7 +117,7 @@ M1 reading_plan.json
       → M2 单篇精读链路
 ```
 
-M1 链路由 `DirectionRunner` 编排，详见 LITERATURE_SEARCH.md。
+M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 ## 7. 与上下游模块接口
 

@@ -12,27 +12,27 @@
 
 ### M1 — Literature Search
 
-- [docs/development/LITERATURE_SEARCH.md](docs/development/LITERATURE_SEARCH.md) — 搜索规划、多源检索、去重评分、阅读计划
+- [docs/development/M1_LITERATURE_SEARCH.md](docs/development/M1_LITERATURE_SEARCH.md) — 搜索规划、多源检索、去重评分、阅读计划
 
 ### M2 — Single Paper Understanding
 
-- [docs/development/PARSER.md](docs/development/PARSER.md) — M2.1 文档解析
-- [docs/development/EVIDENCE.md](docs/development/EVIDENCE.md) — M2.2 证据链路
-- [docs/development/PAPER_UNDERSTANDING.md](docs/development/PAPER_UNDERSTANDING.md) — M2.3 讲解生成
-- [docs/development/AUDIT_QUALITY.md](docs/development/AUDIT_QUALITY.md) — M2.4 质量审计
-- [docs/development/FULL_PIPELINE.md](docs/development/FULL_PIPELINE.md) — M2.5 单篇/方向链路编排
+- [docs/development/M2_1_PARSER.md](docs/development/M2_1_PARSER.md) — M2.1 文档解析
+- [docs/development/M2_2_EVIDENCE.md](docs/development/M2_2_EVIDENCE.md) — M2.2 证据链路
+- [docs/development/M2_3_PAPER_UNDERSTANDING.md](docs/development/M2_3_PAPER_UNDERSTANDING.md) — M2.3 讲解生成
+- [docs/development/M2_4_AUDIT_QUALITY.md](docs/development/M2_4_AUDIT_QUALITY.md) — M2.4 质量审计
+- [docs/development/M2_5_FULL_PIPELINE.md](docs/development/M2_5_FULL_PIPELINE.md) — M2.5 单篇/方向链路编排
 
 ### M3 — API / Frontend
 
-- [docs/development/FRONTEND_RENDER.md](docs/development/FRONTEND_RENDER.md) — 前端渲染、状态展示、API 规则
+- [docs/development/M3_FRONTEND_RENDER.md](docs/development/M3_FRONTEND_RENDER.md) — 前端渲染、状态展示、API 规则
 
 ### M4 — Interactive Learning
 
-- [docs/development/INTERACTIVE_LEARNING.md](docs/development/INTERACTIVE_LEARNING.md) — 选中内容解释、符号与公式解释、导师式追问、研究训练、论文知识库、长期记忆、memory-first retrieval、token 节省
+- [docs/development/M4_INTERACTIVE_LEARNING.md](docs/development/M4_INTERACTIVE_LEARNING.md) — 选中内容解释、符号与公式解释、导师式追问、研究训练、论文知识库、长期记忆、memory-first retrieval、token 节省
 
 ### M5 — Engineering Reliability
 
-- [docs/development/ENGINEERING_RELIABILITY.md](docs/development/ENGINEERING_RELIABILITY.md) — artifact versioning、缓存、CI、安全、debug API
+- [docs/development/M5_ENGINEERING_RELIABILITY.md](docs/development/M5_ENGINEERING_RELIABILITY.md) — artifact versioning、缓存、CI、安全、debug API
 
 ## 辅助文档
 

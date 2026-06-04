@@ -32,54 +32,54 @@
 
 | 子模块 | 开发文档 | 代码位置 |
 |--------|---------|---------|
-| M1.1 搜索规划 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/query/` |
-| M1.2 多源检索 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/acquisition/` |
-| M1.3 下载 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/source_resolver.py` |
-| M1.4 去重评分 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/selection/` |
-| M1.5 阅读计划 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/direction/` |
+| M1.1 搜索规划 | [LITERATURE_SEARCH.md](development/M1_LITERATURE_SEARCH.md) | `src/researchsensei/query/` |
+| M1.2 多源检索 | [LITERATURE_SEARCH.md](development/M1_LITERATURE_SEARCH.md) | `src/researchsensei/acquisition/` |
+| M1.3 下载 | [LITERATURE_SEARCH.md](development/M1_LITERATURE_SEARCH.md) | `src/researchsensei/source_resolver.py` |
+| M1.4 去重评分 | [LITERATURE_SEARCH.md](development/M1_LITERATURE_SEARCH.md) | `src/researchsensei/selection/` |
+| M1.5 阅读计划 | [LITERATURE_SEARCH.md](development/M1_LITERATURE_SEARCH.md) | `src/researchsensei/direction/` |
 
 ### M2 单篇论文解析、精读与可信讲解
 
 | 子模块 | 开发文档 | 代码位置 |
 |--------|---------|---------|
-| M2.1 解析 | [PARSER.md](development/PARSER.md) | `src/researchsensei/parser/`, `src/researchsensei/ingestion/` |
-| M2.2 证据链路 | [EVIDENCE.md](development/EVIDENCE.md) | `src/researchsensei/evidence/`, `src/researchsensei/grounding.py` |
-| M2.3 讲解生成 | [PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | `src/researchsensei/paper_card.py`, `*_v2.py` |
-| M2.4 质量审计 | [AUDIT_QUALITY.md](development/AUDIT_QUALITY.md) | `src/researchsensei/audit/` |
-| M2.5 状态门控 | [FULL_PIPELINE.md](development/FULL_PIPELINE.md), [PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | `src/researchsensei/ingestion/pipeline.py` |
+| M2.1 解析 | [PARSER.md](development/M2_1_PARSER.md) | `src/researchsensei/parser/`, `src/researchsensei/ingestion/` |
+| M2.2 证据链路 | [EVIDENCE.md](development/M2_2_EVIDENCE.md) | `src/researchsensei/evidence/`, `src/researchsensei/grounding.py` |
+| M2.3 讲解生成 | [PAPER_UNDERSTANDING.md](development/M2_3_PAPER_UNDERSTANDING.md) | `src/researchsensei/paper_card.py`, `*_v2.py` |
+| M2.4 质量审计 | [AUDIT_QUALITY.md](development/M2_4_AUDIT_QUALITY.md) | `src/researchsensei/audit/` |
+| M2.5 状态门控 | [FULL_PIPELINE.md](development/M2_5_FULL_PIPELINE.md), [PAPER_UNDERSTANDING.md](development/M2_3_PAPER_UNDERSTANDING.md) | `src/researchsensei/ingestion/pipeline.py` |
 
 ### M3 接口与前端展示
 
 | 子模块 | 开发文档 | 代码位置 |
 |--------|---------|---------|
-| M3.1 后端 API | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `src/researchsensei/web/` |
-| M3.2 上传页面 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/views/UploadView.vue` |
-| M3.3 学习工作区 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/views/LearningWorkspaceView.vue` |
-| M3.4 状态提示 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/components/StatusBanner.vue` |
-| M3.5 调试入口 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `src/researchsensei/web/app.py` |
+| M3.1 后端 API | [FRONTEND_RENDER.md](development/M3_FRONTEND_RENDER.md) | `src/researchsensei/web/` |
+| M3.2 上传页面 | [FRONTEND_RENDER.md](development/M3_FRONTEND_RENDER.md) | `frontend/src/views/UploadView.vue` |
+| M3.3 学习工作区 | [FRONTEND_RENDER.md](development/M3_FRONTEND_RENDER.md) | `frontend/src/views/LearningWorkspaceView.vue` |
+| M3.4 状态提示 | [FRONTEND_RENDER.md](development/M3_FRONTEND_RENDER.md) | `frontend/src/components/StatusBanner.vue` |
+| M3.5 调试入口 | [FRONTEND_RENDER.md](development/M3_FRONTEND_RENDER.md) | `src/researchsensei/web/app.py` |
 
 ### M4 互动式学习与长期记忆
 
 | 子模块 | 开发文档 | 代码位置 |
 |--------|---------|---------|
-| M4.1 选中内容解释 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
-| M4.2 符号与公式解释 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
-| M4.3 上下文追问 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
-| M4.4 导师式追问与研究训练 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
-| M4.5 知识库与长期记忆 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
-| M4.6 记忆优先检索 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.1 选中内容解释 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.2 符号与公式解释 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.3 上下文追问 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.4 导师式追问与研究训练 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.5 知识库与长期记忆 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.6 记忆优先检索 | [INTERACTIVE_LEARNING.md](development/M4_INTERACTIVE_LEARNING.md) | 未实现 |
 
 ### M5 工程可靠性与测试保障
 
 | 子模块 | 开发文档 | 代码位置 |
 |--------|---------|---------|
-| M5.1 后端测试 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `tests/` |
-| M5.2 前端测试 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `frontend/src/components/tests/` |
-| M5.3 LLM smoke / 成本 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
-| M5.4 缓存 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `src/researchsensei/llm/response_cache.py` |
-| M5.5 安全 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
-| M5.6 Debug/admin | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
-| M5.7 CI | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.1 后端测试 | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | `tests/` |
+| M5.2 前端测试 | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | `frontend/src/components/tests/` |
+| M5.3 LLM smoke / 成本 | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.4 缓存 | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | `src/researchsensei/llm/response_cache.py` |
+| M5.5 安全 | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.6 Debug/admin | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.7 CI | [ENGINEERING_RELIABILITY.md](development/M5_ENGINEERING_RELIABILITY.md) | 未实现 |
 
 ---
 
