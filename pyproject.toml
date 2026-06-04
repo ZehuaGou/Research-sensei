@@ -36,9 +36,16 @@ testpaths = ["tests"]
 pythonpath = [".", "src"]
 asyncio_mode = "auto"
 python_files = ["test_*.py"]
+markers = [
+  "live: real external service tests (default excluded)",
+  "network: tests requiring network (default excluded)",
+  "llm: real LLM call tests (default excluded)",
+  "slow: slow tests (default excluded)",
+]
 addopts = [
   "--ignore=legacy_tests",
   "--ignore=tests_e2e",
+  "--ignore=tests_live",
 ]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",

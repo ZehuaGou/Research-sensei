@@ -309,6 +309,8 @@ component_status:
 - 前端不直接调用 /artifacts
 - StatusBanner 有测试
 - 每个 M3.x 子模块都有测试覆盖
+- 真实验收必须有至少一个真实后端 API smoke：上传真实小 PDF，后端返回 job / status / cards，前端能展示状态
+- mock fetch 只能用于组件单测，不代表页面验收通过
 
 ## 16. 当前实现状态
 

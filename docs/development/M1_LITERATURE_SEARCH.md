@@ -266,7 +266,6 @@ class DirectionRunner:
 ### 禁止
 
 - adapter 失败不能静默吞掉
-- 不能单测真实联网
 - warnings 必须是 `WarningItem`，不能是 `str`
 - `search_log` 必须记录每个 source 的结果
 
@@ -335,12 +334,12 @@ class DirectionRunner:
 
 ### 全局测试规则
 
-- 默认 pytest 不联网、不真实调用 LLM
-- HTTP 测试用 `httpx.MockTransport`
+- 快速回归（`python -m pytest -q`）可使用 mock，不作为模块验收依据
+- 真实验收必须真实联网调用 arXiv / OpenAlex
 - adapter 失败必须写入 warnings，不能静默吞掉
 - 去重必须有独立测试
 - reading_plan 必须有 scoring_breakdown 测试
-- 真实联网 M1 验证只在 `tests_live/` 中显式开启，不进入默认 pytest
+- M1 真实验收入口：`RUN_LIVE_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python -m pytest -q tests_live/test_m1_live_search_and_source.py`
 
 ### M1 live search/source validation
 
@@ -369,17 +368,18 @@ M1 完成后，应能做到：
 
 1. 输入用户研究问题（中文或英文）
 2. 生成 query_plan.json（含 core_terms, related_terms, search_intents）
-3. 通过 mock adapter 获取 candidate_pool.json（含 search_log, warnings）
+3. 真实调用 arXiv / OpenAlex 获取 candidate_pool.json（含 search_log, warnings）
 4. 去重并评分生成 filtered_candidates.json
 5. 生成 source_resolution.json（含 source_type, status, URLs, structured warnings）
 6. 生成 reading_plan.json（含 priority, role, scoring_breakdown, selection_reason）
 7. 每一步 artifact schema 可校验（round-trip 测试通过）
-8. 所有外部服务测试默认 mock，不真实联网
-9. 不调用 LLM 生成论文解释
-10. 不进入 M2 精读链路
-11. 单 adapter 失败不阻断整体流程
-12. M1.1-M1.5 每个子模块都有测试覆盖
-13. M1 一级模块有集成测试（query → candidate_pool → source_resolution → filtered → reading_plan）
+8. 至少一个候选论文真实获取 PDF URL
+9. M1 真实验收通过（`RUN_LIVE_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python -m pytest -q tests_live`）
+10. 不调用 LLM 生成论文解释
+11. 不进入 M2 精读链路
+12. 单 adapter 失败不阻断整体流程
+13. M1.1-M1.5 每个子模块都有测试覆盖
+14. M1 一级模块有集成测试（query → candidate_pool → source_resolution → filtered → reading_plan）
 
 ## 13. 当前实现状态
 

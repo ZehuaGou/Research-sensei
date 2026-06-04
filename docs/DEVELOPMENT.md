@@ -8,12 +8,29 @@
 - 不改旧 `backend/`
 - 不改 `frontend/`，除非明确授权
 - 不随意新增依赖；新增依赖必须先讨论、写清用途、通过测试
-- 默认 pytest 不联网，不真实 LLM
-- HTTP 测试用 `httpx.MockTransport`
-- LLM 测试用 `MockLLMClient`
-- 不提交 `.env` / key / 缓存 / 大文件
+- 不提交 `.env` / key / 缓存 / 大文件 / PDF / live report
 - 所有 warnings 必须是 `list[WarningItem]`，禁止 `list[str]`
 - 测试必须检查 `warning.code` 和 `warning.message`
+
+### 测试体系
+
+测试分为两类：
+
+1. **快速回归测试**（unit / failure-path / schema round-trip）：
+   - 可使用 mock / fake
+   - 只用于验证局部逻辑、schema、失败路径
+   - 不作为模块完成验收依据
+   - 命令：`python -m pytest -q`
+
+2. **真实验收测试**（live eval / real LLM / real PDF）：
+   - 涉及外部服务的模块必须真实联网
+   - 涉及 LLM 的模块必须真实调用 LLM
+   - 涉及 PDF 的模块必须真实读取 PDF
+   - 模块完成必须提供真实验收报告
+   - 命令：`RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python -m pytest -q tests_live`
+   - 或：`RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
+
+**模块完成 = 快速回归通过 + 真实验收通过。** mock 测试只能证明代码局部逻辑没坏，不能证明产品可用。不允许把 mock 测试通过写成模块完成。不允许把 skip 写成 pass。不允许缺 API key / 缺网络时仍然汇报"真实验收通过"。
 
 ---
 
@@ -96,15 +113,16 @@
 子模块文档 → 子模块代码 → 子模块单元测试 → 子模块失败路径测试 → 子模块验收 → 再进入下一个子模块
 
 每个子模块必须有：
-- unit tests
-- failure-path tests
+- unit tests（可 mock）
+- failure-path tests（可 mock）
 - schema/artifact round-trip tests（如果涉及）
 - API tests（如果涉及 API）
 - Vitest tests（如果涉及 frontend）
-- LLM 子模块默认用 fake/mock client，不真实调用
-- 外部服务子模块默认用 mock transport
+- 真实验收测试（涉及外部服务 / LLM / PDF 的模块必须有）
 
-每个子模块完成后必须跑基础回归：`python -m pytest -q`
+每个子模块完成后必须跑：
+- 快速回归：`python -m pytest -q`
+- 真实验收：`RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
 
 ### 第二层：一级模块集成测试
 

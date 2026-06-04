@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from researchsensei.acquisition import ArxivAdapter, OpenAlexAdapter
+from researchsensei.source_resolver import SourceResolver
 from researchsensei.core.config import ConfigService, ModelProviderConfig
 from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
@@ -303,6 +304,194 @@ def run_m2_real_llm_smoke(config: LiveEvalConfig, *, work_dir: str | Path) -> di
         )
 
 
+def run_real_pdf_end_to_end_eval(
+    config: LiveEvalConfig,
+    *,
+    work_dir: str | Path,
+    query: str = LIVE_QUERY,
+) -> dict[str, Any]:
+    """End-to-end: real search → real PDF download → real parser → real LLM → audit → status."""
+    live_reason = config.live_skip_reason()
+    if live_reason:
+        return _failed_result("real_pdf_e2e", live_reason, skipped=True)
+    llm_reason = config.llm_skip_reason()
+    if llm_reason:
+        return _failed_result("real_pdf_e2e", llm_reason, skipped=True)
+
+    work_root = Path(work_dir)
+    work_root.mkdir(parents=True, exist_ok=True)
+    pdf_dir = work_root / "pdf"
+    pdf_dir.mkdir(parents=True, exist_ok=True)
+
+    # Step 1: real search
+    max_results = max(1, min(config.max_live_cases, 5))
+    candidates: list = []
+    for adapter in (ArxivAdapter(), OpenAlexAdapter()):
+        try:
+            candidates.extend(adapter.search(query, max_results=max_results))
+        except Exception:
+            pass
+
+    if not candidates:
+        return _failed_result("real_pdf_e2e", "No candidates returned from live search.", extra={"real_network": True})
+
+    # Step 2: find candidate with pdf_url or arxiv_id
+    pdf_candidate = None
+    for c in candidates:
+        if c.pdf_url:
+            pdf_candidate = c
+            break
+        if c.arxiv_id:
+            pdf_candidate = c
+            break
+
+    if pdf_candidate is None:
+        return _failed_result(
+            "real_pdf_e2e",
+            "No candidate with pdf_url or arxiv_id found.",
+            extra={"real_network": True, "candidate_count": len(candidates)},
+        )
+
+    # Step 3: download real PDF
+    resolver = SourceResolver()
+    run_dir = pdf_dir / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    source_status = None
+    if pdf_candidate.pdf_url:
+        source_status = resolver.resolve_pdf_url(pdf_candidate.pdf_url, run_dir)
+    elif pdf_candidate.arxiv_id:
+        source_status = resolver.resolve_arxiv_id(pdf_candidate.arxiv_id, run_dir)
+
+    if source_status is None or source_status.status != "resolved":
+        reason = "PDF download failed."
+        if source_status:
+            reason = f"PDF download failed: status={source_status.status}, warnings={[w.message for w in source_status.warnings]}"
+        return _failed_result(
+            "real_pdf_e2e",
+            reason,
+            extra={
+                "real_network": True,
+                "real_pdf_download": False,
+                "candidate_paper_id": pdf_candidate.paper_id,
+                "candidate_title": pdf_candidate.title,
+            },
+        )
+
+    # Find the downloaded file
+    pdf_files = list(run_dir.glob("source.*"))
+    if not pdf_files:
+        return _failed_result(
+            "real_pdf_e2e",
+            "PDF resolved but source file not found in run_dir.",
+            extra={"real_network": True, "real_pdf_download": True},
+        )
+    source_path = pdf_files[0]
+
+    # Step 4: run full pipeline with real LLM
+    llm_client = build_live_llm_client(config)
+    pipeline_work = work_root / "pipeline"
+    pipeline_work.mkdir(parents=True, exist_ok=True)
+    workspace = WorkspaceStore(pipeline_work / "workspace")
+    jobs = JobStore(pipeline_work / "jobs.sqlite")
+    job_id = f"live-pdf-e2e-{int(time.time() * 1000)}"
+
+    started = time.perf_counter()
+    try:
+        job = SinglePaperIngestionRunner(
+            workspace=workspace,
+            jobs=jobs,
+            llm_client=llm_client,
+        ).run(str(source_path), job_id=job_id)
+        latency_ms = int((time.perf_counter() - started) * 1000)
+    except Exception as exc:
+        return _failed_result(
+            "real_pdf_e2e",
+            f"Pipeline exception: {type(exc).__name__}: {str(exc)[:300]}",
+            extra={
+                "real_network": True,
+                "real_pdf_download": True,
+                "real_llm": True,
+                "token_usage": llm_client.usage.as_dict(),
+            },
+        )
+
+    if job.status != JobStatus.SUCCEEDED:
+        return _failed_result(
+            "real_pdf_e2e",
+            job.error or "Pipeline did not succeed.",
+            extra={
+                "real_network": True,
+                "real_pdf_download": True,
+                "real_llm": True,
+                "job_status": job.status.value,
+                "token_usage": llm_client.usage.as_dict(),
+            },
+        )
+
+    # Step 5: verify artifacts
+    run_dir_path = Path(job.run_dir)
+    artifacts = {a.artifact_type: Path(a.path) for a in job.artifacts}
+    quality_report = _load_json(artifacts.get("quality_report")) or {}
+    understanding_status = _load_json(artifacts.get("understanding_status")) or {}
+    paper_card = _load_json(artifacts.get("paper_card"))
+    evidence_index = _load_json(artifacts.get("evidence_index")) or {}
+
+    evidence_refs = _collect_card_evidence_refs(paper_card)
+    traceable_refs = _evidence_refs(evidence_index)
+    evidence_ref_traceable = bool(evidence_refs) and all(ref in traceable_refs for ref in evidence_refs)
+
+    real_llm_called = llm_client.usage.call_count > 0
+    has_quality_report = bool(quality_report)
+    has_understanding_status = bool(understanding_status)
+
+    failure_reasons: list[str] = []
+    if not real_llm_called:
+        failure_reasons.append("No real LLM call was made.")
+    if not has_quality_report:
+        failure_reasons.append("quality_report.json not generated.")
+    if not has_understanding_status:
+        failure_reasons.append("understanding_status.json not generated.")
+
+    us_status = understanding_status.get("status", "")
+    if us_status in ("BLOCKED_UNDERSTANDING", "FAILED"):
+        failure_reasons.append(f"understanding_status is {us_status}.")
+
+    status = "failed" if failure_reasons else "passed"
+
+    return {
+        "name": "real_pdf_e2e",
+        "status": status,
+        "real_network": True,
+        "real_pdf_download": True,
+        "real_llm": real_llm_called,
+        "query": query,
+        "candidate_paper_id": pdf_candidate.paper_id,
+        "candidate_title": pdf_candidate.title,
+        "candidate_source": pdf_candidate.source,
+        "pdf_source": str(source_path),
+        "model": llm_client.usage.model,
+        "prompt_version": "paper_card_v2/formula_card_v2/teaching_card_v2",
+        "schema_version": "v1",
+        "latency_ms": latency_ms,
+        "token_usage": llm_client.usage.as_dict(),
+        "estimated_cost_usd": round(llm_client.usage.estimated_cost_usd, 6),
+        "artifacts": {
+            "run_dir": str(run_dir_path),
+            "quality_report": str(artifacts.get("quality_report", "")),
+            "understanding_status": str(artifacts.get("understanding_status", "")),
+            "paper_card": str(artifacts.get("paper_card", "")),
+        },
+        "understanding_status": us_status,
+        "allowed_for_user_display": bool(understanding_status.get("allowed_for_user_display", False)),
+        "quality_findings": len(quality_report.get("findings", [])),
+        "has_evidence_ref": bool(evidence_refs),
+        "evidence_ref_traceable": evidence_ref_traceable,
+        "total_tokens": llm_client.usage.total_tokens,
+        "failure_reason": "; ".join(failure_reasons),
+    }
+
+
 def run_full_live_eval(
     *,
     config: LiveEvalConfig | None = None,
@@ -333,8 +522,10 @@ def run_full_live_eval(
         },
         "m1_live": run_m1_live_search(actual_config),
         "m2_real_llm": {},
+        "real_pdf_e2e": {},
     }
     report["m2_real_llm"] = run_m2_real_llm_smoke(actual_config, work_dir=work_root)
+    report["real_pdf_e2e"] = run_real_pdf_end_to_end_eval(actual_config, work_dir=work_root)
     report_path = report_dir / "live_eval_report.json"
     report["report_path"] = str(report_path)
     report_path.write_text(json.dumps(_redact_report(report), ensure_ascii=False, indent=2), encoding="utf-8")

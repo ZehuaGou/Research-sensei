@@ -217,9 +217,9 @@ class LightweightParserAdapter(ParserAdapter):
 
 ### 全局规则
 
-- 默认不真实调用 Docling / MinerU / Nougat / Marker
-- 不联网
-- 不调用 LLM
+- 快速回归可使用 mock，不作为模块验收依据
+- 真实验收必须使用真实 PDF 输入（不能只用 synthetic markdown）
+- 不调用 LLM（parser 不需要 LLM）
 
 ## 12. 验收标准
 
@@ -228,7 +228,7 @@ class LightweightParserAdapter(ParserAdapter):
 - ParserResult 包含 DocumentIngestion + ParseMetadata
 - DocumentBlock 扩展字段向后兼容
 - 外部 parser 不能直接写 artifact
-- 默认测试不联网、不真实调用外部 parser
+- 真实验收必须真实解析 PDF（通过 real PDF e2e eval）
 
 ## 13. 当前实现状态
 

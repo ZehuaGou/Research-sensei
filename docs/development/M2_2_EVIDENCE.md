@@ -315,7 +315,8 @@ class EvidenceRetriever:
 
 ### 全局规则
 
-- 默认不联网、不真实调用 LLM
+- 快速回归可使用 mock，不作为模块验收依据
+- 真实验收必须使用真实 PDF 输入，验证 evidence chain 完整性
 - 不新增依赖
 
 ## 13. 验收标准
@@ -324,7 +325,7 @@ class EvidenceRetriever:
 - ClaimEvidenceV2 正确提取 claims
 - BM25 能检索到相关 passages
 - evidence_index.json v1 兼容
-- 默认测试不联网、不真实调用 LLM
+- 真实验收必须验证 evidence_ref 可追溯（通过 real PDF e2e eval）
 
 ## 14. 当前实现状态
 

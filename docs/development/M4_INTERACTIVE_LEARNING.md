@@ -564,8 +564,9 @@ M4 完成后，应能做到：
 7. 重复问题不重复调用 LLM
 8. 所有解释绑定 evidence_ref
 9. 无证据时降级，不编造
-10. 默认测试不真实调用 LLM
-11. M4.1-M4.6 每个子模块都有测试覆盖
+10. 真实验收必须使用真实 LLM + 真实 paper artifacts + 真实 memory retrieval
+11. 不能只用 fake conversation 作为验收依据
+12. M4.1-M4.6 每个子模块都有测试覆盖
 
 ---
 

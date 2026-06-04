@@ -292,8 +292,8 @@ paper_terms = title_words | abstract_words
 
 ### 全局规则
 
-- 默认不真实调用 LLM
-- 不联网
+- 快速回归可使用 mock，不作为模块验收依据
+- 真实验收必须验证 QualityAuditor 在真实 LLM 输出上的审计结果
 - 不新增依赖
 
 ## 13. 验收标准

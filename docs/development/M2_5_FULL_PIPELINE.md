@@ -178,8 +178,8 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 ### 全局规则
 
-- 默认不真实调用 LLM
-- 不联网
+- 快速回归可使用 mock，不作为模块验收依据
+- 真实验收必须真实联网 + 真实 LLM + 真实 PDF
 - 不新增依赖
 
 ## 9. 验收标准
@@ -187,7 +187,8 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - 单篇链路不同状态 artifact 数量正确
 - 状态传递规则正确
 - DownstreamGates 正确
-- 默认测试不联网、不真实调用 LLM
+- 真实验收必须端到端：真实 PDF → parser → evidence → LLM → audit → understanding_status
+- 真实验收通过 `RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
 
 ## 10. 当前实现状态
 

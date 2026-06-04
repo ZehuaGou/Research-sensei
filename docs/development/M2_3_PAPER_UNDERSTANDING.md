@@ -302,10 +302,10 @@ if not understanding_status.allowed_downstream.advisor_questions:
 
 ### 全局规则
 
-- 默认不真实调用 LLM
-- 不联网
+- 快速回归（`python -m pytest -q`）可使用 mock/fake，不作为模块验收依据
+- 真实验收必须真实调用 LLM，使用真实 PDF 输入
 - 不新增依赖
-- real LLM smoke 只在 `tests_live/` 中显式开启，不进入默认 pytest
+- M2 真实验收入口：`RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
 
 ## 14. 验收标准
 
@@ -314,7 +314,12 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - empty evidence_pack → BLOCKED
 - baseline path 输出 BASELINE_ONLY
 - v2 path fail-closed，不 fallback
-- 默认测试不真实调用 LLM
+- 真实验收必须使用真实 PDF 输入（不能只用 synthetic markdown）
+- 真实验收必须真实调用 LLM，生成 paper/formula/teaching cards
+- 真实验收必须通过 QualityAuditor 审计
+- 真实验收必须生成 understanding_status.json
+- evidence_ref 必须可追溯
+- DEGRADED / BLOCKED 必须真实反映质量，不允许为通过测试放宽
 - real LLM smoke 必须记录 model、prompt version、schema version、token、cost、latency、失败原因
 - real LLM smoke 失败不能伪装成普通 mock 测试通过
 
