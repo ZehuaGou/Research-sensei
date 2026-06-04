@@ -16,7 +16,7 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 |------|------|-------------|----------------|
 | groundedness | 每个解释可追踪到论文证据 | evidence_ref 存在且有效 | 核心 claim 无 evidence_ref (F-1, F-4) |
 | faithfulness | 不编造贡献/实验/结论 | token overlap + paper-specific terms | 输出与论文主题不符 (F-6) |
-| explainability | 用人话解释，不是复制原文 | formula char ratio + raw copy detection | human_explanation 是公式文本 (F-2) |
+| explainability | 用人话解释，不是复制原文 | formula char ratio + raw copy detection | human_explanation 是公式文本 (F-10, 未实现) |
 | formula teaching quality | 符号有依据，作用有解释 | symbol 来自上下文或 REASONABLE_INFERENCE | symbol 解释与论文矛盾 |
 | research thinking | 讲清假设/创新点/代价/边界 | claim_type 覆盖 PROBLEM/METHOD/LIMITATION | — |
 | advisor readiness | 追问具体、基于证据 | drill 问题含论文特有术语 | — |
@@ -180,37 +180,37 @@ class Auditor(ABC):
 
 初版 audit 全部 rule-based。未来可预留 LLM-based auditor 实现同一接口。LLM auditor 必须默认 mock，不允许 pytest 真实调用 LLM。
 
-## 10. 核心检测算法
+## 10. 检测算法
 
-### formula char ratio
+### 已实现：evidence_ref validity（F-1, F-2, F-6）
 
+- F-1: 检查 paper_card 核心字段是否有 evidence_ref
+- F-2: 检查 evidence_ref 是否存在于 evidence_index / claim_evidence
+- F-6: 检查 ClaimEvidence.passage_id 是否存在于 PassageIndex
+
+### 设计中 / 未实现
+
+以下算法已设计但未实现：
+
+**formula char ratio（F-10）**:
 ```
 formula_chars = sum(1 for c in text if c in "=\\_^{}")
 ratio = formula_chars / len(text) if text else 0
-# F-2 trigger: ratio >= 0.3
+# F-10 trigger: ratio >= 0.3
 ```
 
-### token overlap (raw copy detection)
-
+**token overlap / raw copy（F-8）**:
 ```
 tokens_a = set(text_a.lower().split())
 tokens_b = set(text_b.lower().split())
 overlap = len(tokens_a & tokens_b) / max(len(tokens_a), 1)
 ```
 
-**raw copy 分类**:
-- core_idea / problem / method raw copy (overlap > 0.8) → **BLOCK**
-- limitations / quote 高重合 → **WARNING**
-- teaching analogy raw copy → **BLOCK**
-
-### evidence_ref validity
-
+**paper-specific terms（F-9）**:
 ```
-for each claim in card:
-    if claim.evidence_ref:
-        assert claim.evidence_ref in evidence_index.claims[].evidence_ref
-    else:
-        assert claim.evidence_type in (INSUFFICIENT_EVIDENCE, NEEDS_HUMAN_CHECK)
+title_words = set(title.lower().split()) - stopwords
+abstract_words = set(abstract.lower().split()) - stopwords
+paper_terms = title_words | abstract_words
 ```
 
 ## 11. AuditFinding 规则
@@ -221,25 +221,23 @@ for each claim in card:
 
 | ID | 条件 | severity | effect |
 |----|------|----------|--------|
-| F-1 | 核心 claim 无 evidence_ref 且未标 INSUFFICIENT_EVIDENCE | P0 | BLOCK |
-| F-2 | evidence_ref 在 evidence_index 中不存在 | P0 | BLOCK |
-| F-3 | LLM 输出包含 evidence pack 之外的 claim | P0 | BLOCK |
-| F-4 | teaching human_explanation formula-heavy (ratio >= 0.3) | P0 | BLOCK |
-| F-5 | BASELINE_ONLY 被当作 final understanding | P0 | BLOCK |
-| F-6 | BLOCKED_UNDERSTANDING 包含解释性内容 | P0 | BLOCK |
+| F-1 | 核心 paper_card 字段（problem / core_idea / method_overview / experiment_summary）缺 evidence_ref | P0 | BLOCK |
+| F-2 | card 中的 evidence_ref 不存在于 evidence_index / claim_evidence | P0 | BLOCK |
+| F-3 | BLOCKED_UNDERSTANDING 状态下仍存在 paper_card / formula_cards / teaching_cards artifact | P0 | BLOCK |
+| F-4 | BASELINE_ONLY 状态却 allowed_for_user_display=True | P0 | BLOCK |
+| F-5 | component_status / allowed_downstream 与 status 矛盾 | P1 | BLOCK |
+| F-6 | ClaimEvidence.passage_id 不存在于 PassageIndex | P0 | BLOCK |
 
 ### 设计中 / 未实现（F-7 以后）
 
 | ID | 条件 | severity | effect | 状态 |
 |----|------|----------|--------|------|
 | F-7 | warnings 不是 WarningItem | P0 | BLOCK | 设计中 |
-| F-8 | core_idea / problem / method raw copy (overlap > 0.8) | P0 | BLOCK | 未实现 |
-| F-9 | ClaimEvidence.passage_id 在 passage_index 中不存在 | P0 | BLOCK | 未实现 |
-| F-10 | component_status 与 status 矛盾 | P1 | BLOCK | 未实现 |
-| F-11 | generic output（无 paper-specific terms） | P1 | BLOCK | 未实现 |
-| F-12 | missing passage_id for claim_evidence v2 | P0 | BLOCK | 未实现 |
-| F-13 | limitations / quote 高重合 | P2 | WARNING | 未实现 |
-| F-14 | teaching analogy 与 source 中等重合 | P2 | WARNING | 未实现 |
+| F-8 | core_idea / problem / method raw copy (overlap > 0.8) | P0 | BLOCK | 未实现（raw-copy 检测） |
+| F-9 | generic output（无 paper-specific terms） | P1 | BLOCK | 未实现（generic-output 检测） |
+| F-10 | teaching human_explanation formula-heavy (ratio >= 0.3) | P0 | BLOCK | 未实现（formula-heavy 检测） |
+| F-11 | limitations / quote 高重合 | P2 | WARNING | 未实现 |
+| F-12 | teaching analogy 与 source 中等重合 | P2 | WARNING | 未实现 |
 
 ### severity / effect 规则
 
@@ -254,6 +252,7 @@ for each claim in card:
 - teaching_cards FAILED → DEGRADED_STRUCTURAL
 - formula_cards FAILED 需要根据 formula 是否核心判断（formula_is_core 算法未决）
 - parser degraded 不是 hard-fail
+- F-5 检查 component_status / allowed_downstream 与 status 的一致性
 
 ## 12. 测试要求
 
@@ -262,7 +261,7 @@ for each claim in card:
 | 测试 | 断言 |
 |------|------|
 | test_hard_fail_core_claim_without_evidence | F-1 triggered |
-| test_hard_fail_formula_text_as_explanation | F-2 (formula char ratio >= 0.3) |
+| test_hard_fail_formula_text_as_explanation | F-10 (formula char ratio >= 0.3, 未实现) |
 | test_hard_fail_generic_output | F-3 (no paper-specific terms) |
 | test_raw_abstract_copy_detected | F-8 warning or block |
 | test_invalid_evidence_ref_detected | F-2 |
@@ -284,12 +283,12 @@ for each claim in card:
 
 | 测试 | 断言 |
 |------|------|
-| test_f1_core_claim_no_evidence | F-1 triggered when core claim has no evidence_ref |
-| test_f2_invalid_evidence_ref | F-2 triggered when evidence_ref not in index |
-| test_f3_out_of_pack_claim | F-3 triggered when claim outside evidence pack |
-| test_f4_formula_heavy_explanation | F-4 triggered when human_explanation is formula text |
-| test_f5_baseline_as_final | F-5 triggered when BASELINE_ONLY treated as final |
-| test_f6_blocked_has_explanation | F-6 triggered when BLOCKED output has explanation text |
+| test_f1_core_field_missing_evidence_ref | F-1 triggered when paper_card problem/core_idea/method_overview/experiment_summary has no evidence_ref |
+| test_f2_evidence_ref_not_in_sources | F-2 triggered when evidence_ref not in evidence_index or claim_evidence |
+| test_f3_blocked_has_card_artifact | F-3 triggered when BLOCKED_UNDERSTANDING but paper_card/formula_cards/teaching_cards exists |
+| test_f4_baseline_user_display_true | F-4 triggered when BASELINE_ONLY but allowed_for_user_display=True |
+| test_f5_component_status_conflict | F-5 triggered when component_status contradicts status |
+| test_f6_passage_id_not_in_index | F-6 triggered when ClaimEvidence.passage_id not found in PassageIndex |
 
 ### 全局规则
 

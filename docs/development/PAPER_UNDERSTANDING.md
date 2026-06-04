@@ -326,5 +326,5 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - formula_is_core 的具体判断算法
 - EvidencePackSummary 是否足够复现 LLM 输入
 - component_status 的值是否还需要 DEGRADED
-- 旧 Phase 8-10 rule-based builders 迁移细节（old `*_with_llm` 函数可能仍有 fallback，但 pipeline 不走它们）
+- 旧 rule-based baseline builders 与 v2 builders 的边界仍需确认（old `*_with_llm` 函数可能仍有 fallback，但 pipeline 不走它们）
 - DownstreamGates 的最终字段是否足够
