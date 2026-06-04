@@ -19,7 +19,7 @@
 - pipeline v2 path 使用 isolated v2 builders，fail-closed，不 fallback
 - QualityReport debug/admin endpoint 尚未实现
 - formula-heavy / raw-copy / generic-output audit 尚未实现
-- Frontend UI 尚未适配新 endpoint
+- frontend 自动化测试尚未引入
 - 外部项目已完成 GitHub README 级调研，正式接入前仍需本地安装验证和样例对比
 - Paper Understanding 质量仍未达到导师级
 - Phase 12 仍冻结
@@ -28,24 +28,24 @@
 
 ## 3. 当前任务
 
-- API gating 第一批已完成：
-  - /understanding_status endpoint 已完成
-  - /cards endpoint 已完成（status gating + card artifact 一致性校验）
-  - SUCCESS 缺 cards 返回 409
-  - DEGRADED 缺 paper_card/formula_cards 返回 409
-  - DEGRADED 缺 teaching_cards 返回 200 + degraded 标记
-  - /artifacts 默认 403，SENSEI_DEBUG=1 时返回 raw artifacts
-  - quality_report 不通过普通 /artifacts 暴露
-  - BASELINE_ONLY cards 不通过普通 /artifacts 暴露
-  - API gating 基础测试已覆盖 SUCCESS / DEGRADED / BLOCKED
-  - Frontend UI 尚未适配新 endpoint
-  - 481 tests passing（476 existing + 5 new）
+- Frontend API 对齐第一批已完成：
+  - UploadView 已改用 /api/v1/documents/parse
+  - LearningWorkspaceView 已改用 /understanding_status + /cards
+  - BASELINE_ONLY / BLOCKED 不展示 cards
+  - DEGRADED 显示部分讲解不可用
+  - 前端不再依赖不存在的 /api/learn/{id}/bundle
+  - 前端不再依赖不存在的 /api/papers/upload
+  - StatusBanner 组件已实现
+  - patterns/drill tab 标记为 Phase 12 未开放
+  - frontend npm run build 成功
+  - 481 tests passing（后端测试未变）
 - 尚未完成：
-  - /quality_report debug/admin endpoint 尚未实现
+  - frontend 自动化测试尚未引入
+  - evidence_ref 跳转尚未实现
+  - quality_report debug UI 尚未实现
+  - Phase 12 patterns/drill 仍冻结
   - 正式鉴权系统尚未实现
-  - formula-heavy / raw-copy / generic-output audit 尚未实现
-  - Phase 12 仍冻结
-- 下一步：讨论 frontend UI 适配或继续补 audit 规则
+- 下一步：讨论后续方向（audit 规则补充 / evidence_ref 跳转 / frontend 测试）
 
 ---
 

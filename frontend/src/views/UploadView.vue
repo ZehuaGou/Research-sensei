@@ -22,22 +22,20 @@ async function upload() {
   if (!file.value) return
   isUploading.value = true
   try {
-    const res = await fetch('/api/papers/upload', {
+    const formData = new FormData()
+    formData.append('file', file.value)
+    const res = await fetch('/api/v1/documents/parse', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/pdf',
-        'x-filename': file.value.name,
-      },
-      body: await file.value.arrayBuffer(),
+      body: formData,
     })
     const data = await res.json()
-    if (data.job_id) {
+    if (res.ok && data.job_id) {
       router.push(`/learn/${data.job_id}`)
     } else {
-      alert(data.error || '上传失败')
+      alert(data.detail || data.error || '上传失败')
     }
   } catch {
-    alert('上传失败')
+    alert('网络错误，请稍后重试')
   } finally {
     isUploading.value = false
   }
