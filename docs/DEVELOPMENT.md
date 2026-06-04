@@ -7,40 +7,89 @@
 - 只改授权文件
 - 不改旧 `backend/`
 - 不改 `frontend/`，除非明确授权
-- 不随意新增依赖；新增依赖必须先讨论、写清用途、通过测试；当前已新增前端测试依赖：Vitest / Vue Test Utils / jsdom
+- 不随意新增依赖；新增依赖必须先讨论、写清用途、通过测试
 - 默认 pytest 不联网，不真实 LLM
 - HTTP 测试用 `httpx.MockTransport`
 - LLM 测试用 `MockLLMClient`
 - 不提交 `.env` / key / 缓存 / 大文件
-- 不写 Claude 贡献者信息
 - 所有 warnings 必须是 `list[WarningItem]`，禁止 `list[str]`
 - 测试必须检查 `warning.code` 和 `warning.message`
 
 ---
 
-## 2. 模块文档索引
+## 2. 开发流程硬要求
 
-| 文档 | 内容 |
-|------|------|
-| [development/PARSER.md](development/PARSER.md) | ParserAdapter / LightweightParser / 外部 parser 调研 |
-| [development/EVIDENCE.md](development/EVIDENCE.md) | PassageIndex / ClaimEvidence / ClaimExtractor / EvidenceRetriever |
-| [development/PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | EvidencePack / understanding_status / fail-closed / LLM 校验 |
-| [development/LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | QueryPlanner / adapters / SelectionService / DirectionRunner |
-| [development/AUDIT_QUALITY.md](development/AUDIT_QUALITY.md) | QualityReport / hard-fail / 检测算法 / 外部 audit 调研 |
-| Workspace / JobStore | 归属 Pipeline / Engineering Reliability 模块，详见 FULL_PIPELINE.md 和 ENGINEERING_RELIABILITY.md |
-| [development/FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | Vue 前端约束 / artifact 展示规则 / 非 SUCCESS 不展示 |
-| [development/ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 测试规范 / cache / artifact versioning / security |
-| [development/FULL_PIPELINE.md](development/FULL_PIPELINE.md) | 单篇链路 / 方向链路 / 状态传递 / 失败规则 |
+- 每个一级模块和重要子模块的开发文档，都必须包含"可复用开源项目 / 外部服务调研表"。
+- 没有完成这个调研表，不允许进入该模块代码开发。
+- 代码实现必须对照模块文档。
+- 测试和验收必须按模块执行。
 
 ---
 
-## 3. 模块文档固定结构
+## 3. 模块文档索引
+
+### M1 论文搜索、获取与阅读计划
+
+| 子模块 | 开发文档 | 代码位置 |
+|--------|---------|---------|
+| M1.1 搜索规划 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/query/` |
+| M1.2 多源检索 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/acquisition/` |
+| M1.3 下载 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/source_resolver.py` |
+| M1.4 去重评分 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/selection/` |
+| M1.5 阅读计划 | [LITERATURE_SEARCH.md](development/LITERATURE_SEARCH.md) | `src/researchsensei/direction/` |
+
+### M2 单篇论文解析、精读与可信讲解
+
+| 子模块 | 开发文档 | 代码位置 |
+|--------|---------|---------|
+| M2.1 解析 | [PARSER.md](development/PARSER.md) | `src/researchsensei/parser/`, `src/researchsensei/ingestion/` |
+| M2.2 证据链路 | [EVIDENCE.md](development/EVIDENCE.md) | `src/researchsensei/evidence/`, `src/researchsensei/grounding.py` |
+| M2.3 讲解生成 | [PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | `src/researchsensei/paper_card.py`, `*_v2.py` |
+| M2.4 质量审计 | [AUDIT_QUALITY.md](development/AUDIT_QUALITY.md) | `src/researchsensei/audit/` |
+| M2.5 状态门控 | [FULL_PIPELINE.md](development/FULL_PIPELINE.md), [PAPER_UNDERSTANDING.md](development/PAPER_UNDERSTANDING.md) | `src/researchsensei/ingestion/pipeline.py` |
+
+### M3 接口与前端展示
+
+| 子模块 | 开发文档 | 代码位置 |
+|--------|---------|---------|
+| M3.1 后端 API | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `src/researchsensei/web/` |
+| M3.2 上传页面 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/views/UploadView.vue` |
+| M3.3 学习工作区 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/views/LearningWorkspaceView.vue` |
+| M3.4 状态提示 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `frontend/src/components/StatusBanner.vue` |
+| M3.5 调试入口 | [FRONTEND_RENDER.md](development/FRONTEND_RENDER.md) | `src/researchsensei/web/app.py` |
+
+### M4 互动式学习与长期记忆
+
+| 子模块 | 开发文档 | 代码位置 |
+|--------|---------|---------|
+| M4.1 选中内容解释 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.2 符号与公式解释 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.3 上下文追问 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.4 导师式追问与研究训练 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.5 知识库与长期记忆 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+| M4.6 记忆优先检索 | [INTERACTIVE_LEARNING.md](development/INTERACTIVE_LEARNING.md) | 未实现 |
+
+### M5 工程可靠性与测试保障
+
+| 子模块 | 开发文档 | 代码位置 |
+|--------|---------|---------|
+| M5.1 后端测试 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `tests/` |
+| M5.2 前端测试 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `frontend/src/components/tests/` |
+| M5.3 LLM smoke / 成本 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.4 缓存 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | `src/researchsensei/llm/response_cache.py` |
+| M5.5 安全 | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.6 Debug/admin | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
+| M5.7 CI | [ENGINEERING_RELIABILITY.md](development/ENGINEERING_RELIABILITY.md) | 未实现 |
+
+---
+
+## 4. 模块文档统一模板
 
 每个模块文档必须包含：
 
 1. 模块目标
 2. 非目标
-3. 外部项目调研
+3. 可复用开源项目 / 外部服务调研表
 4. 当前代码位置
 5. 输入输出
 6. artifact
@@ -49,3 +98,9 @@
 9. 测试断言
 10. hard-fail
 11. 当前未解决问题
+
+### 可复用开源项目 / 外部服务调研表模板
+
+| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
+|------|------|---------------|----------|--------------|------|----------|
+| — | — | — | — | — | — | — |

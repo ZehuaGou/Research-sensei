@@ -6,131 +6,94 @@
 
 - 主链路 v1 已阶段性封版（详见 docs/MAIN_CHAIN_V1_REVIEW.md）
 - 不是最终产品
-- Phase 12 仍冻结
-- 当前不应该继续碎片化小步开发
-- 后续应按模块闭环推进
+- 当前处于设计文档和开发文档整理阶段
+- 暂停继续代码开发
+- 下一步是逐模块补详细开发文档
+- 不再按 Phase 推进，不再碎片化推进
 
 ---
 
-## 2. 当前阶段已完成内容
+## 2. 模块总控表
 
-### Pipeline 主链路：已阶段完成
-
-- ParserAdapter 接入 SinglePaperIngestionRunner
-- PassageIndex 生成并写入 passage_index.json
-- ClaimEvidenceV2 生成并写入 claim_evidence.json
-- EvidenceRetriever / BM25 已实现（runtime only）
-- EvidencePack runtime builder 已实现
-- isolated LLM v2 builders（fail-closed，不 fallback）
-- pipeline v2 path（SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING）
-- UnderstandingStatus + DownstreamGates + EvidencePackSummary
-- QualityAuditor 已接入 pipeline
-- quality_report.json 写入所有非 FAILED run
-- audit BLOCK 可覆盖 v2 SUCCESS/DEGRADED
-- API gating（/understanding_status + /cards + /artifacts debug-only）
-- BASELINE_ONLY / BLOCKED 不返回 cards
-- 481 backend tests passing
-
-### Frontend：部分完成
-
-- UploadView 已对齐 /api/v1/documents/parse
-- LearningWorkspaceView 已对齐 /understanding_status + /cards
-- StatusBanner 组件已实现并有测试（7 tests）
-- BASELINE_ONLY / BLOCKED 不展示 cards
-- DEGRADED 显示降级提示
-- Phase 12 tabs 显示"未开放"
-- LearningWorkspaceView / UploadView 测试尚未完成
-
-### Audit：结构性 audit 已完成，质量型 audit 未完成
-
-- F-1 到 F-6 结构性规则已实现
-- candidate audit 语义已写清
-- formula-heavy / raw-copy / generic-output 未完成
-
-### Evidence：主链路已完成，evidence_ref 跳转未完成
-
-- passage_index.json / claim_evidence.json / evidence_index.json 职责清晰
-- EvidencePack 不持久化
-- EvidencePackSummary 写入 UnderstandingStatus
-- evidence_ref 原文跳转尚未实现
+| 编号 | 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 下一步 |
+|------|------|---------|---------|---------|---------|--------|
+| M1 | 论文搜索、获取与阅读计划 | ✅ LITERATURE_SEARCH.md | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
+| M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | 已阶段完成 | — |
+| M1.2 | 多源检索 | ✅ | ✅ ArxivAdapter + OpenAlexAdapter | ✅ | 已阶段完成 | Semantic Scholar / Crossref 后补 |
+| M1.3 | 下载 | ✅ | ✅ SourceResolver | ✅ | 已阶段完成 | — |
+| M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 已阶段完成 | — |
+| M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 已阶段完成 | — |
+| M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
+| M2.1 | 解析 | ✅ PARSER.md | ✅ ParserAdapter + LightweightParser | ✅ | 已阶段完成 | Docling adapter 后补 |
+| M2.2 | 证据链路 | ✅ EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ✅ | 已阶段完成 | evidence_ref 跳转后补 |
+| M2.3 | 讲解生成 | ✅ PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders | ✅ | 已阶段完成 | Real LLM smoke 后补 |
+| M2.4 | 质量审计 | ✅ AUDIT_QUALITY.md | ✅ QualityAuditor F-1 到 F-6 | ✅ | 已阶段完成 | 质量规则增强后补 |
+| M2.5 | 状态门控 | ✅ FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ✅ | 已阶段完成 | — |
+| M3 | 接口与前端展示 | ✅ FRONTEND_RENDER.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | 页面级测试补完 |
+| M3.1 | 后端 API | ✅ | ✅ /understanding_status + /cards | ✅ | 已阶段完成 | /quality_report 后补 |
+| M3.2 | 上传页面 | ✅ | ✅ UploadView | ❌ 缺测试 | 部分完成 | 补 UploadView 测试 |
+| M3.3 | 学习工作区 | ✅ | ✅ LearningWorkspaceView | ❌ 缺测试 | 部分完成 | 补 LearningWorkspaceView 测试 |
+| M3.4 | 状态提示 | ✅ | ✅ StatusBanner | ✅ 7 tests | 已阶段完成 | — |
+| M3.5 | 调试入口 | ✅ | ✅ /artifacts debug-only | ✅ | 已阶段完成 | debug 鉴权后补 |
+| M4 | 互动式学习与长期记忆 | ⚠️ INTERACTIVE_LEARNING.md | ❌ 未实现 | ❌ 未测试 | 文档待设计，代码未实现 | 先完成开发文档 |
+| M4.1 | 选中内容解释 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M4.2 | 符号与公式解释 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M4.3 | 上下文追问 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M4.4 | 导师式追问与研究训练 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M4.5 | 知识库与长期记忆 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M4.6 | 记忆优先检索 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M5 | 工程可靠性与测试保障 | ✅ ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
+| M5.1 | 后端测试 | ✅ | ✅ 481 tests | ✅ | 已阶段完成 | — |
+| M5.2 | 前端测试 | ✅ | ⚠️ StatusBanner only | ⚠️ | 部分完成 | 补页面级测试 |
+| M5.3 | LLM smoke / 成本 | ⚠️ | ❌ | ❌ | 文档待设计 | 先讨论方案 |
+| M5.4 | 缓存 | ✅ | ✅ ResponseCache | ✅ | 已阶段完成 | — |
+| M5.5 | 安全 | ⚠️ | ❌ | ❌ | 文档待设计 | — |
+| M5.6 | Debug/admin | ⚠️ | ⚠️ SENSEI_DEBUG only | ⚠️ | 部分完成 | 鉴权后补 |
+| M5.7 | CI | ⚠️ | ❌ | ❌ | 文档待设计 | — |
 
 ---
 
-## 3. 模块总控矩阵
+## 3. 当前主要差距
 
-| 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 阶段完成 |
-|------|---------|---------|---------|---------|---------|
-| Parser / ParserAdapter | 已完成 | 已完成 | 已完成 | 可用 | ✅ 已阶段完成 |
-| PassageIndex | 已完成 | 已完成 | 已完成 | 可用 | ✅ 已阶段完成 |
-| ClaimEvidenceV2 | 已完成 | 已完成 | 已完成 | 可用 | ✅ 已阶段完成 |
-| EvidenceRetriever / BM25 | 已完成 | 已完成 | 已完成 | runtime only | ✅ 已阶段完成 |
-| EvidencePack | 已完成 | 已完成 | 已完成 | runtime only | ✅ 已阶段完成 |
-| baseline card builders | 已完成 | 已完成 | 已完成 | rule-based fallback | ✅ 已阶段完成 |
-| LLM v2 builders | 已完成 | 已完成 | 已完成 | fail-closed | ✅ 已阶段完成 |
-| UnderstandingStatus | 已完成 | 已完成 | 已完成 | 5 状态 + DownstreamGates | ✅ 已阶段完成 |
-| QualityAuditor / QualityReport | 已完成 | 已完成 | 已完成 | F-1 到 F-6 | ✅ 已阶段完成 |
-| Pipeline | 已完成 | 已完成 | 已完成 | baseline + v2 path | ✅ 已阶段完成 |
-| API gating | 已完成 | 已完成 | 已完成 | /understanding_status + /cards | ✅ 已阶段完成 |
-| Frontend Upload | 已完成 | 已完成 | 未完成 | 已对齐 API，缺测试 | ⚠️ 部分完成 |
-| Frontend LearningWorkspace | 已完成 | 已完成 | 未完成 | 已对齐 API，缺测试 | ⚠️ 部分完成 |
-| Frontend tests (StatusBanner) | 已完成 | 已完成 | 已完成 | 7 tests | ✅ 已阶段完成 |
-| Frontend tests (页面级) | 文档有 | 未开始 | 未开始 | 无 | ❌ 未开始 |
-| Real LLM integration | 文档有 | 未开始 | 未开始 | 无 | ❌ 未开始 |
-| Docling parser adapter | 文档有 | 未开始 | 未开始 | 无 | ❌ 未开始 |
-| evidence_ref 跳转 | 文档有 | 未开始 | 未开始 | 无 | ❌ 未开始 |
-| Debug/admin 鉴权 | 文档有 | 未开始 | 未开始 | 无 | ❌ 未开始 |
-| Phase 12 | 冻结中 | 冻结中 | 冻结中 | 不可使用 | 🔒 冻结中 |
-
----
-
-## 4. 当前主要差距
-
-- Real LLM smoke 未做（v2 path 从未用真实 LLM 跑过）
+- M4 互动式学习文档待设计、代码未实现
+- Real LLM smoke 未做
 - Docling parser adapter 未做
 - evidence_ref 原文跳转未做
-- Frontend 页面级测试不足（LearningWorkspaceView / UploadView 无测试）
-- Audit 质量规则不足（formula-heavy / raw-copy / generic-output 未实现）
-- Debug/admin 鉴权未做（当前用 SENSEI_DEBUG 环境变量）
-- Phase 12 冻结
+- Frontend 页面级测试不足
+- Audit 质量规则不足
+- Debug/admin 鉴权未做
 - 完整产品还未完成
 
 ---
 
-## 5. 下一阶段推荐顺序
+## 4. 下一阶段推荐
 
 ### P0：先做
 
-1. **Frontend Testing 模块闭环**
-   - StatusBanner 已完成
-   - 下一步补 LearningWorkspaceView status gating 测试
-   - 再补 UploadView upload flow 测试
-   - 完成后才算 Frontend Testing 第一阶段完成
-
-2. **Real LLM smoke 方案讨论**
-   - 先讨论 env / model / cost / failure handling
-   - 不直接调用真实 LLM
+1. **M3 页面级测试** — LearningWorkspaceView status gating 测试 + UploadView upload flow 测试
+2. **M5.3 Real LLM smoke 方案讨论** — 先讨论 env / model / cost / failure handling
 
 ### P1：近期做
 
 - Real LLM smoke 实现
-- DoclingParserAdapter
-- Audit 质量规则增强（formula-heavy / raw-copy / generic-output）
-- /quality_report debug endpoint
-- Debug/admin 鉴权
+- M2.1 DoclingParserAdapter
+- M2.4 Audit 质量规则增强
+- M3.1 /quality_report debug endpoint
+- M5.6 Debug/admin 鉴权
 
 ### P2：后置
 
-- evidence_ref 跳转
-- e2e 测试
-- Phase 12 解冻准备
+- M2.2 evidence_ref 跳转
+- M5.2 e2e 测试
+- M4 开发文档设计
 
 ---
 
-## 6. 当前禁止事项
+## 5. 当前禁止事项
 
-- 不进入 Phase 12
+- M4 当前不进入代码开发
 - 不再碎片化一个小点一个 commit，除非是 bugfix
-- 不新增大依赖，除非先讨论；已新增的前端测试依赖是 Vitest / Vue Test Utils / jsdom
+- 不新增大依赖，除非先讨论
 - 不真实调用 LLM，除非先完成 smoke 方案
 - 不把 BASELINE_ONLY 当最终导师级理解
 - 不把 DEGRADED_STRUCTURAL 当完整导师级解释
@@ -138,16 +101,7 @@
 
 ---
 
-## 7. 下一步建议
-
-- P0 文档补齐正在进行中（DESIGN / DEVELOPMENT / GLOSSARY / MODULE_CONTRACTS / IMPLEMENTATION_PLAN / FRONTEND_RENDER / ENGINEERING_RELIABILITY）
-- 文档补齐完成后，再决定是否恢复代码开发
-- 下一步代码开发方向：Frontend Testing 模块闭环（LearningWorkspaceView / UploadView 测试）
-- Phase 12 仍冻结
-
----
-
-## 8. 测试和 commit
+## 6. 测试和 commit
 
 - backend pytest: 481 passed
 - frontend npm test: 7 passed (StatusBanner)

@@ -2,7 +2,7 @@
 
 ---
 
-## 1. 项目定位
+## 1. 产品定位
 
 ResearchSensei 是论文研读导师系统，帮助研究生和初级研究者真正读懂论文。
 
@@ -26,9 +26,9 @@ LLM 容易编造。每个解释必须可追踪到论文中的具体证据（evid
 
 规则 baseline（rule-based builders）是诊断工具，不是最终导师级理解。不能冒充高质量解释。
 
-### reuse before build
+### 不重复造轮子
 
-能复用成熟项目就先评估复用，不重复造轮子。外部项目必须通过 adapter 或独立模块接入。
+ResearchSensei 不优先自研所有能力。每个模块在设计和实现前，都要优先调研 GitHub 开源项目、论文工具、成熟库和外部 API。能稳定复用的优先复用；不能直接复用的，也要学习其接口设计、数据结构、失败处理和测试方式。
 
 ### adapter-first
 
@@ -40,58 +40,96 @@ LLM 容易编造。每个解释必须可追踪到论文中的具体证据（evid
 
 ---
 
-## 3. 为什么不是 ARIS
-
-ARIS 做的是自动科研：idea discovery → experiment → paper writing → rebuttal。目标是帮研究者做科研。
-
-ResearchSensei 做的是教人读懂论文：解析 → 证据 → 理解 → 卡片 → 追问。目标是帮学生建立科研思维。
-
-两者目标完全不同。只参考 ARIS 的：
-- audit chain（5 层审计）
-- reviewer independence（审计者独立于生成者）
-- claim audit（零上下文验证）
-
-不整包迁移 ARIS。
-
----
-
-## 4. 为什么保留 Vue / FastAPI / Pydantic
-
-- Vue 3 前端已有基础，重写成本高收益低
-- FastAPI 适合 API、schema 校验、mock 测试
-- Pydantic 适合 artifact JSON 驱动链路
-- 旧 `backend/` 冻结，新功能只走 `src/researchsensei/`
-
----
-
-## 5. 系统架构
+## 3. 用户核心流程
 
 ```
-Product Layer       → Vue / FastAPI / workspace / job / artifact / Pydantic
-Parser Layer        → ParserAdapter interface, LightweightParser fallback
-Evidence Layer      → PassageIndex, ClaimExtractor, ClaimEvidence, EvidenceRetriever
-Paper Understanding → paper_card, formula_cards, teaching_cards, evidence-constrained LLM
-Literature Search   → QueryPlanner, adapters, SelectionService, DirectionRunner
-Audit / Quality     → explanation audit, formula audit, evidence audit, reviewer independence
+用户输入研究方向 → M1 搜索论文 → 生成阅读计划
+                                    ↓
+用户上传论文 PDF  → M2 解析论文 → 证据链路 → 讲解生成 → 质量审计 → 状态门控
+                                    ↓
+                            M3 前端根据状态展示结果
+                                    ↓
+                            M4 用户追问 / 训练 / 长期记忆
+                                    ↓
+                            M5 全程保障可靠、安全、可测试
 ```
 
 ---
 
-## 6. 用户流程
+## 4. 一级模块体系
 
-用户上传论文 PDF → 系统解析为结构化文档 → 构建 passage 和 claim evidence → 生成 evidence pack → LLM 生成卡片 → 审计 → 前端根据状态展示结果。
+| 编号 | 模块 | 职责 |
+|------|------|------|
+| M1 | 论文搜索、获取与阅读计划 | 搜索、下载、筛选、排序、生成阅读计划 |
+| M2 | 单篇论文解析、精读与可信讲解 | 解析、证据链路、讲解生成、质量审计、状态门控 |
+| M3 | 接口与前端展示 | 后端 API、前端状态展示、debug 入口 |
+| M4 | 互动式学习与长期记忆 | 选中解释、追问、训练、知识库、记忆检索 |
+| M5 | 工程可靠性与测试保障 | 测试、安全、缓存、debug/admin、CI、成本控制 |
 
-不同状态用户看到什么：
+---
 
-| status | 用户看到 |
-|--------|---------|
-| SUCCESS | 完整论文卡片、公式卡片、教学讲解 |
-| DEGRADED_STRUCTURAL | 部分卡片 + "部分讲解暂不可用" 提示 |
-| BASELINE_ONLY | "当前为基线解析结果，不是最终导师级理解"，不展示卡片 |
-| BLOCKED_UNDERSTANDING | 阻断原因 + 警告，不展示卡片 |
-| FAILED | 系统错误 |
+## 5. 子模块索引
 
-BASELINE_ONLY 不是最终导师级理解。DEGRADED_STRUCTURAL 不是完整导师级解释。
+### M1 论文搜索、获取与阅读计划
+
+| 子模块 | 职责 |
+|--------|------|
+| M1.1 用户问题与搜索规划 | QueryPlanner |
+| M1.2 多源论文检索 | Search Adapters / Acquisition |
+| M1.3 论文下载与原始材料获取 | Paper Download / Source Fetch |
+| M1.4 候选论文去重与评分 | Candidate Selection |
+| M1.5 阅读计划生成 | Reading Plan / DirectionRunner |
+
+### M2 单篇论文解析、精读与可信讲解
+
+| 子模块 | 职责 |
+|--------|------|
+| M2.1 论文解析与结构化 | Parser / Ingestion |
+| M2.2 证据链路构建 | Evidence / Grounding |
+| M2.3 论文理解与讲解生成 | Paper Understanding / Teaching |
+| M2.4 质量审计与可信控制 | Audit / Quality |
+| M2.5 理解状态与结果门控 | UnderstandingStatus / Gates |
+
+### M3 接口与前端展示
+
+| 子模块 | 职责 |
+|--------|------|
+| M3.1 后端 API | API endpoints |
+| M3.2 上传与任务页面 | Upload / Job UI |
+| M3.3 论文学习工作区 | Learning Workspace |
+| M3.4 状态提示与卡片展示 | StatusBanner / Cards |
+| M3.5 调试入口与 raw artifact 限制 | Debug / Artifacts Gating |
+
+### M4 互动式学习与长期记忆
+
+| 子模块 | 职责 |
+|--------|------|
+| M4.1 选中内容解释 | Selection Explain |
+| M4.2 符号与公式解释 | Symbol / Formula Explain |
+| M4.3 上下文追问 | Interactive Q&A |
+| M4.4 导师式追问与研究训练 | Advisor-style Questioning / Research Drill |
+| M4.5 论文知识库与长期记忆 | PaperMemory / SessionContext |
+| M4.6 记忆优先检索与 token 节省 | Memory-first Retrieval |
+
+### M5 工程可靠性与测试保障
+
+| 子模块 | 职责 |
+|--------|------|
+| M5.1 后端测试 | pytest |
+| M5.2 前端测试 | Vitest |
+| M5.3 真实 LLM smoke 与成本控制 | LLM Smoke / Cost |
+| M5.4 缓存与复用 | Cache |
+| M5.5 安全与密钥扫描 | Secret Scan |
+| M5.6 Debug/admin 权限 | Debug/Admin |
+| M5.7 CI 与发布检查 | CI / Release Check |
+
+---
+
+## 6. 模块流转
+
+```
+M1 找论文 → M2 读懂论文 → M3 展示结果 → M4 互动学习与长期记忆 → M5 保障系统可靠
+```
 
 ---
 
@@ -127,13 +165,44 @@ source_status.json
 query_plan.json → candidate_pool.json → filtered_candidates.json → reading_plan.json
 ```
 
-每个 artifact 有明确的生成者和消费者，JSON 可序列化/反序列化，失败时阻断而非编造。
+---
+
+## 8. 当前未实现能力归属
+
+| 能力 | 归属模块 | 当前状态 |
+|------|---------|---------|
+| Docling parser adapter | M2.1 | 文档有，代码未实现 |
+| Real LLM smoke | M5.3 | 文档有，代码未实现 |
+| evidence_ref 原文跳转 | M2.2 | 文档有，代码未实现 |
+| formula-heavy / raw-copy / generic audit | M2.4 | 文档有，代码未实现 |
+| Debug/admin 鉴权 | M5.6 | 文档有，代码未实现 |
+| /quality_report endpoint | M3.1 | 文档有，代码未实现 |
+| Frontend 页面级测试 | M5.2 | 部分完成 |
+| 互动式学习 | M4 | 文档待设计，代码未实现 |
+| 长期记忆 | M4.5 | 文档待设计，代码未实现 |
+| 导师式追问 | M4.4 | 文档待设计，代码未实现 |
+| 成本控制 | M5.3 | 文档待设计，代码未实现 |
 
 ---
 
-## 8. 产品边界
+## 9. 为什么不是 ARIS
 
-- v1 主链路已阶段性封版
-- 不是最终产品
-- Real LLM smoke、Docling parser、evidence_ref 跳转、debug/admin 鉴权、Phase 12 都是后续能力
-- Phase 12（patterns / drill / advisor questions）当前冻结
+ARIS 做的是自动科研：idea discovery → experiment → paper writing → rebuttal。目标是帮研究者做科研。
+
+ResearchSensei 做的是教人读懂论文：解析 → 证据 → 理解 → 卡片 → 追问。目标是帮学生建立科研思维。
+
+两者目标完全不同。只参考 ARIS 的：
+- audit chain（5 层审计）
+- reviewer independence（审计者独立于生成者）
+- claim audit（零上下文验证）
+
+不整包迁移 ARIS。
+
+---
+
+## 10. 为什么保留 Vue / FastAPI / Pydantic
+
+- Vue 3 前端已有基础，重写成本高收益低
+- FastAPI 适合 API、schema 校验、mock 测试
+- Pydantic 适合 artifact JSON 驱动链路
+- 旧 `backend/` 冻结，新功能只走 `src/researchsensei/`
