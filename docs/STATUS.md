@@ -4,12 +4,14 @@
 
 ## 1. 当前总判断
 
-- 主链路 v1 已阶段性封版（详见 docs/MAIN_CHAIN_V1_REVIEW.md）
-- 不是最终产品
-- 当前处于设计文档和开发文档整理阶段
-- 暂停继续代码开发
-- 下一步是逐模块补详细开发文档
-- 不再按 Phase 推进，不再碎片化推进
+- 项目有完整文档体系和 489 mock tests，但真实能力严重不足
+- 当前没有任何模块通过真实端到端验证
+- M1 搜索无法获取可下载论文（arXiv 超时、OpenAlex 无 PDF URL）
+- M2 只用 synthetic markdown 验证，无真实 PDF
+- M3 无真实前后端联调
+- M4 零代码
+- 成熟项目（arxiv.py / pyalex / Docling / Semantic Scholar）零接入
+- 详细审计见 docs/audit/FULL_PROJECT_REALITY_AUDIT.md
 
 ---
 
@@ -17,18 +19,18 @@
 
 | 编号 | 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 下一步 |
 |------|------|---------|---------|---------|---------|--------|
-| M1 | 论文搜索、获取与阅读计划 | ✅ M1_LITERATURE_SEARCH.md | ✅ 基础闭环完成 | ✅ 已测试 | M1.1-M1.5 基础闭环已打通 | Semantic Scholar / Crossref 后补 |
-| M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | 已阶段完成 | — |
-| M1.2 | 多源检索 | ✅ | ⚠️ arXiv/OpenAlex 已实现 | ⚠️ | 部分完成 | Semantic Scholar / Crossref 后补 |
-| M1.3 | 论文原始材料获取 | ✅ | ✅ PaperSourceResolver | ✅ | 基础 source resolution 已实现；不解析论文内容 | 真实 source/PDF 获取 adapter 后补 |
-| M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 已阶段完成 | — |
-| M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 已阶段完成 | — |
-| M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
-| M2.1 | 解析 | ✅ M2_1_PARSER.md | ✅ ParserAdapter + LightweightParser | ✅ | 已阶段完成 | Docling adapter 后补 |
-| M2.2 | 证据链路 | ✅ M2_2_EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ✅ | 已阶段完成 | evidence_ref 跳转后补 |
-| M2.3 | 讲解生成 | ✅ M2_3_PAPER_UNDERSTANDING.md | ✅ baseline + v2 builders + live smoke | ✅ | 已阶段完成；real LLM smoke 入口已实现 | 持续扩大真实样例 |
-| M2.4 | 质量审计 | ✅ M2_4_AUDIT_QUALITY.md | ✅ QualityAuditor F-1 到 F-6 | ✅ | 已阶段完成 | 质量规则增强后补 |
-| M2.5 | 状态门控 | ✅ M2_5_FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ✅ | 已阶段完成 | — |
+| M1 | 论文搜索、获取与阅读计划 | ✅ M1_LITERATURE_SEARCH.md | ⚠️ 薄 wrapper | ⚠️ mock only | THIN_WRAPPER_ONLY：arXiv 超时、OpenAlex 无 PDF URL | 修复 PDF URL 提取、接入成熟库 |
+| M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | LLM + fallback | — |
+| M1.2 | 多源检索 | ✅ | ⚠️ 自写 httpx wrapper | ⚠️ | THIN_WRAPPER_ONLY：arXiv 超时、OpenAlex 无 pdf_url | 接入 arxiv.py / pyalex |
+| M1.3 | 论文原始材料获取 | ✅ | ⚠️ PaperSourceResolver | ⚠️ | 只做 metadata resolution，不下载 PDF | 真实 PDF 获取 |
+| M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 功能完整 | — |
+| M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 功能完整 | — |
+| M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ⚠️ 部分实现 | ⚠️ mock only | MOCK_TESTED：无真实 PDF 验证 | 真实 PDF e2e 验证 |
+| M2.1 | 解析 | ✅ M2_1_PARSER.md | ⚠️ PyMuPDF get_text | ⚠️ | MOCK_TESTED：parser 太弱 | 接入 Docling |
+| M2.2 | 证据链路 | ✅ M2_2_EVIDENCE.md | ✅ PassageIndex + ClaimEvidenceV2 + BM25 | ⚠️ | MOCK_TESTED：依赖 parser 质量 | 真实 PDF 验证 |
+| M2.3 | 讲解生成 | ✅ M2_3_PAPER_UNDERSTANDING.md | ⚠️ v2 builders + synthetic smoke | ⚠️ | MOCK_TESTED：teaching_cards 真实 LLM JSON 失败 | 修复 JSON 解析、真实 PDF 验证 |
+| M2.4 | 质量审计 | ✅ M2_4_AUDIT_QUALITY.md | ⚠️ F-1 到 F-6 结构性检查 | ⚠️ | MOCK_TESTED：只查结构不查内容 | F-7+ 内容检查 |
+| M2.5 | 状态门控 | ✅ M2_5_FULL_PIPELINE.md | ✅ UnderstandingStatus + DownstreamGates | ⚠️ | MOCK_TESTED：无真实 PDF 验证 | 真实 e2e 验证 |
 | M3 | 接口与前端展示 | ✅ M3_FRONTEND_RENDER.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | 页面级测试补完 |
 | M3.1 | 后端 API | ✅ | ✅ /understanding_status + /cards | ✅ | 已阶段完成 | /quality_report 后补 |
 | M3.2 | 上传页面 | ✅ | ✅ UploadView | ❌ 缺测试 | 部分完成 | 补 UploadView 测试 |
@@ -43,9 +45,9 @@
 | M4.5 | 知识库与长期记忆 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M4.6 | 记忆优先检索 | ✅ | ❌ | ❌ | 文档已设计 | — |
 | M5 | 工程可靠性与测试保障 | ✅ M5_ENGINEERING_RELIABILITY.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | — |
-| M5.1 | 后端测试 | ✅ | ✅ 481 tests | ✅ | 已阶段完成 | — |
+| M5.1 | 后端测试 | ✅ | ✅ 489 tests | ✅ | 快速回归通过（全部 mock） | — |
 | M5.2 | 前端测试 | ✅ | ⚠️ StatusBanner only | ⚠️ | 部分完成 | 补页面级测试 |
-| M5.3 | LLM smoke / 成本 | ✅ | ✅ tests_live + scripts/run_live_eval.py | ✅ opt-in | 已实现受控 live eval；不进入默认 pytest | 增加更多真实样例和定价配置 |
+| M5.3 | LLM smoke / 成本 | ✅ | ⚠️ live eval 框架存在 | ⚠️ | MOCK_TESTED：真实 PDF e2e 失败、arXiv 超时、OpenAlex 无 PDF | 修复 M1 PDF 获取、跑通真实 e2e |
 | M5.4 | 缓存 | ✅ | ✅ ResponseCache | ✅ | 已阶段完成 | — |
 | M5.5 | 安全 | ✅ | ❌ | ❌ | 文档已补齐，secret scan 工具未接入 | 接入 gitleaks / pre-commit |
 | M5.6 | Debug/admin | ⚠️ | ⚠️ SENSEI_DEBUG only | ⚠️ | 部分完成 | 鉴权后补 |
@@ -53,16 +55,17 @@
 
 ---
 
-## 3. 当前主要差距
+## 3. 当前主要差距（审计后）
 
-- M4 互动式学习文档已设计、代码未实现
-- Real LLM smoke 已有受控入口，但真实样例数量仍少
-- Docling parser adapter 未做
-- evidence_ref 原文跳转未做
-- Frontend 页面级测试不足
-- Audit 质量规则不足
-- Debug/admin 鉴权未做
-- 完整产品还未完成
+- **M1 PDF 获取不可用**：arXiv 超时、OpenAlex 无 PDF URL，阻塞 M2 真实验证
+- **M2 无真实 PDF 验证**：只用 synthetic markdown，parser 太弱
+- **M2.3 teaching_cards 真实 LLM JSON 解析失败**
+- **M2.4 审计只查结构不查内容**：F-7+ 全部未实现
+- **M3 无真实前后端联调**
+- **M4 零代码**
+- **成熟项目零接入**：arxiv.py / pyalex / Docling / Semantic Scholar 全部未接入
+- **无 CI、无 secret scan**
+- 详细审计见 docs/audit/FULL_PROJECT_REALITY_AUDIT.md
 
 ---
 
