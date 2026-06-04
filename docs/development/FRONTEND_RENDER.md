@@ -55,7 +55,7 @@ M2 pipeline 完成
 
 ### 测试
 
-- `frontend/src/components/__tests__/StatusBanner.test.ts` — StatusBanner 7 tests
+- `frontend/src/components/tests/StatusBanner.spec.ts` — StatusBanner 7 tests
 - `tests/test_api_status_gating.py` — API status gating 15 tests
 
 ## 6. API 端点
@@ -201,15 +201,18 @@ component_status:
 | status | 行为 |
 |--------|------|
 | SUCCESS | 返回成功 cards |
-| DEGRADED_STRUCTURAL | 只返回成功组件 cards，返回 degraded_components / warnings |
+| DEGRADED_STRUCTURAL | 只返回成功组件 cards，返回 `degraded: true` + `missing_components` |
 | BASELINE_ONLY | 普通用户返回 403；debug/admin 可返回 baseline cards |
 | BLOCKED_UNDERSTANDING | 返回 403 + blocking_reason + warnings |
 | FAILED | 返回 500/failed status |
 
-## 11. /artifacts 与 /quality_report 权限
+## 11. /artifacts 权限与 /quality_report 状态
 
 - `/artifacts` 定位为 debug/admin raw API
-- `/quality_report` 定位为 debug/admin API
+- `/quality_report` endpoint 当前未实现
+- `quality_report.json` 当前只能通过 debug/admin raw artifacts（`/artifacts`）查看
+- 普通用户不能访问完整 QualityReport
+- 后续如果新增 `/quality_report` endpoint，必须走正式 debug/admin 鉴权
 - 普通前端不应直接用 `/artifacts` 展示 cards
 - `/cards` 是用户端展示 card 的唯一受控 API
 - production 必须有鉴权；本地开发可通过 `SENSEI_DEBUG=1`
@@ -329,7 +332,7 @@ component_status:
 - M3.2 UploadView 页面级测试
 - M3.3 LearningWorkspaceView 页面级测试
 - M4 互动式学习 tabs（显示"未开放"）
-- /quality_report debug endpoint
+- /quality_report debug endpoint（当前未实现，quality_report.json 只能通过 /artifacts 查看）
 - debug/admin 鉴权机制
 - evidence_ref 跳转
 
