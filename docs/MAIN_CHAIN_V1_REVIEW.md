@@ -1,4 +1,7 @@
-# ResearchSensei 主链路 v1 封版记录
+# ResearchSensei 主链路 v1 封版记录 — 历史归档
+
+> **本文档是历史封版记录，不作为当前开发依据。**
+> 当前正式开发依据是 M1-M5 模块体系，见 DESIGN.md 和 STATUS.md。
 
 ---
 

@@ -23,6 +23,10 @@
 - **QualityReport**: Audit output with findings list.
 - **AuditFinding**: Single audit finding with code / severity / effect.
 - **QualityAuditor**: Rule-based auditor that reads candidate artifacts.
+- **PatternCard**: Research thinking pattern extraction from paper structure (M4, not yet implemented).
+- **DrillCard**: Socratic-style questioning card for deep understanding (M4, not yet implemented).
+- **InteractiveAnswer**: On-demand answer to user's specific question about a paper (M4, not yet implemented).
+- **ContextPack**: Curated context window for LLM interactive answer (M4, not yet implemented).
 
 ## Status Terms
 
@@ -45,20 +49,6 @@
 - `teaching_cards.json`: Teaching explanation cards
 - `understanding_status.json`: Pipeline understanding status
 - `quality_report.json`: Audit quality report
-- `query_plan.json`: Search plan
-- `candidate_pool.json`: Raw candidate papers
-- `filtered_candidates.json`: Deduplicated candidates
-- `reading_plan.json`: Prioritized reading list
-
-## Artifact Names
-
-- `source_status.json`: Source resolution status
-- `parsed_document.json`: Parsed document blocks
-- `evidence_index.json`: Evidence bindings
-- `paper_skeleton.json`: Paper structure extraction
-- `paper_card.json`: Paper learning card
-- `formula_cards.json`: Formula explanation cards
-- `teaching_cards.json`: Teaching explanation cards
 - `query_plan.json`: Search plan
 - `candidate_pool.json`: Raw candidate papers
 - `filtered_candidates.json`: Deduplicated candidates

@@ -1,4 +1,8 @@
-# Technical Discussion
+# Technical Discussion — 历史归档
+
+> **本文档是历史技术讨论归档，不作为当前开发依据。**
+> 当前正式开发依据是：DESIGN.md、DEVELOPMENT.md、STATUS.md、docs/development/*.md。
+> 本文档保留外部项目调研和历史共识参考，但不再指导开发。
 
 ---
 

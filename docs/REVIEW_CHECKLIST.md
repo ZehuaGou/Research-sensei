@@ -1,6 +1,6 @@
 # ResearchSensei Review Checklist
 
-> **Canonical docs**: See `docs/DEVELOPMENT.md`, `docs/STATUS.md`, `docs/development/`.
+> **Canonical docs**: See `docs/DEVELOPMENT.md`, `docs/STATUS.md`, `docs/development/*.md`.
 
 ## Pre-Commit Checklist
 
@@ -13,16 +13,17 @@
 7. Is there any API key or secret in the changes?
 8. Did I update documentation if needed?
 
-## Phase Completion Checklist
+## Module Completion Checklist
 
 1. All new tests pass
 2. All existing tests still pass
 3. No forbidden files modified
 4. No new dependencies (or reuse gate completed)
-5. Documentation updated
+5. Module development doc (`docs/development/*.md`) updated
 6. Artifacts backward compatible (if applicable)
 7. No real network/LLM in default tests
 8. Hard-fail conditions tested
+9. Research table in module doc completed (before code development)
 
 ## ResearchSensei Quality Standards
 
@@ -30,3 +31,5 @@
 - No formula text as human explanation
 - No template-based generic output
 - No fabrication of results or datasets
+- Fail-closed: BLOCKED_UNDERSTANDING rather than garbage output
+- No mutable default values in Pydantic schemas (`Field(default_factory=...)`)
