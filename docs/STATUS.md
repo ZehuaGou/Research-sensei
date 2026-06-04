@@ -17,10 +17,10 @@
 
 | 编号 | 模块 | 文档状态 | 代码状态 | 测试状态 | 当前结论 | 下一步 |
 |------|------|---------|---------|---------|---------|--------|
-| M1 | 论文搜索、获取与阅读计划 | ✅ LITERATURE_SEARCH.md | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
+| M1 | 论文搜索、获取与阅读计划 | ✅ LITERATURE_SEARCH.md | ⚠️ 部分完成 | ⚠️ 部分测试 | 部分完成 | M1.3 实现 |
 | M1.1 | 搜索规划 | ✅ | ✅ QueryPlanner | ✅ | 已阶段完成 | — |
-| M1.2 | 多源检索 | ✅ | ✅ ArxivAdapter + OpenAlexAdapter | ✅ | 已阶段完成 | Semantic Scholar / Crossref 后补 |
-| M1.3 | 下载 | ✅ | ✅ SourceResolver | ✅ | 已阶段完成 | — |
+| M1.2 | 多源检索 | ✅ | ⚠️ arXiv/OpenAlex 已实现 | ⚠️ | 部分完成 | Semantic Scholar / Crossref 后补 |
+| M1.3 | 论文原始材料获取 | ✅ | ❌ 未实现 | ❌ | 文档已设计，代码未实现 | 实现代码 |
 | M1.4 | 去重评分 | ✅ | ✅ SelectionService | ✅ | 已阶段完成 | — |
 | M1.5 | 阅读计划 | ✅ | ✅ DirectionRunner | ✅ | 已阶段完成 | — |
 | M2 | 单篇论文解析、精读与可信讲解 | ✅ 5 个子文档 | ✅ 已实现 | ✅ 已测试 | 已阶段完成 | — |
