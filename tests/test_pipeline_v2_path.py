@@ -144,7 +144,7 @@ def test_baseline_writes_10_artifacts(tmp_path: Path) -> None:
 
     job = runner.run(source, job_id="test-count")
 
-    assert len(job.artifacts) == 10
+    assert len(job.artifacts) == 11
 
 
 def test_baseline_old_card_artifacts_still_written(tmp_path: Path) -> None:
@@ -222,7 +222,7 @@ def test_v2_success_writes_10_artifacts(tmp_path: Path) -> None:
 
     job = runner.run(source, job_id=_V2_PAPER_ID)
 
-    assert len(job.artifacts) == 10
+    assert len(job.artifacts) == 11
     artifact_types = {a.artifact_type for a in job.artifacts}
     assert "paper_card" in artifact_types
     assert "teaching_cards" in artifact_types

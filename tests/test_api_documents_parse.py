@@ -43,7 +43,7 @@ def test_parse_upload_markdown_generates_phase6_artifacts(tmp_path: Path) -> Non
     artifacts = response.json()["artifacts"]
     artifact_types = {artifact["artifact_type"] for artifact in artifacts}
 
-    assert {"source_status", "ingestion", "passage_index", "claim_evidence", "evidence_index", "paper_skeleton", "paper_card", "formula_cards", "teaching_cards", "understanding_status"} == artifact_types
+    assert {"source_status", "ingestion", "passage_index", "claim_evidence", "evidence_index", "paper_skeleton", "paper_card", "formula_cards", "teaching_cards", "understanding_status", "quality_report"} == artifact_types
     assert all(Path(artifact["path"]).exists() for artifact in artifacts)
 
 

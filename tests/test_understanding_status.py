@@ -174,11 +174,11 @@ def test_artifact_count_includes_understanding_status(tmp_path: Path) -> None:
 
     artifact_types = {a.artifact_type for a in job.artifacts}
     assert "understanding_status" in artifact_types
-    assert len(job.artifacts) == 10
+    assert len(job.artifacts) == 11
     expected = {
         "source_status", "ingestion", "passage_index", "claim_evidence",
         "evidence_index", "paper_skeleton", "paper_card", "formula_cards",
-        "teaching_cards", "understanding_status",
+        "teaching_cards", "understanding_status", "quality_report",
     }
     assert artifact_types == expected
 

@@ -5,6 +5,7 @@ import logging
 import shutil
 from pathlib import Path
 
+from researchsensei.audit.quality_auditor import QualityAuditor
 from researchsensei.evidence.claim_extractor import build_claim_evidence
 from researchsensei.evidence.evidence_pack import build_evidence_pack
 from researchsensei.evidence.passage_index import build_passage_index
@@ -20,11 +21,13 @@ from researchsensei.paper_card_v2 import build_paper_card_v2
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.parser.adapter import ParserAdapter
 from researchsensei.schemas import (
+    ArtifactBundle,
     ClaimEvidenceBundle,
     DownstreamGates,
     EvidencePack,
     JobRecord,
     JobStatus,
+    QualityReport,
     SourceStatus,
     UnderstandingStatus,
     WarningItem,
@@ -65,12 +68,14 @@ class SinglePaperIngestionRunner:
         ingestion: LightweightIngestionService | None = None,
         parser_adapter: ParserAdapter | None = None,
         llm_client: LLMClient | MockLLMClient | None = None,
+        quality_auditor: QualityAuditor | None = None,
     ) -> None:
         self.workspace = workspace
         self.jobs = jobs
         self.ingestion = ingestion or LightweightIngestionService()
         self.parser_adapter = parser_adapter
         self.llm_client = llm_client
+        self.quality_auditor = quality_auditor or QualityAuditor()
 
     def run(
         self,
@@ -162,6 +167,17 @@ class SinglePaperIngestionRunner:
                 warnings=[WarningItem(code="PIPELINE_FAILED", message=error_summary)],
             )
 
+        # Audit: construct candidate ArtifactBundle and run QualityAuditor
+        quality_report, understanding_status, card_artifacts = self._run_audit(
+            actual_job_id,
+            understanding_status,
+            card_artifacts,
+            evidence_index,
+            claim_evidence,
+            passage_index,
+            paper_skeleton,
+        )
+
         # Write artifacts
         return self._write_artifacts(
             actual_job_id,
@@ -174,7 +190,69 @@ class SinglePaperIngestionRunner:
             paper_skeleton,
             understanding_status,
             card_artifacts,
+            quality_report,
         )
+
+    def _run_audit(
+        self,
+        paper_id: str,
+        understanding_status: UnderstandingStatus,
+        card_artifacts: dict,
+        evidence_index,
+        claim_evidence,
+        passage_index,
+        paper_skeleton,
+    ) -> tuple[QualityReport, UnderstandingStatus, dict]:
+        """Run QualityAuditor on candidate artifacts. May override status."""
+        bundle = _build_artifact_bundle(
+            paper_card=card_artifacts.get("paper_card"),
+            formula_cards=card_artifacts.get("formula_cards"),
+            teaching_cards=card_artifacts.get("teaching_cards"),
+            evidence_index=evidence_index,
+            claim_evidence=claim_evidence,
+            passage_index=passage_index,
+            paper_skeleton=paper_skeleton,
+            understanding_status=understanding_status,
+        )
+
+        quality_report = self.quality_auditor.audit(bundle)
+
+        # Check for BLOCK findings
+        block_findings = [f for f in quality_report.findings if f.effect == "BLOCK"]
+        current_status = understanding_status.status
+
+        # Only override v2 SUCCESS / DEGRADED to BLOCKED
+        if block_findings and current_status in ("SUCCESS", "DEGRADED_STRUCTURAL"):
+            audit_warnings = _convert_findings_to_warnings(
+                [f for f in quality_report.findings if f.effect == "WARNING"]
+            )
+            understanding_status = _build_blocked_status(
+                paper_id,
+                blocking_reason="AUDIT_BLOCKED",
+                component_status={
+                    "paper_card": "FAILED",
+                    "formula_cards": "SKIPPED",
+                    "teaching_cards": "SKIPPED",
+                    "llm": "SUCCESS",
+                    "evidence_pack": "SUCCESS",
+                    "audit": "FAILED",
+                },
+                evidence_pack_summary=understanding_status.evidence_pack_summary,
+                warnings=audit_warnings,
+            )
+            card_artifacts = {}
+
+        # Add WARNING findings to status warnings (for non-overridden cases)
+        elif not block_findings:
+            warning_items = _convert_findings_to_warnings(
+                [f for f in quality_report.findings if f.effect == "WARNING"]
+            )
+            if warning_items:
+                understanding_status = understanding_status.model_copy(
+                    update={"warnings": [*understanding_status.warnings, *warning_items]}
+                )
+
+        return quality_report, understanding_status, card_artifacts
 
     def _run_v2_builders(
         self,
@@ -268,6 +346,7 @@ class SinglePaperIngestionRunner:
         paper_skeleton,
         understanding_status: UnderstandingStatus,
         card_artifacts: dict,
+        quality_report: QualityReport,
     ) -> JobRecord:
         """Write all artifacts and update job."""
         source_status_path = run_dir / "source_status.json"
@@ -277,6 +356,7 @@ class SinglePaperIngestionRunner:
         evidence_path = run_dir / "evidence_index.json"
         skeleton_path = run_dir / "paper_skeleton.json"
         understanding_status_path = run_dir / "understanding_status.json"
+        quality_report_path = run_dir / "quality_report.json"
 
         self.workspace.write_json(source_status_path, resolved_source_status)
         self.workspace.write_json(parsed_path, document)
@@ -285,6 +365,7 @@ class SinglePaperIngestionRunner:
         self.workspace.write_json(evidence_path, evidence_index)
         self.workspace.write_json(skeleton_path, paper_skeleton)
         self.workspace.write_json(understanding_status_path, understanding_status)
+        self.workspace.write_json(quality_report_path, quality_report)
 
         artifacts = [
             WorkspaceArtifact(artifact_type="ingestion", path=str(parsed_path)),
@@ -312,6 +393,7 @@ class SinglePaperIngestionRunner:
             artifacts.append(WorkspaceArtifact(artifact_type="teaching_cards", path=str(teaching_path)))
 
         artifacts.append(WorkspaceArtifact(artifact_type="understanding_status", path=str(understanding_status_path)))
+        artifacts.append(WorkspaceArtifact(artifact_type="quality_report", path=str(quality_report_path)))
 
         current_step = "ingestion_degraded" if document.degraded else "ingestion_completed"
         return self.jobs.update(
@@ -512,3 +594,46 @@ def _build_evidence_pack_summary(
         claim_type_counts=claim_type_counts,
         truncated_passage_ids=[],
     )
+
+
+def _build_artifact_bundle(
+    *,
+    paper_card=None,
+    formula_cards=None,
+    teaching_cards=None,
+    evidence_index=None,
+    claim_evidence=None,
+    passage_index=None,
+    paper_skeleton=None,
+    understanding_status=None,
+) -> ArtifactBundle:
+    """Build ArtifactBundle from in-memory objects for audit."""
+    def _to_dict(obj):
+        if obj is None:
+            return None
+        if isinstance(obj, dict):
+            return obj
+        return obj.model_dump(mode="json")
+
+    return ArtifactBundle(
+        paper_card=_to_dict(paper_card),
+        formula_cards=_to_dict(formula_cards),
+        teaching_cards=_to_dict(teaching_cards),
+        evidence_index=_to_dict(evidence_index),
+        claim_evidence=_to_dict(claim_evidence),
+        passage_index=_to_dict(passage_index),
+        paper_skeleton=_to_dict(paper_skeleton),
+        understanding_status=_to_dict(understanding_status),
+    )
+
+
+def _convert_findings_to_warnings(findings) -> list[WarningItem]:
+    """Convert AuditFinding WARNING items to WarningItem for UnderstandingStatus."""
+    items: list[WarningItem] = []
+    for f in findings:
+        items.append(WarningItem(
+            code=f.code,
+            message=f.message,
+            detail=f"artifact={f.artifact}; field={f.field}; severity={f.severity}; effect={f.effect}",
+        ))
+    return items
