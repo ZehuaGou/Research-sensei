@@ -173,13 +173,21 @@ QueryPlanner.plan()
   -> query_plan.json
 DirectionRunner._acquire()
   -> candidate_pool.json
+SelectionService.deduplicate()
+  -> deduplicated candidates
+CandidateVerifier.verify_many()
+  -> verification fields
+RelevanceJudge.judge_many()
+  -> LLM relevance fields
+DirectionRunner._should_download()
+  -> download decision
 PaperSourceResolver.resolve_many()
   -> source_resolution.json
-SelectionService.deduplicate()
-  -> filtered_candidates.json
 SelectionService.build_reading_plan()
-  -> reading_plan.json
+  -> filtered_candidates.json + reading_plan.json
 ```
+
+Note: verification + LLM relevance judge happen before download. Candidates with `should_download=false` are not downloaded. `filtered_candidates.json` contains post-verify + post-relevance + post-download final candidates.
 
 ## M1.1 Query Planning
 
@@ -426,14 +434,46 @@ python -m pytest -q
 python scripts/run_live_eval.py
 ```
 
-### M1 Live Status Levels
+### Direction Exploration Mode 验收
 
-**passed**:
+当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
 
+未来验收必须满足：
+
+- broad direction query uses real LLM and real network
+- `survey_candidates.json` exists
+- `direction_landscape.json` exists
+- `method_families` non-empty
+- `chronology_stages` non-empty
+- `landscape_anchors` non-empty
+- `recommended_reading_order` non-empty
+- every survey candidate has quality reason
+- every landscape anchor has source, reason, verification status
+
+### Focused Acquisition Mode 验收
+
+当前状态：REAL_E2E_VERIFIED。
+
+验收必须满足：
+
+- `query_plan.json` exists
+- `candidate_pool.json` exists
+- `source_resolution.json` exists
+- `filtered_candidates.json` exists
+- `reading_plan.json` exists
 - `sources_success >= 3`
+- `verified_candidate_count` exists
+- `llm_judged_candidate_count` exists
 - `pdf_download_success_count >= 1`
-- `A_READ count >= 1`
-- every A_READ has `can_enter_m2=true`
+- every `A_READ_FOR_M2` satisfies:
+  - `verification_status == verified`
+  - `llm_relevance_score >= 0.65`
+  - `llm_relevance_label in {HIGH, MEDIUM}`
+  - `should_a_read == true`
+  - `pdf_downloaded == true`
+  - `pdf_metadata_check == passed`
+  - `pdf_title_match == match`
+  - `can_enter_m2 == true`
 
 **degraded_passed**:
 
@@ -449,6 +489,19 @@ python scripts/run_live_eval.py
 - or no validated PDF downloaded
 - or no A_READ paper
 - or any A_READ has `can_enter_m2=false`
+
+### Seed Paper Expansion Mode 验收
+
+当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
+
+未来验收必须满足：
+
+- seed paper metadata exists
+- `paper_relation_graph.json` exists
+- `seed_expansion_result.json` exists
+- `upstream_papers` / `downstream_papers` / `related_surveys` / `follow_up_papers` present
+- every relation has `relation_type`, evidence source, confidence
+- unverified relation cannot be shown as trusted
 
 ### Additional Checks
 

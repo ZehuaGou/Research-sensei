@@ -227,20 +227,26 @@ seed_paper_metadata → paper_relation_graph.json → seed_expansion_result.json
 
 | 能力 | 归属模块 | 当前状态 |
 |------|---------|---------|
-| Direction Exploration Mode | M1 | NOT_IMPLEMENTED |
-| Seed Paper Expansion Mode | M1 | NOT_IMPLEMENTED |
-| Survey Deep Reading | M2 | NOT_IMPLEMENTED |
-| Docling parser adapter | M2.1 | 文档有，代码未实现 |
-| Real LLM smoke | M5.3 | 文档有，代码未实现 |
-| evidence_ref 原文跳转 | M2.2 | 文档有，代码未实现 |
-| Debug/admin 鉴权 | M5.6 | 文档有，代码未实现 |
-| /quality_report endpoint | M3.1 | 文档有，代码未实现 |
-| DirectionWorkspace | M3 | NOT_IMPLEMENTED |
-| SeedExpansionPanel | M3 | NOT_IMPLEMENTED |
-| 互动式学习 | M4 | 文档待设计，代码未实现 |
-| 长期记忆 | M4.5 | 文档待设计，代码未实现 |
-| 导师式追问 | M4.4 | 文档待设计，代码未实现 |
-| 成本控制 | M5.3 | 文档待设计，代码未实现 |
+| Direction Exploration Mode | M1 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| Focused Acquisition Mode | M1 | REAL_E2E_VERIFIED |
+| Seed Paper Expansion Mode | M1 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| Survey Deep Reading | M2 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| Docling / external parser adapter | M2.1 | EVALUATED_IN_DOC, NOT_IMPLEMENTED |
+| evidence_ref 原文跳转 | M2.2 / M3 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| DirectionWorkspace | M3 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| PaperWorkspace full real validation | M3 | PARTIAL_CODE, REAL_PAGE_VALIDATION_MISSING |
+| SeedExpansionPanel | M3 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M4 paper-level interaction | M4 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M4 direction-level interaction | M4 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M4 seed-expansion interaction | M4 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M4 long-term memory | M4.5 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M4 advisor training | M4.4 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M5 real LLM smoke / live eval | M5.3 | PARTIAL_CODE, NOT_FULLY_VERIFIED |
+| M5 cost control | M5.3 | DOC_DESIGNED, PARTIAL_CODE |
+| M5 secret scan | M5.5 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M5 CI / release check | M5.7 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| Debug/admin 鉴权 | M5.6 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| /quality_report endpoint | M3.1 / M5.6 | DOC_DESIGNED, NOT_IMPLEMENTED |
 
 ---
 

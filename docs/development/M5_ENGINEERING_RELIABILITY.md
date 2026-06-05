@@ -265,16 +265,16 @@ python scripts/run_live_eval.py
 - 必须有 cost limit
 - 必须限制样例数量
 - 必须记录模型名、prompt version、schema version、运行日期
-- 不允许默认真实调用 LLM
+- 涉及 LLM 的验收必须真实调用 LLM。成本通过 token limit / cost limit / sample limit 控制，而不是用 mock 替代
 - live eval report 写入 `reports/live_eval/live_eval_report.json`
 - `reports/live_eval/` 必须加入 `.gitignore`，报告、工作目录、PDF、大文件不得提交
-- 如果缺少 API key，真实 LLM 测试必须 skip 或报告明确失败原因，不得伪装通过
+- 如果缺少 API key，真实 LLM 测试必须 fail，并报告明确失败原因；不得 skip 后算通过
 
 ### 测试要求
 
 | 测试 | 断言 |
 |------|------|
-| test_llm_smoke_opt_in | 快速回归中不执行，RUN_LLM_TESTS=1 时必须执行且不能 skip |
+| test_llm_smoke_real_execution | python -m pytest -q 在配置真实 env 时必须真实执行；缺 key 时必须失败，不能 skip |
 | test_llm_smoke_token_limit | token 用量不超过限制 |
 | test_llm_smoke_records_metadata | 记录模型名、prompt version、运行日期 |
 | test_m1_live_search_and_source_resolution | 显式开启后真实 arXiv/OpenAlex 检索，并记录 source resolution |
@@ -552,10 +552,12 @@ python scripts/run_live_eval.py
 
 ### 状态流 / 错误策略
 
-- 不真实联网
-- 不真实调用 LLM
-- 失败时不得发布
-- CI 默认排除 live / network / llm / slow 测试
+CI / release readiness 必须区分两类结果：
+
+1. local structural check: 可以只证明代码结构和构建没有明显错误；不能标记模块完成；不能标记 release ready
+2. real release validation: 必须真实联网；必须真实调用 LLM；必须真实下载/解析 PDF；必须运行 frontend build/test；必须运行 secret scan；失败则不得发布
+
+如果 CI 环境没有配置 API key / network / live env，只能报告 "real release validation not run"，不能报告 release ready
 
 ### 测试要求
 

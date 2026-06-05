@@ -217,8 +217,8 @@ class LightweightParserAdapter(ParserAdapter):
 
 ### 全局规则
 
-- 快速回归可使用 mock，不作为模块验收依据
-- 真实验收必须使用真实 PDF 输入（不能只用 synthetic markdown）
+- Parser 接口 / schema round-trip 可以作为本地结构检查，但不能作为 M2.1 验收
+- M2.1 验收必须使用真实 PDF 输入，验证 parsed_document.json、warning、degraded 状态和 parser metadata
 - 不调用 LLM（parser 不需要 LLM）
 
 ## 12. 验收标准

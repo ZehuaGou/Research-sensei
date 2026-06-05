@@ -23,14 +23,16 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | Module | Mode | Code Status | Test Status | Real Status | Notes |
 |---|---|---|---|---|---|
 | M1 | Focused Acquisition | implemented | real tested | REAL_E2E_VERIFIED | 窄 query 真实链路通过 |
-| M1 | Direction Exploration | not implemented | — | DOC_REQUIRED | 宽 query 方向框架未实现 |
-| M1 | Seed Paper Expansion | not implemented | — | DOC_REQUIRED | seed paper 扩展未实现 |
+| M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
+| M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Overall | — | — | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，其余未实现 |
-| M2 | Paper Deep Reading | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收 |
-| M2 | Survey Deep Reading | not implemented | — | DOC_REQUIRED | 综述论文精读未实现 |
-| M3 | Frontend | existing code | component tests | not verified | M3 前端组件测试通过，页面级验收未完成 |
-| M4 | Interactive Learning | existing docs | — | DOC_REQUIRED | M4 互动式学习文档待设计，代码未实现 |
-| M5 | Reliability | existing docs | — | DOC_REQUIRED | M5 工程可靠性文档已有，验收矩阵待实现 |
+| M2 | Paper Deep Reading | partial code exists | structural tests exist, not completion | NOT_REAL_E2E_VERIFIED | 文档存在，部分代码存在，结构性测试不能替代验收；真实 PDF + 真实 LLM + 真实 audit e2e 尚未验证 |
+| M2 | Survey Deep Reading | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 综述论文精读文档已设计，代码未实现 |
+| M3 | PaperWorkspace | partial API/frontend code | component tests | PARTIAL_CODE_NOT_REAL_VALIDATED | 部分 API/前端代码存在，StatusBanner 测试存在，页面级真实后端验证缺失 |
+| M3 | DirectionWorkspace | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 文档已设计，代码未实现 |
+| M3 | SeedExpansionPanel | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 文档已设计，代码未实现 |
+| M4 | Interactive Learning | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 文档已设计，schema 为候选设计，API / memory / retrieval / 前端集成未实现 |
+| M5 | Reliability | partial infra | — | PARTIAL_INFRA, NOT_PRODUCTION_READY | 真实验收规则已文档化，live eval 基础设施部分存在，secret scan / CI / debug/admin 生产鉴权未实现 |
 
 ## M1 Focused Acquisition Live Result (2026-06-05, HEAD fc7d494)
 

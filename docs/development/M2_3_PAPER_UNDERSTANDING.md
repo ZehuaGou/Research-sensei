@@ -281,7 +281,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 | 测试 | 断言 |
 |------|------|
 | test_no_llm_client_produces_baseline_only | status == "BASELINE_ONLY" |
-| test_mock_llm_client_produces_evidence_bound_card | card has evidence_refs, status is SUCCESS |
+| test_real_llm_client_produces_evidence_bound_card | 真实 LLM 输出必须可解析；输出必须绑定 allowed evidence_ref；invalid JSON / missing evidence_ref / invalid evidence_ref 必须 BLOCKED_UNDERSTANDING |
 | test_llm_failure_blocks_understanding | BLOCKED_UNDERSTANDING, warning "LLM_UNAVAILABLE" |
 | test_invalid_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "INVALID_EVIDENCE_REF" |
 | test_missing_evidence_ref_blocks | BLOCKED_UNDERSTANDING, warning "MISSING_EVIDENCE_REF" |
@@ -311,8 +311,8 @@ if not understanding_status.allowed_downstream.advisor_questions:
 
 ### 全局规则
 
-- 快速回归（`python -m pytest -q`）可使用 mock/fake，不作为模块验收依据
-- 真实验收必须真实调用 LLM，使用真实 PDF 输入
+- M2.3 结构检查不能替代验收。M2.3 验收必须使用真实 PDF + 真实 LLM + 真实 EvidencePack + QualityAuditor。任何 simulated / synthetic / fake conversation 都不能作为 M2.3 完成依据
+- BASELINE_ONLY is diagnostic only and is never user-facing completion
 - 不新增依赖
 - M2 真实验收入口：`RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
 

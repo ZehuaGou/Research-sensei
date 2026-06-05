@@ -189,8 +189,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 ### 全局规则
 
-- 快速回归可使用 mock，不作为模块验收依据
-- 真实验收必须真实联网 + 真实 LLM + 真实 PDF
+- M2.5 的结构性状态测试不能替代验收。M2.5 验收必须跑真实 PDF → parser → evidence → real LLM → QualityAuditor → understanding_status 的端到端链路
 - 不新增依赖
 
 ## 9. 验收标准

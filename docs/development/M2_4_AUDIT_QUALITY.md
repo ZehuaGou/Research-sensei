@@ -25,7 +25,9 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 
 ## 3. 非目标
 
-- 不用真实 LLM
+- 不负责生成 LLM 输出（生成归 M2.3）
+- 不替代 M2.3 card builder
+- 不替代 M5 live eval
 - 不新增依赖
 
 ## 4. 可复用开源项目 / 外部服务调研
@@ -178,7 +180,7 @@ class Auditor(ABC):
     def audit(self, artifacts: ArtifactBundle) -> AuditResult: ...
 ```
 
-初版 audit 全部 rule-based。未来可预留 LLM-based auditor 实现同一接口。LLM auditor 必须默认 mock，不允许 pytest 真实调用 LLM。
+初版 audit 全部 rule-based。未来可预留 LLM-based auditor 实现同一接口。如果未来引入 LLM-based auditor，验收必须使用真实 LLM 和真实 artifacts。rule-based auditor 可以做结构检查，但不能把结构检查冒充为真实质量验收。
 
 ## 10. 检测算法
 
@@ -292,8 +294,7 @@ paper_terms = title_words | abstract_words
 
 ### 全局规则
 
-- 快速回归可使用 mock，不作为模块验收依据
-- 真实验收必须验证 QualityAuditor 在真实 LLM 输出上的审计结果
+- QualityAuditor 的纯规则测试只能证明规则触发正确，不能证明真实讲解质量。M2.4 验收必须审计真实 LLM 生成的 paper_card / formula_cards / teaching_cards，并验证 BLOCK / WARNING / DEGRADED / SUCCESS 状态映射正确
 - 不新增依赖
 
 ## 13. 验收标准
@@ -302,7 +303,6 @@ paper_terms = title_words | abstract_words
 - 不 import card builder
 - F-1 到 F-6 正确触发
 - candidate audit 语义正确
-- 默认测试不真实调用 LLM
 
 ## 14. 当前实现状态
 

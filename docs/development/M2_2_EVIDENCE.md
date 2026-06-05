@@ -325,8 +325,7 @@ Direction-related fields must still be evidence-grounded. Paper-level evidence_r
 
 ### 全局规则
 
-- 快速回归可使用 mock，不作为模块验收依据
-- 真实验收必须使用真实 PDF 输入，验证 evidence chain 完整性
+- Evidence 结构检查不能替代验收。M2.2 验收必须使用真实 PDF 输入，验证 evidence chain 完整性
 - 不新增依赖
 
 ## 13. 验收标准

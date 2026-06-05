@@ -75,7 +75,74 @@ Status: NOT_IMPLEMENTED
 
 DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend capabilities, not replacements.
 
-## 4. 可复用开源项目 / 外部服务调研
+## 4. Direction / Paper / Seed API Contract
+
+### DirectionWorkspace future APIs
+
+**POST /api/v1/directions/search**
+
+input:
+- `direction_query`
+- `max_surveys`
+- `max_papers`
+- `prefer_surveys: true`
+
+output:
+- `job_id`
+- `status`
+- `survey_candidates`
+- `direction_landscape_status`
+
+**GET /api/v1/directions/{direction_job_id}/landscape**
+
+output:
+- `direction_landscape`
+- `survey_candidates`
+- `method_families`
+- `chronology_stages`
+- `landscape_anchors`
+- `recommended_reading_order`
+
+Status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+### PaperWorkspace APIs
+
+Existing:
+- `POST /api/v1/documents/parse`
+
+Future accepted inputs:
+- upload PDF
+- title
+- DOI
+- arXiv ID
+- arXiv URL
+- PDF URL
+- publisher URL
+
+M3 must show:
+- `download_status`
+- `verification_status`
+- `pdf_metadata_check`
+- `pdf_title_match`
+- `can_enter_m2`
+
+Status: PARTIAL_CODE / PAGE_REAL_VALIDATION_MISSING
+
+### SeedExpansionPanel future APIs
+
+**POST /api/v1/papers/{paper_id}/expand**
+
+input:
+- `paper_id`
+- `expansion_types`: cited_by / references / related_surveys / follow_up / same_route
+
+output:
+- `seed_expansion_result`
+- `paper_relation_graph`
+
+Status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+## 5. 可复用开源项目 / 外部服务调研
 
 | 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
 |------|------|---------------|----------|--------------|------|----------|
@@ -83,7 +150,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 | Vitest | 前端测试 | vitest.dev | devDependency | 否 | 无 | ✅ 已引入 |
 | Vue Test Utils | 组件测试 | test-utils.vuejs.org | devDependency | 否 | 无 | ✅ 已引入 |
 
-## 5. 当前代码位置
+## 6. 当前代码位置
 
 ### 后端 API
 
@@ -100,7 +167,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 - `frontend/src/components/tests/StatusBanner.spec.ts` — StatusBanner 7 tests
 - `tests/test_api_status_gating.py` — API status gating 15 tests
 
-## 6. API 端点
+## 7. API 端点
 
 ### POST /api/v1/documents/parse
 
@@ -159,7 +226,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 |----|-----|
 | 输出 | `{ "status": "ok", "service": "researchsensei" }` |
 
-## 7. 前端组件
+## 8. 前端组件
 
 ### UploadView（M3.2）
 
@@ -188,7 +255,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 | DEGRADED_STRUCTURAL | indigo warning | missing components 列表 |
 | FAILED | red error | 重新上传提示 |
 
-## 8. status 展示规则
+## 9. status 展示规则
 
 ### SUCCESS
 
@@ -221,7 +288,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 - 展示系统错误
 - 不展示 cards
 
-## 9. component_status 展示规则
+## 10. component_status 展示规则
 
 ```
 component_status:
@@ -238,7 +305,7 @@ component_status:
 | FAILED | 隐藏，显示对应降级提示 |
 | BASELINE | 普通用户隐藏，debug/admin 可看 |
 
-## 10. /cards API 行为
+## 11. /cards API 行为
 
 | status | 行为 |
 |--------|------|
@@ -248,7 +315,7 @@ component_status:
 | BLOCKED_UNDERSTANDING | 返回 403 + blocking_reason + warnings |
 | FAILED | 返回 403，不返回 card 内容 |
 
-## 11. /artifacts 权限与 /quality_report 状态
+## 12. /artifacts 权限与 /quality_report 状态
 
 - `/artifacts` 定位为 debug/admin raw API
 - `/quality_report` endpoint 当前未实现
@@ -259,7 +326,7 @@ component_status:
 - `/cards` 是用户端展示 card 的唯一受控 API
 - production 必须有鉴权；本地开发可通过 `SENSEI_DEBUG=1`
 
-## 12. evidence_ref 跳转（设计中）
+## 13. evidence_ref 跳转（设计中）
 
 - evidence_ref 跳转依赖 `parsed_document.json` + `passage_index.json` + `claim_evidence.json`
 - 前端可通过 evidence_ref / passage_id 定位 passage_text 和 block_ids
@@ -267,7 +334,7 @@ component_status:
 - `passage_index.json` 是 evidence 跳转的关键 artifact
 - 当前未实现
 
-## 13. 错误策略
+## 14. 错误策略
 
 | 场景 | API 行为 | 前端行为 |
 |------|----------|----------|
@@ -280,7 +347,7 @@ component_status:
 | SENSEI_DEBUG 未启用访问 /artifacts | 403 | 不展示 |
 | 前端 fetch 失败 | — | 显示错误提示 |
 
-## 14. 测试要求
+## 15. 测试要求
 
 ### M3.1 后端 API 测试
 
@@ -342,7 +409,7 @@ component_status:
 - 页面级验收必须真实后端联调
 - 组件测试不代替页面级验收
 
-## 15. 验收标准
+## 16. 验收标准
 
 - 普通用户不能绕过 understanding_status 获取 cards
 - BASELINE_ONLY / BLOCKED 不展示 cards
@@ -354,7 +421,7 @@ component_status:
 - 真实验收必须有至少一个真实后端 API smoke：上传真实小 PDF，后端返回 job / status / cards，前端能展示状态
 - mock fetch 只能用于组件单测，不代表页面验收通过
 
-## 16. 当前实现状态
+## 17. 当前实现状态
 
 ### 已实现
 
@@ -380,7 +447,7 @@ component_status:
 - debug/admin 鉴权机制
 - evidence_ref 跳转
 
-## 17. External Reference Implementation Notes
+## 18. External Reference Implementation Notes
 
 - **Reference source**: ARIS `skills/research-lit/SKILL.md` (output table), ARIS verification/relevance/source fields
 - **Reference use**: STRATEGY_BORROW
@@ -390,7 +457,7 @@ component_status:
 - **Boundary**: ARIS has no reusable frontend UI. M3 remains Vue + FastAPI. Only display field structure is borrowed. Not just title and abstract; must show trust/selection/degradation reasons.
 - **Validation implication**: BLOCKED does not return card content. Raw artifacts require debug/admin permission.
 
-## 18. 当前未解决问题
+## 19. 当前未解决问题
 
 - debug/admin 具体鉴权机制
 - `/artifacts` 是否需要脱敏版本
