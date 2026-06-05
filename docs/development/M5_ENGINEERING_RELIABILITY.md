@@ -586,20 +586,15 @@ python scripts/run_live_eval.py
 
 ---
 
-## 14. External Reference Boundary
+## 14. External Reference Implementation Notes
 
-ARIS is one external reference for engineering discipline patterns. It is not a testing framework and does not replace ResearchSensei's real-test policy.
-
-| Strategy | Reference use | Application in M5 |
-|---|---|---|
-| Run traces / session recovery | STRATEGY_BORROW | Artifact versioning, resume/rerun semantics |
-| Threat scan security checks | STRATEGY_BORROW | Secret scanning, API key detection |
-| Large file / PDF not in git | STRATEGY_BORROW | Already adopted: .gitignore rules |
-| API key not leaked in logs | STRATEGY_BORROW | Already adopted: _redact_report in live_eval |
-| Helper resolution (tool availability) | STRATEGY_BORROW | Check external tool availability before use |
-| Graceful degradation | DO_NOT_REUSE | ARIS skip-on-failure must not become ResearchSensei's fake passes |
-
-**ResearchSensei boundary**: mock/fake/skip do not count as valid tests. Real-test failure remains failure. CI/release rules remain ResearchSensei-specific. pytest default includes tests_live. Live env missing should fail. Secret scan must pass. git ls-files must not include PDF/report/.env.
+- **Reference source**: ARIS `skills/research-review/SKILL.md` (Review Tracing), `tools/research_wiki.py` (threat scan / quarantine pattern), shared helper resolution pattern
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Review traces; output manifest; session recovery; helper resolution; threat scan / quarantine; large-file hygiene
+- **ResearchSensei-owned target**: `live_eval_report`, CI / release check, secret scan, debug/admin boundary, run logs
+- **Schema / artifact impact**: `live_eval_report` should record sources, failures, token usage, artifacts, validation status. Run logs must not include keys. PDF/report/cache not committed.
+- **Boundary**: ARIS graceful degradation cannot be adopted. ResearchSensei real-test failure = failure. mock/fake/skip are not acceptance.
+- **Validation implication**: pytest default includes tests_live. Missing env/key/network = fail. `git ls-files` must not include PDF / report / `.env`. Secret scan must pass.
 
 ---
 

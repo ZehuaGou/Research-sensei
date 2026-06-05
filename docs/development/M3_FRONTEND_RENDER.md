@@ -338,19 +338,15 @@ component_status:
 - debug/admin 鉴权机制
 - evidence_ref 跳转
 
-## 17. External Reference Boundary
+## 17. External Reference Implementation Notes
 
-ARIS has no frontend UI to reuse. M3 may reference ARIS-style output fields such as verification_status, source contribution, relevance_reason, limitations, and open_questions. These fields must be exposed through ResearchSensei APIs and rendered in ResearchSensei frontend components.
-
-| Display concept | Reference use | Application in M3 |
-|---|---|---|
-| verification_status per paper | STRATEGY_BORROW | Display verification badge on cards |
-| relevance_reason | STRATEGY_BORROW | Show why a paper was selected |
-| source contribution tracking | STRATEGY_BORROW | Display which sources contributed metadata |
-| Limitations & Open Questions | STRATEGY_BORROW | Display as structured card section |
-| pdf_metadata_check | STRATEGY_BORROW | Display PDF validation status |
-
-**ResearchSensei boundary**: No ARIS UI dependency. ResearchSensei frontend remains Vue/FastAPI based. Raw artifacts still require debug/admin boundaries. User-facing cards must show why content is trusted, selected, degraded, or blocked.
+- **Reference source**: ARIS `skills/research-lit/SKILL.md` (output table), ARIS verification/relevance/source fields
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Users should see why a paper was selected, why it is trusted, why it is degraded or blocked. Display source contribution, verification_status, relevance_reason, limitations, open_questions.
+- **ResearchSensei-owned target**: `/cards` response, `/understanding_status` response, `LearningWorkspaceView`, `StatusBanner`
+- **Schema / artifact impact**: Card response should include `verification_status` / `relevance_reason` / `source_confidence` / `evidence_ref` summary. DEGRADED / BLOCKED should show reasons.
+- **Boundary**: ARIS has no reusable frontend UI. M3 remains Vue + FastAPI. Only display field structure is borrowed. Not just title and abstract; must show trust/selection/degradation reasons.
+- **Validation implication**: BLOCKED does not return card content. Raw artifacts require debug/admin permission.
 
 ## 18. 当前未解决问题
 

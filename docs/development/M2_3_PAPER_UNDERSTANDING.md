@@ -11,9 +11,15 @@
 - 不新增依赖
 - 不改 frontend
 
-## External Reference Boundary
+## External Reference Implementation Notes
 
-ARIS provides useful paper-understanding reference patterns (Problem/Method/Results/Relevance, reviewer independence, verification_status), but does not replace ResearchSensei parser, evidence, cards, or auditor. ResearchSensei output must be paper_card / formula_cards / teaching_cards with evidence_ref binding, not ARIS-style markdown summaries. Card generation must use real LLM and evidence_ref; no evidence means BLOCKED_UNDERSTANDING.
+- **Reference source**: ARIS `skills/research-lit/SKILL.md`, `skills/idea-discovery/SKILL.md`
+- **Reference use**: PROMPT_BORROW, STRATEGY_BORROW
+- **Borrowed behavior**: Problem / Method / Results / Relevance; What They Did; Key Results; Limitations & Open Questions; Potential Improvement Directions
+- **ResearchSensei-owned target**: `paper_card.json`, `formula_cards.json`, `teaching_cards.json`
+- **Schema / artifact impact**: paper_card should contain problem / method / results / relevance; teaching_card can absorb limitations / open_questions / potential_improvements; every core explanation must bind evidence_ref
+- **Boundary**: Does not output ARIS markdown. Does not only summarize. ARIS has no formula_card capability; formula/symbol teaching remains ResearchSensei-owned or requires other specialized project evaluation.
+- **Validation implication**: Real LLM + real evidence_pack. Core explanation without evidence_ref must be BLOCKED or degraded. formula_card cannot be replaced by ARIS summary.
 
 ## 3. 产品流程位置
 

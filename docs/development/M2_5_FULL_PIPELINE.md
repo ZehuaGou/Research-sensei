@@ -202,17 +202,15 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - DownstreamGates 已实现
 - 测试已覆盖：15+ tests
 
-## 11. External Reference Boundary
+## 11. External Reference Implementation Notes
 
-ARIS does not have a direct equivalent to M2.5 pipeline orchestration. ARIS's contribution is at the verification and source discipline level, which feeds into M2.5 status decisions.
-
-| Strategy | Reference use | Application in M2.5 |
-|---|---|---|
-| Verification status (verified/unverified/pending/error) | STRATEGY_BORROW | Map to UnderstandingStatus decisions |
-| Source contribution tracking | STRATEGY_BORROW | Track which source contributed each artifact |
-| Graceful degradation | DO_NOT_REUSE | ARIS skip-on-failure conflicts with ResearchSensei's real-test policy |
-
-**ResearchSensei boundary**: UnderstandingStatus and DownstreamGates remain ResearchSensei-owned. Unverified or low-evidence outputs cannot enter M3/M4 as normal cards. M2.5 must fail on real failures, not degrade to mock.
+- **Reference source**: ARIS `tools/verify_papers.py` (verification_status), ARIS composed output discipline
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: verified / unverified / verify_pending / error status affects downstream gate; output must state why it cannot enter downstream
+- **ResearchSensei-owned target**: `understanding_status.json`, `DownstreamGates`
+- **Schema / artifact impact**: `source_verification_status`, `allowed_for_user_display`, `allowed_downstream`, `blocking_reason`, `warnings`
+- **Boundary**: ResearchSensei gate controls M3/M4. ARIS composed output is only an output discipline reference.
+- **Validation implication**: Unverified / low-evidence outputs cannot enter M4 advisor. DEGRADED / BLOCKED reasons must be visible.
 
 ## 12. 当前未解决问题
 

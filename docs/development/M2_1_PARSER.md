@@ -239,18 +239,15 @@ class LightweightParserAdapter(ParserAdapter):
 - DoclingParserAdapter 未实现
 - 外部 parser 仍是 optional adapter
 
-## 14. External Reference Boundary
+## 14. External Reference Implementation Notes
 
-ARIS does not have a dedicated parser module. ARIS relies on external tools (DeepXiv, arXiv metadata) and does not perform robust PDF parsing with layout analysis, table extraction, or formula detection.
-
-| Strategy | Reference use | Application in M2.1 |
-|---|---|---|
-| PDF download validation | STRATEGY_BORROW | Already adopted in M1.3 source resolver |
-| DeepXiv section-level access | EVALUATE_OTHER_PROJECTS | Optional future adapter for structured section extraction |
-| Docling multi-format parsing | EVALUATE_OTHER_PROJECTS | Primary candidate for replacing PyMuPDF get_text |
-| Marker PDF-to-Markdown | EVALUATE_OTHER_PROJECTS | GPL-3.0 license risk; evaluate before adopting |
-
-**ResearchSensei boundary**: M2.1 parser must remain ResearchSensei-specific. ARIS does not provide a replacement for PyMuPDF-based or Docling-based parsing. Parser still needs section blocks, passage blocks, formula blocks. Parser validation must use real PDF parsing; synthetic markdown is not enough for acceptance.
+- **Reference source**: ARIS `skills/research-lit/SKILL.md` (paper reading flow), `skills/idea-discovery/SKILL.md` (reference paper summary)
+- **Reference use**: DO_NOT_REUSE for parser, EVALUATE_OTHER_PROJECTS for parser quality
+- **Borrowed behavior**: Only borrows "title / abstract / intro / method overview" initial reading order
+- **ResearchSensei-owned target**: `parsed_paper.json`, `section_blocks`, `passage_blocks`, `formula_blocks`
+- **Schema / artifact impact**: DocumentBlock fields (block_id, type, text, section, bbox, table_html, figure_caption, reference_entries)
+- **Boundary**: ARIS is not a dedicated parser. ARIS cannot replace ParserAdapter. Still needs evaluation of Docling / Marker / MinerU / DeepXiv for parser quality improvement.
+- **Validation implication**: Parser validation must use real PDF. Synthetic markdown is not acceptance. Must output section / passage / formula structure.
 
 ## 15. 当前未解决问题
 

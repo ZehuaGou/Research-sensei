@@ -590,62 +590,70 @@ M4 完成后，应能做到：
 
 ---
 
-## 18. External Reference Boundary
+## 18. External Reference Implementation Notes
 
 ARIS is a prompt/workflow reference for advisor-style research training and memory discipline. It is not a runtime dependency and does not replace ResearchSensei interaction design.
 
-### M4.1 选中内容解释
+### M4.1 Selected Text Explanation
 
-Reference use: DO_NOT_REUSE. ARIS has no direct equivalent for UI-level selected text explanation.
-ResearchSensei boundary: must use selected_text + evidence_ref + current paper artifacts. cited_evidence_refs must be non-empty.
+- **Reference source**: None directly
+- **Reference use**: DO_NOT_REUSE
+- **Borrowed behavior**: Only borrows source/evidence discipline
+- **ResearchSensei-owned target**: `SelectionExplanation`
+- **Schema / artifact impact**: `answer`, `cited_evidence_refs`, `cited_passage_ids`, `relation_to_current_section`, `relation_to_paper_claim`, `confidence`, `used_memory_ids`
+- **Boundary**: ARIS has no UI-level selected text explanation. Must use `selected_text` + `evidence_ref` + current paper artifacts.
+- **Validation implication**: `cited_evidence_refs` non-empty. No evidence_ref = degraded / rejected.
 
-### M4.2 符号与公式解释
+### M4.2 Formula / Symbol Explanation
 
-Reference use: DO_NOT_REUSE / EVALUATE_OTHER_PROJECTS. ARIS does not provide formula/symbol teaching.
-ResearchSensei boundary: formula_card / passage_index / evidence_ref grounded explanation. Symbol meaning must come from formula_card / passage / evidence_ref, not general LLM guessing.
+- **Reference source**: None directly
+- **Reference use**: DO_NOT_REUSE, EVALUATE_OTHER_PROJECTS
+- **Borrowed behavior**: None
+- **ResearchSensei-owned target**: `FormulaSymbolExplanation`
+- **Schema / artifact impact**: `formula_id`, `symbol`, `meaning`, `source_sentence`, `intuition`, `numeric_example`, `role_in_method`, `evidence_ref`
+- **Boundary**: ARIS does not provide formula/symbol teaching. Must be self-built or evaluate other specialized projects.
+- **Validation implication**: Symbol meaning must come from formula_card / passage / evidence_ref. No general LLM guessing.
 
-### M4.3 上下文追问
+### M4.3 Contextual Follow-up
 
-Reference use: PROMPT_BORROW. Borrow from ARIS: follow-up patterns, scope tightening, evidence-seeking questions.
-ResearchSensei boundary: must stay inside current paper / memory / evidence. Answer must cite evidence_refs or explicitly degrade.
+- **Reference source**: ARIS `skills/idea-discovery/SKILL.md`, `skills/research-review/SKILL.md`
+- **Reference use**: PROMPT_BORROW
+- **Borrowed behavior**: Follow-up patterns, scope tightening, evidence-seeking questions. Ask user to focus on a problem, adjust hypothesis, ignore irrelevant direction.
+- **ResearchSensei-owned target**: `InteractiveAnswer`
+- **Schema / artifact impact**: `answer`, `evidence_refs`, `memory_refs`, `uncertainty`, `follow_up_suggestions`, `used_context`
+- **Boundary**: ResearchSensei targets single-paper learning. Does not enter full idea-discovery pipeline.
+- **Validation implication**: Answer must use memory / artifacts / evidence. `cited_evidence_refs` non-empty or explicitly degraded.
 
-### M4.4 导师式追问与研究训练
+### M4.4 Advisor Questions / Research Training
 
-Reference use: PROMPT_BORROW / STRATEGY_BORROW. Borrow from ARIS research-review / research-refine-pipeline:
-- senior reviewer style
-- logical gap questions
-- missing experiment questions
-- contribution sufficiency questions
-- minimal experiment package
-- results-to-claims matrix
-- mock NeurIPS review style
+- **Reference source**: ARIS `skills/research-review/SKILL.md`, `skills/research-refine-pipeline/SKILL.md`
+- **Reference use**: PROMPT_BORROW, STRATEGY_BORROW
+- **Borrowed behavior from research-review**: Senior reviewer mode; logical gaps; unjustified claims; missing experiments; narrative weaknesses; contribution sufficiency; mock review; results-to-claims matrix; minimum experiment package
+- **Borrowed behavior from research-refine-pipeline**: Problem Anchor; dominant contribution; intentionally rejected complexity; key claims; must-run ablations; remaining risks; planning gate
+- **ResearchSensei-owned target**: `AdvisorQuestion`, `AdvisorEvaluation`
+- **Schema / artifact impact**: `question_type` (assumption / method / experiment / limitation / innovation / claim_evidence / ablation), `expected_answer_points`, `evidence_refs`, `follow_up_policy`, `missing_points`, `misconceptions`, `next_question`
+- **Boundary**: ARIS reviewer/refine is for research idea evaluation. ResearchSensei advisor is for paper learning training. Questions must be paper-grounded. Advisor mode is not automatic paper writing.
+- **Validation implication**: Every advisor question has `evidence_refs` when available. Weak answer triggers follow-up. Strong answer triggers deeper question. `question_type` covers assumption / method / experiment / limitation / innovation.
 
-ResearchSensei boundary:
-- questions must be paper-grounded
-- every question should cite evidence_refs when possible
-- advisor mode is for learning/training, not automatic paper writing
-- question_type covers assumption / method / experiment / limitation / innovation
-- weak answer triggers follow-up; strong answer triggers deeper question
+### M4.5 Long-term Memory
 
-### M4.5 论文知识库与长期记忆
+- **Reference source**: ARIS `tools/research_wiki.py`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Paper nodes; research notes; typed edges (extends / contradicts / addresses_gap / inspired_by / tested_by / supports / invalidates / supersedes); source trace; query_pack / compressed context
+- **ResearchSensei-owned target**: `PaperMemory`, `PassageMemory`, `FormulaMemory`, `SymbolMemory`, `SessionContext`, `UserQuestionMemory`
+- **Schema / artifact impact**: `memory_id`, `paper_id`, `source_artifact`, `evidence_refs`, `confidence`, `updated_at`, `schema_version`
+- **Boundary**: Does not directly adopt ARIS wiki file structure. Cache is not memory. Memory must bind `evidence_refs`. Does not store API keys / private data.
+- **Validation implication**: Memory round-trip. Memory traceability. Low-confidence memory does not override evidence. No secrets.
 
-Reference use: STRATEGY_BORROW. Borrow from ARIS research_wiki:
-- paper nodes, research notes, source trace, persistent research memory concept
+### M4.6 Memory-first Retrieval
 
-ResearchSensei boundary:
-- memory schema remains PaperMemory / PassageMemory / FormulaMemory / SymbolMemory / SessionContext / UserQuestionMemory
-- cache is not memory
-- no API key / private data storage
-- memory must round-trip and contain source_artifact and evidence_refs
-- low-confidence memory must not override evidence
-
-### M4.6 memory-first retrieval
-
-Reference use: STRATEGY_BORROW. Borrow from ARIS: context reuse / session recovery idea.
-ResearchSensei boundary:
-- memory hit must still be verified with evidence when confidence is low
-- token saving cannot override evidence quality
-- MemoryRetrievalResult must include matched_memory_ids, should_call_llm, confidence, warnings
+- **Reference source**: ARIS `tools/research_wiki.py`, ARIS review tracing / session recovery patterns
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: First read existing notes / query_pack / paper memory; then decide whether to call LLM; reuse confirmed context; record session recovery info
+- **ResearchSensei-owned target**: `MemoryRetrievalResult`
+- **Schema / artifact impact**: `matched_memory_ids`, `matched_artifacts`, `should_call_llm`, `confidence`, `warnings`, `estimated_token_saved`
+- **Boundary**: Memory hit does not mean correct. Low-confidence memory must be verified with evidence. Token saving cannot override evidence quality.
+- **Validation implication**: Stale memory must verify. No evidence = degraded.
 
 ---
 

@@ -49,25 +49,61 @@ Borrowed strategies (not copied code):
 
 These strategies are not optional optimizations. They are part of M1 real validation. Without them, arXiv requests easily fail due to default client behavior, network exit points, or rate limiting.
 
-## External Reference Boundary
+## External Reference Implementation Notes
 
-ARIS is one external reference for robust source-access discipline, candidate verification discipline, and top-relevant-only download policy. It is not used as the M1 search backend and does not replace ResearchSensei's source adapters.
+### M1.1 Query Planning
 
-**Why not ARIS-only search**: ARIS's search capabilities are designed for workflow/skill execution and may not cover all use cases as well as ResearchSensei's best-of-breed multi-source approach. ResearchSensei retains OpenAlex, Semantic Scholar, Crossref, and arXiv as independent adapters, each optimized for its domain.
+- **Reference source**: ARIS `skills/research-lit/SKILL.md`, `skills/idea-discovery/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Split broad research direction into searchable academic queries; preserve user direction / constraints / scope; use LLM to generate structured search plan instead of keyword splitting
+- **ResearchSensei-owned target**: `query_plan.json`
+- **Schema / artifact impact**: `english_query`, `query_variants`, `core_terms`, `related_terms`, `exclude_terms`, `search_intents`
+- **Boundary**: Does not use ARIS skill output format. ResearchSensei retains QueryPlan schema.
+- **Validation implication**: Chinese query must produce English academic query via real LLM. No LLM / LLM JSON failure = M1 failure.
 
-**Final M1 route**: best-of-breed multi-source search + ARIS-style verification/download discipline. M1 does not treat "found a PDF" as success; it must verify relevance, authenticity, and PDF consistency.
+### M1.2 Multi-source Acquisition
 
-M1 must also remain open to other external references: Unpaywall (OA PDF resolution), PaperQA (passage retrieval), STORM (multi-perspective questioning), DeepXiv (section-level access), Exa (web search).
+- **Reference source**: ARIS `tools/arxiv_fetch.py`, `tools/semantic_scholar_fetch.py`, `tools/openalex_fetch.py`, `skills/research-lit/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: arXiv User-Agent / contact email / rate-limit handling; source contribution tracking; source success/failure diagnostics; do not hide source failures
+- **ResearchSensei-owned target**: `candidate_pool.json`, `source_metrics`
+- **Schema / artifact impact**: `sources_attempted`, `sources_success`, `source_failures`, `source_contribution`, `candidate.source_ids`, `candidate.raw_source_metadata`
+- **Boundary**: Does not adopt ARIS-only search. ResearchSensei retains best-of-breed source set: arXiv robust official endpoint adapter, OpenAlex/pyalex, Semantic Scholar official REST, Crossref/habanero. Other projects open for evaluation: Unpaywall, PaperQA, STORM, DeepXiv, Exa.
+- **Validation implication**: `sources_attempted >= 4`. Source failure must have structured error. One source success does not mean multi-source stability.
 
-| Strategy | Reference use | Application in M1 |
-|---|---|---|
-| arXiv robust fetch (User-Agent, retry, id_list) | STRATEGY_BORROW | Already adopted in ArxivAdapter |
-| Semantic Scholar REST + proxy | STRATEGY_BORROW | Already adopted in SemanticScholarAdapter |
-| OpenAlex polite pool | STRATEGY_BORROW | Already adopted via pyalex |
-| Candidate verification (arXiv/Crossref/S2) | STRATEGY_BORROW | Verify that candidates exist in external catalogs |
-| Source verification status | STRATEGY_BORROW | `RESOLVED_PDF_DOWNLOADED` / `METADATA_ONLY` / `FAILED_DOWNLOAD` |
-| Top-relevant-only PDF download | STRATEGY_BORROW | Download PDF only for high-relevance candidates |
-| DeepXiv section-level access | EVALUATE_OTHER_PROJECTS | Optional future adapter |
+### M1.3 Source Acquisition / PDF Download
+
+- **Reference source**: ARIS `tools/arxiv_fetch.py`, `skills/research-lit/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Download only top-relevant PDFs; PDF download uses User-Agent / retry / backoff; PDF size guard; PDF header validation
+- **ResearchSensei-owned target**: `source_resolution.json`
+- **Schema / artifact impact**: `download_status`, `source_url`, `final_url`, `content_type`, `file_size`, `sha256`, `local_path`, `pdf_metadata_check`, `pdf_title_match`, `pdf_metadata_warning`
+- **Boundary**: M1 does lightweight PDF validation only, not M2 full-text parsing. PDF not committed to git. Does not download all candidates with PDFs.
+- **Validation implication**: At least one `RESOLVED_PDF_DOWNLOADED`. PDF must pass `%PDF` / `file_size` / `sha256` checks. Metadata-only cannot enter M2.
+
+### M1.4 Dedup / Verification / Relevance
+
+- **Reference source**: ARIS `tools/verify_papers.py`, `skills/research-lit/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Three-layer candidate verification: (1) arXiv ID verification, (2) CrossRef DOI verification, (3) Semantic Scholar fuzzy title verification. Candidate status uses: `verified`, `unverified`, `verify_pending`, `error`. Transient API failure is `verify_pending`, not hallucination. Unverified candidates cannot enter A_READ. `verification_method` and `verification_reason` preserved.
+- **ResearchSensei-owned target**: `filtered_candidates.json`
+- **Schema / artifact impact**: `verification_status`, `verification_method`, `verification_reason`, `verification_confidence`, `rule_relevance_score`, `llm_relevance_score`, `llm_relevance_label`, `matched_concepts`, `missing_concepts`, `relevance_reason`, `should_download`, `should_a_read`
+- **Boundary**: Does not vendor ARIS `verify_papers.py`. Does not treat ARIS CLI output as ResearchSensei artifact. ResearchSensei implements its own schema conversion and gate.
+- **Validation implication**: `verified_candidate_count` must exist. `unverified_candidate_count` must exist. `verify_pending_count` must exist. `llm_judged_candidate_count` must exist. `relevance_filtered_count` must exist. A_READ must be verified + relevant + PDF validated.
+
+### M1.5 Reading Plan
+
+- **Reference source**: ARIS `skills/research-lit/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Each recommended paper must state: Problem, Method, Results, Relevance, Source, Verification status. Only top-relevant papers enter the reading plan.
+- **ResearchSensei-owned target**: `reading_plan.json`
+- **Schema / artifact impact**: `role`, `selection_reason`, `relevance_reason`, `verification_status`, `source_confidence`, `metadata_confidence`, `risk_note`, `can_enter_m2`
+- **Boundary**: Does not reuse ARIS markdown table. ReadingPlan is a ResearchSensei artifact. A_READ serves M2 downstream.
+- **Validation implication**: `A_READ count >= 1`. Every A_READ has `can_enter_m2=true`. Every A_READ has `verification_status`, validated PDF, `relevance_reason`.
+
+### General M1 Boundary
+
+ARIS is one external reference. ResearchSensei retains its own module boundaries, schemas, artifacts, gates, APIs, frontend, and validation rules. Other external projects remain open for evaluation (Unpaywall, PaperQA, STORM, DeepXiv, Exa).
 
 ## Pipeline
 

@@ -314,18 +314,15 @@ paper_terms = title_words | abstract_words
 - F-7 以后规则未实现（设计中）
 - formula-heavy / raw-copy / generic-output 未实现
 
-## 15. External Reference Boundary
+## 15. External Reference Implementation Notes
 
-ARIS provides useful verification-status and hallucination-discipline patterns, but does not replace ResearchSensei's artifact-level auditor.
-
-| Strategy | Reference use | Application in M2.4 |
-|---|---|---|
-| Reviewer independence (file-path only) | STRATEGY_BORROW | Audit reads artifacts, never receives builder explanations |
-| Hallucination detection | STRATEGY_BORROW | Detect fabricated references in cards |
-| Source verification status | STRATEGY_BORROW | Track verified/unverified/verify_pending per claim |
-| Kill-argument adversarial review | STRATEGY_BORROW | Future advisor question quality assessment |
-
-**ResearchSensei boundary**: QualityAuditor remains artifact-level and evidence_ref-level auditor. ARIS does not replace F-1 to F-6 rules or formula-heavy/raw-copy detection. Reviewer-style concerns may inform checks, but reviewer opinion cannot replace evidence.
+- **Reference source**: ARIS `tools/verify_papers.py`, `skills/research-review/SKILL.md`
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Hallucinated paper protection; source verification gate; reviewer-style weakness detection (logical gaps, missing experiments, narrative weakness, contribution sufficiency)
+- **ResearchSensei-owned target**: `quality_report.json`
+- **Schema / artifact impact**: `source_verification_checks`, `hallucinated_source_risk`, `unsupported_claim_risk`, `generic_summary_risk`, `missing_evidence_ref_risk`
+- **Boundary**: ARIS reviewer opinion cannot replace evidence. QualityAuditor still checks by ResearchSensei artifacts.
+- **Validation implication**: Missing evidence_ref must fail. BLOCKED status cannot display cards. BASELINE_ONLY cannot be user-displayed.
 
 ## 16. 当前未解决问题
 

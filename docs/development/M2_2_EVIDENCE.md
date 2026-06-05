@@ -339,18 +339,15 @@ class EvidenceRetriever:
 - evidence_ref 前端跳转未实现
 - embedding retriever / vector DB 未实现
 
-## 15. External Reference Boundary
+## 15. External Reference Implementation Notes
 
-ARIS provides useful source-discipline and verification-status patterns, but does not replace ResearchSensei's passage-level evidence infrastructure.
-
-| Strategy | Reference use | Application in M2.2 |
-|---|---|---|
-| Candidate verification (arXiv/Crossref/S2) | STRATEGY_BORROW | Verify that evidence_ref targets actually exist in external catalogs |
-| Hallucination rate tracking | STRATEGY_BORROW | Track hallucinated/non-existent references as a quality metric |
-| Source verification status | STRATEGY_BORROW | PASS/WARN/BLOCKED/ERROR verdict per evidence source |
-| Contribution tracking | STRATEGY_BORROW | Track which source contributed each claim/passage |
-
-**ResearchSensei boundary**: PassageIndex, ClaimEvidence, EvidencePack, evidence_ref remain ResearchSensei-owned. Paper-level verification cannot replace passage-level evidence_ref binding. Validation must use real evidence chains, not synthetic passages.
+- **Reference source**: ARIS `tools/verify_papers.py`, `skills/research-lit/SKILL.md` (result-to-claim / paper-claim-audit)
+- **Reference use**: STRATEGY_BORROW
+- **Borrowed behavior**: Source discipline; verification_status; no-hallucinated-paper discipline; claim must trace back to evidence
+- **ResearchSensei-owned target**: `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `EvidencePack`
+- **Schema / artifact impact**: `ClaimEvidence.passage_id`, `ClaimEvidence.evidence_ref`, `ClaimEvidence.semantic_support`, `EvidencePackItem.claim_id`, `EvidencePackItem.passage_id`
+- **Boundary**: ARIS primarily verifies paper-level authenticity. ResearchSensei must do passage-level evidence_ref. Paper-level verified cannot replace passage-level evidence.
+- **Validation implication**: `ClaimEvidence.passage_id` must exist in PassageIndex. `evidence_ref` must be traceable. Core claims without `passage_id` cannot enter trusted explanation.
 
 ## 16. 当前未解决问题
 
