@@ -590,26 +590,62 @@ M4 完成后，应能做到：
 
 ---
 
-## 18. ARIS Alignment
+## 18. External Reference Boundary
 
-M4 has the highest ARIS overlap among all modules. ARIS's research-review, research-refine-pipeline, and research_wiki directly inform M4.3-M4.6.
+ARIS is a prompt/workflow reference for advisor-style research training and memory discipline. It is not a runtime dependency and does not replace ResearchSensei interaction design.
 
-| ARIS Capability | Reuse Mode | Application in M4 |
-|---|---|---|
-| `research-review` senior reviewer prompts | PROMPT_BORROW | M4.4 advisor question generation: mock NeurIPS review, claims matrix, minimal experiment design |
-| `research-review` iterative adversarial dialogue | STRATEGY_BORROW | M4.4 multi-round drill with convergence criteria |
-| `research-refine-pipeline` method thesis gate | STRATEGY_BORROW | M4.4 "freeze Problem Anchor before experiments" principle |
-| `research_wiki.py` ingest_paper / query_pack | STRATEGY_BORROW | M4.5 PaperMemory schema: frontmatter + TODO sections, append-only log |
-| `research_wiki.py` query_pack budget enforcement | STRATEGY_BORROW | M4.6 token budget: max 8000 chars with priority sections |
-| `research_wiki.py` edge graph (typed relationships) | STRATEGY_BORROW | M4.5 memory relationships between papers |
-| `novelty-check` claim-by-claim verification | STRATEGY_BORROW | M4.4 advisor can ask "is this claim novel?" |
-| `idea-discovery` phased filtering | STRATEGY_BORROW | M4.3 context retrieval: memory → artifacts → LLM fallback |
+### M4.1 选中内容解释
 
-**M4.1 / M4.2 remain ResearchSensei-specific**: ARIS does not have selection explanation or formula/symbol explanation. These require ResearchSensei's evidence_ref, PassageIndex, and formula_card infrastructure.
+Reference use: DO_NOT_REUSE. ARIS has no direct equivalent for UI-level selected text explanation.
+ResearchSensei boundary: must use selected_text + evidence_ref + current paper artifacts. cited_evidence_refs must be non-empty.
 
-**M4.4 advisor mode reference**: ARIS's `research-review` generates mock NeurIPS reviews with claims matrix and action plans. M4.4 advisor questions should adopt this structure for group_meeting and defense modes.
+### M4.2 符号与公式解释
 
-**M4.5/M4.6 memory reference**: ARIS's `research_wiki.py` uses file-system-based markdown + JSONL edges with append-only audit log. M4.5 should evaluate whether to adopt file-system storage or use SQLite/JSON artifact. The query_pack budget enforcement pattern (priority sections, max chars) directly applies to M4.6 memory-first retrieval.
+Reference use: DO_NOT_REUSE / EVALUATE_OTHER_PROJECTS. ARIS does not provide formula/symbol teaching.
+ResearchSensei boundary: formula_card / passage_index / evidence_ref grounded explanation. Symbol meaning must come from formula_card / passage / evidence_ref, not general LLM guessing.
+
+### M4.3 上下文追问
+
+Reference use: PROMPT_BORROW. Borrow from ARIS: follow-up patterns, scope tightening, evidence-seeking questions.
+ResearchSensei boundary: must stay inside current paper / memory / evidence. Answer must cite evidence_refs or explicitly degrade.
+
+### M4.4 导师式追问与研究训练
+
+Reference use: PROMPT_BORROW / STRATEGY_BORROW. Borrow from ARIS research-review / research-refine-pipeline:
+- senior reviewer style
+- logical gap questions
+- missing experiment questions
+- contribution sufficiency questions
+- minimal experiment package
+- results-to-claims matrix
+- mock NeurIPS review style
+
+ResearchSensei boundary:
+- questions must be paper-grounded
+- every question should cite evidence_refs when possible
+- advisor mode is for learning/training, not automatic paper writing
+- question_type covers assumption / method / experiment / limitation / innovation
+- weak answer triggers follow-up; strong answer triggers deeper question
+
+### M4.5 论文知识库与长期记忆
+
+Reference use: STRATEGY_BORROW. Borrow from ARIS research_wiki:
+- paper nodes, research notes, source trace, persistent research memory concept
+
+ResearchSensei boundary:
+- memory schema remains PaperMemory / PassageMemory / FormulaMemory / SymbolMemory / SessionContext / UserQuestionMemory
+- cache is not memory
+- no API key / private data storage
+- memory must round-trip and contain source_artifact and evidence_refs
+- low-confidence memory must not override evidence
+
+### M4.6 memory-first retrieval
+
+Reference use: STRATEGY_BORROW. Borrow from ARIS: context reuse / session recovery idea.
+ResearchSensei boundary:
+- memory hit must still be verified with evidence when confidence is low
+- token saving cannot override evidence quality
+- MemoryRetrievalResult must include matched_memory_ids, should_call_llm, confidence, warnings
 
 ---
 

@@ -339,19 +339,18 @@ class EvidenceRetriever:
 - evidence_ref 前端跳转未实现
 - embedding retriever / vector DB 未实现
 
-## 15. ARIS Alignment
+## 15. External Reference Boundary
 
-ARIS's `verify_papers.py` provides three-layer candidate verification (arXiv batch API → CrossRef DOI → S2 fuzzy title match). This verification discipline is directly relevant to M2.2 evidence chain integrity.
+ARIS provides useful source-discipline and verification-status patterns, but does not replace ResearchSensei's passage-level evidence infrastructure.
 
-| ARIS Capability | Reuse Mode | Application in M2.2 |
+| Strategy | Reference use | Application in M2.2 |
 |---|---|---|
-| `verify_papers.py` 3-layer verification | STRATEGY_BORROW | Verify that evidence_ref targets actually exist in external catalogs |
-| `verify_papers.py` hallucination rate | STRATEGY_BORROW | Track hallucinated/non-existent references as a quality metric |
+| Candidate verification (arXiv/Crossref/S2) | STRATEGY_BORROW | Verify that evidence_ref targets actually exist in external catalogs |
+| Hallucination rate tracking | STRATEGY_BORROW | Track hallucinated/non-existent references as a quality metric |
 | Source verification status | STRATEGY_BORROW | PASS/WARN/BLOCKED/ERROR verdict per evidence source |
-| Disk-backed cache with TTL | STRATEGY_BORROW | Cache verification results to avoid repeated API calls |
-| research-lit contribution tracking | STRATEGY_BORROW | Track which source contributed each claim/passage |
+| Contribution tracking | STRATEGY_BORROW | Track which source contributed each claim/passage |
 
-**Boundary**: ARIS verifies paper existence, not passage-level evidence quality. M2.2 still needs PassageIndex, ClaimEvidence, BM25, and EvidencePack for fine-grained evidence binding.
+**ResearchSensei boundary**: PassageIndex, ClaimEvidence, EvidencePack, evidence_ref remain ResearchSensei-owned. Paper-level verification cannot replace passage-level evidence_ref binding. Validation must use real evidence chains, not synthetic passages.
 
 ## 16. 当前未解决问题
 

@@ -314,19 +314,18 @@ paper_terms = title_words | abstract_words
 - F-7 以后规则未实现（设计中）
 - formula-heavy / raw-copy / generic-output 未实现
 
-## 15. ARIS Alignment
+## 15. External Reference Boundary
 
-ARIS's audit chain (experiment-audit → result-to-claim → paper-claim-audit → citation-audit → kill-argument) and reviewer independence principle are directly relevant to M2.4.
+ARIS provides useful verification-status and hallucination-discipline patterns, but does not replace ResearchSensei's artifact-level auditor.
 
-| ARIS Capability | Reuse Mode | Application in M2.4 |
+| Strategy | Reference use | Application in M2.4 |
 |---|---|---|
-| Reviewer independence (file-path only, no summaries) | STRATEGY_BORROW | Audit reads artifacts, never receives builder explanations |
-| `verify_papers.py` hallucination detection | STRATEGY_BORROW | Detect fabricated references in cards |
+| Reviewer independence (file-path only) | STRATEGY_BORROW | Audit reads artifacts, never receives builder explanations |
+| Hallucination detection | STRATEGY_BORROW | Detect fabricated references in cards |
 | Source verification status | STRATEGY_BORROW | Track verified/unverified/verify_pending per claim |
 | Kill-argument adversarial review | STRATEGY_BORROW | Future advisor question quality assessment |
-| claim-by-claim verification | STRATEGY_BORROW | Per-claim evidence_ref validation |
 
-**Boundary**: ARIS audit is workflow-level (5-layer chain). M2.4 QualityAuditor is rule-based structural + semantic checks. ARIS does not replace F-1 to F-6 rules or formula-heavy/raw-copy detection.
+**ResearchSensei boundary**: QualityAuditor remains artifact-level and evidence_ref-level auditor. ARIS does not replace F-1 to F-6 rules or formula-heavy/raw-copy detection. Reviewer-style concerns may inform checks, but reviewer opinion cannot replace evidence.
 
 ## 16. 当前未解决问题
 

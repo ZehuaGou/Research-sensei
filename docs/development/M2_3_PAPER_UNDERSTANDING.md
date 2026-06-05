@@ -8,9 +8,12 @@
 
 ## 2. 非目标
 
-- 默认测试不用真实 LLM
 - 不新增依赖
 - 不改 frontend
+
+## External Reference Boundary
+
+ARIS provides useful paper-understanding reference patterns (Problem/Method/Results/Relevance, reviewer independence, verification_status), but does not replace ResearchSensei parser, evidence, cards, or auditor. ResearchSensei output must be paper_card / formula_cards / teaching_cards with evidence_ref binding, not ARIS-style markdown summaries. Card generation must use real LLM and evidence_ref; no evidence means BLOCKED_UNDERSTANDING.
 
 ## 3. 产品流程位置
 

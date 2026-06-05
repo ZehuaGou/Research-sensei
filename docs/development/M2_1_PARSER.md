@@ -48,7 +48,7 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 - **GitHub**: `datalab-to/marker`
 - **主要能力**: PDF 转 Markdown / JSON / chunks / HTML，支持 tables / forms / equations / inline math / links / references / code blocks
 - **输出格式**: Markdown / JSON / chunks / HTML
-- **可选 LLM 模式**: 有，但默认测试不能用真实 LLM
+- **可选 LLM 模式**: 有，但 Marker LLM 增强不在 M2.1 默认路径中
 - **许可证风险**: 代码 GPL-3.0，模型许可另有限制，商用/分发前必须确认
 - **是否适合当前接入**: 否 — 许可证和依赖风险，不适合默认依赖
 - **未来 adapter 映射**: Marker JSON / chunks → `DocumentIngestion.blocks`
@@ -239,16 +239,18 @@ class LightweightParserAdapter(ParserAdapter):
 - DoclingParserAdapter 未实现
 - 外部 parser 仍是 optional adapter
 
-## 14. ARIS Alignment
+## 14. External Reference Boundary
 
 ARIS does not have a dedicated parser module. ARIS relies on external tools (DeepXiv, arXiv metadata) and does not perform robust PDF parsing with layout analysis, table extraction, or formula detection.
 
-| ARIS Capability | Reuse Mode | Application in M2.1 |
+| Strategy | Reference use | Application in M2.1 |
 |---|---|---|
 | PDF download validation | STRATEGY_BORROW | Already adopted in M1.3 source resolver |
 | DeepXiv section-level access | EVALUATE_OTHER_PROJECTS | Optional future adapter for structured section extraction |
+| Docling multi-format parsing | EVALUATE_OTHER_PROJECTS | Primary candidate for replacing PyMuPDF get_text |
+| Marker PDF-to-Markdown | EVALUATE_OTHER_PROJECTS | GPL-3.0 license risk; evaluate before adopting |
 
-**Boundary**: M2.1 parser must remain ResearchSensei-specific. ARIS does not provide a replacement for PyMuPDF-based or Docling-based parsing.
+**ResearchSensei boundary**: M2.1 parser must remain ResearchSensei-specific. ARIS does not provide a replacement for PyMuPDF-based or Docling-based parsing. Parser still needs section blocks, passage blocks, formula blocks. Parser validation must use real PDF parsing; synthetic markdown is not enough for acceptance.
 
 ## 15. 当前未解决问题
 

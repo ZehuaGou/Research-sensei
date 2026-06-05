@@ -92,14 +92,16 @@ Latest validated live result (with robust arXiv/Semantic Scholar adapters and pr
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item cleared for M2.
 
-## ARIS Alignment Summary
+## External Reference Boundary
 
-ResearchSensei's "科研自动化" reference project is ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`).
+ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`) is one external reference, not a runtime dependency, not a replacement architecture, and not the only source of design ideas. ResearchSensei remains an independent product with its own module boundaries, schemas, artifacts, gates, APIs, frontend, and validation rules.
 
-| Module | ARIS Overlap | Reuse Mode | Key Boundary |
+| Module | ARIS overlap | Reference use | ResearchSensei-owned boundary |
 |---|---|---|---|
-| M1 | High | STRATEGY_BORROW | Search backend remains best-of-breed (OpenAlex/Semantic Scholar/Crossref/arXiv). ARIS provides verification/download discipline. |
-| M2 | Medium-High | STRATEGY_BORROW + ADAPTER_REUSE | ARIS verification_status/source discipline enhance evidence and audit. Parser/formula/evidence_ref remain ResearchSensei-specific. |
-| M3 | Low (code), Medium (schema) | STRATEGY_BORROW | No ARIS UI to reuse. Display fields borrow verification/relevance/source structure. |
-| M4 | High | STRATEGY_BORROW + PROMPT_BORROW | ARIS research-review/research_wiki strongly inform M4.3-M4.6. M4.1/M4.2 formula teaching remains self-built. |
-| M5 | Medium | STRATEGY_BORROW | ARIS run traces/session recovery/threat_scan are useful references. Real test discipline must not degrade.
+| M1 | High | STRATEGY_BORROW | Search remains best-of-breed. ARIS only informs verification, source discipline, and download discipline. |
+| M2 | Medium-High | STRATEGY_BORROW / PROMPT_BORROW | Parser, evidence_ref, formula_card, QualityAuditor, and artifacts remain ResearchSensei-owned. |
+| M3 | Low code, medium schema | STRATEGY_BORROW | No ARIS UI dependency. Only source/relevance/verification display concepts are referenced. |
+| M4 | High for advisor/memory, low for formula UI | PROMPT_BORROW / STRATEGY_BORROW | M4 remains a paper-learning interaction module. ARIS informs advisor/review/memory patterns only. |
+| M5 | Medium | STRATEGY_BORROW | Run discipline can be referenced. ResearchSensei keeps stricter real-test policy. |
+
+Other external projects remain open for evaluation. For example, M2 parser quality may require Docling / Marker / DeepXiv; M4 formula teaching may require a different specialized reference. ARIS must not block evaluation of better-fit projects.

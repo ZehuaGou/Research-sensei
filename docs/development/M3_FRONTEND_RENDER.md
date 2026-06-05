@@ -338,11 +338,11 @@ component_status:
 - debug/admin 鉴权机制
 - evidence_ref 跳转
 
-## 17. ARIS Alignment
+## 17. External Reference Boundary
 
-ARIS has no frontend UI. However, ARIS's structured output fields provide display discipline that M3 should adopt.
+ARIS has no frontend UI to reuse. M3 may reference ARIS-style output fields such as verification_status, source contribution, relevance_reason, limitations, and open_questions. These fields must be exposed through ResearchSensei APIs and rendered in ResearchSensei frontend components.
 
-| ARIS Output Field | Reuse Mode | Application in M3 |
+| Display concept | Reference use | Application in M3 |
 |---|---|---|
 | verification_status per paper | STRATEGY_BORROW | Display verification badge on cards |
 | relevance_reason | STRATEGY_BORROW | Show why a paper was selected |
@@ -350,7 +350,7 @@ ARIS has no frontend UI. However, ARIS's structured output fields provide displa
 | Limitations & Open Questions | STRATEGY_BORROW | Display as structured card section |
 | pdf_metadata_check | STRATEGY_BORROW | Display PDF validation status |
 
-**Boundary**: ARIS has no reusable frontend components. M3 frontend must be self-built. Only the output field structure is borrowed.
+**ResearchSensei boundary**: No ARIS UI dependency. ResearchSensei frontend remains Vue/FastAPI based. Raw artifacts still require debug/admin boundaries. User-facing cards must show why content is trusted, selected, degraded, or blocked.
 
 ## 18. 当前未解决问题
 
