@@ -74,11 +74,13 @@ python -m pytest -q tests_live
 python scripts/run_live_eval.py
 ```
 
-Latest live result:
+Latest validated live result (with robust arXiv/Semantic Scholar adapters and proxy):
 
-- `python -m pytest -q tests_live` with live env -> `2 passed`.
-- `python scripts/run_live_eval.py` with live env -> `m1_status=passed`, `candidate_count=10`, `pdf_download_success_count=2`, `a_read_count=2`.
-- Source failures are explicitly recorded, not hidden: arXiv returned HTTP 429; Semantic Scholar connection failed in the current network environment.
+- `python scripts/run_live_eval.py` with live env -> `m1_status=passed`
+- All 4 sources succeeded: arXiv, OpenAlex, Semantic Scholar, Crossref
+- candidate_count=15, pdf_download_success_count=7, a_read_count=5
+- All A_READ have `can_enter_m2=true`
+- Source failures in earlier runs (arXiv 429, Semantic Scholar connection refused) were resolved by robust adapter rewrite (User-Agent, retry/backoff, httpx trust_env proxy)
 
 ## Hard Rules
 

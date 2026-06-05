@@ -113,7 +113,7 @@ class SelectionExplanation(SenseiModel):
 | test_selection_missing_evidence_ref | degraded / rejected + warning |
 | test_selection_not_in_paper | rejected / warning |
 | test_selection_has_citations | cited_evidence_refs 非空 |
-| test_selection_no_real_llm | 使用 fake client |
+| test_selection_real_llm_grounded_explanation | 真实 LLM 返回 grounded explanation with cited_evidence_refs |
 | test_selection_failure_path | LLM failure → degraded |
 
 ---
@@ -219,7 +219,7 @@ class InteractiveAnswer(SenseiModel):
 | 测试 | 断言 |
 |------|------|
 | test_question_from_memory | 不调用 LLM |
-| test_question_from_evidence | fake LLM |
+| test_question_from_evidence | 真实 LLM 基于 evidence 回答 |
 | test_question_missing_evidence | degraded answer |
 | test_question_has_refs | evidence_refs 或 memory_refs 非空 |
 | test_repeated_question_memory | 命中 memory |
@@ -308,7 +308,7 @@ class AdvisorEvaluation(SenseiModel):
 | test_advisor_strong_deeper | strong answer → deeper question |
 | test_advisor_mode_style | advisor_mode 影响 question style |
 | test_advisor_no_generic | 基于当前论文 |
-| test_advisor_no_real_llm | fake client |
+| test_advisor_real_llm_question_generation | 真实 LLM 生成 paper-specific 问题 |
 
 ---
 
@@ -535,8 +535,7 @@ class MemoryRetrievalResult(SenseiModel):
 
 ### 全局规则
 
-- 默认测试不真实调用 LLM，使用 fake/mock LLM client
-- 不联网，不新增依赖
+- M4 validation must use real LLM and real artifacts. Mock/fake clients are not valid acceptance tests. Missing keys or unavailable external services fail validation instead of skipping.
 
 ### 每子模块测试覆盖
 

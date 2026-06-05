@@ -12,8 +12,7 @@ M1 does not teach the paper, parse the full paper, or generate paper/formula/dri
 
 - Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
 - Search/acquisition must use mature projects or official clients through adapters.
-- arXiv and OpenAlex must not be implemented through self-written HTTP/XML/JSON wrappers.
-- Semantic Scholar and Crossref are adapter-backed sources.
+- Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed. arXiv uses a robust official endpoint adapter (ARIS-style) with full diagnostic discipline. OpenAlex uses `pyalex`. Semantic Scholar uses official REST API via httpx with proxy support. Crossref uses `habanero`.
 - A_READ papers must be cleared for M2, which currently means a validated PDF was downloaded and has a local path, file size, and sha256.
 - M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
