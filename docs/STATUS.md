@@ -27,20 +27,32 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 
 | Module | Code Status | Test Status | Real Status | Notes |
 |---|---|---|---|---|
-| M1.1 Query Planning | implemented | unit tested | REAL_LLM_VERIFIED | 无 LLM 时硬失败，不再 heuristic fallback |
-| M1.2 Acquisition | implemented | unit tested | LIVE_SEARCH_VERIFIED | 使用 `arxiv`, `pyalex`, `semanticscholar`, `habanero`；OpenAlex/Crossref live success，arXiv 429 与 Semantic Scholar 连接失败已记录 |
-| M1.3 Source Acquisition | implemented | unit tested | REAL_PDF_VERIFIED | live eval 下载并校验 2 个 PDF，记录 sha256/local_path |
-| M1.4 Selection | implemented | unit tested | M1_REAL_VERIFIED | dedup/score 使用真实 metadata 字段；A_READ 受 PDF/M2 gate 约束 |
-| M1.5 Reading Plan | implemented | unit tested | M1_REAL_VERIFIED | live eval 产生 2 个 A_READ，均 `can_enter_m2=true` |
+| M1.1 Query Planning | implemented | real tested | REAL_LLM_VERIFIED | 真实 LLM (mimo-v2.5-pro) query planning，无 heuristic fallback |
+| M1.2 Acquisition | implemented | real tested | LIVE_SEARCH_VERIFIED | 4 源全部成功（arXiv/OpenAlex/Semantic Scholar/Crossref）。arXiv 使用 httpx + 自定义 User-Agent + 429/503 retry。Semantic Scholar 使用 httpx REST adapter + proxy 支持 |
+| M1.3 Source Acquisition | implemented | real tested | REAL_PDF_VERIFIED | live eval 下载并校验 7 个 PDF，记录 sha256/local_path |
+| M1.4 Selection | implemented | real tested | M1_REAL_VERIFIED | dedup/score 使用真实 metadata 字段；A_READ 受 PDF/M2 gate 约束 |
+| M1.5 Reading Plan | implemented | real tested | M1_REAL_VERIFIED | live eval 产生 5 个 A_READ，均 `can_enter_m2=true` |
 | M2+ | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收，mock 测试已删除 |
+
+## M1 Live Eval Results (2026-06-05)
+
+- All 4 sources succeeded: arXiv, OpenAlex, Semantic Scholar, Crossref
+- 15 candidates, 7 PDFs downloaded, 5 A_READ papers
+- All A_READ have `can_enter_m2=true`
+- arXiv: httpx + custom User-Agent + 429/503 retry/backoff + Rate exceeded body detection
+- Semantic Scholar: httpx REST adapter with `trust_env=True` for proxy support
+- Source resolver: PDF download with retry/backoff + User-Agent + %PDF header validation
+- LLM: mimo-v2.5-pro, 530 tokens
 
 ## Completed In This Pass
 
 - Added mature dependencies in `pyproject.toml`: `arxiv`, `pyalex`, `semanticscholar`, `habanero`.
-- Replaced self-written arXiv/OpenAlex HTTP parsing wrappers with mature package adapters.
-- Added Semantic Scholar and Crossref adapters through adapter boundaries.
+- Replaced arXiv `arxiv` package with httpx-based adapter: custom User-Agent, 429/503/Rate exceeded retry, id_list lookup, multi-query strategy.
+- Replaced Semantic Scholar `semanticscholar` package with httpx REST adapter: proxy support (trust_env=True), API key support, 429/503 retry.
+- Added OpenAlex and Crossref adapters through adapter boundaries.
 - Removed QueryPlanner heuristic fallback. Missing/invalid LLM planning now raises `QueryPlanningError`.
 - Added real M1 PDF acquisition fields: `download_status`, `final_url`, `content_type`, `file_size`, `sha256`, `local_path`, `error_code`.
+- Enhanced source_resolver PDF download with retry/backoff and User-Agent.
 - Reworked reading plan gate so A_READ requires downloadable/validated full text and `can_enter_m2`.
 - Replaced live eval completion definition with M1 real validation only. Synthetic M2 markdown is no longer accepted as M1 evidence.
 - Deleted `docs/audit/FULL_PROJECT_REALITY_AUDIT.md` as requested by the uploaded correction document.

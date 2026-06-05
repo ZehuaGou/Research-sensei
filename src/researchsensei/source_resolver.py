@@ -45,7 +45,11 @@ class PaperSourceResolver:
     ) -> None:
         self.network_enabled = network_enabled
         self.download_dir = Path(download_dir).resolve() if download_dir else None
-        self.http_client = http_client or httpx.Client()
+        _default_headers = {"User-Agent": "ResearchSensei/0.5 (+https://github.com/ZehuaGou/Research-sensei)"}
+        if http_client:
+            self.http_client = http_client
+        else:
+            self.http_client = httpx.Client(headers=_default_headers, trust_env=True)
         self.timeout_seconds = timeout_seconds
         self.max_download_bytes = max_download_bytes
         self.external_resolver = external_resolver
@@ -159,6 +163,8 @@ class PaperSourceResolver:
         source_type: PaperSourceType,
         download_dir: Path,
     ) -> ResolvedPaperSource:
+        import time as _time
+
         parsed = urlparse(pdf_url)
         if parsed.scheme not in {"http", "https"}:
             return self._download_failed(
@@ -170,10 +176,54 @@ class PaperSourceResolver:
                 code="INVALID_URL",
                 message="PDF URL must use http/https.",
             )
-        try:
-            response = self.http_client.get(pdf_url, timeout=self.timeout_seconds, follow_redirects=True)
-            response.raise_for_status()
-        except Exception as exc:
+
+        max_retries = 3
+        backoff = [2.0, 4.0, 8.0]
+        response = None
+
+        for attempt in range(max_retries):
+            try:
+                response = self.http_client.get(pdf_url, timeout=self.timeout_seconds, follow_redirects=True)
+                if response.status_code in {429, 503} and attempt < max_retries - 1:
+                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    logger.warning(
+                        "PDF download %s got %d, retry %d/%d in %.1fs",
+                        pdf_url[:80], response.status_code, attempt + 1, max_retries, wait,
+                    )
+                    _time.sleep(wait)
+                    continue
+                response.raise_for_status()
+                break
+            except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
+                if attempt < max_retries - 1:
+                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    logger.warning(
+                        "PDF download %s error: %s, retry %d/%d in %.1fs",
+                        pdf_url[:80], exc, attempt + 1, max_retries, wait,
+                    )
+                    _time.sleep(wait)
+                    continue
+                return self._download_failed(
+                    paper,
+                    pdf_url=pdf_url,
+                    source_url=source_url,
+                    landing_url=landing_url,
+                    source_type=source_type,
+                    code="DOWNLOAD_FAILED",
+                    message=str(exc)[:300],
+                )
+            except Exception as exc:
+                return self._download_failed(
+                    paper,
+                    pdf_url=pdf_url,
+                    source_url=source_url,
+                    landing_url=landing_url,
+                    source_type=source_type,
+                    code="DOWNLOAD_FAILED",
+                    message=str(exc)[:300],
+                )
+
+        if response is None:
             return self._download_failed(
                 paper,
                 pdf_url=pdf_url,
@@ -181,7 +231,7 @@ class PaperSourceResolver:
                 landing_url=landing_url,
                 source_type=source_type,
                 code="DOWNLOAD_FAILED",
-                message=str(exc)[:300],
+                message="No response after retries.",
             )
 
         content = response.content
