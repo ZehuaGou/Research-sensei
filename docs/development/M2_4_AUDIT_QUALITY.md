@@ -324,6 +324,18 @@ paper_terms = title_words | abstract_words
 - **Boundary**: ARIS reviewer opinion cannot replace evidence. QualityAuditor still checks by ResearchSensei artifacts.
 - **Validation implication**: Missing evidence_ref must fail. BLOCKED status cannot display cards. BASELINE_ONLY cannot be user-displayed.
 
+## 16. Direction & Survey Audit Rules
+
+M2.4 audit must additionally verify:
+
+- Direction-related fields (`method_family`, `contribution_to_direction`, `what_problem_it_solves`, `what_limitation_it_leaves`, `relation_to_previous_methods`, `relation_to_later_methods`, `datasets_and_metrics`, `comparable_methods`) must have `evidence_ref`.
+- Comparison claims must have `evidence_ref`.
+- Limitation / future work claims must have `evidence_ref`.
+- Survey extracted key papers must be traceable to survey passages.
+- Paper relation claims must be evidence-grounded.
+
+If evidence is insufficient, direction-related fields must NOT be used to update `direction_landscape`.
+
 ## 16. 当前未解决问题
 
 - formula char ratio 阈值是否需要调优

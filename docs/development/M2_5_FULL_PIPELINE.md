@@ -108,7 +108,7 @@ source (PDF/MD/TXT)
 - BASELINE_ONLY 只能作为 diagnostic artifact
 - API/frontend gating 详见 M3 M3_FRONTEND_RENDER.md
 
-### Direction-Support Gates (C1, C4)
+### Direction-Support Gates
 
 M2.5 DownstreamGates should include:
 

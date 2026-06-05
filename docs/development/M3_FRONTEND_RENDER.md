@@ -32,31 +32,48 @@ M2 pipeline 完成
 - card 是否展示由 status + component_status + allowed_downstream 决定
 - BLOCKED_UNDERSTANDING 时绝对不能展示解释性 card 内容
 - BASELINE_ONLY 普通用户不能当作最终理解展示
-- M3 has two workspaces: DirectionWorkspace (C1) and PaperWorkspace (C3), parallel capabilities, not replacements
+- M3 has three frontend areas: DirectionWorkspace, PaperWorkspace, SeedExpansionPanel — parallel capabilities, not replacements
 
-### DirectionWorkspace (C1)
+### DirectionWorkspace
 
 Displays:
-- `direction_landscape`
-- chronology stages
+- direction search input
+- survey candidates
+- direction framework
 - method families
+- chronology stages
 - landscape anchors
 - recommended reading order
-- gaps / open questions
-- current SOTA candidates
+- deep-read buttons
 
 Status: NOT_IMPLEMENTED
 
-### PaperWorkspace (C3)
+### PaperWorkspace
 
 Displays:
-- `paper_card`
-- `formula_cards`
-- `teaching_cards`
-- `evidence_ref` (future: passage-level jump)
+- upload PDF
+- input paper title / DOI / arXiv / URL
+- download/verification status
+- paper_card
+- formula_cards
+- teaching_cards
+- evidence_refs
 - quality status
+- find-upstream/downstream button
 
-DirectionWorkspace and PaperWorkspace are parallel capabilities, not replacements.
+### SeedExpansionPanel
+
+Displays:
+- upstream papers
+- downstream papers
+- related surveys
+- follow-up improvements
+- same-route papers
+- one-click deep-read buttons
+
+Status: NOT_IMPLEMENTED
+
+DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend capabilities, not replacements.
 
 ## 4. 可复用开源项目 / 外部服务调研
 

@@ -249,7 +249,37 @@ class LightweightParserAdapter(ParserAdapter):
 - **Boundary**: ARIS is not a dedicated parser. ARIS cannot replace ParserAdapter. Still needs evaluation of Docling / Marker / MinerU / DeepXiv for parser quality improvement.
 - **Validation implication**: Parser validation must use real PDF. Synthetic markdown is not acceptance. Must output section / passage / formula structure.
 
-## 15. 当前未解决问题
+## 15. Survey Paper Support
+
+M2.1 Parser should support two types of papers:
+
+### Ordinary Research Paper
+
+Parser preserves:
+- sections
+- passages
+- formulas
+- tables
+- figures
+- datasets
+- baselines
+- compared_methods
+- limitation_statements
+- future_work_statements
+- method_family_clues
+
+### Survey / Review Paper
+
+Parser additionally preserves:
+- taxonomy_sections
+- method_family_sections
+- survey_tables
+- reference_clusters
+- historical_or_chronological_sections
+
+Status: NOT_IMPLEMENTED
+
+## 16. 当前未解决问题
 
 - Docling 本地样例验证需要哪些论文
 - 外部 parser 映射细节（DoclingDocument → DocumentIngestion.blocks）

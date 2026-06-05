@@ -6,18 +6,25 @@
 
 在 M2 单篇论文理解完成后，提供互动式学习能力：让用户通过选中内容、追问、训练、长期记忆，真正掌握论文，而非只看一遍卡片。
 
-M4 有两个交互层级：
+M4 有三类互动：
 
-**Paper-level interaction (C3, C5)**:
+**Paper-level interaction**:
 - 选中内容解释
 - 公式 / 符号解释
+- 方法机制解释
 - 单篇论文追问
 
-**Direction-level interaction (C1, C5)**:
+**Direction-level interaction**:
 - 方向演进追问
 - 方法族对比追问
 - 代表论文关系追问
 - 导师式研究路线追问
+
+**Seed-expansion interaction**:
+- "这篇论文引用了谁？"
+- "谁改进了它？"
+- "后续哪些论文最值得看？"
+- "它属于哪条技术路线？"
 
 Example direction-level questions:
 - "这个方向是怎么发展的？"
@@ -421,7 +428,7 @@ class UserQuestionMemory(SenseiModel):
     updated_at: str = ""
     schema_version: str = "v1"
 
-# Direction-level memory types (C1, C6)
+# Direction-level memory types
 
 class DirectionMemory(SenseiModel):
     """Memory of a research direction the user has studied."""

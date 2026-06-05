@@ -363,9 +363,9 @@ ARIS's structured paper output (Problem / Method / Results / Relevance / Source 
 
 **Boundary**: ARIS does not have formula_card or symbol explanation. ARIS does not have evidence_ref / PassageIndex / ClaimEvidence binding. These remain ResearchSensei-specific.
 
-## 17. Direction-Support Fields (C1, C4)
+## 17. Direction-Support Fields
 
-M2.3 paper_card should expose direction-support fields when evidence exists. These fields support C1 Direction Framework and C4 Cross-paper Understanding.
+M2.3 paper_card should expose direction-support fields when evidence exists. These fields support direction exploration and cross-paper understanding.
 
 | Field | Description | Evidence requirement |
 |-------|-------------|---------------------|
@@ -380,7 +380,22 @@ M2.3 paper_card should expose direction-support fields when evidence exists. The
 
 These fields are optional in paper_card but required for direction framework updates. M2.4 audit must verify evidence_ref for direction-related claims.
 
-## 18. 当前未解决问题
+## 18. Survey Paper Support
+
+For survey/review papers, M2.3 additionally outputs:
+
+| Output | Description |
+|--------|-------------|
+| `survey_landscape` | Overall landscape of the surveyed field |
+| `method_taxonomy` | Taxonomy of methods covered |
+| `extracted_key_papers` | Key papers identified in the survey |
+| `survey_claims` | Claims made by the survey about the field |
+
+`survey_landscape` does NOT replace `paper_card`. `formula_card` is NOT replaced by survey summary.
+
+Status: NOT_IMPLEMENTED
+
+## 19. 当前未解决问题
 
 - formula_is_core 的具体判断算法
 - EvidencePackSummary 是否足够复现 LLM 输入

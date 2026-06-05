@@ -183,6 +183,16 @@ class EvidenceRetriever:
 | LIMITATION | 局限、假设或未来工作 |
 | FORMULA_CONTEXT | 公式的作用、变量来源、优化目标 |
 | DEFINITION | 术语或符号定义 |
+| METHOD_CLAIM | 方法声明 |
+| DATASET_CLAIM | 数据集声明 |
+| COMPARISON_CLAIM | 对比声明 |
+| IMPROVEMENT_CLAIM | 改进声明 |
+| FUTURE_WORK_CLAIM | 未来工作声明 |
+| TAXONOMY_CLAIM | 综述分类声明 |
+| SURVEY_REFERENCE_CLAIM | 综述引用声明 |
+| PAPER_RELATION_CLAIM | 论文关系声明 |
+
+Direction-related fields must still be evidence-grounded. Paper-level evidence_ref cannot be replaced by direction summary.
 
 ### semantic_support 值
 

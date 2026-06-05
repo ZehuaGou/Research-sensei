@@ -2,20 +2,20 @@
 
 ---
 
-## 0. 产品能力层与模块关系
+## 0. 模块与产品能力关系
 
-ResearchSensei 有 6 层产品能力（C1-C6，见 `docs/DESIGN.md` Product Capability Layers）。M1-M5 是模块划分，不等于能力层划分。一个模块可以支撑多个能力层，一个能力层也可能跨多个模块。
+`docs/DESIGN.md` 是纲领设计文档。`docs/DEVELOPMENT.md` 是开发规范入口。M1-M5 开发文档必须服从 DESIGN。
 
-| 能力层 | 核心模块 | 支撑模块 |
-|--------|---------|---------|
-| C1 Direction Framework | M1 | M2 (direction-support fields), M3 (DirectionWorkspace), M4 (direction-level interaction) |
-| C2 Paper Acquisition | M1 | M5 (reliability) |
-| C3 Single Paper Deep Reading | M2 | M1 (A_READ_FOR_M2), M3 (PaperWorkspace), M4 (paper-level interaction) |
-| C4 Cross-paper Understanding | M2 + M4 | M1 (reading_plan), M3 (DirectionWorkspace) |
-| C5 Interactive Learning | M4 | M2 (evidence_ref), M3 (UI) |
-| C6 Long-term Memory | M4 | M5 (reliability) |
+M1-M5 是正式工程模块。产品能力可以跨模块，但不另设编号。
 
-开发文档必须同时覆盖 C1-C6 能力层。
+| 产品能力 | 主要涉及模块 |
+|---------|------------|
+| 方向探索 | M1, M2, M3, M4, M5 |
+| 单篇论文精读 | M2, M3, M4, M5 |
+| 论文搜索和获取 | M1, M3, M5 |
+| Seed paper expansion | M1, M2, M3, M4, M5 |
+| 互动学习 | M4, M2, M3, M5 |
+| 长期记忆 | M4, M5 |
 
 ---
 

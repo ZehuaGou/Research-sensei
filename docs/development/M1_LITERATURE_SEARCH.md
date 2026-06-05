@@ -2,42 +2,72 @@
 
 ## Goal
 
-M1 is the entry point for a research direction. It has two modes:
+M1 has three modes:
 
-**Focused Acquisition Mode** (C2): Given a narrow query, find verified + relevant + PDF downloaded papers that can enter M2 for deep reading.
+**Direction Exploration Mode**: Given a broad research direction, search for surveys first, then build a direction framework with method families, chronology stages, landscape anchors, and recommended reading order.
 
-**Direction Framework Mode** (C1): Given a broad query, generate a direction framework with method families, chronology stages, landscape anchors, and recommended reading order.
+**Focused Acquisition Mode**: Given a narrow query / title / DOI / URL / arXiv ID, find verified + relevant + PDF downloaded papers that can enter M2 for deep reading.
 
-M1 does not teach the paper, parse the full paper, or generate paper/formula/drill cards. Those belong to M2+.
+**Seed Paper Expansion Mode**: Given a seed paper (already read or being read), find upstream papers, downstream papers, related surveys, follow-up improvements, and build a local paper relation graph.
 
-## Two Modes
+M1 does not teach the paper, parse the full paper, or generate paper/formula/drill cards. Those belong to M2.
+
+## Three Modes
+
+### Direction Exploration Mode
+
+Status: NOT_IMPLEMENTED
+
+Input: research direction (e.g. "时间序列异常检测")
+
+Behavior:
+1. Search for high-quality surveys first
+2. If no qualified survey found, execute staged multi-source search
+3. Build direction framework
+
+Output:
+- `survey_candidates.json`
+- `direction_landscape.json` — with `method_families`, `chronology_stages`, `landscape_anchors`, `representative_papers`, `recommended_reading_order`, `gaps_or_open_questions`
+- `reading_plan.json`
+
+`direction_landscape.json` does NOT replace `reading_plan.json`. `direction_landscape.json` serves direction understanding. `reading_plan.json` serves reading plan. `A_READ_FOR_M2` serves single-paper deep reading entry.
+
+LandscapeAnchor serves direction understanding, not necessarily M2 entry. A LandscapeAnchor can temporarily lack a PDF.
 
 ### Focused Acquisition Mode
 
 Status: REAL_E2E_VERIFIED
+
+Input: focused query / title / DOI / arXiv ID / URL
 
 Pipeline:
 ```
 user query -> real LLM query plan -> multi-source acquisition -> dedup -> verification -> LLM relevance judge -> download gate -> PDF validation -> reading_plan.json (A_READ_FOR_M2)
 ```
 
-A_READ_FOR_M2 must be verified + relevant + PDF downloaded + title match.
+A_READ_FOR_M2 must satisfy ALL:
+- `verification_status == verified`
+- `llm_relevance_score >= 0.65`
+- `llm_relevance_label in {HIGH, MEDIUM}`
+- `should_a_read == true`
+- `pdf_downloaded == true`
+- `pdf_metadata_check == passed`
+- `pdf_title_match == match`
+- `can_enter_m2 == true`
 
-### Direction Framework Mode
+### Seed Paper Expansion Mode
 
-Status: DOC_REQUIRED / NOT_IMPLEMENTED
+Status: NOT_IMPLEMENTED
 
-Pipeline:
-```
-user query -> real LLM query plan -> multi-source acquisition -> dedup -> direction analysis -> direction_landscape.json
-```
+Input: seed paper metadata / paper_id / uploaded paper
 
-Artifacts:
-- `direction_landscape.json` — with `chronology_stage`, `method_family`, `landscape_anchor`, `representative_papers`, `recommended_reading_order`, `gaps_or_open_questions`
+Behavior:
+1. Find citing papers, cited papers, related surveys, same-route papers, follow-up improvements
+2. Build local paper relation graph
 
-`direction_landscape.json` does NOT replace `reading_plan.json`. `direction_landscape.json` serves direction understanding (C1). `reading_plan.json` serves reading plan (C2). `A_READ_FOR_M2` serves single-paper deep reading entry (C3).
-
-LandscapeAnchor serves direction understanding, not necessarily M2 entry.
+Output:
+- `paper_relation_graph.json`
+- `seed_expansion_result.json`
 
 ## Non-Negotiable Requirements
 
@@ -355,6 +385,14 @@ If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`
 
 ## Artifacts
 
+### Direction Exploration Mode
+
+| Artifact | Description |
+|---|---|
+| `survey_candidates.json` | Survey candidates found by search |
+| `direction_landscape.json` | Direction framework with method families, chronology stages, landscape anchors, recommended reading order, gaps |
+| `reading_plan.json` | Reading plan derived from direction framework |
+
 ### Focused Acquisition Mode
 
 | Artifact | Description |
@@ -365,11 +403,12 @@ If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`
 | `filtered_candidates.json` | Final candidates with verification/LLM relevance/PDF fields |
 | `reading_plan.json` | Prioritized plan with A_READ_FOR_M2/B_SKIM/C_REFERENCE and warnings |
 
-### Direction Framework Mode
+### Seed Paper Expansion Mode
 
 | Artifact | Description |
 |---|---|
-| `direction_landscape.json` | Direction framework with chronology stages, method families, landscape anchors, recommended reading order, gaps |
+| `paper_relation_graph.json` | Graph of upstream/downstream/related papers |
+| `seed_expansion_result.json` | Structured expansion result |
 
 ## Live Acceptance
 

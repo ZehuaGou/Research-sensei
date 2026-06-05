@@ -14,24 +14,23 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | DOC_ONLY | 只有文档 |
 | DOC_REQUIRED | 文档待补充，代码未实现 |
 | UNIT_TESTED | 有单元测试，但没有真实外部链路验证 |
-| LIVE_SEARCH_VERIFIED | 真实联网搜索通过 |
-| REAL_LLM_VERIFIED | 真实 LLM 调用通过 |
-| REAL_PDF_VERIFIED | 真实 PDF 下载、文件头、大小、sha256 校验通过 |
-| REAL_E2E_VERIFIED | 真实端到端通过（focused acquisition mode） |
-| PARTIAL_REAL_E2E_VERIFIED | 部分能力真实端到端通过，其他能力未实现 |
+| REAL_E2E_VERIFIED | 真实端到端通过 |
+| PARTIAL_REAL_E2E_VERIFIED | 部分模式真实端到端通过，其他模式未实现 |
 | PRODUCTION_READY | 可用于稳定生产环境 |
 
 ## Module Matrix
 
-| Module | Code Status | Test Status | Real Status | Notes |
-|---|---|---|---|---|
-| M1 Focused Acquisition | implemented | real tested | REAL_E2E_VERIFIED | 窄 query 真实链路通过：LLM query plan → 多源搜索 → 验证 → LLM relevance → PDF 下载 → A_READ gate |
-| M1 Direction Framework | not implemented | — | DOC_REQUIRED | 宽 query 方向框架未实现：direction_landscape.json / chronology_stage / method_family / landscape_anchor |
-| M1 Overall | — | — | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，direction framework 未实现 |
-| M2 | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收 |
-| M3 | existing code | component tests | not verified | M3 前端组件测试通过，页面级验收未完成 |
-| M4 | existing docs | — | DOC_REQUIRED | M4 互动式学习文档待设计，代码未实现 |
-| M5 | existing docs | — | DOC_REQUIRED | M5 工程可靠性文档已有，C1-C6 验收矩阵待实现 |
+| Module | Mode | Code Status | Test Status | Real Status | Notes |
+|---|---|---|---|---|---|
+| M1 | Focused Acquisition | implemented | real tested | REAL_E2E_VERIFIED | 窄 query 真实链路通过 |
+| M1 | Direction Exploration | not implemented | — | DOC_REQUIRED | 宽 query 方向框架未实现 |
+| M1 | Seed Paper Expansion | not implemented | — | DOC_REQUIRED | seed paper 扩展未实现 |
+| M1 | Overall | — | — | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，其余未实现 |
+| M2 | Paper Deep Reading | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收 |
+| M2 | Survey Deep Reading | not implemented | — | DOC_REQUIRED | 综述论文精读未实现 |
+| M3 | Frontend | existing code | component tests | not verified | M3 前端组件测试通过，页面级验收未完成 |
+| M4 | Interactive Learning | existing docs | — | DOC_REQUIRED | M4 互动式学习文档待设计，代码未实现 |
+| M5 | Reliability | existing docs | — | DOC_REQUIRED | M5 工程可靠性文档已有，验收矩阵待实现 |
 
 ## M1 Focused Acquisition Live Result (2026-06-05, HEAD fc7d494)
 
@@ -76,7 +75,7 @@ Every A_READ must satisfy ALL:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item that passes the strict gate above.
-- M1 direction framework is NOT complete. direction_landscape.json / chronology_stage / method_family are not implemented.
+- M1 direction exploration and seed paper expansion are NOT complete.
 
 ## External Reference Boundary
 
