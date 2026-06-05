@@ -59,6 +59,30 @@ Output:
 
 Boundary: Does not parse full papers. Does not generate paper cards.
 
+**M1 Source Acquisition Contract**:
+
+M1 must resolve best available source, not just PDF.
+
+Source priority:
+1. `latex_source`
+2. `structured_html`
+3. `pdf`
+4. `metadata_only`
+
+`source_resolution.json` must include:
+- `source_type`
+- `source_priority`
+- `preferred_m2_input`
+- `latex_source_url`, `latex_source_downloaded`, `latex_source_path`, `latex_source_sha256`, `latex_source_format`, `latex_main_file`, `latex_aux_files`, `latex_compile_status`
+- `structured_html_url`, `structured_html_downloaded`
+- `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`
+- `source_confidence`, `source_warning`
+
+**Failure contract (source-aware)**:
+- If LaTeX source exists but download fails, record `latex_source_error` and continue to structured_html/pdf only as degraded path.
+- If only PDF is available, M2 must mark `parser_input_type=pdf` and cannot claim source-level formula fidelity.
+- `metadata_only` cannot enter M2 deep reading.
+
 **Live validation contract**:
 
 - focused query uses real LLM and real network
@@ -134,9 +158,23 @@ M2.3 paper_card exposes direction-support fields when evidence exists:
 - `datasets_and_metrics`
 - `comparable_methods`
 
+**M2 source-aware parser**:
+
+M2 must select parser by `preferred_m2_input`.
+
+Parser priority:
+1. `LaTeXSourceParser` — preferred when LaTeX source is available; best for formulas, citations, section hierarchy
+2. `StructuredHTMLParser` — preferred for structured HTML/XML
+3. `MinerUAdapter` — preferred for PDF-only papers where formulas/tables matter
+4. `DoclingAdapter` — preferred for structure/layout extraction if MinerU is unavailable
+5. `GROBIDReferenceAdapter` — for metadata/references/citation contexts, not as the only deep parser
+6. `PyMuPDFLowConfidenceAdapter` — fallback only; cannot produce high-confidence formula cards
+
+PDF→LaTeX / PDF→Markdown is fallback, not the preferred route. If LaTeX source is available, M2 should prefer source for formulas, symbols, sections, citations, and bibliography.
+
 **Live validation contract**:
 
-- real PDF input (not synthetic)
+- real input (LaTeX source or PDF, depending on source availability)
 - real parser output
 - real LLM card generation
 - `evidence_ref` traceable
@@ -148,8 +186,9 @@ M2.3 paper_card exposes direction-support fields when evidence exists:
 - no passages / no claims / empty evidence pack → `BLOCKED_UNDERSTANDING`
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
+- `PyMuPDFLowConfidenceAdapter` output cannot produce high-confidence formula explanation
 
-**Current status**: partial code exists; real PDF + real LLM + real audit e2e not yet verified
+**Current status**: partial code exists; LaTeXSourceParser not implemented; real PDF + real LLM + real audit e2e not yet verified
 
 ### Survey / Review Paper
 

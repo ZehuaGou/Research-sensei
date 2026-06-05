@@ -153,6 +153,10 @@ class ClaimEvidence(SenseiModel):
     semantic_support: str = ""
     source_sentence: str = ""
     generated_by: str = "rule"   # "rule" / "llm"
+    # source-aware fields
+    source_origin: str = ""      # latex_source | structured_html | pdf | grobid_reference | parser_generated
+    formula_origin: str = ""     # source_latex | mathml | ocr_latex | plain_text | unknown
+    source_location: dict = Field(default_factory=dict)  # latex_file, latex_line_start/end, html_selector, pdf_page, pdf_bbox
 ```
 
 ### ClaimExtractor / EvidenceRetriever
@@ -193,6 +197,14 @@ class EvidenceRetriever:
 | PAPER_RELATION_CLAIM | 论文关系声明 |
 
 Direction-related fields must still be evidence-grounded. Paper-level evidence_ref cannot be replaced by direction summary.
+
+### Source-Aware Evidence Rules
+
+Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Formula explanations must prefer `source_latex` evidence when available. If evidence comes from PDF OCR, formula confidence must be lower.
+
+- `source_origin` records where the evidence came from: `latex_source`, `structured_html`, `pdf`, `grobid_reference`, `parser_generated`
+- `formula_origin` records how the formula was obtained: `source_latex` (from LaTeX source, highest fidelity), `mathml` (from HTML/MathML), `ocr_latex` (OCR-derived, lower confidence), `plain_text`, `unknown`
+- `source_location` records the exact location in the source: `latex_file`/`latex_line_start`/`latex_line_end` for LaTeX, `html_selector` for HTML, `pdf_page`/`pdf_bbox` for PDF
 
 ### semantic_support 值
 

@@ -336,7 +336,17 @@ M2.4 audit must additionally verify:
 
 If evidence is insufficient, direction-related fields must NOT be used to update `direction_landscape`.
 
-## 16. 当前未解决问题
+## 17. Formula Source Audit (FSA)
+
+| ID | 条件 | severity | effect | 状态 |
+|----|------|----------|--------|------|
+| FSA-1 | high-confidence formula_card must have `source_latex` or `mathml` evidence | P0 | BLOCK | 设计中 |
+| FSA-2 | OCR-derived formula (`ocr_latex`) cannot be marked high confidence without verification | P1 | WARNING | 设计中 |
+| FSA-3 | `formula_card.original_latex` must match evidence_ref source when `parser_input_type=latex_source` | P0 | BLOCK | 设计中 |
+| FSA-4 | `source_level_formula_available=true` but formula_card missing `original_latex` → warning/block depending severity | P1 | BLOCK/WARNING | 设计中 |
+| FSA-5 | `PyMuPDFLowConfidenceAdapter` output cannot produce high-confidence formula explanation | P0 | BLOCK | 设计中 |
+
+## 18. 当前未解决问题
 
 - formula char ratio 阈值是否需要调优
 - token overlap 阈值是否需要调优

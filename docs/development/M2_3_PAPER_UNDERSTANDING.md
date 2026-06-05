@@ -380,6 +380,17 @@ M2.3 paper_card should expose direction-support fields when evidence exists. The
 
 These fields are optional in paper_card but required for direction framework updates. M2.4 audit must verify evidence_ref for direction-related claims.
 
+## 17.5 Source-Aware Formula Preference
+
+formula_card and teaching_card must prefer `source_latex` formulas.
+
+Rules:
+- If `parser_input_type == latex_source`: formula_card should include `original_latex`; symbol explanation should use `source_latex`; formula confidence can be high if evidence_ref valid
+- If `parser_input_type == pdf` and `formula_origin == ocr_latex`: formula_card must include `ocr_warning`; confidence cannot be high unless verified by additional evidence
+- If `formula_origin == plain_text` or `unknown`: do not generate detailed formula derivation; mark formula explanation as degraded
+
+Survey Deep Reading should extract method_taxonomy and key papers preferably from LaTeX/HTML structure when available; PDF-only extraction must record lower source confidence.
+
 ## 18. Survey Paper Support
 
 For survey/review papers, M2.3 additionally outputs:

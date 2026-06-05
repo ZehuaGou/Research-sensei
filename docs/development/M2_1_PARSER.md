@@ -23,14 +23,41 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 
 | 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
 |------|------|---------------|----------|--------------|------|----------|
-| Docling | 多格式文档解析 | github.com/docling-project/docling | OPTIONAL_ADAPTER | 否 | 依赖较重 | 第一个候选外部 parser |
-| MinerU | PDF/image 解析 | github.com/opendatalab/MinerU | OPTIONAL_ADAPTER | 否 | 依赖重 | 暂不接入 |
+| LaTeXML | LaTeX → XML/HTML/MathML/JATS/TEI | github.com/brucemiller/LaTeXML | OPTIONAL_ADAPTER | 否 | 安装复杂 | 候选 LaTeX source parser |
+| pylatexenc / LatexWalker | 轻量 LaTeX AST 解析 | pypi.org/project/pylatexenc | OPTIONAL_ADAPTER | 否 | 功能有限 | 候选轻量 LaTeX parser |
+| Pandoc | LaTeX → Markdown/HTML | github.com/jgm/pandoc | OPTIONAL_ADAPTER | 否 | 外部二进制 | 候选格式转换 |
+| Docling | 多格式文档解析 | github.com/docling-project/docling | OPTIONAL_ADAPTER | 否 | 依赖较重 | 候选结构 parser |
+| MinerU | PDF/image 解析 | github.com/opendatalab/MinerU | OPTIONAL_ADAPTER | 否 | 依赖重 | 首选 PDF-only 公式/表格 parser |
+| GROBID | PDF 元数据/引用 | github.com/kermitt2/grobid | OPTIONAL_ADAPTER | 否 | Java 依赖 | 元数据/引用 parser |
+| PyMuPDF | PDF 文本提取 | pymupdf.readthedocs.io | OPTIONAL_ADAPTER | 否 | 无 | 低置信 fallback |
 | Marker | PDF 转 Markdown | github.com/datalab-to/marker | OPTIONAL_ADAPTER | 否 | GPL-3.0 license | 暂不接入 |
 | Nougat | 学术 PDF 解析 | github.com/facebookresearch/nougat | OPTIONAL_ADAPTER | 否 | GPU 依赖 | 暂不接入 |
 
 未完成调研不得进入代码开发。
 
+## 4.5 Parser Priority
+
+M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.json`.
+
+1. **LaTeXSourceParser** — highest priority when LaTeX source is available
+2. **StructuredHTMLParser** — for structured HTML/XML
+3. **MinerUAdapter** — first PDF-only parser candidate for formula/table-heavy papers
+4. **DoclingAdapter** — structure/layout parser candidate when MinerU unavailable
+5. **GROBIDReferenceAdapter** — for metadata/references/citation contexts only
+6. **PyMuPDFLowConfidenceAdapter** — fallback only; cannot produce high-confidence formula cards
+
 ## 5. 外部项目调研（详细）
+
+### LaTeXSourceParser
+
+- **Priority**: highest
+- **Input**: `latex_source_path`, `latex_main_file`, `latex_aux_files`
+- **Responsible for**: section/subsection hierarchy, equations and display formulas, inline formulas, labels/refs/citations, bibliography/bibtex files, theorem/algorithm/table environments, formula source text
+- **Candidate tools**:
+  - **LaTeXML**: candidate for LaTeX → XML/HTML/MathML/JATS/TEI conversion. Preferred for semantic XML/HTML/MathML if install/runtime is acceptable.
+  - **pylatexenc / LatexWalker**: candidate for lightweight LaTeX AST parsing. Preferred for lightweight extraction of sections/formulas/citations if LaTeXML is too heavy.
+  - **Pandoc**: candidate for LaTeX → Markdown/HTML conversion.
+- **Decision**: Do not hard-code one LaTeX parser as final yet. M2.1 must evaluate LaTeXML and lightweight LaTeX parsing.
 
 ### Docling
 
@@ -59,8 +86,24 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 - **主要能力**: PDF/image/DOCX/PPTX/XLSX 解析，公式转 LaTeX、表格转 HTML、OCR、FastAPI/Gradio、CPU/GPU/MPS
 - **输出格式**: Markdown、按阅读顺序排序的 JSON、中间格式
 - **安装复杂度**: 较重
-- **是否适合当前接入**: 否 — 能力强但系统复杂，先作为 optional parser backend
+- **优先级**: 首选 PDF-only parser，用于公式/表格密集论文
+- **必须评估**: 是否可在 RTX 4060 8GB VRAM 上运行、inline/display formula 输出、table 输出、section hierarchy、速度和内存
 - **未来 adapter 映射**: MinerU JSON / Markdown → `DocumentIngestion.blocks`
+
+### GROBID
+
+- **GitHub**: `kermitt2/grobid`
+- **主要能力**: PDF 元数据提取、参考文献解析、引用上下文
+- **输出格式**: TEI XML
+- **优先级**: 用于 metadata/references/citation contexts，不足以单独支撑深度阅读
+- **未来 adapter 映射**: GROBID TEI → `DocumentIngestion.blocks`（引用/元数据部分）
+
+### PyMuPDF
+
+- **文档**: `pymupdf.readthedocs.io`
+- **主要能力**: PDF 文本提取
+- **优先级**: fallback only，不能产生高置信 formula_cards
+- **限制**: 不做 LaTeX 公式识别，不做结构化 section 解析
 
 ### Nougat
 
@@ -117,6 +160,13 @@ class ParseMetadata(SenseiModel):
     source_format: str = ""
     page_count: int = 0
     extra: dict = Field(default_factory=dict)
+    # source-aware fields
+    parser_input_type: str = ""      # latex_source | structured_html | pdf | metadata_only
+    parser_adapter: str = ""         # latex_source_parser | structured_html_parser | mineru | docling | grobid | pymupdf_low_confidence
+    formula_fidelity: str = "unknown"  # source_latex | mathml | ocr_latex | plain_text | unknown
+    source_level_formula_available: bool = False
+    latex_parse_status: str = "not_applicable"  # not_applicable | parsed | partial | failed
+    latex_parse_warnings: list[str] = Field(default_factory=list)
 
 class ParserResult(SenseiModel):
     document: DocumentIngestion

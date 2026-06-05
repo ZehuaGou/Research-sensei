@@ -22,8 +22,31 @@ M2.5 是 M2 的编排层：串联 M2.1-M2.4，管理 artifact 流转和状态门
 
 ## 5. 单篇论文链路
 
+### Source-Aware Pipeline
+
+Input from M1: `preferred_m2_input`, `source_resolution.json`
+
 ```
-source (PDF/MD/TXT)
+if preferred_m2_input == latex_source:
+    LaTeXSourceParser
+elif preferred_m2_input == structured_html:
+    StructuredHTMLParser
+elif preferred_m2_input == pdf:
+    MinerUAdapter or DoclingAdapter
+else:
+    BLOCKED_UNDERSTANDING
+```
+
+### Status rules
+
+- LaTeX source parse success: `formula_explanation_allowed` can be true; `survey_landscape_allowed` can be true if evidence exists
+- PDF-only parse success: `formula_explanation_allowed` depends on `formula_origin` and audit
+- PyMuPDF fallback: paper summary may be allowed only as degraded; `formula_explanation_allowed` must be false unless evidence is sufficient
+
+### Detailed chain
+
+```
+source (LaTeX/HTML/PDF/MD/TXT)
   → ParserAdapter.parse()
     → ParserResult (DocumentIngestion + ParseMetadata)
       → parsed_document.json

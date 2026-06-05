@@ -132,15 +132,17 @@ These strategies are not optional optimizations. They are part of M1 real valida
 - **Boundary**: Does not adopt ARIS-only search. ResearchSensei retains best-of-breed source set: arXiv robust official endpoint adapter, OpenAlex/pyalex, Semantic Scholar official REST, Crossref/habanero. Other projects open for evaluation: Unpaywall, PaperQA, STORM, DeepXiv, Exa.
 - **Validation implication**: `sources_attempted >= 4`. Source failure must have structured error. One source success does not mean multi-source stability.
 
-### M1.3 Source Acquisition / PDF Download
+### M1.3 论文原始材料获取 / Best Available Source Resolution
 
 - **Reference source**: ARIS `tools/arxiv_fetch.py`, `skills/research-lit/SKILL.md`
 - **Reference use**: STRATEGY_BORROW
 - **Borrowed behavior**: Download only top-relevant PDFs; PDF download uses User-Agent / retry / backoff; PDF size guard; PDF header validation
 - **ResearchSensei-owned target**: `source_resolution.json`
-- **Schema / artifact impact**: `download_status`, `source_url`, `final_url`, `content_type`, `file_size`, `sha256`, `local_path`, `pdf_metadata_check`, `pdf_title_match`, `pdf_metadata_warning`
-- **Boundary**: M1 does lightweight PDF validation only, not M2 full-text parsing. PDF not committed to git. Does not download all candidates with PDFs.
-- **Validation implication**: At least one `RESOLVED_PDF_DOWNLOADED`. PDF must pass `%PDF` / `file_size` / `sha256` checks. Metadata-only cannot enter M2.
+- **Schema / artifact impact**: `source_type`, `source_priority`, `preferred_m2_input`, `latex_source_url`, `latex_source_downloaded`, `latex_source_path`, `latex_source_sha256`, `latex_source_format`, `latex_main_file`, `structured_html_url`, `structured_html_downloaded`, `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`, `source_confidence`, `source_warning`
+- **Boundary**: M1 does lightweight source validation only, not M2 full-text parsing. Source files not committed to git. Does not download all candidates.
+- **Validation implication**: M1 must try LaTeX source first, then structured HTML, then PDF. At least one deep-reading source downloaded. Metadata-only cannot enter M2.
+
+M1.3 不只下载 PDF。M1.3 必须优先尝试获取 LaTeX source / arXiv source。如果 source 不可得，再尝试 structured HTML / XML。最后才是 PDF。
 
 ### M1.4 Dedup / Verification / Relevance
 
@@ -180,14 +182,17 @@ CandidateVerifier.verify_many()
 RelevanceJudge.judge_many()
   -> LLM relevance fields
 DirectionRunner._should_download()
-  -> download decision
+  -> download/source decision
 PaperSourceResolver.resolve_many()
+  -> try latex_source first
+  -> then structured_html
+  -> then pdf
   -> source_resolution.json
 SelectionService.build_reading_plan()
   -> filtered_candidates.json + reading_plan.json
 ```
 
-Note: verification + LLM relevance judge happen before download. Candidates with `should_download=false` are not downloaded. `filtered_candidates.json` contains post-verify + post-relevance + post-download final candidates.
+Note: verification + LLM relevance judge happen before download. Candidates with `should_download=false` are not downloaded. `filtered_candidates.json` contains post-verify + post-relevance + post-source-resolution final candidates. M1 must not stop at PDF if LaTeX source is available. PDF success is not the best possible result when source is available.
 
 ## M1.1 Query Planning
 
@@ -297,9 +302,58 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 
 ## M1.3 Source Acquisition
 
-`PaperSourceResolver` records whether a candidate only has metadata, a landing page, a PDF URL, or a validated downloaded PDF.
+`PaperSourceResolver` resolves best available source for each candidate. M1 不只下载 PDF，必须优先尝试获取 LaTeX source。
 
-For downloaded PDFs it records:
+### M1.3 Source Priority
+
+1. **latex_source** — preferred when arXiv source / LaTeX source package is available; best for formulas, citations, section hierarchy, labels, references, and bibliography
+2. **structured_html** — preferred when publisher/arXiv HTML is available; useful for reading order and MathML/HTML structure
+3. **pdf** — acceptable for M2 only when source is unavailable; must pass PDF validation and title match; formula fidelity is lower than source
+4. **metadata_only** — can be used for landscape anchor or reference; cannot enter M2 deep reading
+
+### source_resolution.json Schema
+
+```json
+{
+  "paper_id": "",
+  "title": "",
+  "source_type": "latex_source | structured_html | pdf | metadata_only",
+  "source_priority": 1,
+  "preferred_m2_input": "latex_source | structured_html | pdf | none",
+
+  "latex_source_url": "",
+  "latex_source_downloaded": false,
+  "latex_source_path": "",
+  "latex_source_sha256": "",
+  "latex_source_format": "tar | gz | zip | tex | unknown",
+  "latex_main_file": "",
+  "latex_aux_files": [],
+  "latex_compile_status": "not_checked | compile_ok | compile_failed | not_applicable",
+  "latex_source_error": "",
+
+  "structured_html_url": "",
+  "structured_html_downloaded": false,
+  "structured_html_path": "",
+  "structured_html_error": "",
+
+  "pdf_url": "",
+  "pdf_downloaded": false,
+  "pdf_path": "",
+  "pdf_sha256": "",
+  "pdf_metadata_check": "passed | mismatch | unknown | not_applicable",
+  "pdf_title_match": "match | mismatch | unknown | not_applicable",
+  "pdf_error": "",
+
+  "source_confidence": "high | medium | low",
+  "source_warning": []
+}
+```
+
+### Source Resolution Strategy
+
+`PaperSourceResolver` records source resolution status for each type.
+
+For downloaded sources it records:
 
 - `download_status`
 - `final_url`
@@ -311,6 +365,8 @@ For downloaded PDFs it records:
 
 Supported status values include:
 
+- `RESOLVED_LATEX_SOURCE_DOWNLOADED`
+- `RESOLVED_STRUCTURED_HTML_DOWNLOADED`
 - `RESOLVED_PDF_DOWNLOADED`
 - `RESOLVED_PDF_URL_ONLY`
 - `RESOLVED_LANDING_ONLY`
@@ -318,7 +374,7 @@ Supported status values include:
 - `FAILED_DOWNLOAD`
 - `NO_SOURCE_FOUND`
 
-Only `RESOLVED_PDF_DOWNLOADED` can clear a paper for M2.
+`RESOLVED_LATEX_SOURCE_DOWNLOADED` or `RESOLVED_STRUCTURED_HTML_DOWNLOADED` or `RESOLVED_PDF_DOWNLOADED` can clear a paper for M2. LaTeX source is preferred over PDF.
 
 ### PDF Download Strategy
 
@@ -381,13 +437,32 @@ Priorities:
 - `llm_relevance_score >= 0.65` (LLM-based)
 - `llm_relevance_label in {HIGH, MEDIUM}`
 - `should_a_read == true`
-- `pdf_downloaded == true`
 - `can_enter_m2 == true`
-- `pdf_metadata_check == passed`
-- `pdf_title_match == match`
 - `source_confidence >= medium`
 - `metadata_confidence >= medium`
 - `role != IRRELEVANT`
+
+A_READ_FOR_M2 must have one valid deep-reading input:
+
+**Either** (preferred):
+- `preferred_m2_input == latex_source`
+- `latex_source_downloaded == true`
+- `latex_main_file` exists
+- `source_confidence in {high, medium}`
+
+**Or**:
+- `preferred_m2_input == structured_html`
+- `structured_html_downloaded == true`
+- `source_confidence in {high, medium}`
+
+**Or** (fallback):
+- `preferred_m2_input == pdf`
+- `pdf_downloaded == true`
+- `pdf_metadata_check == passed`
+- `pdf_title_match == match`
+- `source_confidence in {high, medium}`
+
+`metadata_only` cannot enter `A_READ_FOR_M2`.
 
 If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`, not a fake success.
 
@@ -464,15 +539,13 @@ python scripts/run_live_eval.py
 - `sources_success >= 3`
 - `verified_candidate_count` exists
 - `llm_judged_candidate_count` exists
-- `pdf_download_success_count >= 1`
+- at least one deep-reading source downloaded (latex_source or structured_html or pdf)
 - every `A_READ_FOR_M2` satisfies:
   - `verification_status == verified`
   - `llm_relevance_score >= 0.65`
   - `llm_relevance_label in {HIGH, MEDIUM}`
   - `should_a_read == true`
-  - `pdf_downloaded == true`
-  - `pdf_metadata_check == passed`
-  - `pdf_title_match == match`
+  - has one valid deep-reading input (latex_source or structured_html or pdf with title match)
   - `can_enter_m2 == true`
 
 **degraded_passed**:

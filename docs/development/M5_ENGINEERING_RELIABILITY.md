@@ -33,8 +33,16 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 ### M1 Focused Acquisition
 
 - focused query live eval
-- A_READ_FOR_M2 verified + PDF + title match
+- A_READ_FOR_M2 verified + source + title match
 - Status: REAL_E2E_VERIFIED
+
+### M1 Source Acquisition (LaTeX source priority)
+
+- query arXiv paper with LaTeX source
+- `latex_source_downloaded == true`
+- `latex_main_file` exists
+- `source_resolution.preferred_m2_input == latex_source`
+- Status: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### M1 Seed Paper Expansion
 
@@ -49,6 +57,35 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 - paper/formula/teaching cards
 - evidence_ref
 - Status: not verified
+
+### M2 LaTeX Source Parse Eval
+
+- real arXiv source package
+- LaTeXSourceParser extracts sections
+- extracts at least one display formula
+- formula evidence `source_origin == latex_source`
+- `formula_card.original_latex` exists
+- Status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+### M2 PDF-Only Fallback Eval
+
+- real PDF-only paper
+- MinerU or Docling parses
+- `formula_origin` recorded
+- PyMuPDF fallback cannot pass formula high-confidence test
+- Status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+### Hardware Note
+
+User target hardware:
+- RTX 4060
+- 8GB VRAM
+
+Parser evaluation must record:
+- `runtime_device`
+- `peak_vram_estimate` or observed VRAM if available
+- `parser_runtime_seconds`
+- `parser_resource_error`
 
 ### M2 Survey Deep Reading
 
