@@ -56,7 +56,7 @@ M4 is entered from three frontend contexts:
 2. **DirectionWorkspace**: M1 direction_landscape + selected survey / anchors → direction-level Q&A / method-family comparison / reading-order explanation
 3. **SeedExpansionPanel**: M1 paper_relation_graph → upstream/downstream explanation / follow-up paper recommendation / route explanation
 
-M4 在 M3 之后：用户已经看到论文卡片，开始互动学习。
+M4 通常由 M3 的 PaperWorkspace、DirectionWorkspace 或 SeedExpansionPanel 触发。M4 不再被描述为单一线性流程的最后一步，而是围绕论文、方向和 seed expansion 三种上下文提供互动学习。
 
 M4 依赖 M2 的 artifacts：
 - paper_card.json, formula_cards.json, teaching_cards.json
@@ -532,7 +532,7 @@ class UserLearningProgressMemory(SenseiModel):
 | method_family_memory | method_family_memory.json / DB table |
 | stage_memory | stage_memory.json / DB table |
 | paper_relation_memory | paper_relation_memory.json / DB table |
-| user_learning_progress_memory | user_learning_progress_memory.json / DB table | |
+| user_learning_progress_memory | user_learning_progress_memory.json / DB table |
 
 当前不落库，不改 workspace，不改数据库。实现前需要讨论 storage strategy：SQLite / JSON artifact / vector DB / hybrid。
 

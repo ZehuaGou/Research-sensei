@@ -284,7 +284,7 @@ python scripts/run_live_eval.py
 
 ### 验收标准
 
-- 快速回归不调用真实 LLM（成本控制）
+- Local structural check may be run separately for developer convenience, but it is not module acceptance and not release validation
 - 涉及 LLM 的模块必须通过真实 LLM 验收才能标记完成
 - 缺 API key 时必须失败，不能 skip 后算通过
 - token 和成本受控
