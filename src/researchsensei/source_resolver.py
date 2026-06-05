@@ -618,37 +618,99 @@ def _safe_name(value: str) -> str:
 
 
 def _check_pdf_metadata(content: bytes, expected_title: str) -> tuple[str, str, str]:
-    """M1.3 lightweight PDF metadata validation.
+    """M1.3 PDF metadata/title validation.
 
     Returns (pdf_metadata_check, pdf_title_match, pdf_metadata_warning).
-    Only examines the first 64KB for PDF /Title metadata — not full parsing.
+    1. Check %PDF header.
+    2. Try fitz (PyMuPDF) to read metadata and first-page text.
+    3. Check title token overlap between expected title and PDF content.
     """
     if not expected_title:
         return ("skipped", "unknown", "No expected title to compare against.")
 
-    # Check %PDF header (already validated by caller, but be explicit)
     if not content.startswith(PDF_BYTES):
         return ("failed", "unknown", "Content does not start with %PDF header.")
 
-    # Look for /Title in first 64KB of PDF (common metadata location)
+    # Try fitz for metadata + first-page text
+    try:
+        import fitz  # PyMuPDF
+
+        with fitz.open(stream=content, filetype="pdf") as doc:
+            # Metadata title
+            meta_title = (doc.metadata or {}).get("title", "").strip()
+
+            # First-page text (first 2000 chars)
+            first_page_text = ""
+            if len(doc) > 0:
+                first_page_text = doc[0].get_text()[:2000]
+
+            # Check title tokens against metadata title and first-page text
+            expected_tokens = _title_tokens(expected_title)
+            if not expected_tokens:
+                return ("passed", "unknown", "Expected title has no meaningful tokens.")
+
+            # Try metadata title first
+            if meta_title:
+                if _titles_match_for_pdf(expected_title, meta_title):
+                    return ("passed", "match", "")
+                # Metadata title exists but doesn't match — check first page as backup
+                meta_match = _title_token_overlap(expected_tokens, _title_tokens(meta_title))
+                page_match = _title_token_overlap(expected_tokens, _title_tokens(first_page_text))
+                if page_match >= 0.6:
+                    return ("passed", "match", f"PDF metadata title mismatch but first-page tokens match ({page_match:.0%}).")
+                return ("passed", "mismatch", f"PDF metadata title '{meta_title[:80]}' does not match expected title. Token overlap: {meta_match:.0%}.")
+
+            # No metadata title — check first page text
+            if first_page_text.strip():
+                page_match = _title_token_overlap(expected_tokens, _title_tokens(first_page_text))
+                if page_match >= 0.6:
+                    return ("passed", "match", f"Title matched via first-page text tokens ({page_match:.0%}).")
+                if page_match >= 0.3:
+                    return ("passed", "unknown", f"Partial title token overlap in first page ({page_match:.0%}). Cannot confirm.")
+                return ("passed", "unknown", f"Low title token overlap in first page ({page_match:.0%}). PDF may not contain expected paper.")
+
+            # No text at all (scanned/image PDF)
+            return ("text_unavailable", "unknown", "No extractable text on first page (may be scanned PDF).")
+
+    except ImportError:
+        # fitz not available — fall back to header scan
+        pass
+    except Exception as exc:
+        return ("passed", "unknown", f"fitz PDF parsing error: {type(exc).__name__}: {str(exc)[:100]}")
+
+    # Fallback: scan first 64KB for /Title in PDF header
     header_chunk = content[: 64 * 1024]
     try:
         header_text = header_chunk.decode("latin-1", errors="ignore")
     except Exception:
         return ("passed", "unknown", "Could not decode PDF header for metadata check.")
 
-    title_match = _extract_pdf_title_from_header(header_text)
-    if title_match is None:
+    meta_title = _extract_pdf_title_from_header(header_text)
+    if meta_title is None:
         return ("passed", "unknown", "No /Title metadata found in PDF header.")
 
-    match_result = "match" if _titles_match_for_pdf(expected_title, title_match) else "mismatch"
-    warning = "" if match_result == "match" else f"PDF /Title '{title_match[:80]}' does not match expected title."
+    match_result = "match" if _titles_match_for_pdf(expected_title, meta_title) else "mismatch"
+    warning = "" if match_result == "match" else f"PDF /Title '{meta_title[:80]}' does not match expected title."
     return ("passed", match_result, warning)
+
+
+def _title_tokens(title: str) -> list[str]:
+    """Extract meaningful tokens from a title (>2 chars, lowercase)."""
+    import re as _re
+    return [t for t in _re.sub(r"[^a-z0-9]+", " ", title.lower()).split() if len(t) > 2]
+
+
+def _title_token_overlap(expected_tokens: list[str], actual_tokens: list[str]) -> float:
+    """Compute Jaccard-like overlap: fraction of expected tokens found in actual."""
+    if not expected_tokens:
+        return 0.0
+    actual_set = set(actual_tokens)
+    hits = sum(1 for t in expected_tokens if t in actual_set)
+    return hits / len(expected_tokens)
 
 
 def _extract_pdf_title_from_header(header_text: str) -> str | None:
     """Extract /Title from PDF metadata header section."""
-    # Match /Title (...) or /Title <hex>
     import re as _re
     match = _re.search(r"/Title\s*\(([^)]{1,200})\)", header_text)
     if match:
@@ -676,5 +738,12 @@ def _titles_match_for_pdf(expected: str, pdf_title: str) -> bool:
         shorter = norm_expected if len(norm_expected) <= len(norm_pdf) else norm_pdf
         longer = norm_pdf if len(norm_expected) <= len(norm_pdf) else norm_expected
         if shorter in longer:
+            return True
+    # Token overlap check for fuzzy match
+    expected_tokens = set(norm_expected.split())
+    actual_tokens = set(norm_pdf.split())
+    if expected_tokens and actual_tokens:
+        overlap = len(expected_tokens & actual_tokens) / len(expected_tokens)
+        if overlap >= 0.7:
             return True
     return False

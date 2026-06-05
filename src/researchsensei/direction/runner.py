@@ -15,6 +15,7 @@ from researchsensei.schemas import (
     QueryPlan,
     ReadingPlan,
     SourceResolutionResult,
+    VerificationStatus,
 )
 from researchsensei.selection import SelectionService
 from researchsensei.source_resolver import PaperSourceResolver
@@ -25,7 +26,11 @@ logger = logging.getLogger(__name__)
 
 
 class DirectionRunner:
-    """Orchestrates M1: query planning -> acquisition -> source resolution -> reading plan."""
+    """Orchestrates M1: query planning -> acquisition -> dedup -> verify -> relevance -> download -> reading plan.
+
+    Key ordering: verification + LLM relevance happen BEFORE PDF download.
+    Only verified+relevant candidates with should_download=true are downloaded.
+    """
 
     def __init__(
         self,
@@ -62,6 +67,7 @@ class DirectionRunner:
         query_plan = await self.query_planner.plan(user_query)
         query = query_plan.english_query or query_plan.direction_en or query_plan.user_query
 
+        # Step 1: Acquire candidates from all sources
         candidates, acquisition_warnings, search_log, source_metrics = self._acquire(query_plan)
         raw_pool = self.selection_service.build_candidate_pool(
             query=query,
@@ -71,26 +77,47 @@ class DirectionRunner:
             source_metrics=source_metrics,
         )
 
-        source_resolution = self.source_resolver.resolve_many(
-            query=query,
-            candidates=candidates,
-            download_dir=Path(run_dir) / "source_pdfs",
-        )
-        resolved_candidates = self._apply_source_resolution(candidates, source_resolution)
-        deduplicated = self.selection_service.deduplicate(resolved_candidates)
+        # Step 2: Deduplicate
+        deduplicated = self.selection_service.deduplicate(candidates)
 
-        # M1.4: Verify candidates
+        # Step 3: Verify candidates (BEFORE download)
         verified_candidates = self.verifier.verify_batch(deduplicated)
 
-        # M1.4: LLM relevance judgment
+        # Step 4: LLM relevance judgment (BEFORE download)
         llm_judged_candidates, relevance_metadata = await self.relevance_judge.judge_with_score(
             query, verified_candidates
         )
 
+        # Step 5: Select candidates for download
+        # Only download: verified/relevant + should_download=true
+        download_candidates = [
+            c for c in llm_judged_candidates
+            if self._should_download(c)
+        ]
+        download_ids = {c.paper_id for c in download_candidates}
+
+        # Step 6: Download PDFs for selected candidates
+        source_resolution = SourceResolutionResult(query=query, items=[], warnings=[])
+        if download_candidates:
+            source_resolution = self.source_resolver.resolve_many(
+                query=query,
+                candidates=download_candidates,
+                download_dir=Path(run_dir) / "source_pdfs",
+            )
+
+        # Step 7: Apply source resolution back to ALL candidates
+        resolved_candidates = self._apply_source_resolution(llm_judged_candidates, source_resolution)
+
+        # Step 8: Build filtered_candidates from final candidates
         filtered_candidates = self.selection_service.build_candidate_pool(
             query=query,
-            candidates=deduplicated,
-            search_log=search_log + ["dedup: applied after source resolution"],
+            candidates=resolved_candidates,
+            search_log=search_log + [
+                "dedup: applied before verification",
+                f"verified: {sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.VERIFIED)}/{len(resolved_candidates)}",
+                f"llm_judged: {relevance_metadata.get('llm_judged_candidate_count', 0)}",
+                f"download_selected: {len(download_candidates)}",
+            ],
             warnings=acquisition_warnings,
             source_metrics=source_metrics,
         ).model_copy(
@@ -99,17 +126,19 @@ class DirectionRunner:
                 "deduplicated_count": len(deduplicated),
             }
         )
-        reading_plan = self.selection_service.build_reading_plan(query_plan, llm_judged_candidates)
+
+        # Step 9: Build reading plan from resolved candidates
+        reading_plan = self.selection_service.build_reading_plan(query_plan, resolved_candidates)
 
         # Compute verification summary
-        from researchsensei.schemas import VerificationStatus
         verification_summary = {
-            "verified_candidate_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.VERIFIED),
-            "unverified_candidate_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.UNVERIFIED),
-            "verify_pending_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.VERIFY_PENDING),
-            "error_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.ERROR),
+            "verified_candidate_count": sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.VERIFIED),
+            "unverified_candidate_count": sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.UNVERIFIED),
+            "verify_pending_count": sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.VERIFY_PENDING),
+            "error_count": sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.ERROR),
         }
 
+        # Write artifacts
         self.workspace.write_json(run_dir / "query_plan.json", query_plan)
         self.workspace.write_json(run_dir / "candidate_pool.json", raw_pool)
         self.workspace.write_json(run_dir / "source_resolution.json", source_resolution)
@@ -130,6 +159,17 @@ class DirectionRunner:
             ),
             verification_summary=verification_summary,
             relevance_summary=relevance_metadata,
+        )
+
+    @staticmethod
+    def _should_download(candidate: CandidatePaper) -> bool:
+        """Gate for PDF download: only verified + relevant + should_download."""
+        return (
+            candidate.verification_status == VerificationStatus.VERIFIED
+            and candidate.should_download is True
+            and candidate.llm_relevance_score >= 0.65
+            and candidate.llm_relevance_label in ("HIGH", "MEDIUM")
+            and candidate.rule_relevance_score >= 0.45
         )
 
     def _acquire(

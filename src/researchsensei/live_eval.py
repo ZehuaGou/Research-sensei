@@ -279,6 +279,7 @@ def run_m1_live_search(
     relevance_summary = bundle.relevance_summary
 
     # M1 live status: passed / degraded_passed / failed
+    # Strict check: every A_READ must satisfy ALL gate conditions
     failure_reasons: list[str] = []
     if llm_client.usage.call_count <= 0:
         failure_reasons.append("No real LLM query-planning call was made.")
@@ -292,12 +293,44 @@ def run_m1_live_search(
         failure_reasons.append("No real PDF was downloaded and validated.")
     if not a_read_items:
         failure_reasons.append("No A_READ item was selected.")
-    if a_read_items and len(a_read_can_enter_m2) != len(a_read_items):
-        failure_reasons.append("Some A_READ papers are not cleared for M2.")
+
+    # Check each A_READ strictly
+    from researchsensei.schemas import VerificationStatus as VS
+    a_read_gate_failures: list[str] = []
+    for item in a_read_items:
+        p = item.paper
+        sr_meta = p.raw_source_metadata.get("source_resolution", {})
+        pdf_meta = sr_meta.get("pdf_metadata_check", "") if isinstance(sr_meta, dict) else ""
+
+        reasons = []
+        if p.verification_status != VS.VERIFIED:
+            reasons.append(f"verification_status={p.verification_status.value}")
+        if p.llm_relevance_score < 0.65:
+            reasons.append(f"llm_relevance_score={p.llm_relevance_score}")
+        if p.llm_relevance_label not in ("HIGH", "MEDIUM"):
+            reasons.append(f"llm_relevance_label={p.llm_relevance_label}")
+        if not p.should_a_read:
+            reasons.append("should_a_read=false")
+        if not p.pdf_downloaded:
+            reasons.append("pdf_downloaded=false")
+        if not item.can_enter_m2:
+            reasons.append("can_enter_m2=false")
+        if pdf_meta == "mismatch":
+            reasons.append("pdf_metadata_check=mismatch")
+        if not _confidence_at_least(p.source_confidence, "medium"):
+            reasons.append(f"source_confidence={p.source_confidence}")
+        if not _confidence_at_least(p.metadata_confidence, "medium"):
+            reasons.append(f"metadata_confidence={p.metadata_confidence}")
+
+        if reasons:
+            a_read_gate_failures.append(f"'{p.title[:50]}': {'; '.join(reasons)}")
+
+    if a_read_gate_failures:
+        failure_reasons.append(f"A_READ gate failures: {a_read_gate_failures[0]}")
 
     # Determine M1 status per M1 doc: passed / degraded_passed / failed
     sources_success_count = len(sources_success)
-    all_a_read_valid = a_read_items and len(a_read_can_enter_m2) == len(a_read_items)
+    all_a_read_valid = a_read_items and not a_read_gate_failures
 
     if failure_reasons:
         status = "failed"
@@ -481,3 +514,10 @@ def _redact_secret_like_text(value: str) -> str:
 
 def run_async(coro):
     return asyncio.run(coro)
+
+
+_CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
+
+
+def _confidence_at_least(value: str, minimum: str) -> bool:
+    return _CONFIDENCE_ORDER.get(value, 0) >= _CONFIDENCE_ORDER.get(minimum, 0)

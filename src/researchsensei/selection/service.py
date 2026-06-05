@@ -294,18 +294,38 @@ class SelectionService:
 
     @staticmethod
     def _eligible_for_a_read(item: ReadingPlanItem) -> bool:
-        """A_READ requires: verified + relevant + PDF downloaded + metadata/source confidence."""
+        """A_READ requires ALL of (AND logic, not OR):
+
+        - verification_status == VERIFIED
+        - scoring_breakdown.relevance_score >= 0.45 (rule-based)
+        - llm_relevance_score >= 0.65 (LLM-based)
+        - llm_relevance_label in ("HIGH", "MEDIUM")
+        - should_a_read == True (LLM explicitly says worth deep reading)
+        - pdf_downloaded == True
+        - can_enter_m2 == True
+        - pdf_metadata_check != "mismatch"
+        - source_confidence >= medium
+        - metadata_confidence >= medium
+        - role != "IRRELEVANT"
+        """
         paper = item.paper
-        is_verified = paper.verification_status == VerificationStatus.VERIFIED
-        has_relevance = (
-            item.scoring_breakdown.relevance_score >= 0.45
-            or (paper.llm_relevance_score >= 0.5 and paper.llm_relevance_label in ("HIGH", "MEDIUM"))
-        )
+        sr = item.scoring_breakdown
+
+        # Pull pdf_metadata_check from raw_source_metadata
+        pdf_meta_check = ""
+        sr_meta = paper.raw_source_metadata.get("source_resolution", {})
+        if isinstance(sr_meta, dict):
+            pdf_meta_check = sr_meta.get("pdf_metadata_check", "")
+
         return (
-            item.can_enter_m2
-            and is_verified
-            and has_relevance
-            and item.scoring_breakdown.pdf_available_score > 0
+            paper.verification_status == VerificationStatus.VERIFIED
+            and sr.relevance_score >= 0.45
+            and paper.llm_relevance_score >= 0.65
+            and paper.llm_relevance_label in ("HIGH", "MEDIUM")
+            and paper.should_a_read is True
+            and paper.pdf_downloaded is True
+            and item.can_enter_m2 is True
+            and pdf_meta_check != "mismatch"
             and _confidence_at_least(paper.source_confidence, "medium")
             and _confidence_at_least(paper.metadata_confidence, "medium")
             and item.role != "IRRELEVANT"
