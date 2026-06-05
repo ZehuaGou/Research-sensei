@@ -303,7 +303,8 @@ class SelectionService:
         - should_a_read == True (LLM explicitly says worth deep reading)
         - pdf_downloaded == True
         - can_enter_m2 == True
-        - pdf_metadata_check != "mismatch"
+        - pdf_metadata_check == "passed"
+        - pdf_title_match == "match"
         - source_confidence >= medium
         - metadata_confidence >= medium
         - role != "IRRELEVANT"
@@ -311,11 +312,13 @@ class SelectionService:
         paper = item.paper
         sr = item.scoring_breakdown
 
-        # Pull pdf_metadata_check from raw_source_metadata
+        # Pull PDF metadata fields from raw_source_metadata
         pdf_meta_check = ""
+        pdf_title_match = ""
         sr_meta = paper.raw_source_metadata.get("source_resolution", {})
         if isinstance(sr_meta, dict):
             pdf_meta_check = sr_meta.get("pdf_metadata_check", "")
+            pdf_title_match = sr_meta.get("pdf_title_match", "")
 
         return (
             paper.verification_status == VerificationStatus.VERIFIED
@@ -325,7 +328,8 @@ class SelectionService:
             and paper.should_a_read is True
             and paper.pdf_downloaded is True
             and item.can_enter_m2 is True
-            and pdf_meta_check != "mismatch"
+            and pdf_meta_check == "passed"
+            and pdf_title_match == "match"
             and _confidence_at_least(paper.source_confidence, "medium")
             and _confidence_at_least(paper.metadata_confidence, "medium")
             and item.role != "IRRELEVANT"

@@ -274,6 +274,9 @@ def run_m1_live_search(
     a_read_can_enter_m2 = [item.paper.paper_id for item in a_read_items if item.can_enter_m2 and item.paper.can_enter_m2]
     downloaded = [item for item in bundle.source_resolution.items if item.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED]
 
+    # Build a_read paper_ids for downloaded_sources check
+    a_read_paper_ids = {item.paper.paper_id for item in a_read_items}
+
     # Verification and relevance summary
     verification_summary = bundle.verification_summary
     relevance_summary = bundle.relevance_summary
@@ -301,6 +304,7 @@ def run_m1_live_search(
         p = item.paper
         sr_meta = p.raw_source_metadata.get("source_resolution", {})
         pdf_meta = sr_meta.get("pdf_metadata_check", "") if isinstance(sr_meta, dict) else ""
+        pdf_title = sr_meta.get("pdf_title_match", "") if isinstance(sr_meta, dict) else ""
 
         reasons = []
         if p.verification_status != VS.VERIFIED:
@@ -315,8 +319,10 @@ def run_m1_live_search(
             reasons.append("pdf_downloaded=false")
         if not item.can_enter_m2:
             reasons.append("can_enter_m2=false")
-        if pdf_meta == "mismatch":
-            reasons.append("pdf_metadata_check=mismatch")
+        if pdf_meta != "passed":
+            reasons.append(f"pdf_metadata_check={pdf_meta}")
+        if pdf_title != "match":
+            reasons.append(f"pdf_title_match={pdf_title}")
         if not _confidence_at_least(p.source_confidence, "medium"):
             reasons.append(f"source_confidence={p.source_confidence}")
         if not _confidence_at_least(p.metadata_confidence, "medium"):
@@ -341,22 +347,38 @@ def run_m1_live_search(
     else:
         status = "failed"
 
-    sample_a_read = [
-        {
-            "paper_id": item.paper.paper_id,
-            "title": item.paper.title,
-            "sources": item.paper.sources,
+    def _a_read_sample(item):
+        p = item.paper
+        sr_meta = p.raw_source_metadata.get("source_resolution", {})
+        return {
+            "paper_id": p.paper_id,
+            "title": p.title,
+            "sources": p.sources,
             "role": item.role,
-            "can_enter_m2": item.can_enter_m2 and item.paper.can_enter_m2,
-            "pdf_downloaded": item.paper.pdf_downloaded,
+            "can_enter_m2": item.can_enter_m2 and p.can_enter_m2,
+            "pdf_downloaded": p.pdf_downloaded,
             "score": item.scoring_breakdown.weighted_total,
-            "verification_status": item.paper.verification_status.value,
-            "verification_method": item.paper.verification_method,
-            "llm_relevance_label": item.paper.llm_relevance_label,
-            "llm_relevance_score": item.paper.llm_relevance_score,
+            "verification_status": p.verification_status.value,
+            "verification_method": p.verification_method,
+            "verification_reason": p.verification_reason,
+            "verification_confidence": p.verification_confidence,
+            "rule_relevance_score": p.rule_relevance_score,
+            "llm_relevance_score": p.llm_relevance_score,
+            "llm_relevance_label": p.llm_relevance_label,
+            "should_download": p.should_download,
+            "should_a_read": p.should_a_read,
+            "matched_concepts": p.matched_concepts,
+            "missing_concepts": p.missing_concepts,
+            "relevance_reason": p.relevance_reason,
+            "pdf_file_size": sr_meta.get("file_size", 0) if isinstance(sr_meta, dict) else 0,
+            "pdf_sha256": sr_meta.get("sha256", "") if isinstance(sr_meta, dict) else "",
+            "pdf_metadata_check": sr_meta.get("pdf_metadata_check", "") if isinstance(sr_meta, dict) else "",
+            "pdf_title_match": sr_meta.get("pdf_title_match", "") if isinstance(sr_meta, dict) else "",
+            "selection_reason": item.selection_reason,
+            "risk_note": item.risk_note,
         }
-        for item in a_read_items[: config.max_live_cases]
-    ]
+
+    sample_a_read = [_a_read_sample(item) for item in a_read_items[: config.max_live_cases]]
 
     run_dir = workspace.root / "runs" / "m1-live"
     return {
@@ -384,11 +406,17 @@ def run_m1_live_search(
             {
                 "paper_id": item.paper_id,
                 "title": item.title,
+                "source_url": item.source_url,
+                "final_url": item.final_url,
+                "content_type": item.content_type,
                 "file_size": item.file_size,
                 "sha256": item.sha256,
                 "local_path": item.local_path,
                 "pdf_metadata_check": item.pdf_metadata_check,
                 "pdf_title_match": item.pdf_title_match,
+                "pdf_metadata_warning": item.pdf_metadata_warning,
+                "whether_a_read": item.paper_id in a_read_paper_ids,
+                "if_not_a_read_reason": "" if item.paper_id in a_read_paper_ids else _not_a_read_reason(item, bundle),
             }
             for item in downloaded[: config.max_live_cases]
         ],
@@ -521,3 +549,30 @@ _CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
 
 def _confidence_at_least(value: str, minimum: str) -> bool:
     return _CONFIDENCE_ORDER.get(value, 0) >= _CONFIDENCE_ORDER.get(minimum, 0)
+
+
+def _not_a_read_reason(item, bundle) -> str:
+    """Explain why a downloaded PDF did not enter A_READ."""
+    paper_id = item.paper_id
+    # Find in reading_plan
+    for rp_item in bundle.reading_plan.items:
+        if rp_item.paper.paper_id == paper_id:
+            p = rp_item.paper
+            sr_meta = p.raw_source_metadata.get("source_resolution", {})
+            pdf_meta = sr_meta.get("pdf_metadata_check", "") if isinstance(sr_meta, dict) else ""
+            pdf_title = sr_meta.get("pdf_title_match", "") if isinstance(sr_meta, dict) else ""
+            reasons = []
+            if p.verification_status.value != "verified":
+                reasons.append(f"verification={p.verification_status.value}")
+            if p.llm_relevance_score < 0.65:
+                reasons.append(f"llm_relevance={p.llm_relevance_score}")
+            if not p.should_a_read:
+                reasons.append("should_a_read=false")
+            if pdf_meta != "passed":
+                reasons.append(f"pdf_meta={pdf_meta}")
+            if pdf_title != "match":
+                reasons.append(f"pdf_title={pdf_title}")
+            if rp_item.priority != "A_READ":
+                reasons.append(f"priority={rp_item.priority}")
+            return "; ".join(reasons) if reasons else "unknown"
+    return "not_in_reading_plan"

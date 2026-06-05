@@ -206,7 +206,7 @@ def _apply_judgment(candidate: CandidatePaper, judgment: dict[str, Any]) -> Cand
             "matched_concepts": matched,
             "missing_concepts": missing,
             "relevance_reason": reason or candidate.relevance_reason,
-            "should_download": should_download or candidate.should_download,
-            "should_a_read": should_a_read or candidate.should_a_read,
+            "should_download": should_download,
+            "should_a_read": should_a_read,
         }
     )

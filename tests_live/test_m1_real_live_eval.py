@@ -76,3 +76,104 @@ def test_m1_real_llm_multisource_pdf_acquisition_and_report(tmp_path) -> None:
         if secret:
             assert secret not in serialized
     assert "Bearer " not in serialized
+
+
+@pytest.mark.live
+@pytest.mark.llm
+@pytest.mark.network
+def test_m1_a_read_gate_strict_assertions(tmp_path) -> None:
+    """Every A_READ must satisfy ALL gate conditions — no exceptions."""
+    assert _live_m1_enabled(), (
+        "RUN_LIVE_TESTS=1, RUN_LLM_TESTS=1, RESEARCHSENSEI_LIVE_EVAL=1 are required. "
+        "M1 tests must run with real LLM, real network, real PDF download. "
+        "Missing env vars = test failure, not skip."
+    )
+
+    config = LiveEvalConfig.from_env(report_dir=tmp_path)
+    report = run_full_live_eval(config=config, work_dir=tmp_path / "work")
+    result = report["m1_live"]
+
+    assert result["status"] == "passed", result.get("failure_reason", "")
+    assert result["a_read_count"] >= 1, "No A_READ items found"
+
+    for item in result["sample_a_read"]:
+        title = item.get("title", "")
+
+        # Hard gate: verification
+        assert item["verification_status"] == "verified", (
+            f"A_READ '{title}': verification_status={item['verification_status']}"
+        )
+
+        # Hard gate: LLM relevance
+        assert item["llm_relevance_score"] >= 0.65, (
+            f"A_READ '{title}': llm_relevance_score={item['llm_relevance_score']}"
+        )
+        assert item["llm_relevance_label"] in {"HIGH", "MEDIUM"}, (
+            f"A_READ '{title}': llm_relevance_label={item['llm_relevance_label']}"
+        )
+
+        # Hard gate: LLM decision
+        assert item["should_a_read"] is True, (
+            f"A_READ '{title}': should_a_read={item['should_a_read']}"
+        )
+
+        # Hard gate: PDF
+        assert item["pdf_downloaded"] is True, (
+            f"A_READ '{title}': pdf_downloaded={item['pdf_downloaded']}"
+        )
+        assert item["pdf_metadata_check"] == "passed", (
+            f"A_READ '{title}': pdf_metadata_check={item['pdf_metadata_check']}"
+        )
+        assert item["pdf_title_match"] == "match", (
+            f"A_READ '{title}': pdf_title_match={item['pdf_title_match']}"
+        )
+
+        # Hard gate: M2 readiness
+        assert item["can_enter_m2"] is True, (
+            f"A_READ '{title}': can_enter_m2={item['can_enter_m2']}"
+        )
+
+        # Hard gate: core concepts not missing
+        missing = [c.lower() for c in item.get("missing_concepts", [])]
+        assert "anomaly detection" not in missing, (
+            f"A_READ '{title}': missing_concepts contains 'anomaly detection'"
+        )
+        assert "transformer" not in missing, (
+            f"A_READ '{title}': missing_concepts contains 'transformer'"
+        )
+
+
+@pytest.mark.live
+@pytest.mark.llm
+@pytest.mark.network
+def test_m1_negative_check_classification_not_in_a_read(tmp_path) -> None:
+    """Classification papers must NOT enter A_READ for anomaly detection queries."""
+    assert _live_m1_enabled(), (
+        "RUN_LIVE_TESTS=1, RUN_LLM_TESTS=1, RESEARCHSENSEI_LIVE_EVAL=1 are required. "
+        "M1 tests must run with real LLM, real network, real PDF download. "
+        "Missing env vars = test failure, not skip."
+    )
+
+    config = LiveEvalConfig.from_env(report_dir=tmp_path)
+    report = run_full_live_eval(config=config, work_dir=tmp_path / "work")
+    result = report["m1_live"]
+
+    assert result["status"] == "passed", result.get("failure_reason", "")
+
+    # Check that classification papers are not in A_READ
+    a_read_titles = [item["title"].lower() for item in result["sample_a_read"]]
+    for title in a_read_titles:
+        assert "classification" not in title or "anomaly" in title, (
+            f"Classification-only paper entered A_READ: {title}"
+        )
+
+    # Also check reading_plan for the specific known classification paper
+    plan_path = Path(result["artifacts"]["reading_plan"])
+    if plan_path.exists():
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        for item in plan.get("items", []):
+            title_lower = item["paper"]["title"].lower()
+            if "classification" in title_lower and "anomaly" not in title_lower:
+                assert item["priority"] != "A_READ", (
+                    f"Classification paper '{item['paper']['title']}' must not be A_READ"
+                )
