@@ -45,7 +45,7 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 
 ### ARIS
 
-- **机制**: reviewer independence（只传文件路径，不传摘要）；kill-argument（两线程对抗）；claim audit（零上下文验证）
+- **机制**: reviewer independence（只传文件路径，不传摘要）；research-review（两线程对抗）；claim audit（零上下文验证）
 - **对本模块的用处**: reviewer independence 原则可直接应用（审计者独立于生成者）；claim audit 的零上下文思路可借鉴
 - **当前是否直接接入**: 否 — 只参考设计
 - **借鉴落地**: card builder 只负责生成；audit 模块独立读取 card + evidence + source artifact；audit 不接收 card builder 的解释；audit 结果决定 understanding_status

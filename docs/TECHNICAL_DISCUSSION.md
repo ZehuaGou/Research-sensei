@@ -57,7 +57,7 @@
 
 1. ResearchSensei 主路线是 Python / FastAPI / Pydantic / JSON artifacts / Vue frontend。
 2. ARIS-style skills 不作为主执行方式。
-3. ARIS 只参考 audit chain、reviewer independence、claim audit、kill-argument 等思想。
+3. ARIS 只参考 audit chain、reviewer independence、claim audit、research-review 等思想。
 4. 外部项目不能直接污染主流程，必须通过 adapter 或独立模块接入。
 5. fail-closed 是最终质量策略：宁可不输出，也不输出低可信解释。
 6. BASELINE_ONLY 不能作为最终理解，不能作为 Phase 12 输入。
@@ -176,7 +176,7 @@ source / selected paper
 - Audit 只能读取 artifacts 或序列化 JSON。
 - Audit 输出 QualityReport。
 - QualityReport 决定 understanding_status。
-- ARIS 的 reviewer independence、claim audit、kill-argument 思想值得参考。
+- ARIS 的 reviewer independence、claim audit、research-review 思想值得参考。
 
 ### 未决问题
 

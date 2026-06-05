@@ -34,7 +34,7 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 |------|------|---------------|----------|--------------|------|----------|
 | ARIS audit chain | 5 层审计 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 只借鉴 audit 分层思想 |
 | ARIS reviewer independence | 审计独立性 | 同上 | REFERENCE_ONLY | 否 | — | 原则可直接应用 |
-| ARIS kill-argument | 对抗式评估 | 同上 | REFERENCE_ONLY | 否 | — | 参考 advisor 评估 |
+| ARIS research-review | 对抗式评估 | 同上 | REFERENCE_ONLY | 否 | — | 参考 advisor 评估 |
 | OpenScholar | citation accuracy | 未确认 repo | REFERENCE_ONLY | 否 | — | 参考 evidence_ref 评估 |
 | PaperQA | citation/provenance | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 参考 provenance tracking |
 
@@ -44,7 +44,7 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 
 ### ARIS audit chain
 
-- **机制**: 5 层审计 — experiment-audit → result-to-claim → paper-claim-audit → citation-audit → kill-argument
+- **机制**: 5 层审计 — experiment-audit → result-to-claim → paper-claim-audit → citation-audit → research-review
 - **关键设计**: 每层用 fresh thread（不复用上下文）；executor 不审计自己；只传文件路径不传摘要
 - **对本模块的用处**: audit 分层思想可借鉴；reviewer independence 原则可直接应用
 - **当前是否接入**: 否 — 只参考设计
@@ -55,7 +55,7 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts → 
 - **对本模块的用处**: explanation audit 必须独立于 card builder
 - **当前是否接入**: 否 — 原则可直接应用
 
-### ARIS kill-argument
+### ARIS research-review
 
 - **机制**: Thread 1 写最强 200 字拒稿理由；Thread 2 独立逐点辩护；第三个线程评分
 - **对本模块的用处**: advisor question 质量评估可参考对抗思路

@@ -7,6 +7,7 @@ from pathlib import Path
 
 from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, OpenAlexAdapter, SemanticScholarAdapter
 from researchsensei.query import QueryPlanner
+from researchsensei.relevance_judge import RelevanceJudge
 from researchsensei.schemas import (
     CandidatePaper,
     DirectionBundle,
@@ -17,6 +18,7 @@ from researchsensei.schemas import (
 )
 from researchsensei.selection import SelectionService
 from researchsensei.source_resolver import PaperSourceResolver
+from researchsensei.verification import CandidateVerifier
 from researchsensei.workspace import WorkspaceStore
 
 logger = logging.getLogger(__name__)
@@ -35,6 +37,8 @@ class DirectionRunner:
         crossref_adapter: CrossrefAdapter | None = None,
         selection_service: SelectionService | None = None,
         source_resolver: PaperSourceResolver | None = None,
+        verifier: CandidateVerifier | None = None,
+        relevance_judge: RelevanceJudge | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = 20,
     ) -> None:
@@ -46,6 +50,8 @@ class DirectionRunner:
         self.crossref_adapter = crossref_adapter or CrossrefAdapter()
         self.selection_service = selection_service or SelectionService()
         self.source_resolver = source_resolver or PaperSourceResolver(network_enabled=True)
+        self.verifier = verifier or CandidateVerifier()
+        self.relevance_judge = relevance_judge or RelevanceJudge()
         self.sources = sources or ["arxiv", "openalex", "semantic_scholar", "crossref"]
         self.max_results_per_source = max_results_per_source
 
@@ -73,6 +79,14 @@ class DirectionRunner:
         resolved_candidates = self._apply_source_resolution(candidates, source_resolution)
         deduplicated = self.selection_service.deduplicate(resolved_candidates)
 
+        # M1.4: Verify candidates
+        verified_candidates = self.verifier.verify_batch(deduplicated)
+
+        # M1.4: LLM relevance judgment
+        llm_judged_candidates, relevance_metadata = await self.relevance_judge.judge_with_score(
+            query, verified_candidates
+        )
+
         filtered_candidates = self.selection_service.build_candidate_pool(
             query=query,
             candidates=deduplicated,
@@ -85,7 +99,16 @@ class DirectionRunner:
                 "deduplicated_count": len(deduplicated),
             }
         )
-        reading_plan = self.selection_service.build_reading_plan(query_plan, deduplicated)
+        reading_plan = self.selection_service.build_reading_plan(query_plan, llm_judged_candidates)
+
+        # Compute verification summary
+        from researchsensei.schemas import VerificationStatus
+        verification_summary = {
+            "verified_candidate_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.VERIFIED),
+            "unverified_candidate_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.UNVERIFIED),
+            "verify_pending_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.VERIFY_PENDING),
+            "error_count": sum(1 for c in llm_judged_candidates if c.verification_status == VerificationStatus.ERROR),
+        }
 
         self.workspace.write_json(run_dir / "query_plan.json", query_plan)
         self.workspace.write_json(run_dir / "candidate_pool.json", raw_pool)
@@ -105,6 +128,8 @@ class DirectionRunner:
                 + [warning.code for warning in source_resolution.warnings]
                 + reading_plan.warnings
             ),
+            verification_summary=verification_summary,
+            relevance_summary=relevance_metadata,
         )
 
     def _acquire(
@@ -203,6 +228,8 @@ class DirectionRunner:
                                 "sha256": resolved.sha256,
                                 "file_size": resolved.file_size,
                                 "content_type": resolved.content_type,
+                                "pdf_metadata_check": resolved.pdf_metadata_check,
+                                "pdf_title_match": resolved.pdf_title_match,
                             },
                         },
                     }

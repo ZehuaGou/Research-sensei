@@ -46,7 +46,7 @@ M4 的下游 gates 由 M2 的 DownstreamGates 控制（legacy field names）：
 | LangChain Memory | 长期记忆框架 | github.com/langchain-ai/langchain | REFERENCE_ONLY | 否 | 过重 | 只借鉴 memory 模块设计 |
 | MemGPT / Letta | 会话记忆管理 | github.com/cpacker/MemGPT | REFERENCE_ONLY | 否 | 过重 | 只借鉴 session memory 设计 |
 | STORM | 多视角追问 | github.com/stanford-oval/storm | REFERENCE_ONLY | 否 | — | 只借鉴 multi-perspective questioning |
-| ARIS kill-argument | 对抗式评估 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 参考 advisor 评估思路 |
+| ARIS research-review | 对抗式评估 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 参考 advisor 评估思路 |
 
 未完成调研不得进入代码开发。
 

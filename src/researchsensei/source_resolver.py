@@ -267,6 +267,10 @@ class PaperSourceResolver:
         target = paper_dir / "source.pdf"
         target.write_bytes(content)
         sha256 = hashlib.sha256(content).hexdigest()
+
+        # M1.3 lightweight PDF metadata validation
+        meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
+
         return self._base_result(
             paper,
             status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
@@ -280,6 +284,9 @@ class PaperSourceResolver:
             file_size=target.stat().st_size,
             sha256=sha256,
             local_path=str(target),
+            pdf_metadata_check=meta_check,
+            pdf_title_match=title_match,
+            pdf_metadata_warning=meta_warning,
             metadata={"resolution_strategy": "downloaded_validated_pdf"},
         )
 
@@ -331,6 +338,9 @@ class PaperSourceResolver:
         error: str = "",
         error_code: str = "",
         metadata: dict[str, str] | None = None,
+        pdf_metadata_check: str = "",
+        pdf_title_match: str = "",
+        pdf_metadata_warning: str = "",
     ) -> ResolvedPaperSource:
         return ResolvedPaperSource(
             paper_id=paper.paper_id,
@@ -352,6 +362,9 @@ class PaperSourceResolver:
             warnings=warnings or [],
             error=error,
             metadata=metadata or {},
+            pdf_metadata_check=pdf_metadata_check,
+            pdf_title_match=pdf_title_match,
+            pdf_metadata_warning=pdf_metadata_warning,
         )
 
     @staticmethod
@@ -602,3 +615,66 @@ def _content_type_for_suffix(suffix: str) -> str:
 def _safe_name(value: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", value).strip("._")
     return safe[:80] or "paper"
+
+
+def _check_pdf_metadata(content: bytes, expected_title: str) -> tuple[str, str, str]:
+    """M1.3 lightweight PDF metadata validation.
+
+    Returns (pdf_metadata_check, pdf_title_match, pdf_metadata_warning).
+    Only examines the first 64KB for PDF /Title metadata — not full parsing.
+    """
+    if not expected_title:
+        return ("skipped", "unknown", "No expected title to compare against.")
+
+    # Check %PDF header (already validated by caller, but be explicit)
+    if not content.startswith(PDF_BYTES):
+        return ("failed", "unknown", "Content does not start with %PDF header.")
+
+    # Look for /Title in first 64KB of PDF (common metadata location)
+    header_chunk = content[: 64 * 1024]
+    try:
+        header_text = header_chunk.decode("latin-1", errors="ignore")
+    except Exception:
+        return ("passed", "unknown", "Could not decode PDF header for metadata check.")
+
+    title_match = _extract_pdf_title_from_header(header_text)
+    if title_match is None:
+        return ("passed", "unknown", "No /Title metadata found in PDF header.")
+
+    match_result = "match" if _titles_match_for_pdf(expected_title, title_match) else "mismatch"
+    warning = "" if match_result == "match" else f"PDF /Title '{title_match[:80]}' does not match expected title."
+    return ("passed", match_result, warning)
+
+
+def _extract_pdf_title_from_header(header_text: str) -> str | None:
+    """Extract /Title from PDF metadata header section."""
+    # Match /Title (...) or /Title <hex>
+    import re as _re
+    match = _re.search(r"/Title\s*\(([^)]{1,200})\)", header_text)
+    if match:
+        return match.group(1).strip()
+    match = _re.search(r"/Title\s*<([0-9A-Fa-f\s]{2,400})>", header_text)
+    if match:
+        hex_str = match.group(1).replace(" ", "")
+        try:
+            return bytes.fromhex(hex_str).decode("utf-16-be", errors="ignore").strip()
+        except Exception:
+            pass
+    return None
+
+
+def _titles_match_for_pdf(expected: str, pdf_title: str) -> bool:
+    """Fuzzy title match for PDF metadata validation."""
+    import re as _re
+    norm_expected = _re.sub(r"[^a-z0-9]+", " ", expected.lower()).strip()
+    norm_pdf = _re.sub(r"[^a-z0-9]+", " ", pdf_title.lower()).strip()
+    if not norm_expected or not norm_pdf:
+        return False
+    if norm_expected == norm_pdf:
+        return True
+    if len(norm_expected) > 10 and len(norm_pdf) > 10:
+        shorter = norm_expected if len(norm_expected) <= len(norm_pdf) else norm_pdf
+        longer = norm_pdf if len(norm_expected) <= len(norm_pdf) else norm_expected
+        if shorter in longer:
+            return True
+    return False

@@ -6,7 +6,7 @@ from pydantic import Field
 
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.enums import PaperSourceStatus, PaperSourceType, SearchIntent
+from researchsensei.schemas.enums import PaperSourceStatus, PaperSourceType, SearchIntent, VerificationStatus
 
 
 class QueryPlan(SenseiModel):
@@ -58,6 +58,20 @@ class CandidatePaper(SenseiModel):
     source_confidence: str = "low"
     metadata_confidence: str = "low"
     raw_source_metadata: dict[str, object] = Field(default_factory=dict)
+    # M1.4 verification fields
+    verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
+    verification_method: str = ""
+    verification_reason: str = ""
+    verification_confidence: str = "low"
+    # M1.4 LLM relevance fields
+    rule_relevance_score: float = 0.0
+    llm_relevance_score: float = 0.0
+    llm_relevance_label: str = ""  # HIGH, MEDIUM, LOW, IRRELEVANT
+    matched_concepts: list[str] = Field(default_factory=list)
+    missing_concepts: list[str] = Field(default_factory=list)
+    relevance_reason: str = ""
+    should_download: bool = False
+    should_a_read: bool = False
 
 
 class ScoringBreakdown(SenseiModel):
@@ -128,6 +142,10 @@ class ResolvedPaperSource(SenseiModel):
     warnings: list[WarningItem] = Field(default_factory=list)
     error: str = ""
     metadata: dict[str, str] = Field(default_factory=dict)
+    # M1.3 PDF metadata validation fields
+    pdf_metadata_check: str = ""  # "passed", "failed", "skipped"
+    pdf_title_match: str = ""  # "match", "mismatch", "unknown"
+    pdf_metadata_warning: str = ""
 
 
 class SourceResolutionResult(SenseiModel):
@@ -158,3 +176,6 @@ class DirectionBundle(SenseiModel):
     filtered_candidates: CandidatePool
     reading_plan: ReadingPlan
     warnings: list[str] = Field(default_factory=list)
+    # M1.4 verification and relevance metadata
+    verification_summary: dict[str, int] = Field(default_factory=dict)
+    relevance_summary: dict[str, int] = Field(default_factory=dict)

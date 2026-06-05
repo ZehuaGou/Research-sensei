@@ -14,8 +14,10 @@ from researchsensei.direction import DirectionRunner
 from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
 from researchsensei.query import QueryPlanner
+from researchsensei.relevance_judge import RelevanceJudge
 from researchsensei.schemas import PaperSourceStatus
 from researchsensei.source_resolver import PaperSourceResolver
+from researchsensei.verification import CandidateVerifier
 from researchsensei.workspace import WorkspaceStore
 
 LIVE_QUERY = "时间序列异常检测 transformer 方法"
@@ -231,10 +233,19 @@ def run_m1_live_search(
         timeout_seconds=12.0,
         max_download_bytes=80 * 1024 * 1024,
     )
+    verifier = CandidateVerifier(
+        s2_api_key=os.getenv("SEMANTIC_SCHOLAR_API_KEY", ""),
+    )
+    relevance_judge = RelevanceJudge(
+        llm_client=llm_client,
+        enabled=True,
+    )
     runner = DirectionRunner(
         workspace=workspace,
         query_planner=QueryPlanner(llm_client=llm_client),
         source_resolver=source_resolver,
+        verifier=verifier,
+        relevance_judge=relevance_judge,
         max_results_per_source=max(1, min(config.max_live_cases, 5)),
     )
     started = time.perf_counter()
@@ -263,6 +274,11 @@ def run_m1_live_search(
     a_read_can_enter_m2 = [item.paper.paper_id for item in a_read_items if item.can_enter_m2 and item.paper.can_enter_m2]
     downloaded = [item for item in bundle.source_resolution.items if item.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED]
 
+    # Verification and relevance summary
+    verification_summary = bundle.verification_summary
+    relevance_summary = bundle.relevance_summary
+
+    # M1 live status: passed / degraded_passed / failed
     failure_reasons: list[str] = []
     if llm_client.usage.call_count <= 0:
         failure_reasons.append("No real LLM query-planning call was made.")
@@ -279,7 +295,19 @@ def run_m1_live_search(
     if a_read_items and len(a_read_can_enter_m2) != len(a_read_items):
         failure_reasons.append("Some A_READ papers are not cleared for M2.")
 
-    status = "failed" if failure_reasons else "passed"
+    # Determine M1 status per M1 doc: passed / degraded_passed / failed
+    sources_success_count = len(sources_success)
+    all_a_read_valid = a_read_items and len(a_read_can_enter_m2) == len(a_read_items)
+
+    if failure_reasons:
+        status = "failed"
+    elif sources_success_count >= 3 and pdf_download_success_count >= 1 and all_a_read_valid:
+        status = "passed"
+    elif sources_success_count == 2 and pdf_download_success_count >= 1 and all_a_read_valid:
+        status = "degraded_passed"
+    else:
+        status = "failed"
+
     sample_a_read = [
         {
             "paper_id": item.paper.paper_id,
@@ -289,6 +317,10 @@ def run_m1_live_search(
             "can_enter_m2": item.can_enter_m2 and item.paper.can_enter_m2,
             "pdf_downloaded": item.paper.pdf_downloaded,
             "score": item.scoring_breakdown.weighted_total,
+            "verification_status": item.paper.verification_status.value,
+            "verification_method": item.paper.verification_method,
+            "llm_relevance_label": item.paper.llm_relevance_label,
+            "llm_relevance_score": item.paper.llm_relevance_score,
         }
         for item in a_read_items[: config.max_live_cases]
     ]
@@ -322,9 +354,16 @@ def run_m1_live_search(
                 "file_size": item.file_size,
                 "sha256": item.sha256,
                 "local_path": item.local_path,
+                "pdf_metadata_check": item.pdf_metadata_check,
+                "pdf_title_match": item.pdf_title_match,
             }
             for item in downloaded[: config.max_live_cases]
         ],
+        "verified_candidate_count": verification_summary.get("verified_candidate_count", 0),
+        "unverified_candidate_count": verification_summary.get("unverified_candidate_count", 0),
+        "verify_pending_count": verification_summary.get("verify_pending_count", 0),
+        "llm_judged_candidate_count": relevance_summary.get("llm_judged_candidate_count", 0),
+        "relevance_filtered_count": relevance_summary.get("relevance_filtered_count", 0),
         "a_read_count": len(a_read_items),
         "a_read_can_enter_m2_count": len(a_read_can_enter_m2),
         "reading_plan_status": bundle.reading_plan.status,

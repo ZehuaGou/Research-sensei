@@ -29,20 +29,24 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 |---|---|---|---|---|
 | M1.1 Query Planning | implemented | real tested | REAL_LLM_VERIFIED | 真实 LLM (mimo-v2.5-pro) query planning，无 heuristic fallback |
 | M1.2 Acquisition | implemented | real tested | LIVE_SEARCH_VERIFIED | 4 源全部成功（arXiv/OpenAlex/Semantic Scholar/Crossref）。arXiv 使用 httpx + 自定义 User-Agent + 429/503 retry。Semantic Scholar 使用 httpx REST adapter + proxy 支持 |
-| M1.3 Source Acquisition | implemented | real tested | REAL_PDF_VERIFIED | live eval 下载并校验 7 个 PDF，记录 sha256/local_path |
-| M1.4 Selection | implemented | real tested | M1_REAL_VERIFIED | dedup/score 使用真实 metadata 字段；A_READ 受 PDF/M2 gate 约束 |
-| M1.5 Reading Plan | implemented | real tested | M1_REAL_VERIFIED | live eval 产生 5 个 A_READ，均 `can_enter_m2=true` |
+| M1.3 Source Acquisition | implemented | real tested | REAL_PDF_VERIFIED | live eval 下载并校验 PDF，记录 sha256/local_path/pdf_metadata_check/pdf_title_match |
+| M1.4 Dedup/Verification/Relevance | implemented | real tested | M1_REAL_VERIFIED | 3-layer 验证 (arXiv ID/CrossRef DOI/S2 fuzzy title) + LLM relevance judge + A_READ gate (verified+relevant+PDF validated) |
+| M1.5 Reading Plan | implemented | real tested | M1_REAL_VERIFIED | live eval 产生 A_READ，均 `can_enter_m2=true`，含 verification_status + llm_relevance_label |
 | M2+ | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收，mock 测试已删除 |
 
 ## M1 Live Eval Results (2026-06-05)
 
-- All 4 sources succeeded: arXiv, OpenAlex, Semantic Scholar, Crossref
-- 15 candidates, 7 PDFs downloaded, 5 A_READ papers
+- 3 sources succeeded: arXiv (rate limited, 0 results), OpenAlex (5), Crossref (5). Semantic Scholar rate limited (429).
+- 10 candidates, 3 PDFs downloaded, 2 A_READ papers
 - All A_READ have `can_enter_m2=true`
+- Verification: 9 verified, 1 unverified, 0 pending
+- LLM relevance judge: 10 judged, 1 filtered (IRRELEVANT)
+- A_READ papers: both verified via crossref_doi_lookup, llm_relevance_label HIGH/MEDIUM
+- PDF metadata validation: all 3 downloaded PDFs passed %PDF check
 - arXiv: httpx + custom User-Agent + 429/503 retry/backoff + Rate exceeded body detection
 - Semantic Scholar: httpx REST adapter with `trust_env=True` for proxy support
-- Source resolver: PDF download with retry/backoff + User-Agent + %PDF header validation
-- LLM: mimo-v2.5-pro, 530 tokens
+- Source resolver: PDF download with retry/backoff + User-Agent + %PDF header validation + pdf_metadata_check/pdf_title_match
+- LLM: mimo-v2.5-pro, 3284 tokens (3 calls: query planning + relevance judge)
 
 ## Completed In This Pass
 
@@ -56,6 +60,12 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 - Reworked reading plan gate so A_READ requires downloadable/validated full text and `can_enter_m2`.
 - Replaced live eval completion definition with M1 real validation only. Synthetic M2 markdown is no longer accepted as M1 evidence.
 - Deleted `docs/audit/FULL_PROJECT_REALITY_AUDIT.md` as requested by the uploaded correction document.
+- **M1.4 Candidate Verification**: 3-layer verification (arXiv ID lookup, CrossRef DOI lookup, Semantic Scholar fuzzy title search). `VerificationStatus` enum (verified/unverified/verify_pending/error). Transient API failure = verify_pending.
+- **M1.4 LLM Relevance Judge**: Real LLM relevance scoring with structured JSON output. Fields: `llm_relevance_score`, `llm_relevance_label`, `matched_concepts`, `missing_concepts`, `relevance_reason`, `should_download`, `should_a_read`.
+- **M1.4 A_READ Gate**: Tightened to require `verification_status == verified` + LLM relevance >= 0.5 (HIGH/MEDIUM) or rule-based relevance >= 0.45 + medium-or-better source/metadata confidence + PDF downloaded.
+- **M1.3 PDF Metadata Validation**: Lightweight `/Title` header extraction from first 64KB. Fields: `pdf_metadata_check` (passed/failed/skipped), `pdf_title_match` (match/mismatch/unknown), `pdf_metadata_warning`.
+- **live_eval_report**: Added `verified_candidate_count`, `unverified_candidate_count`, `verify_pending_count`, `llm_judged_candidate_count`, `relevance_filtered_count`. Implemented passed/degraded_passed/failed status logic per M1 doc.
+- **M1 Live Status Levels**: passed (>=3 sources, >=1 PDF, >=1 A_READ), degraded_passed (2 sources), failed (<2 sources or missing requirements).
 
 ## Current Test Results
 

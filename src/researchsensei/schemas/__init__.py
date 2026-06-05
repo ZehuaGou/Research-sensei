@@ -3,7 +3,7 @@ from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEn
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent
+from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, VerificationStatus
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
@@ -69,6 +69,7 @@ __all__ = [
     "TeachingCard",
     "TeachingCardBundle",
     "UnderstandingStatus",
+    "VerificationStatus",
     "WarningItem",
     "WorkspaceArtifact",
 ]

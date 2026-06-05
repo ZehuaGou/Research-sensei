@@ -11,6 +11,7 @@ from researchsensei.schemas import (
     ReadingPlan,
     ReadingPlanItem,
     ScoringBreakdown,
+    VerificationStatus,
 )
 
 TOP_VENUE_TERMS = (
@@ -112,17 +113,23 @@ class SelectionService:
         items.sort(key=lambda item: item.scoring_breakdown.weighted_total, reverse=True)
 
         a_read_count = 0
+        unverified_count = 0
         for item in items:
             total = item.scoring_breakdown.weighted_total
-            relevance = item.scoring_breakdown.relevance_score
-            if relevance < 0.2 or total < 0.25 or item.role == "IRRELEVANT":
+            # Use LLM relevance if available, otherwise fall back to rule-based
+            relevance = item.paper.llm_relevance_score if item.paper.llm_relevance_score > 0 else item.scoring_breakdown.relevance_score
+            is_irrelevant_llm = item.paper.llm_relevance_label == "IRRELEVANT"
+
+            if relevance < 0.2 or total < 0.25 or item.role == "IRRELEVANT" or is_irrelevant_llm:
                 item.priority = "D_IGNORE"
                 item.selection_reason = _append_reason(item.selection_reason, "Filtered: weak relevance or low metadata confidence.")
                 continue
+            if item.paper.verification_status != VerificationStatus.VERIFIED:
+                unverified_count += 1
             if self._eligible_for_a_read(item) and a_read_count < self.max_a_read:
                 item.priority = "A_READ"
                 a_read_count += 1
-                item.selection_reason = _append_reason(item.selection_reason, "A_READ: full text is available and metadata/source signals are usable.")
+                item.selection_reason = _append_reason(item.selection_reason, "A_READ: verified, relevant, and full text is downloaded and validated.")
             elif total >= 0.45:
                 item.priority = "B_SKIM"
                 item.selection_reason = _append_reason(item.selection_reason, "B_SKIM: useful background, but not cleared for deep-card generation.")
@@ -134,6 +141,8 @@ class SelectionService:
         warnings: list[str] = []
         if a_read_count == 0:
             warnings.append("NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT")
+        if unverified_count > 0:
+            warnings.append(f"UNVERIFIED_CANDIDATES:{unverified_count}")
         if len(visible_items) < len(items):
             warnings.append(f"FILTERED_D_IGNORE:{len(items) - len(visible_items)}")
 
@@ -285,11 +294,20 @@ class SelectionService:
 
     @staticmethod
     def _eligible_for_a_read(item: ReadingPlanItem) -> bool:
+        """A_READ requires: verified + relevant + PDF downloaded + metadata/source confidence."""
+        paper = item.paper
+        is_verified = paper.verification_status == VerificationStatus.VERIFIED
+        has_relevance = (
+            item.scoring_breakdown.relevance_score >= 0.45
+            or (paper.llm_relevance_score >= 0.5 and paper.llm_relevance_label in ("HIGH", "MEDIUM"))
+        )
         return (
             item.can_enter_m2
-            and item.scoring_breakdown.relevance_score >= 0.45
+            and is_verified
+            and has_relevance
             and item.scoring_breakdown.pdf_available_score > 0
-            and item.scoring_breakdown.metadata_completeness >= 0.45
+            and _confidence_at_least(paper.source_confidence, "medium")
+            and _confidence_at_least(paper.metadata_confidence, "medium")
             and item.role != "IRRELEVANT"
         )
 

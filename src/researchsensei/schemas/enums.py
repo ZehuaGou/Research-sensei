@@ -28,6 +28,15 @@ class PaperSourceStatus(str, Enum):
     NO_SOURCE_FOUND = "NO_SOURCE_FOUND"
 
 
+class VerificationStatus(str, Enum):
+    """M1.4 candidate verification status."""
+
+    VERIFIED = "verified"
+    UNVERIFIED = "unverified"
+    VERIFY_PENDING = "verify_pending"
+    ERROR = "error"
+
+
 class PaperSourceType(str, Enum):
     ARXIV_SOURCE = "ARXIV_SOURCE"
     PDF = "PDF"
