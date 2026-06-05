@@ -80,7 +80,7 @@ Every A_READ must satisfy ALL:
 - MockLLMClient 已从 src/ 和 tests/ 中删除。
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
-- M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item that passes the strict gate above.
+- M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
 - M1 direction exploration and seed paper expansion are NOT complete.
 
 ## External Reference Boundary

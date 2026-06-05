@@ -50,10 +50,16 @@ A_READ_FOR_M2 must satisfy ALL:
 - `llm_relevance_score >= 0.65`
 - `llm_relevance_label in {HIGH, MEDIUM}`
 - `should_a_read == true`
-- `pdf_downloaded == true`
-- `pdf_metadata_check == passed`
-- `pdf_title_match == match`
 - `can_enter_m2 == true`
+- `source_confidence in {high, medium}`
+- `has_valid_deep_reading_source == true`
+
+`has_valid_deep_reading_source` means one of:
+1. `latex_source_downloaded == true` and `latex_main_file` exists
+2. `structured_html_downloaded == true`
+3. `pdf_downloaded == true` and `pdf_metadata_check == passed` and `pdf_title_match == match`
+
+`metadata_only` cannot enter `A_READ_FOR_M2`.
 
 ### Seed Paper Expansion Mode
 
@@ -74,7 +80,7 @@ Output:
 - Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
 - Search/acquisition must use mature projects or official clients through adapters.
 - Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed. arXiv uses a robust official endpoint adapter (ARIS-style) with full diagnostic discipline. OpenAlex uses `pyalex`. Semantic Scholar uses official REST API via httpx with proxy support. Crossref uses `habanero`.
-- A_READ papers must be cleared for M2, which currently means a validated PDF was downloaded and has a local path, file size, and sha256.
+- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML, or validated PDF (fallback). Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
 - M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Mock/fake/skip are not valid test outcomes for M1.
@@ -87,7 +93,7 @@ Output:
 | OpenAlex metadata search | `pyalex` | `OpenAlexAdapter` |
 | Semantic Scholar metadata/search | httpx REST API (custom adapter) | `SemanticScholarAdapter` |
 | Crossref DOI metadata | `habanero` | `CrossrefAdapter` |
-| PDF download/validation | `httpx` with retry/backoff | `PaperSourceResolver` |
+| Best available source resolution | arXiv source / structured HTML / PDF with retry/backoff | `PaperSourceResolver` |
 
 All third-party packages are isolated behind adapters so the core schemas and selection logic remain replaceable.
 
@@ -152,7 +158,7 @@ M1.3 不只下载 PDF。M1.3 必须优先尝试获取 LaTeX source / arXiv sourc
 - **ResearchSensei-owned target**: `filtered_candidates.json`
 - **Schema / artifact impact**: `verification_status`, `verification_method`, `verification_reason`, `verification_confidence`, `rule_relevance_score`, `llm_relevance_score`, `llm_relevance_label`, `matched_concepts`, `missing_concepts`, `relevance_reason`, `should_download`, `should_a_read`
 - **Boundary**: Does not vendor ARIS `verify_papers.py`. Does not treat ARIS CLI output as ResearchSensei artifact. ResearchSensei implements its own schema conversion and gate.
-- **Validation implication**: `verified_candidate_count` must exist. `unverified_candidate_count` must exist. `verify_pending_count` must exist. `llm_judged_candidate_count` must exist. `relevance_filtered_count` must exist. A_READ must be verified + relevant + PDF validated.
+- **Validation implication**: `verified_candidate_count` must exist. `unverified_candidate_count` must exist. `verify_pending_count` must exist. `llm_judged_candidate_count` must exist. `relevance_filtered_count` must exist. A_READ_FOR_M2 must be verified + relevant + valid deep-reading source. Valid deep-reading source can be LaTeX source, structured HTML, or validated PDF. PDF is fallback, not the only valid input.
 
 ### M1.5 Reading Plan
 
