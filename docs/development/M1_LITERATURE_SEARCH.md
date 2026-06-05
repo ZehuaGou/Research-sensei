@@ -50,6 +50,24 @@ Borrowed strategies (not copied code):
 
 These strategies are not optional optimizations. They are part of M1 real validation. Without them, arXiv requests easily fail due to default client behavior, network exit points, or rate limiting.
 
+## ARIS Alignment
+
+ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`) overlaps with M1 at high level. The following ARIS capabilities are relevant:
+
+| ARIS Capability | Reuse Mode | Application in M1 |
+|---|---|---|
+| `arxiv_fetch.py` robust fetch | STRATEGY_BORROW | Already adopted: User-Agent, retry/backoff, id_list, PDF validation |
+| `semantic_scholar_fetch.py` REST API | STRATEGY_BORROW | Already adopted: httpx adapter, API key, proxy support |
+| `openalex_fetch.py` polite pool | STRATEGY_BORROW | Already adopted: pyalex with mailto |
+| `verify_papers.py` 3-layer verification | STRATEGY_BORROW | Candidate verification against arXiv/Crossref/S2 catalogs |
+| `research-lit` multi-source aggregation | STRATEGY_BORROW | Multi-source dedup and contribution tracking |
+| Source verification status | STRATEGY_BORROW | `RESOLVED_PDF_DOWNLOADED` / `METADATA_ONLY` / `FAILED_DOWNLOAD` |
+| `deepxiv_fetch.py` | EVALUATE_OTHER_PROJECTS | Optional future adapter for section-level paper access |
+
+**Why not ARIS-only search**: ARIS's search capabilities are designed for workflow/skill execution and may not cover all use cases as well as ResearchSensei's best-of-breed multi-source approach. ResearchSensei retains OpenAlex, Semantic Scholar, Crossref, and arXiv as independent adapters, each optimized for its domain.
+
+**Final M1 route**: best-of-breed multi-source search + ARIS verification/download discipline. M1 does not treat "found a PDF" as success; it must verify relevance, authenticity, and PDF consistency.
+
 ## Pipeline
 
 ```text

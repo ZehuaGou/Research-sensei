@@ -586,7 +586,24 @@ python scripts/run_live_eval.py
 
 ---
 
-## 14. 当前未解决问题
+## 14. ARIS Alignment
+
+M5 has medium overlap with ARIS. ARIS provides engineering discipline patterns but not a testing framework.
+
+| ARIS Capability | Reuse Mode | Application in M5 |
+|---|---|---|
+| Run traces / session recovery | STRATEGY_BORROW | Artifact versioning, resume/rerun semantics |
+| `threat_scan` security checks | STRATEGY_BORROW | Secret scanning, API key detection |
+| Large file / PDF not in git | STRATEGY_BORROW | Already adopted: .gitignore rules |
+| API key not leaked in logs | STRATEGY_BORROW | Already adopted: _redact_report in live_eval |
+| Helper resolution (tool availability) | STRATEGY_BORROW | Check external tool availability before use |
+| Graceful degradation | DO_NOT_REUSE | ARIS skip-on-failure must not become ResearchSensei's fake passes |
+
+**Boundary**: ARIS's graceful degradation (skip when env/key/network missing) conflicts with ResearchSensei's real-test-first policy. M5 must fail on real failures, not degrade to mock. ARIS run traces are a reference for artifact versioning, not a replacement for M5's testing infrastructure.
+
+---
+
+## 15. 当前未解决问题
 
 - artifact_manifest 是否未来需要
 - content_hash 是否在 v2 初版加入

@@ -314,7 +314,21 @@ paper_terms = title_words | abstract_words
 - F-7 以后规则未实现（设计中）
 - formula-heavy / raw-copy / generic-output 未实现
 
-## 15. 当前未解决问题
+## 15. ARIS Alignment
+
+ARIS's audit chain (experiment-audit → result-to-claim → paper-claim-audit → citation-audit → kill-argument) and reviewer independence principle are directly relevant to M2.4.
+
+| ARIS Capability | Reuse Mode | Application in M2.4 |
+|---|---|---|
+| Reviewer independence (file-path only, no summaries) | STRATEGY_BORROW | Audit reads artifacts, never receives builder explanations |
+| `verify_papers.py` hallucination detection | STRATEGY_BORROW | Detect fabricated references in cards |
+| Source verification status | STRATEGY_BORROW | Track verified/unverified/verify_pending per claim |
+| Kill-argument adversarial review | STRATEGY_BORROW | Future advisor question quality assessment |
+| claim-by-claim verification | STRATEGY_BORROW | Per-claim evidence_ref validation |
+
+**Boundary**: ARIS audit is workflow-level (5-layer chain). M2.4 QualityAuditor is rule-based structural + semantic checks. ARIS does not replace F-1 to F-6 rules or formula-heavy/raw-copy detection.
+
+## 16. 当前未解决问题
 
 - formula char ratio 阈值是否需要调优
 - token overlap 阈值是否需要调优

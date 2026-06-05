@@ -339,7 +339,22 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
 - formula_is_core 判断未实现
 
-## 16. 当前未解决问题
+## 16. ARIS Alignment
+
+ARIS's structured paper output (Problem / Method / Results / Relevance / Source / Verification Status) overlaps with M2.3 paper understanding. ARIS also provides reference paper summary templates and "What They Did / Key Results / Limitations & Open Questions" structures.
+
+| ARIS Capability | Reuse Mode | Application in M2.3 |
+|---|---|---|
+| Problem/Method/Results/Relevance structure | STRATEGY_BORROW | Enhance paper_card output schema |
+| Reference Paper Summary template | STRATEGY_BORROW | Standardize paper_card fields |
+| "What They Did" / "Key Results" | STRATEGY_BORROW | method_overview and experiment_summary fields |
+| Limitations & Open Questions | STRATEGY_BORROW | limitations field with structured open questions |
+| Verification status per claim | STRATEGY_BORROW | Track which claims are verified vs. inferred |
+| Potential Improvement Directions | STRATEGY_BORROW | Future advisor/drill input |
+
+**Boundary**: ARIS does not have formula_card or symbol explanation. ARIS does not have evidence_ref / PassageIndex / ClaimEvidence binding. These remain ResearchSensei-specific.
+
+## 17. 当前未解决问题
 
 - formula_is_core 的具体判断算法
 - EvidencePackSummary 是否足够复现 LLM 输入

@@ -339,7 +339,21 @@ class EvidenceRetriever:
 - evidence_ref 前端跳转未实现
 - embedding retriever / vector DB 未实现
 
-## 15. 当前未解决问题
+## 15. ARIS Alignment
+
+ARIS's `verify_papers.py` provides three-layer candidate verification (arXiv batch API → CrossRef DOI → S2 fuzzy title match). This verification discipline is directly relevant to M2.2 evidence chain integrity.
+
+| ARIS Capability | Reuse Mode | Application in M2.2 |
+|---|---|---|
+| `verify_papers.py` 3-layer verification | STRATEGY_BORROW | Verify that evidence_ref targets actually exist in external catalogs |
+| `verify_papers.py` hallucination rate | STRATEGY_BORROW | Track hallucinated/non-existent references as a quality metric |
+| Source verification status | STRATEGY_BORROW | PASS/WARN/BLOCKED/ERROR verdict per evidence source |
+| Disk-backed cache with TTL | STRATEGY_BORROW | Cache verification results to avoid repeated API calls |
+| research-lit contribution tracking | STRATEGY_BORROW | Track which source contributed each claim/passage |
+
+**Boundary**: ARIS verifies paper existence, not passage-level evidence quality. M2.2 still needs PassageIndex, ClaimEvidence, BM25, and EvidencePack for fine-grained evidence binding.
+
+## 16. 当前未解决问题
 
 - passage 分段策略（按 section 还是按 paragraph count）需要实测
 - claim_type 判断准确性（关键词匹配 vs 位置启发式）需要实测

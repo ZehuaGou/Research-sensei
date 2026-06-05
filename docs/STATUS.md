@@ -89,3 +89,15 @@ Latest live result:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item cleared for M2.
+
+## ARIS Alignment Summary
+
+ResearchSensei's "科研自动化" reference project is ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`).
+
+| Module | ARIS Overlap | Reuse Mode | Key Boundary |
+|---|---|---|---|
+| M1 | High | STRATEGY_BORROW | Search backend remains best-of-breed (OpenAlex/Semantic Scholar/Crossref/arXiv). ARIS provides verification/download discipline. |
+| M2 | Medium-High | STRATEGY_BORROW + ADAPTER_REUSE | ARIS verification_status/source discipline enhance evidence and audit. Parser/formula/evidence_ref remain ResearchSensei-specific. |
+| M3 | Low (code), Medium (schema) | STRATEGY_BORROW | No ARIS UI to reuse. Display fields borrow verification/relevance/source structure. |
+| M4 | High | STRATEGY_BORROW + PROMPT_BORROW | ARIS research-review/research_wiki strongly inform M4.3-M4.6. M4.1/M4.2 formula teaching remains self-built. |
+| M5 | Medium | STRATEGY_BORROW | ARIS run traces/session recovery/threat_scan are useful references. Real test discipline must not degrade.

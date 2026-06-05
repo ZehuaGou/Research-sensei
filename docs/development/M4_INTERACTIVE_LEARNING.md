@@ -591,7 +591,30 @@ M4 完成后，应能做到：
 
 ---
 
-## 18. 未决问题
+## 18. ARIS Alignment
+
+M4 has the highest ARIS overlap among all modules. ARIS's research-review, research-refine-pipeline, and research_wiki directly inform M4.3-M4.6.
+
+| ARIS Capability | Reuse Mode | Application in M4 |
+|---|---|---|
+| `research-review` senior reviewer prompts | PROMPT_BORROW | M4.4 advisor question generation: mock NeurIPS review, claims matrix, minimal experiment design |
+| `research-review` iterative adversarial dialogue | STRATEGY_BORROW | M4.4 multi-round drill with convergence criteria |
+| `research-refine-pipeline` method thesis gate | STRATEGY_BORROW | M4.4 "freeze Problem Anchor before experiments" principle |
+| `research_wiki.py` ingest_paper / query_pack | STRATEGY_BORROW | M4.5 PaperMemory schema: frontmatter + TODO sections, append-only log |
+| `research_wiki.py` query_pack budget enforcement | STRATEGY_BORROW | M4.6 token budget: max 8000 chars with priority sections |
+| `research_wiki.py` edge graph (typed relationships) | STRATEGY_BORROW | M4.5 memory relationships between papers |
+| `novelty-check` claim-by-claim verification | STRATEGY_BORROW | M4.4 advisor can ask "is this claim novel?" |
+| `idea-discovery` phased filtering | STRATEGY_BORROW | M4.3 context retrieval: memory → artifacts → LLM fallback |
+
+**M4.1 / M4.2 remain ResearchSensei-specific**: ARIS does not have selection explanation or formula/symbol explanation. These require ResearchSensei's evidence_ref, PassageIndex, and formula_card infrastructure.
+
+**M4.4 advisor mode reference**: ARIS's `research-review` generates mock NeurIPS reviews with claims matrix and action plans. M4.4 advisor questions should adopt this structure for group_meeting and defense modes.
+
+**M4.5/M4.6 memory reference**: ARIS's `research_wiki.py` uses file-system-based markdown + JSONL edges with append-only audit log. M4.5 should evaluate whether to adopt file-system storage or use SQLite/JSON artifact. The query_pack budget enforcement pattern (priority sections, max chars) directly applies to M4.6 memory-first retrieval.
+
+---
+
+## 19. 未决问题
 
 - PaperMemory 和 PassageMemory 的粒度
 - 记忆优先检索的具体策略和阈值

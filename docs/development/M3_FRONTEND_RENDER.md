@@ -338,7 +338,21 @@ component_status:
 - debug/admin 鉴权机制
 - evidence_ref 跳转
 
-## 17. 当前未解决问题
+## 17. ARIS Alignment
+
+ARIS has no frontend UI. However, ARIS's structured output fields provide display discipline that M3 should adopt.
+
+| ARIS Output Field | Reuse Mode | Application in M3 |
+|---|---|---|
+| verification_status per paper | STRATEGY_BORROW | Display verification badge on cards |
+| relevance_reason | STRATEGY_BORROW | Show why a paper was selected |
+| source contribution tracking | STRATEGY_BORROW | Display which sources contributed metadata |
+| Limitations & Open Questions | STRATEGY_BORROW | Display as structured card section |
+| pdf_metadata_check | STRATEGY_BORROW | Display PDF validation status |
+
+**Boundary**: ARIS has no reusable frontend components. M3 frontend must be self-built. Only the output field structure is borrowed.
+
+## 18. 当前未解决问题
 
 - debug/admin 具体鉴权机制
 - `/artifacts` 是否需要脱敏版本

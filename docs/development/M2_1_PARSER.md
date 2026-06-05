@@ -239,7 +239,18 @@ class LightweightParserAdapter(ParserAdapter):
 - DoclingParserAdapter 未实现
 - 外部 parser 仍是 optional adapter
 
-## 14. 当前未解决问题
+## 14. ARIS Alignment
+
+ARIS does not have a dedicated parser module. ARIS relies on external tools (DeepXiv, arXiv metadata) and does not perform robust PDF parsing with layout analysis, table extraction, or formula detection.
+
+| ARIS Capability | Reuse Mode | Application in M2.1 |
+|---|---|---|
+| PDF download validation | STRATEGY_BORROW | Already adopted in M1.3 source resolver |
+| DeepXiv section-level access | EVALUATE_OTHER_PROJECTS | Optional future adapter for structured section extraction |
+
+**Boundary**: M2.1 parser must remain ResearchSensei-specific. ARIS does not provide a replacement for PyMuPDF-based or Docling-based parsing.
+
+## 15. 当前未解决问题
 
 - Docling 本地样例验证需要哪些论文
 - 外部 parser 映射细节（DoclingDocument → DocumentIngestion.blocks）
