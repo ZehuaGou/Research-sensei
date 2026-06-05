@@ -197,7 +197,7 @@ class TeachingCardLLMOutput(SenseiModel):
 
 ```python
 class SinglePaperIngestionRunner:
-    def __init__(self, ..., llm_client: LLMClient | MockLLMClient | None = None):
+    def __init__(self, ..., llm_client: LLMClient | None = None):
         self.llm_client = llm_client
 
     def run(self, ...):
@@ -363,7 +363,24 @@ ARIS's structured paper output (Problem / Method / Results / Relevance / Source 
 
 **Boundary**: ARIS does not have formula_card or symbol explanation. ARIS does not have evidence_ref / PassageIndex / ClaimEvidence binding. These remain ResearchSensei-specific.
 
-## 17. 当前未解决问题
+## 17. Direction-Support Fields (C1, C4)
+
+M2.3 paper_card should expose direction-support fields when evidence exists. These fields support C1 Direction Framework and C4 Cross-paper Understanding.
+
+| Field | Description | Evidence requirement |
+|-------|-------------|---------------------|
+| `method_family` | Which method family this paper belongs to | Must have evidence_ref |
+| `contribution_to_direction` | How this paper advances the research direction | Must have evidence_ref |
+| `what_problem_it_solves` | What specific problem it addresses | Must have evidence_ref |
+| `what_limitation_it_leaves` | What limitations remain | Must have evidence_ref |
+| `relation_to_previous_methods` | How it relates to prior work | Must have evidence_ref |
+| `relation_to_later_methods` | How later work improved on it | Must have evidence_ref |
+| `datasets_and_metrics` | Datasets and metrics used | Must have evidence_ref |
+| `comparable_methods` | Directly comparable methods | Must have evidence_ref |
+
+These fields are optional in paper_card but required for direction framework updates. M2.4 audit must verify evidence_ref for direction-related claims.
+
+## 18. 当前未解决问题
 
 - formula_is_core 的具体判断算法
 - EvidencePackSummary 是否足够复现 LLM 输入

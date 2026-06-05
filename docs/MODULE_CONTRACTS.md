@@ -1,228 +1,228 @@
 # ResearchSensei Module Contracts
 
-> **Canonical docs**: See `docs/DEVELOPMENT.md` and `docs/development/*.md`.
+> **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, and `docs/development/*.md`.
+>
+> Module contracts distinguish:
+> 1. **Schema / artifact contract** — what the module produces
+> 2. **Live validation contract** — what real-world conditions must pass
+> 3. **Failure contract** — what happens when things go wrong
 
 ---
 
-## M1 — Literature Search
+## M1 — Literature Search & Direction Framework
 
-**测试边界**: 每个 search/download/selection 子模块必须有 mock external tests。adapter 默认用 MockTransport。
+M1 has two modes. See `docs/development/M1_LITERATURE_SEARCH.md`.
 
-### query
+### Focused Acquisition Mode (C2)
 
-Input: user_query
-Output: query_plan.json
-Boundary: Does not search papers. Does not generate reading plans.
+**Schema / artifact contract**:
 
-### acquisition
+Input: user_query (narrow, e.g. "时间序列异常检测 transformer 方法")
+Output:
+- `query_plan.json`
+- `candidate_pool.json`
+- `source_resolution.json`
+- `filtered_candidates.json` — final candidates with verification/LLM relevance/PDF fields
+- `reading_plan.json` — with `A_READ_FOR_M2` papers
 
-Input: query_plan.json
-Output: candidate_pool.json
-Boundary: Does not filter A_READ. Does not do paper reading.
+Boundary: Does not parse full papers. Does not generate paper cards.
 
-### selection
+**Live validation contract**:
 
-Input: candidate_pool.json
-Output: filtered_candidates.json, reading_plan.json
-Boundary: Does not download full text. Does not generate paper cards.
+- `sources_success >= 3`
+- `verified_candidate_count` exists
+- `pdf_download_success_count >= 1`
+- Every `A_READ` has: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `pdf_downloaded == true`, `pdf_metadata_check == passed`, `pdf_title_match == match`, `can_enter_m2 == true`
 
----
+**Failure contract**:
 
-## M2 — Single Paper Understanding
+- Missing LLM client → `QueryPlanningError`
+- LLM JSON parse failure → `QueryPlanningError`
+- Source 429/503 → retry with backoff, then structured error in `source_metrics`
+- PDF download failure → `FAILED_DOWNLOAD` status, not silently skipped
+- Verification API failure → `verify_pending`, not `unverified`
 
-**测试边界**: 每个 parser/evidence/understanding/audit/gating 子模块必须有 schema/artifact/failure tests。LLM 默认用 fake/mock client。
+### Direction Framework Mode (C1)
 
-### source_resolver (M2.0)
+**Schema / artifact contract**:
 
-Input: paper metadata, input_path/url
-Output: source_status.json, source file
-Boundary: Does not parse content. Does not generate understanding.
+Input: user_query (broad, e.g. "时间序列异常检测")
+Output:
+- `direction_landscape.json` — with `chronology_stage`, `method_family`, `landscape_anchor`, `representative_papers`, `recommended_reading_order`, `gaps_or_open_questions`
 
-### ingestion / parser (M2.1)
+Boundary: `direction_landscape.json` does NOT replace `reading_plan.json`. `direction_landscape.json` serves direction understanding (C1). `reading_plan.json` serves reading plan (C2). `A_READ_FOR_M2` serves single-paper deep reading entry (C3).
 
-Input: source file
-Output: parsed_document.json (ParserResult)
-Boundary: Does not explain papers. Does not generate paper_skeleton.
-
-### passage_index (M2.2)
-
-Input: parsed_document.json
-Output: passage_index.json
-Boundary: Only builds passages. Does not judge claims.
-
-### claim_evidence (M2.2)
-
-Input: passage_index.json
-Output: claim_evidence.json
-Boundary: Only extracts claim evidence. Does not generate final explanations.
-
-### grounding (M2.2, v1 compatibility)
-
-Input: parsed_document.json
-Output: evidence_index.json
-Boundary: Block-level evidence (v1). Does not generate teaching text.
-
-### evidence_retriever (M2.2)
-
-Input: claim_evidence.json + passage_index.json
-Output: EvidenceRetrievalResult (runtime, not persisted)
-Boundary: BM25 retrieval only. Does not generate cards.
-
-### evidence_pack (M2.2)
-
-Input: claim_evidence.json + passage_index.json + optional retriever
-Output: EvidencePack + EvidencePackSummary (runtime, not persisted)
-Boundary: Filters and prioritizes evidence for LLM. Not persisted.
-
-### paper_understanding (M2.3)
-
-Input: EvidencePack + paper_skeleton.json
-Output: paper_card.json / formula_cards.json / teaching_cards.json / understanding_status.json
-Boundary: Fail-closed. Unreliable → BLOCKED_UNDERSTANDING.
-
-### audit (M2.4)
-
-Input: candidate artifacts (in-memory dicts)
-Output: quality_report.json
-Boundary: Reads candidate artifacts, does not regenerate cards. Does not write artifacts. Pure logic.
-
-### full_pipeline (M2.5)
-
-Input: source file → all M2.1-M2.4
-Output: 10 artifacts (baseline/success), fewer on degraded/blocked
-Boundary: Orchestration only. Does not contain business logic.
+**Status**: DOC_REQUIRED / NOT_IMPLEMENTED
 
 ---
 
-## M3 — API / Frontend
+## M2 — Single Paper Deep Reading (C3, C4)
 
-**测试边界**: API 和前端子模块必须有 endpoint / component tests。前端 fetch 默认用 mock。
+M2 remains single-paper deep reading. M2 outputs also expose direction-support fields when evidence exists.
 
-### api (M3.1)
+**Schema / artifact contract**:
 
-Input: job_id
-Output: /understanding_status, /cards
-Boundary: /artifacts debug-only. Normal frontend must not use /artifacts.
+Input: source file (PDF)
+Output:
+- `parsed_document.json`
+- `passage_index.json`
+- `claim_evidence.json`
+- `evidence_index.json` (v1 compatibility)
+- `paper_skeleton.json`
+- `paper_card.json` / `formula_cards.json` / `teaching_cards.json`
+- `understanding_status.json`
+- `quality_report.json`
 
-### upload_page (M3.2)
+M2.3 paper_card should expose direction-support fields when evidence exists:
+- `method_family`
+- `contribution_to_direction`
+- `what_problem_it_solves`
+- `what_limitation_it_leaves`
+- `relation_to_previous_methods`
+- `relation_to_later_methods`
+- `datasets_and_metrics`
+- `comparable_methods`
 
-Input: user file upload
-Output: parse job creation
-Boundary: Does not parse content itself. Delegates to api.
+M2.4 audit: direction-related fields must have `evidence_ref`. Comparison claims must have `evidence_ref`. Limitation / future work claims must have `evidence_ref`.
 
-### learning_workspace (M3.3)
+M2.5 gates: `direction_framework_update_allowed`, `cross_paper_comparison_allowed` (in addition to existing single-paper gates).
 
-Input: /understanding_status + /cards
-Output: User page display
-Boundary: Does not read /artifacts directly. Does not display BASELINE/BLOCKED cards.
+**Live validation contract**:
 
-### status_banner (M3.4)
+- Real PDF parse (not synthetic)
+- `evidence_ref` exists for claims
+- paper_card / formula_cards / teaching_cards generated with real LLM
+- QualityAuditor runs with real artifacts
 
-Input: understanding_status
-Output: Status banner UI
-Boundary: Displays status, does not modify data.
+**Failure contract**:
 
-### debug_entry (M3.5)
-
-Input: debug signal (SENSEI_DEBUG)
-Output: raw artifact access
-Boundary: Debug/admin only. Production must have auth.
-
----
-
-## M4 — Interactive Learning
-
-**测试边界**: 互动和记忆子模块必须有 context / memory / no-duplicate-LLM-call tests。
-
-### direction / selection_explanation (M4.1)
-
-Input: selected text, paper context
-Output: explanation for selected content
-Boundary: Must use paper context, not generic knowledge.
-
-### patterns / symbol_formula_explanation (M4.2)
-
-Input: formula/symbol, paper context
-Output: symbol/formula breakdown
-Boundary: Must bind to paper evidence, not fabricate meanings.
-
-### interactive / context_qa (M4.3)
-
-Input: user question, session context, cards
-Output: interactive_answer.json
-Boundary: Must not send entire paper to prompt.
-
-### drill / advisor_drill (M4.4)
-
-Input: paper_card, formula_cards, pattern_cards
-Output: advisor questions and evaluations
-Boundary: Questions must be paper-specific, not generic.
-
-### context / paper_memory (M4.5)
-
-Input: reading sessions, user interactions
-Output: PaperMemory / SessionContext
-Boundary: Memory is structured, not raw chat history.
-
-### memory_first_retrieval (M4.6)
-
-Input: user question, PaperMemory, paper context
-Output: retrieved context for answer
-Boundary: Must check memory before calling LLM. No duplicate LLM calls for same question.
+- Parser failure → `FAILED`
+- No passages → `BLOCKED_UNDERSTANDING`
+- LLM failure → `BLOCKED_UNDERSTANDING`
+- Audit BLOCK → `BLOCKED_UNDERSTANDING`
 
 ---
 
-## M5 — Engineering Reliability
+## M3 — API / Frontend (C1, C3, C5)
 
-> M5 是**横切工程保障模块**，负责测试基础设施、CI、安全、smoke、成本控制和发布门槛。
-> M1-M4 的业务测试必须在各自模块内完成，M5 不替代模块验收。
+M3 has two workspaces:
 
-**测试边界**: M5 负责测试基础设施和全局回归，不替代 M1-M4 子模块测试。
+### DirectionWorkspace (C1)
 
-### backend_tests (M5.1)
+Displays:
+- `direction_landscape`
+- chronology stages
+- method families
+- landscape anchors
+- recommended reading order
+- gaps / open questions
+- current SOTA candidates
 
-Input: tests/, src/, pytest config
-Output: pytest result
-Boundary: 默认不联网。默认不真实调用 LLM。不依赖外部 API。
+### PaperWorkspace (C3)
 
-### frontend_tests (M5.2)
+Displays:
+- `paper_card`
+- `formula_cards`
+- `teaching_cards`
+- `evidence_ref` (future: passage-level jump)
+- quality status
 
-Input: frontend/src/, Vitest specs
-Output: npm test result
-Boundary: 不启动真实后端。fetch 使用 mock。组件测试不代替 e2e。
+DirectionWorkspace and PaperWorkspace are parallel capabilities, not replacements.
 
-### llm_smoke_and_cost (M5.3)
+**Schema / artifact contract**:
 
-Input: explicit env flags, model config, smoke prompt
-Output: live smoke report
-Boundary: 默认不执行。必须显式开启。必须控制 token 和成本。不进入普通 pytest。所有 LLM 调用通过 llm/client.py。
+- `/understanding_status` — status gating
+- `/cards` — paper cards (status-gated)
+- `/artifacts` — debug/admin only
+- DirectionWorkspace endpoints (future)
 
-### cache (M5.4)
+**Live validation contract**:
 
-Input: prompt hash, model config, schema version
-Output: cached LLM response
-Boundary: cache 不进 Git。测试默认关闭。cache 不等于长期记忆。
+- Real API smoke: upload real small PDF → backend returns job / status / cards → frontend can display status
 
-### secret_scan (M5.5)
+**Failure contract**:
 
-Input: repo files, commit diff
-Output: secret scan result
-Boundary: 不允许提交 .env、API key、cache、大文件。不在日志打印 key。
+- BASELINE_ONLY → 403 for normal users
+- BLOCKED → 403 + blocking_reason
+- SENSEI_DEBUG off → /artifacts returns 403
 
-### debug_admin (M5.6)
+---
 
-Input: admin/debug auth signal, request path
-Output: allow/deny debug API access
-Boundary: /artifacts 是 debug/admin raw API。/quality_report 是 debug/admin API。SENSEI_DEBUG 只适合本地开发。生产环境必须有正式鉴权。
+## M4 — Interactive Learning (C3, C5, C6)
 
-### ci_release_check (M5.7)
+M4 has two interaction levels:
 
-Input: test commands, build commands, secret scan
-Output: release readiness result
-Boundary: 不真实联网。不真实调用 LLM。失败时不得发布。
+### Paper-level interaction (C3, C5)
 
-### render
+- Selected content explanation
+- Formula / symbol explanation
+- Single-paper Q&A
 
-Input: cards JSON
-Output: HTML/Markdown (future)
-Boundary: Must not call LLM in render.
+### Direction-level interaction (C1, C5)
+
+- Direction evolution Q&A
+- Method family comparison Q&A
+- Representative paper relationship Q&A
+- Advisor-style research route Q&A
+
+Example direction-level questions:
+- "这个方向是怎么发展的？"
+- "Transformer 相比 Autoencoder 解决了什么问题？"
+- "Anomaly Transformer 后面有哪些改进？"
+- "这个方向现在还有什么开放问题？"
+- "如果我要找创新点，应该沿哪几条路线看？"
+
+Direction-level interaction does NOT replace formula/symbol explanation. Formula/symbol explanation remains M4.2 core capability.
+
+### Memory types (C6)
+
+- `PaperMemory`
+- `DirectionMemory`
+- `MethodFamilyMemory`
+- `StageMemory`
+- `PaperRelationMemory`
+- `UserLearningProgressMemory`
+
+**Status**: DOC_REQUIRED / NOT_IMPLEMENTED
+
+---
+
+## M5 — Engineering Reliability (C1-C6)
+
+M5 defines reliability matrix across C1-C6, but does not replace module-level tests.
+
+### C1 Direction Framework
+
+- broad query live eval
+- `direction_landscape.json` exists
+- stages / method_families / anchors sufficient
+
+### C2 Focused Acquisition
+
+- focused query live eval
+- `A_READ_FOR_M2` verified + PDF + title match
+
+### C3 Single Paper Deep Reading
+
+- real PDF parse
+- `evidence_ref`
+- paper/formula/teaching cards
+
+### C4 Cross-paper Understanding
+
+- `relation_to_previous_methods`
+- comparison claims with evidence
+
+### C5 Interactive Learning
+
+- paper-level Q&A
+- direction-level Q&A
+- advisor questions
+
+### C6 Long-term Memory
+
+- paper memory
+- direction memory
+- method family memory
+
+**Test policy**: `python -m pytest -q` runs all tests including `tests_live`. Missing env/key/network = failure, not skip. mock/fake/skip are not valid acceptance tests.

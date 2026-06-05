@@ -6,6 +6,28 @@
 
 在 M2 单篇论文理解完成后，提供互动式学习能力：让用户通过选中内容、追问、训练、长期记忆，真正掌握论文，而非只看一遍卡片。
 
+M4 有两个交互层级：
+
+**Paper-level interaction (C3, C5)**:
+- 选中内容解释
+- 公式 / 符号解释
+- 单篇论文追问
+
+**Direction-level interaction (C1, C5)**:
+- 方向演进追问
+- 方法族对比追问
+- 代表论文关系追问
+- 导师式研究路线追问
+
+Example direction-level questions:
+- "这个方向是怎么发展的？"
+- "Transformer 相比 Autoencoder 解决了什么问题？"
+- "Anomaly Transformer 后面有哪些改进？"
+- "这个方向现在还有什么开放问题？"
+- "如果我要找创新点，应该沿哪几条路线看？"
+
+Direction-level interaction does NOT replace formula/symbol explanation. Formula/symbol explanation remains M4.2 core capability.
+
 M4 是正式一级模块。当前状态：文档设计中，代码未实现，当前不进入代码开发。
 
 ---
@@ -395,6 +417,71 @@ class UserQuestionMemory(SenseiModel):
     evidence_refs: list[str] = Field(default_factory=list)
     follow_ups: list[str] = Field(default_factory=list)
     source_artifact: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    schema_version: str = "v1"
+
+# Direction-level memory types (C1, C6)
+
+class DirectionMemory(SenseiModel):
+    """Memory of a research direction the user has studied."""
+    memory_id: str = ""
+    direction_query: str = ""
+    chronology_stages: list[str] = Field(default_factory=list)
+    method_families: list[str] = Field(default_factory=list)
+    key_papers: list[str] = Field(default_factory=list)
+    gaps_or_open_questions: list[str] = Field(default_factory=list)
+    user_notes: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    schema_version: str = "v1"
+
+class MethodFamilyMemory(SenseiModel):
+    """Memory of a method family within a direction."""
+    memory_id: str = ""
+    family_name: str = ""
+    direction_id: str = ""
+    representative_papers: list[str] = Field(default_factory=list)
+    key_innovations: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+    user_understanding_level: str = "unknown"
+    created_at: str = ""
+    updated_at: str = ""
+    schema_version: str = "v1"
+
+class StageMemory(SenseiModel):
+    """Memory of a chronology stage within a direction."""
+    memory_id: str = ""
+    stage_name: str = ""
+    direction_id: str = ""
+    time_range: str = ""
+    key_papers: list[str] = Field(default_factory=list)
+    dominant_method_family: str = ""
+    breakthrough: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    schema_version: str = "v1"
+
+class PaperRelationMemory(SenseiModel):
+    """Memory of how papers relate to each other."""
+    memory_id: str = ""
+    paper_a_id: str = ""
+    paper_b_id: str = ""
+    relation_type: str = ""  # improves / extends / compares / supersedes
+    evidence_refs: list[str] = Field(default_factory=list)
+    user_notes: str = ""
+    created_at: str = ""
+    updated_at: str = ""
+    schema_version: str = "v1"
+
+class UserLearningProgressMemory(SenseiModel):
+    """Memory of user's learning progress across directions."""
+    memory_id: str = ""
+    user_id: str = ""
+    directions_studied: list[str] = Field(default_factory=list)
+    papers_read: list[str] = Field(default_factory=list)
+    weak_areas: list[str] = Field(default_factory=list)
+    strong_areas: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
     schema_version: str = "v1"

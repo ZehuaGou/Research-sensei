@@ -32,6 +32,31 @@ M2 pipeline 完成
 - card 是否展示由 status + component_status + allowed_downstream 决定
 - BLOCKED_UNDERSTANDING 时绝对不能展示解释性 card 内容
 - BASELINE_ONLY 普通用户不能当作最终理解展示
+- M3 has two workspaces: DirectionWorkspace (C1) and PaperWorkspace (C3), parallel capabilities, not replacements
+
+### DirectionWorkspace (C1)
+
+Displays:
+- `direction_landscape`
+- chronology stages
+- method families
+- landscape anchors
+- recommended reading order
+- gaps / open questions
+- current SOTA candidates
+
+Status: NOT_IMPLEMENTED
+
+### PaperWorkspace (C3)
+
+Displays:
+- `paper_card`
+- `formula_cards`
+- `teaching_cards`
+- `evidence_ref` (future: passage-level jump)
+- quality status
+
+DirectionWorkspace and PaperWorkspace are parallel capabilities, not replacements.
 
 ## 4. 可复用开源项目 / 外部服务调研
 
@@ -296,9 +321,9 @@ component_status:
 ### 全局规则
 
 - 前端测试用 Vitest + Vue Test Utils + jsdom
-- fetch 使用 mock
-- 不启动真实后端
-- 组件测试不代替 e2e
+- 组件级测试可使用 mock fetch（快速回归）
+- 页面级验收必须真实后端联调
+- 组件测试不代替页面级验收
 
 ## 15. 验收标准
 

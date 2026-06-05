@@ -4,7 +4,7 @@
 
 ## 1. 模块目标
 
-定义全局工程可靠性与测试保障规则：后端测试、前端测试、LLM smoke、缓存、安全、debug 权限、CI。
+定义全局工程可靠性与测试保障规则：后端测试、前端测试、LLM smoke、缓存、安全、debug 权限、CI。M5 定义可靠性矩阵 across C1-C6 能力层，但不替代各模块测试。
 
 ## 2. 非目标
 
@@ -17,6 +17,50 @@
 M5 是横切支撑模块，保障 M1-M4 的可靠性、安全性、可测试性。
 
 **M5 不替代 M1-M4 子模块测试。** M1-M4 每个 Mx.y 仍必须独立完成：文档 → 代码 → 测试 → 验收。M5 负责全局测试基础设施和工程保障，不是"最后统一测试模块"。
+
+## 3.5 C1-C6 多能力验收矩阵
+
+M5 定义跨能力层的验收矩阵。每个能力层的验收条件：
+
+### C1 Direction Framework
+
+- broad query live eval
+- `direction_landscape.json` exists
+- stages / method_families / anchors sufficient
+- Status: NOT_IMPLEMENTED
+
+### C2 Focused Acquisition
+
+- focused query live eval
+- `A_READ_FOR_M2` verified + PDF + title match
+- Status: REAL_E2E_VERIFIED
+
+### C3 Single Paper Deep Reading
+
+- real PDF parse
+- `evidence_ref` exists
+- paper/formula/teaching cards generated with real LLM
+- Status: not verified
+
+### C4 Cross-paper Understanding
+
+- `relation_to_previous_methods` exists
+- comparison claims have `evidence_ref`
+- Status: NOT_IMPLEMENTED
+
+### C5 Interactive Learning
+
+- paper-level Q&A works
+- direction-level Q&A works
+- advisor questions work
+- Status: NOT_IMPLEMENTED
+
+### C6 Long-term Memory
+
+- paper memory persists
+- direction memory persists
+- method family memory persists
+- Status: NOT_IMPLEMENTED
 
 ## 4. 可复用开源项目 / 外部服务调研
 

@@ -2,11 +2,42 @@
 
 ## Goal
 
-M1 is the entry point for a research direction. It must turn a user's direction into a small, evidence-aware reading plan:
+M1 is the entry point for a research direction. It has two modes:
 
-`user query -> real LLM query plan -> mature source acquisition -> dedup/score -> real source acquisition -> reading_plan.json`
+**Focused Acquisition Mode** (C2): Given a narrow query, find verified + relevant + PDF downloaded papers that can enter M2 for deep reading.
+
+**Direction Framework Mode** (C1): Given a broad query, generate a direction framework with method families, chronology stages, landscape anchors, and recommended reading order.
 
 M1 does not teach the paper, parse the full paper, or generate paper/formula/drill cards. Those belong to M2+.
+
+## Two Modes
+
+### Focused Acquisition Mode
+
+Status: REAL_E2E_VERIFIED
+
+Pipeline:
+```
+user query -> real LLM query plan -> multi-source acquisition -> dedup -> verification -> LLM relevance judge -> download gate -> PDF validation -> reading_plan.json (A_READ_FOR_M2)
+```
+
+A_READ_FOR_M2 must be verified + relevant + PDF downloaded + title match.
+
+### Direction Framework Mode
+
+Status: DOC_REQUIRED / NOT_IMPLEMENTED
+
+Pipeline:
+```
+user query -> real LLM query plan -> multi-source acquisition -> dedup -> direction analysis -> direction_landscape.json
+```
+
+Artifacts:
+- `direction_landscape.json` — with `chronology_stage`, `method_family`, `landscape_anchor`, `representative_papers`, `recommended_reading_order`, `gaps_or_open_questions`
+
+`direction_landscape.json` does NOT replace `reading_plan.json`. `direction_landscape.json` serves direction understanding (C1). `reading_plan.json` serves reading plan (C2). `A_READ_FOR_M2` serves single-paper deep reading entry (C3).
+
+LandscapeAnchor serves direction understanding, not necessarily M2 entry.
 
 ## Non-Negotiable Requirements
 
@@ -305,25 +336,40 @@ Priorities:
 - `C_REFERENCE`: metadata-only reference.
 - `D_IGNORE`: filtered out of the returned learning plan.
 
-`A_READ` requires:
+`A_READ` requires ALL of (AND logic):
 
-- sufficient relevance
-- medium-or-better metadata confidence
-- medium-or-better source confidence
-- PDF available and actually downloaded/validated
-- `can_enter_m2=true`
+- `verification_status == verified`
+- `scoring_breakdown.relevance_score >= 0.45` (rule-based)
+- `llm_relevance_score >= 0.65` (LLM-based)
+- `llm_relevance_label in {HIGH, MEDIUM}`
+- `should_a_read == true`
+- `pdf_downloaded == true`
+- `can_enter_m2 == true`
+- `pdf_metadata_check == passed`
+- `pdf_title_match == match`
+- `source_confidence >= medium`
+- `metadata_confidence >= medium`
+- `role != IRRELEVANT`
 
 If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`, not a fake success.
 
 ## Artifacts
+
+### Focused Acquisition Mode
 
 | Artifact | Description |
 |---|---|
 | `query_plan.json` | Real LLM-generated query plan |
 | `candidate_pool.json` | Raw candidate pool and source metrics |
 | `source_resolution.json` | PDF/source acquisition status and download metadata |
-| `filtered_candidates.json` | Deduplicated candidate pool |
-| `reading_plan.json` | Prioritized plan with A_READ/B_SKIM/C_REFERENCE and warnings |
+| `filtered_candidates.json` | Final candidates with verification/LLM relevance/PDF fields |
+| `reading_plan.json` | Prioritized plan with A_READ_FOR_M2/B_SKIM/C_REFERENCE and warnings |
+
+### Direction Framework Mode
+
+| Artifact | Description |
+|---|---|
+| `direction_landscape.json` | Direction framework with chronology stages, method families, landscape anchors, recommended reading order, gaps |
 
 ## Live Acceptance
 

@@ -100,11 +100,22 @@ source (PDF/MD/TXT)
 - M4 patterns 需要 `allowed_downstream.phase12_patterns == True`
 - M4 drill 需要 `allowed_downstream.phase12_drill == True`（或 `phase12_drill_degraded == True`）
 - M4 advisor 需要 `allowed_downstream.advisor_questions == True`
+- M4 direction-level interaction 需要 `allowed_downstream.direction_framework_update_allowed == True`
+- M4 cross-paper comparison 需要 `allowed_downstream.cross_paper_comparison_allowed == True`
 - UI 只能展示 `allowed_for_user_display == True` 的结果
 - 用户端走 `/cards` API，debug/admin 走 `/artifacts` / `/quality_report`
 - BLOCKED 不展示 card 内容
 - BASELINE_ONLY 只能作为 diagnostic artifact
 - API/frontend gating 详见 M3 M3_FRONTEND_RENDER.md
+
+### Direction-Support Gates (C1, C4)
+
+M2.5 DownstreamGates should include:
+
+- `direction_framework_update_allowed: bool` — allows M1 direction framework to use this paper's direction-support fields
+- `cross_paper_comparison_allowed: bool` — allows M4 cross-paper understanding to compare this paper with others
+
+These gates require: SUCCESS or DEGRADED status, direction-support fields have evidence_ref, and audit did not BLOCK direction-related claims.
 
 ## 6. 研究方向链路（M1 连接点）
 

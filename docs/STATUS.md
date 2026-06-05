@@ -6,91 +6,66 @@
 
 M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex、真实 Semantic Scholar、真实 Crossref、真实 PDF 下载。mock/fake/skip 不作为有效测试。缺 key、缺网络、API 限流、PDF 下载失败均视为失败。
 
-当前整改重点：M1 Literature Search 必须从”模拟/薄 wrapper”升级为真实链路：
-
-`real LLM query planning -> mature source adapters -> metadata merge/dedup -> real PDF download/validation -> A_READ reading plan gate`
-
 ## Status Levels
 
 | Level | Meaning |
 |---|---|
 | NOT_STARTED | 没有代码或文档 |
 | DOC_ONLY | 只有文档 |
+| DOC_REQUIRED | 文档待补充，代码未实现 |
 | UNIT_TESTED | 有单元测试，但没有真实外部链路验证 |
 | LIVE_SEARCH_VERIFIED | 真实联网搜索通过 |
 | REAL_LLM_VERIFIED | 真实 LLM 调用通过 |
 | REAL_PDF_VERIFIED | 真实 PDF 下载、文件头、大小、sha256 校验通过 |
-| M1_REAL_VERIFIED | M1 真实链路通过：LLM + 多源搜索 + PDF + A_READ gate |
+| REAL_E2E_VERIFIED | 真实端到端通过（focused acquisition mode） |
+| PARTIAL_REAL_E2E_VERIFIED | 部分能力真实端到端通过，其他能力未实现 |
 | PRODUCTION_READY | 可用于稳定生产环境 |
 
 ## Module Matrix
 
 | Module | Code Status | Test Status | Real Status | Notes |
 |---|---|---|---|---|
-| M1.1 Query Planning | implemented | real tested | REAL_LLM_VERIFIED | 真实 LLM (mimo-v2.5-pro) query planning，无 heuristic fallback |
-| M1.2 Acquisition | implemented | real tested | LIVE_SEARCH_VERIFIED | 4 源全部成功（arXiv/OpenAlex/Semantic Scholar/Crossref）。arXiv 使用 httpx + 自定义 User-Agent + 429/503 retry。Semantic Scholar 使用 httpx REST adapter + proxy 支持 |
-| M1.3 Source Acquisition | implemented | real tested | REAL_PDF_VERIFIED | live eval 下载并校验 PDF，记录 sha256/local_path/pdf_metadata_check/pdf_title_match |
-| M1.4 Dedup/Verification/Relevance | implemented | real tested | M1_REAL_VERIFIED | 3-layer 验证 (arXiv ID/CrossRef DOI/S2 fuzzy title) + LLM relevance judge + A_READ gate (verified+relevant+PDF validated) |
-| M1.5 Reading Plan | implemented | real tested | M1_REAL_VERIFIED | live eval 产生 A_READ，均 `can_enter_m2=true`，含 verification_status + llm_relevance_label |
-| M2+ | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收，mock 测试已删除 |
+| M1 Focused Acquisition | implemented | real tested | REAL_E2E_VERIFIED | 窄 query 真实链路通过：LLM query plan → 多源搜索 → 验证 → LLM relevance → PDF 下载 → A_READ gate |
+| M1 Direction Framework | not implemented | — | DOC_REQUIRED | 宽 query 方向框架未实现：direction_landscape.json / chronology_stage / method_family / landscape_anchor |
+| M1 Overall | — | — | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，direction framework 未实现 |
+| M2 | existing docs | mock tests deleted | not verified | M2 必须真实 PDF + 真实 LLM 验收 |
+| M3 | existing code | component tests | not verified | M3 前端组件测试通过，页面级验收未完成 |
+| M4 | existing docs | — | DOC_REQUIRED | M4 互动式学习文档待设计，代码未实现 |
+| M5 | existing docs | — | DOC_REQUIRED | M5 工程可靠性文档已有，C1-C6 验收矩阵待实现 |
 
-## M1 Live Eval Results (2026-06-05)
+## M1 Focused Acquisition Live Result (2026-06-05, HEAD fc7d494)
 
-- 3 sources succeeded: arXiv (rate limited, 0 results), OpenAlex (5), Crossref (5). Semantic Scholar rate limited (429).
-- 10 candidates, 3 PDFs downloaded, 2 A_READ papers
-- All A_READ have `can_enter_m2=true`
-- Verification: 9 verified, 1 unverified, 0 pending
-- LLM relevance judge: 10 judged, 1 filtered (IRRELEVANT)
-- A_READ papers: both verified via crossref_doi_lookup, llm_relevance_label HIGH/MEDIUM
-- PDF metadata validation: all 3 downloaded PDFs passed %PDF check
-- arXiv: httpx + custom User-Agent + 429/503 retry/backoff + Rate exceeded body detection
-- Semantic Scholar: httpx REST adapter with `trust_env=True` for proxy support
-- Source resolver: PDF download with retry/backoff + User-Agent + %PDF header validation + pdf_metadata_check/pdf_title_match
-- LLM: mimo-v2.5-pro, 3284 tokens (3 calls: query planning + relevance judge)
+Focused query: "时间序列异常检测 transformer 方法"
 
-## Completed In This Pass
+- sources_success: arXiv / OpenAlex / Crossref (3 sources). Semantic Scholar rate limited (429).
+- candidate_count: 10
+- verified_candidate_count: 10
+- verify_pending_count: 0
+- pdf_download_success_count: 2
+- A_READ_FOR_M2: 2
+- All A_READ have: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `pdf_downloaded == true`, `pdf_metadata_check == passed`, `pdf_title_match == match`, `can_enter_m2 == true`
+- A_READ papers:
+  1. Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT (verified via crossref_doi_lookup, llm_relevance=HIGH)
+  2. Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy (verified via s2_title_search, llm_relevance=HIGH)
+- Classification paper "Improving position encoding of transformers for multivariate time series classification" was excluded from A_READ by LLM relevance judge
+- LLM: mimo-v2.5-pro, 3265 tokens (3 calls: query planning + relevance judge)
 
-- Added mature dependencies in `pyproject.toml`: `arxiv`, `pyalex`, `semanticscholar`, `habanero`.
-- Replaced arXiv `arxiv` package with httpx-based adapter: custom User-Agent, 429/503/Rate exceeded retry, id_list lookup, multi-query strategy.
-- Replaced Semantic Scholar `semanticscholar` package with httpx REST adapter: proxy support (trust_env=True), API key support, 429/503 retry.
-- Added OpenAlex and Crossref adapters through adapter boundaries.
-- Removed QueryPlanner heuristic fallback. Missing/invalid LLM planning now raises `QueryPlanningError`.
-- Added real M1 PDF acquisition fields: `download_status`, `final_url`, `content_type`, `file_size`, `sha256`, `local_path`, `error_code`.
-- Enhanced source_resolver PDF download with retry/backoff and User-Agent.
-- Reworked reading plan gate so A_READ requires downloadable/validated full text and `can_enter_m2`.
-- Replaced live eval completion definition with M1 real validation only. Synthetic M2 markdown is no longer accepted as M1 evidence.
-- Deleted `docs/audit/FULL_PROJECT_REALITY_AUDIT.md` as requested by the uploaded correction document.
-- **M1.4 Candidate Verification**: 3-layer verification (arXiv ID lookup, CrossRef DOI lookup, Semantic Scholar fuzzy title search). `VerificationStatus` enum (verified/unverified/verify_pending/error). Transient API failure = verify_pending.
-- **M1.4 LLM Relevance Judge**: Real LLM relevance scoring with structured JSON output. Fields: `llm_relevance_score`, `llm_relevance_label`, `matched_concepts`, `missing_concepts`, `relevance_reason`, `should_download`, `should_a_read`.
-- **M1.4 A_READ Gate**: Tightened to require `verification_status == verified` + LLM relevance >= 0.5 (HIGH/MEDIUM) or rule-based relevance >= 0.45 + medium-or-better source/metadata confidence + PDF downloaded.
-- **M1.3 PDF Metadata Validation**: Lightweight `/Title` header extraction from first 64KB. Fields: `pdf_metadata_check` (passed/failed/skipped), `pdf_title_match` (match/mismatch/unknown), `pdf_metadata_warning`.
-- **live_eval_report**: Added `verified_candidate_count`, `unverified_candidate_count`, `verify_pending_count`, `llm_judged_candidate_count`, `relevance_filtered_count`. Implemented passed/degraded_passed/failed status logic per M1 doc.
-- **M1 Live Status Levels**: passed (>=3 sources, >=1 PDF, >=1 A_READ), degraded_passed (2 sources), failed (<2 sources or missing requirements).
+## M1 A_READ Gate (strict, AND logic)
 
-## Current Test Results
+Every A_READ must satisfy ALL:
 
-- `python -m pytest -q` 现在默认运行 tests_live。缺 env/key/network 时 tests_live 会失败，不会 skip。
-- Required real validation command:
-
-```powershell
-$env:RUN_LIVE_TESTS="1"
-$env:RUN_LLM_TESTS="1"
-$env:RESEARCHSENSEI_LIVE_EVAL="1"
-$env:RESEARCHSENSEI_MAX_LIVE_CASES="5"
-$env:RESEARCHSENSEI_MAX_LLM_COST_USD="1.00"
-$env:RESEARCHSENSEI_MAX_LLM_TOKENS="30000"
-
-python -m pytest -q tests_live
-python scripts/run_live_eval.py
-```
-
-Latest validated live result (with robust arXiv/Semantic Scholar adapters and proxy):
-
-- `python scripts/run_live_eval.py` with live env -> `m1_status=passed`
-- All 4 sources succeeded: arXiv, OpenAlex, Semantic Scholar, Crossref
-- candidate_count=15, pdf_download_success_count=7, a_read_count=5
-- All A_READ have `can_enter_m2=true`
-- Source failures in earlier runs (arXiv 429, Semantic Scholar connection refused) were resolved by robust adapter rewrite (User-Agent, retry/backoff, httpx trust_env proxy)
+- `verification_status == verified`
+- `scoring_breakdown.relevance_score >= 0.45` (rule-based)
+- `llm_relevance_score >= 0.65` (LLM-based)
+- `llm_relevance_label in {HIGH, MEDIUM}`
+- `should_a_read == true`
+- `pdf_downloaded == true`
+- `can_enter_m2 == true`
+- `pdf_metadata_check == passed`
+- `pdf_title_match == match`
+- `source_confidence >= medium`
+- `metadata_confidence >= medium`
+- `role != IRRELEVANT`
 
 ## Hard Rules
 
@@ -100,7 +75,8 @@ Latest validated live result (with robust arXiv/Semantic Scholar adapters and pr
 - MockLLMClient 已从 src/ 和 tests/ 中删除。
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
-- M1 is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item cleared for M2.
+- M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one validated PDF download, and at least one A_READ item that passes the strict gate above.
+- M1 direction framework is NOT complete. direction_landscape.json / chronology_stage / method_family are not implemented.
 
 ## External Reference Boundary
 
