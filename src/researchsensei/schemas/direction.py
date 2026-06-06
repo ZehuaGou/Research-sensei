@@ -6,7 +6,7 @@ from pydantic import Field
 
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.enums import PaperSourceStatus, PaperSourceType, SearchIntent, VerificationStatus
+from researchsensei.schemas.enums import CanonicalizationStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
 
 
 class QueryPlan(SenseiModel):
@@ -72,6 +72,20 @@ class CandidatePaper(SenseiModel):
     relevance_reason: str = ""
     should_download: bool = False
     should_a_read: bool = False
+    # Source-aware M1 fields
+    source_priority: SourcePriority = SourcePriority.METADATA_ONLY
+    preferred_m2_input: str = ""  # latex_source | structured_html | pdf | none
+    has_valid_deep_reading_source: bool = False
+    latex_source_available: bool = False
+    latex_source_downloaded: bool = False
+    latex_main_file: str = ""
+    structured_html_available: bool = False
+    structured_html_downloaded: bool = False
+    metadata_only: bool = True
+    canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_paper_path: str = ""
+    m2_ready: bool = False
+    degradation_reason: str = ""
 
 
 class ScoringBreakdown(SenseiModel):
@@ -146,6 +160,22 @@ class ResolvedPaperSource(SenseiModel):
     pdf_metadata_check: str = ""  # "passed", "failed", "skipped"
     pdf_title_match: str = ""  # "match", "mismatch", "unknown"
     pdf_metadata_warning: str = ""
+    # Source-aware M1 fields
+    source_priority: SourcePriority = SourcePriority.METADATA_ONLY
+    preferred_m2_input: str = ""
+    has_valid_deep_reading_source: bool = False
+    latex_source_available: bool = False
+    latex_source_downloaded: bool = False
+    latex_main_file: str = ""
+    latex_source_path: str = ""
+    latex_source_sha256: str = ""
+    structured_html_available: bool = False
+    structured_html_downloaded: bool = False
+    structured_html_path: str = ""
+    canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_paper_path: str = ""
+    m2_ready: bool = False
+    degradation_reason: str = ""
 
 
 class SourceResolutionResult(SenseiModel):

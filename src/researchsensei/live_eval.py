@@ -380,6 +380,15 @@ def run_m1_live_search(
 
     sample_a_read = [_a_read_sample(item) for item in a_read_items[: config.max_live_cases]]
 
+    # Canonical metrics from canonicalization_summary.json
+    canon_summary_path = run_dir / "canonicalization_summary.json"
+    canon_summary = {}
+    if canon_summary_path.exists():
+        try:
+            canon_summary = json.loads(canon_summary_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
     run_dir = workspace.root / "runs" / "m1-live"
     return {
         "name": "m1_live_search",
@@ -433,6 +442,13 @@ def run_m1_live_search(
         "latency_ms": latency_ms,
         "token_usage": llm_client.usage.as_dict(),
         "estimated_cost_usd": round(llm_client.usage.estimated_cost_usd, 6),
+        # Canonical/m2_ready metrics
+        "canonical_paper_generated_count": canon_summary.get("canonical_paper_generated_count", 0),
+        "m2_ready_count": canon_summary.get("m2_ready_count", 0),
+        "metadata_only_blocked_count": canon_summary.get("metadata_only_blocked_count", 0),
+        "source_type_distribution": canon_summary.get("source_type_distribution", {}),
+        "canonicalization_status_distribution": canon_summary.get("canonicalization_status_distribution", {}),
+        "adapter_status": canon_summary.get("adapter_status", {}),
         "artifacts": {
             "run_dir": str(run_dir),
             "query_plan": str(run_dir / "query_plan.json"),
@@ -440,6 +456,7 @@ def run_m1_live_search(
             "source_resolution": str(run_dir / "source_resolution.json"),
             "filtered_candidates": str(run_dir / "filtered_candidates.json"),
             "reading_plan": str(run_dir / "reading_plan.json"),
+            "canonicalization_summary": str(run_dir / "canonicalization_summary.json"),
         },
     }
 

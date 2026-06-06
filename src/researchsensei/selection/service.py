@@ -11,6 +11,7 @@ from researchsensei.schemas import (
     ReadingPlan,
     ReadingPlanItem,
     ScoringBreakdown,
+    SourcePriority,
     VerificationStatus,
 )
 
@@ -296,15 +297,18 @@ class SelectionService:
     def _eligible_for_a_read(item: ReadingPlanItem) -> bool:
         """A_READ requires ALL of (AND logic, not OR):
 
+        Canonical gate:
+        - has_valid_deep_reading_source == True
+        - canonical_paper_path exists (non-empty)
+        - m2_ready == True
+        - source_priority != METADATA_ONLY
+
+        Legacy gate (still checked):
         - verification_status == VERIFIED
         - scoring_breakdown.relevance_score >= 0.45 (rule-based)
         - llm_relevance_score >= 0.65 (LLM-based)
         - llm_relevance_label in ("HIGH", "MEDIUM")
-        - should_a_read == True (LLM explicitly says worth deep reading)
-        - pdf_downloaded == True
-        - can_enter_m2 == True
-        - pdf_metadata_check == "passed"
-        - pdf_title_match == "match"
+        - should_a_read == True
         - source_confidence >= medium
         - metadata_confidence >= medium
         - role != "IRRELEVANT"
@@ -312,28 +316,38 @@ class SelectionService:
         paper = item.paper
         sr = item.scoring_breakdown
 
-        # Pull PDF metadata fields from raw_source_metadata
-        pdf_meta_check = ""
-        pdf_title_match = ""
-        sr_meta = paper.raw_source_metadata.get("source_resolution", {})
-        if isinstance(sr_meta, dict):
-            pdf_meta_check = sr_meta.get("pdf_metadata_check", "")
-            pdf_title_match = sr_meta.get("pdf_title_match", "")
+        # Canonical gate checks
+        has_valid_source = paper.has_valid_deep_reading_source
+        has_canonical = bool(paper.canonical_paper_path)
+        m2_ready = paper.m2_ready
+        not_metadata_only = paper.source_priority != SourcePriority.METADATA_ONLY
 
-        return (
-            paper.verification_status == VerificationStatus.VERIFIED
-            and sr.relevance_score >= 0.45
-            and paper.llm_relevance_score >= 0.65
-            and paper.llm_relevance_label in ("HIGH", "MEDIUM")
-            and paper.should_a_read is True
-            and paper.pdf_downloaded is True
-            and item.can_enter_m2 is True
-            and pdf_meta_check == "passed"
-            and pdf_title_match == "match"
-            and _confidence_at_least(paper.source_confidence, "medium")
-            and _confidence_at_least(paper.metadata_confidence, "medium")
-            and item.role != "IRRELEVANT"
-        )
+        # Legacy checks
+        verified = paper.verification_status == VerificationStatus.VERIFIED
+        relevant = sr.relevance_score >= 0.45
+        llm_relevant = paper.llm_relevance_score >= 0.65
+        llm_label_ok = paper.llm_relevance_label in ("HIGH", "MEDIUM")
+        should_read = paper.should_a_read is True
+        source_ok = _confidence_at_least(paper.source_confidence, "medium")
+        meta_ok = _confidence_at_least(paper.metadata_confidence, "medium")
+        role_ok = item.role != "IRRELEVANT"
+
+        return all([
+            # Canonical gate
+            has_valid_source,
+            has_canonical,
+            m2_ready,
+            not_metadata_only,
+            # Legacy gate
+            verified,
+            relevant,
+            llm_relevant,
+            llm_label_ok,
+            should_read,
+            source_ok,
+            meta_ok,
+            role_ok,
+        ])
 
     @staticmethod
     def _risk_note(paper: CandidatePaper, can_enter_m2: bool) -> str:

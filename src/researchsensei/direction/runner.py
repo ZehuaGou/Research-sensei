@@ -6,15 +6,18 @@ import time
 from pathlib import Path
 
 from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, OpenAlexAdapter, SemanticScholarAdapter
+from researchsensei.canonical import MaterialNormalizer
 from researchsensei.query import QueryPlanner
 from researchsensei.relevance_judge import RelevanceJudge
 from researchsensei.schemas import (
     CandidatePaper,
+    CanonicalizationResult,
     DirectionBundle,
     PaperSourceStatus,
     QueryPlan,
     ReadingPlan,
     SourceResolutionResult,
+    SourcePriority,
     VerificationStatus,
 )
 from researchsensei.selection import SelectionService
@@ -44,6 +47,7 @@ class DirectionRunner:
         source_resolver: PaperSourceResolver | None = None,
         verifier: CandidateVerifier | None = None,
         relevance_judge: RelevanceJudge | None = None,
+        material_normalizer: MaterialNormalizer | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = 20,
     ) -> None:
@@ -57,6 +61,7 @@ class DirectionRunner:
         self.source_resolver = source_resolver or PaperSourceResolver(network_enabled=True)
         self.verifier = verifier or CandidateVerifier()
         self.relevance_judge = relevance_judge or RelevanceJudge()
+        self.material_normalizer = material_normalizer or MaterialNormalizer()
         self.sources = sources or ["arxiv", "openalex", "semantic_scholar", "crossref"]
         self.max_results_per_source = max_results_per_source
 
@@ -108,6 +113,24 @@ class DirectionRunner:
         # Step 7: Apply source resolution back to ALL candidates
         resolved_candidates = self._apply_source_resolution(llm_judged_candidates, source_resolution)
 
+        # Step 7.5: Material normalization — generate canonical_paper.md for each candidate
+        canonical_dir = Path(run_dir) / "canonical_papers"
+        by_source = {item.paper_id: item for item in source_resolution.items}
+        canonicalization_results: list[CanonicalizationResult] = []
+        for candidate in resolved_candidates:
+            source_item = by_source.get(candidate.paper_id)
+            try:
+                canon_result = self.material_normalizer.normalize(
+                    candidate, source_item, output_dir=canonical_dir / (candidate.paper_id or "unknown")
+                )
+                canonicalization_results.append(canon_result)
+            except Exception as exc:
+                logger.warning("MaterialNormalizer failed for %s: %s", candidate.paper_id, exc)
+
+        # Update candidates with canonical fields
+        by_canon = {cr.paper_id: cr for cr in canonicalization_results}
+        resolved_candidates = self._apply_canonicalization(resolved_candidates, by_canon)
+
         # Step 8: Build filtered_candidates from final candidates
         filtered_candidates = self.selection_service.build_candidate_pool(
             query=query,
@@ -144,6 +167,27 @@ class DirectionRunner:
         self.workspace.write_json(run_dir / "source_resolution.json", source_resolution)
         self.workspace.write_json(run_dir / "filtered_candidates.json", filtered_candidates)
         self.workspace.write_json(run_dir / "reading_plan.json", reading_plan)
+
+        # Write canonicalization results
+        if canonicalization_results:
+            from researchsensei.schemas.canonical import CanonicalizationResult as CR
+            canon_summary = {
+                "total": len(canonicalization_results),
+                "canonical_paper_generated_count": sum(1 for cr in canonicalization_results if cr.canonical_paper_path),
+                "m2_ready_count": sum(1 for cr in canonicalization_results if cr.m2_ready),
+                "metadata_only_blocked_count": sum(1 for cr in canonicalization_results if cr.source_priority == SourcePriority.METADATA_ONLY),
+                "source_type_distribution": {},
+                "canonicalization_status_distribution": {},
+                "adapter_status": {},
+            }
+            for cr in canonicalization_results:
+                st = cr.source_type
+                canon_summary["source_type_distribution"][st] = canon_summary["source_type_distribution"].get(st, 0) + 1
+                cs = cr.canonicalization_status.value
+                canon_summary["canonicalization_status_distribution"][cs] = canon_summary["canonicalization_status_distribution"].get(cs, 0) + 1
+                for ai in cr.adapter_info:
+                    canon_summary["adapter_status"][ai.name] = ai.status.value
+            self.workspace.write_json(run_dir / "canonicalization_summary.json", canon_summary)
 
         return DirectionBundle(
             query_plan=query_plan,
@@ -229,6 +273,34 @@ class DirectionRunner:
         if source == "crossref":
             return self.crossref_adapter
         raise ValueError(f"Unknown source: {source}")
+
+    @staticmethod
+    def _apply_canonicalization(
+        candidates: list[CandidatePaper],
+        by_canon: dict[str, CanonicalizationResult],
+    ) -> list[CandidatePaper]:
+        """Apply canonicalization results to candidates."""
+        updated: list[CandidatePaper] = []
+        for candidate in candidates:
+            canon = by_canon.get(candidate.paper_id)
+            if canon is None:
+                updated.append(candidate)
+                continue
+            updated.append(
+                candidate.model_copy(
+                    update={
+                        "source_priority": canon.source_priority,
+                        "preferred_m2_input": canon.preferred_m2_input,
+                        "has_valid_deep_reading_source": canon.has_valid_deep_reading_source,
+                        "canonicalization_status": canon.canonicalization_status,
+                        "canonical_paper_path": canon.canonical_paper_path,
+                        "m2_ready": canon.m2_ready,
+                        "degradation_reason": canon.degradation_reason,
+                        "metadata_only": canon.source_priority == SourcePriority.METADATA_ONLY,
+                    }
+                )
+            )
+        return updated
 
     @staticmethod
     def _apply_source_resolution(

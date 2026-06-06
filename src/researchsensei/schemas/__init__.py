@@ -3,7 +3,8 @@ from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEn
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import BlockType, EvidenceType, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, VerificationStatus
+from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
+from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.skeleton import PaperSkeleton
@@ -12,9 +13,15 @@ from researchsensei.schemas.source import SourceStatus
 from researchsensei.schemas.status import DownstreamGates, EvidencePackSummary, UnderstandingStatus
 
 __all__ = [
+    "AdapterInfo",
+    "AdapterStatus",
     "ArtifactBundle",
     "AuditFinding",
     "BlockType",
+    "CanonicalizationStatus",
+    "CanonicalPaper",
+    "CanonicalPaperFrontMatter",
+    "CanonicalizationResult",
     "CandidatePaper",
     "CandidatePool",
     "CardClaim",
@@ -35,6 +42,11 @@ __all__ = [
     "EvidencePackItem",
     "EvidenceRetrievalResult",
     "EvidenceType",
+    "FormulaBlock",
+    "FormulaOcrResult",
+    "FormulaOcrStatus",
+    "FormulaOrigin",
+    "FormulaRegionResult",
     "Passage",
     "PassageIndex",
     "PassageIndexBuildConfig",
@@ -64,6 +76,7 @@ __all__ = [
     "ScoringBreakdown",
     "SearchIntent",
     "StatusEnvelope",
+    "SourcePriority",
     "SourceStatus",
     "SourceResolutionResult",
     "TeachingCard",

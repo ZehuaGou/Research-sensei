@@ -27,12 +27,12 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Focused Acquisition | implemented | real tested | REAL_E2E_VERIFIED | 窄 query 真实链路通过 |
 | M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
-| M1 | Source-aware acquisition (LaTeX/HTML priority) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 当前已验证实现只下载 PDF；LaTeX/HTML source 优先获取文档已设计，代码未实现 |
-| M1 | canonical_paper.md pipeline | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | M1 material normalization 与 Markdown-first 输出契约已设计，代码未实现 |
-| M1 | FormulaRegionDetector | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 公式区域检测接口、状态和测试要求已设计，代码未实现 |
-| M1 | FormulaOCRAdapter / pix2tex / LaTeX-OCR | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | OCR adapter 接口、on_demand 触发和限制参数已设计，代码未实现 |
-| M1 | MinerU / Marker / DeepXiv structured adapter | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 作为 material normalization adapter 设计，代码未实现 |
-| M1 | Overall | — | — | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware / direction / seed 尚未实现 |
+| M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
+| M1 | canonical_paper.md pipeline | implemented | unit tested | IMPLEMENTED | MaterialNormalizer 已实现，canonical_paper.md 生成已实现，front matter 和 formula block 支持已实现 |
+| M1 | FormulaRegionDetector | implemented | unit tested | DEGRADED_IMPLEMENTED | 基于 PyMuPDF 的文本公式检测已实现，layout-based 检测未实现 |
+| M1 | FormulaOCRAdapter / pix2tex / LaTeX-OCR | not implemented | — | NOT_IMPLEMENTED | OCR adapter 接口已实现，pix2tex/LaTeX-OCR 模型未集成 |
+| M1 | MinerU / Marker / DeepXiv structured adapter | not implemented | — | NOT_IMPLEMENTED | 作为 material normalization adapter 设计，代码未实现 |
+| M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
 | M2 | Paper Deep Reading | partial code exists | structural tests exist, not completion | NOT_REAL_E2E_VERIFIED | 文档存在，部分代码存在，结构性测试不能替代验收；真实 PDF + 真实 LLM + 真实 audit e2e 尚未验证 |
 | M2 | canonical input reader / validator | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | M2.1 读取并校验 canonical_paper.md、转换 evidence-ready blocks，代码未实现 |
 | M2 | formula_origin full chain | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | source_latex/parser_latex/ocr_latex/reconstructed/unknown 规则已设计，端到端未实现 |
@@ -112,8 +112,9 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
-- 当前已实现能力不包含 `canonical_paper.md` pipeline、M1 material normalization、M2 canonical input reader、FormulaRegionDetector、FormulaOCRAdapter、MinerU/Marker/pix2tex adapter、DeepXiv structured adapter、formula_origin 全链路。
-- `canonical_paper.md` 是 DOC_DESIGNED / NOT_IMPLEMENTED 的 M1→M2 核心契约；完成前不能把 PDF-focused live eval 视为完整 ResearchSensei。
+- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、MaterialNormalizer、canonical_paper.md 生成、FormulaRegionDetector（degraded）、A_READ canonical gate。
+- 当前未实现能力包含：FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、MinerU/Marker/DeepXiv adapter、M2 canonical input reader、formula_origin 全链路。
+- FormulaOCRAdapter 接口已实现，但 OCR 模型未集成，返回 UNAVAILABLE 状态。
 - M1 direction exploration and seed paper expansion are NOT complete.
 
 ## External Reference Boundary

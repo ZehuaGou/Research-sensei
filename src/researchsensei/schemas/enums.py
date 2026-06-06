@@ -70,3 +70,47 @@ class EvidenceType(str, Enum):
     UNVERIFIED = "UNVERIFIED"
     NEEDS_HUMAN_CHECK = "NEEDS_HUMAN_CHECK"
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+# --- Source-aware M1 enums ---
+
+class SourcePriority(str, Enum):
+    """Source priority for best available source resolution."""
+    LATEX_SOURCE = "latex_source"
+    STRUCTURED_HTML = "structured_html"
+    PDF = "pdf"
+    LOW_CONFIDENCE_TEXT = "low_confidence_text"
+    METADATA_ONLY = "metadata_only"
+
+
+class CanonicalizationStatus(str, Enum):
+    """Status of material normalization to canonical_paper.md."""
+    SUCCESS = "success"
+    DEGRADED = "degraded"
+    FAILED = "failed"
+    NOT_ATTEMPTED = "not_attempted"
+
+
+class FormulaOrigin(str, Enum):
+    """Origin of formula content in canonical_paper.md."""
+    SOURCE_LATEX = "source_latex"
+    PARSER_LATEX = "parser_latex"
+    OCR_LATEX = "ocr_latex"
+    RECONSTRUCTED = "reconstructed"
+    UNKNOWN = "unknown"
+
+
+class FormulaOcrStatus(str, Enum):
+    """Status of formula OCR attempt."""
+    SUCCESS = "success"
+    FAILED = "failed"
+    UNAVAILABLE = "unavailable"
+    NOT_TRIGGERED = "not_triggered"
+
+
+class AdapterStatus(str, Enum):
+    """Status of external adapter integration."""
+    IMPLEMENTED = "IMPLEMENTED"
+    DEGRADED_IMPLEMENTED = "DEGRADED_IMPLEMENTED"
+    BLOCKED = "BLOCKED"
+    NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
