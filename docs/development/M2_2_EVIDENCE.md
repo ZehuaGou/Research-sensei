@@ -4,27 +4,49 @@
 
 ## 1. 模块目标
 
-从 block-level evidence 升级到 passage/claim-level evidence，使每个解释能回指具体 claim 而非整个 block。
+从 M2.1 canonical reader 输出的 block-level evidence 升级到 passage/claim-level evidence，使每个解释能回指具体 claim、passage、block，以及 `canonical_paper.md` 中的来源信息。
 
 ## 2. 非目标
 
 - 不用 LLM 做 claim extraction
 - 不用向量数据库
 - 不新增依赖
+- 不重新读取原始 PDF / LaTeX / HTML / DeepXiv
+- 不绕过 `canonical_paper.md`
+- 不把 formula OCR / reconstruction 结果当成原始公式
 
 ## 3. 产品流程位置
 
-M2.2 承接 M2.1 的解析结果，构建证据链路：parsed_document → PassageIndex → ClaimEvidence → EvidencePack → LLM。
+M2.2 承接 M2.1 的解析结果，构建证据链路：
+
+```text
+canonical_paper.md
+-> M2.1 CanonicalPaperReader
+-> parsed_document.json
+-> PassageIndex
+-> ClaimEvidence
+-> EvidencePack
+-> M2.3 LLM builder
+```
 
 ## 4. 可复用开源项目 / 外部服务调研
 
 | 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
 |------|------|---------------|----------|--------------|------|----------|
-| PaperQA | passage retrieval | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 只借鉴 chunk/retrieve 思路 |
-| ARIS result-to-claim | claim audit | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 只借鉴 claim-evidence binding |
-| OpenScholar | citation accuracy | 未确认 repo | REFERENCE_ONLY | 否 | — | 只借鉴 citation accuracy |
+| PaperQA | passage retrieval | github.com/Future-House/paper-qa | STRATEGY_BORROW | 否 | — | 只借鉴 chunk/retrieve 思路 |
+| ARIS result-to-claim | claim audit | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | STRATEGY_BORROW | 否 | — | 只借鉴 claim-evidence binding |
+| OpenScholar | citation accuracy | 未确认 repo | STRATEGY_BORROW | 否 | — | 只借鉴 citation accuracy |
 
 未完成调研不得进入代码开发。
+
+## External Projects / Adapter Candidates
+
+| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
+|---|---|---|---|---|---|---|---|
+| PaperQA / PaperQA2 | M2.2 / M4 | evidence-grounded QA、Docs/add/query、source citation、grounded answer | PaperQA docs/add/query APIs；必须调研 document ingestion、citation object、answer provenance、local corpus mode | STRATEGY_BORROW | 否 | 不能用 fake agent 作为验收；默认引入会带 embeddings/vector store 复杂度 | DOC_DESIGNED |
+| PaperQA adapter | M2.2 / M4 | 对本地 canonical paper corpus 做证据型 QA | 必须调研 PaperQA Python API、settings、citation schema、failure path | OPTIONAL_ADAPTER | 否 | 依赖和运行成本需隔离；不能替代 ResearchSensei evidence_ref schema | RESEARCH_REQUIRED |
+| ARIS research-review | M2.2 / M2.4 / M4 | claim matrix、证据审查、研究问题追问 | `skills/research-review/SKILL.md`; 必须调研 review checklist 和 claim/evidence 输出结构 | STRATEGY_BORROW | 否 | 只能借鉴 review discipline；不是 runtime dependency | DOC_DESIGNED |
+| ARIS research-refine-pipeline | M2.2 / M4 | problem anchor、claim matrix、weakness refinement | `skills/research-refine-pipeline/SKILL.md`; 必须调研 problem/claim/weakness字段 | STRATEGY_BORROW | 否 | 不能把 ResearchSensei 改成 ARIS research pipeline | DOC_DESIGNED |
 
 ## 5. 外部项目调研（详细）
 
@@ -53,7 +75,7 @@ M2.2 承接 M2.1 的解析结果，构建证据链路：parsed_document → Pass
 ### OpenScholar
 
 - **机制**: passage-level retrieval + citation accuracy 评估
-- **GitHub repo**: 未验证；保持 REFERENCE_ONLY 直到 repo/paper 实现确认
+- **GitHub repo**: 未验证；保持 RESEARCH_REQUIRED 直到 repo/paper 实现确认
 - **对本模块的用处**: citation accuracy 评估方法可参考
 - **当前是否直接接入**: 否
 
@@ -71,7 +93,7 @@ M2.2 承接 M2.1 的解析结果，构建证据链路：parsed_document → Pass
 
 | 项 | 值 |
 |----|-----|
-| 输入 | `DocumentIngestion` / `DocumentBlock` |
+| 输入 | `canonical_paper.md` trace + `DocumentIngestion` / `DocumentBlock` |
 | 输出 | `passage_index.json`, `claim_evidence.json`, `evidence_index.json` (v1 wrapper) |
 | 每个 claim 必须 | 能回指原始 block/passage |
 
@@ -155,7 +177,12 @@ class ClaimEvidence(SenseiModel):
     generated_by: str = "rule"   # "rule" / "llm"
     # source-aware fields
     source_origin: str = ""      # latex_source | structured_html | pdf | grobid_reference | parser_generated
-    formula_origin: str = ""     # source_latex | mathml | ocr_latex | plain_text | unknown
+    formula_origin: str = ""     # source_latex | parser_latex | ocr_latex | reconstructed | unknown
+    formula_id: str = ""
+    formula_page: int | None = None
+    formula_bbox: tuple[float, float, float, float] | None = None
+    formula_ocr_status: str = ""
+    canonical_source_path: str = "canonical_paper.md"
     source_location: dict = Field(default_factory=dict)  # latex_file, latex_line_start/end, html_selector, pdf_page, pdf_bbox
 ```
 
@@ -200,11 +227,15 @@ Direction-related fields must still be evidence-grounded. Paper-level evidence_r
 
 ### Source-Aware Evidence Rules
 
-Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Formula explanations must prefer `source_latex` evidence when available. If evidence comes from PDF OCR, formula confidence must be lower.
+Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstructed evidence. Formula explanations must prefer `source_latex` evidence when available. If evidence comes from parser/OCR/reconstruction, formula confidence must be capped and warnings preserved.
 
-- `source_origin` records where the evidence came from: `latex_source`, `structured_html`, `pdf`, `grobid_reference`, `parser_generated`
-- `formula_origin` records how the formula was obtained: `source_latex` (from LaTeX source, highest fidelity), `mathml` (from HTML/MathML), `ocr_latex` (OCR-derived, lower confidence), `plain_text`, `unknown`
+- `source_origin` records where the evidence came from: `latex_source`, `structured_html`, `deepxiv_structured`, `pdf_parser_output`, `low_confidence_text_fallback`, `grobid_reference`, `parser_generated`
+- `formula_origin` records how the formula was obtained: `source_latex`, `parser_latex`, `ocr_latex`, `reconstructed`, `unknown`
 - `source_location` records the exact location in the source: `latex_file`/`latex_line_start`/`latex_line_end` for LaTeX, `html_selector` for HTML, `pdf_page`/`pdf_bbox` for PDF
+- `ocr_latex` can support formula-context evidence but must carry OCR warning
+- `reconstructed` can support only `REASONABLE_INFERENCE` or `INSUFFICIENT_EVIDENCE`
+- `unknown` can support formula existence but cannot support detailed derivation
+- Every evidence_ref must point to a `DocumentBlock` generated from `canonical_paper.md`
 
 ### semantic_support 值
 
@@ -228,7 +259,7 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 
 ### Passage 构建算法
 
-**输入**: `DocumentIngestion.blocks`
+**输入**: `DocumentIngestion.blocks` generated from `canonical_paper.md`
 
 **算法**:
 1. 遍历 blocks，按 section 分组
@@ -240,7 +271,8 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 7. 太短的 passage（< 50 chars）跳过，产生 `WarningItem(code="PASSAGE_TOO_SHORT")`
 8. 太长的 passage（> 2000 chars）按句子边界切分
 9. section 缺失时用 "unknown"，不直接阻断
-10. passage_id 按序分配（p001, p002, ...）
+10. preserve `source_origin`, `formula_origin`, `formula_id`, `formula_page`, `formula_bbox`, `formula_ocr_status`
+11. passage_id 按序分配（p001, p002, ...）
 
 **输出**: `PassageIndex`
 
@@ -295,6 +327,9 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 | test_passage_too_short_skipped | < 50 chars → skipped + warning |
 | test_passage_too_long_split | > 2000 chars → split at sentence boundary |
 | test_passage_index_schema_round_trip | PassageIndex serialize → deserialize preserves all fields |
+| test_passage_from_canonical_input | passage references canonical-derived block |
+| test_passage_preserves_formula_origin | formula_origin preserved |
+| test_passage_preserves_formula_bbox_page | formula_bbox/formula_page preserved |
 
 ### ClaimEvidence 测试
 
@@ -306,6 +341,9 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 | test_claim_extractor_formula_context | at least one claim with claim_type == "FORMULA_CONTEXT" |
 | test_claim_evidence_v2_backward_compatible | v1 字段不变，v2 字段默认空 |
 | test_claim_evidence_schema_round_trip | ClaimEvidenceV2 serialize → deserialize preserves all fields |
+| test_claim_evidence_formula_origin_round_trip | formula_origin values preserved |
+| test_claim_evidence_reconstructed_not_high_confidence | reconstructed formula confidence capped |
+| test_claim_evidence_unknown_blocks_derivation | unknown formula origin cannot support detailed derivation |
 
 ### BM25 / EvidenceRetriever 测试
 
@@ -337,7 +375,7 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 
 ### 全局规则
 
-- Evidence 结构检查不能替代验收。M2.2 验收必须使用真实 PDF 输入，验证 evidence chain 完整性
+- Evidence 结构检查不能替代验收。M2.2 验收必须使用 M1 生成的真实 `canonical_paper.md`，验证 evidence chain 完整性
 - 不新增依赖
 
 ## 13. 验收标准
@@ -346,7 +384,8 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 - ClaimEvidenceV2 正确提取 claims
 - BM25 能检索到相关 passages
 - evidence_index.json v1 兼容
-- 真实验收必须验证 evidence_ref 可追溯（通过 real PDF e2e eval）
+- 真实验收必须验证 evidence_ref 可追溯到 canonical-derived block
+- formula evidence 必须保留 `formula_origin`
 
 ## 14. 当前实现状态
 
@@ -357,6 +396,7 @@ Evidence from LaTeX source has higher formula fidelity than PDF OCR evidence. Fo
 - evidence_index v1 wrapper 保留（grounding.py）
 - pipeline 已写入 passage_index.json + claim_evidence.json + evidence_index.json
 - 测试已覆盖：30+ tests
+- canonical_paper.md trace、formula_origin 全链路、formula_bbox/formula_page/formula_ocr_status 证据传播为 DOC_DESIGNED / NOT_IMPLEMENTED
 - evidence_ref 前端跳转未实现
 - embedding retriever / vector DB 未实现
 

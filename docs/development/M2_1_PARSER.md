@@ -4,20 +4,39 @@
 
 ## 1. 模块目标
 
-设计 ParserAdapter interface，包装现有 parser 为 default adapter，为未来接入高质量外部 parser 留接口。
+M2.1 的目标是读取 M1 输出的 `canonical_paper.md`，校验 canonical front matter、section、paragraph、formula block，并转换成 M2 evidence pipeline 可用的 `DocumentIngestion` / `DocumentBlock`。
+
+当前已有 ParserAdapter / LightweightParserAdapter 代码属于历史 PDF-focused / md/txt/pdf 解析能力。新的工程目标是 canonical input reader / validator。原始 PDF / LaTeX / HTML / DeepXiv / parser output 的 material normalization 前移到 M1。
 
 ## 2. 非目标
 
-- 不接入 Docling / Nougat / Marker / MinerU（只留接口）
+- 不直接接入 Docling / Nougat / Marker / MinerU 执行原始材料归一化；这些属于 M1 material normalization adapter
 - 不新增依赖
-- 不改变现有 parser 行为
+- 不改变现有 parser 行为，除非明确迁移到 canonical reader
 - web / frontend 不直接依赖 ParserAdapter
+- 不执行 FormulaRegionDetector / FormulaOCRAdapter
+- 不把 `parser_latex`、`ocr_latex`、`reconstructed` 冒充 `source_latex`
 
 ## 3. 产品流程位置
 
-M2.1 是单篇论文理解的第一步：用户上传论文 → M2.1 解析为结构化文档 → M2.2 构建证据链路。
+M2.1 是单篇论文理解的第一步：M1 生成 `canonical_paper.md` → M2.1 读取和校验 canonical input → M2.1 生成结构化文档 → M2.2 构建证据链路。
 
 ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
+
+职责拆分：
+
+| 职责 | 归属 | 状态 |
+|---|---|---|
+| PDF / LaTeX / HTML / DeepXiv material normalization | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| MinerU / Marker / DeepXiv / LaTeX source adapter | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FormulaRegionDetector | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FormulaOCRAdapter | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| `canonical_paper.md` generation | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| 读取 `canonical_paper.md` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| 校验 canonical front matter | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| 解析 Markdown section / paragraph / formula blocks | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| 生成 evidence-ready `DocumentBlock` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| 现有 md/txt/pdf LightweightParserAdapter | M2.1 legacy/current code | IMPLEMENTED |
 
 ## 4. 可复用开源项目 / 外部服务调研
 
@@ -30,34 +49,57 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | MinerU | PDF/image 解析 | github.com/opendatalab/MinerU | OPTIONAL_ADAPTER | 否 | 依赖重 | 首选 PDF-only 公式/表格 parser |
 | GROBID | PDF 元数据/引用 | github.com/kermitt2/grobid | OPTIONAL_ADAPTER | 否 | Java 依赖 | 元数据/引用 parser |
 | PyMuPDF | PDF 文本提取 | pymupdf.readthedocs.io | OPTIONAL_ADAPTER | 否 | 无 | 低置信 fallback |
-| Marker | PDF 转 Markdown | github.com/datalab-to/marker | OPTIONAL_ADAPTER | 否 | GPL-3.0 license | 暂不接入 |
-| Nougat | 学术 PDF 解析 | github.com/facebookresearch/nougat | OPTIONAL_ADAPTER | 否 | GPU 依赖 | 暂不接入 |
+| Marker | PDF 转 Markdown | github.com/datalab-to/marker | OPTIONAL_ADAPTER | 否 | GPL-3.0 license | DOC_DESIGNED / NOT_IMPLEMENTED |
+| Nougat | 学术 PDF 解析 | github.com/facebookresearch/nougat | OPTIONAL_ADAPTER | 否 | GPU 依赖 | DOC_DESIGNED / NOT_IMPLEMENTED |
 
 未完成调研不得进入代码开发。
 
-## 4.5 Parser Priority
+## External Projects / Adapter Candidates
 
-M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.json`.
+| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
+|---|---|---|---|---|---|---|---|
+| LaTeXML | M1 material normalization / M2.1 canonical input source | LaTeX -> XML/HTML/MathML/JATS/TEI，保留 source_latex / MathML 结构 | `latexml`, `latexmlpost` CLI；必须调研 XML/HTML/MathML 输出字段和错误码 | OPTIONAL_ADAPTER | 否 | 安装复杂，Windows/Perl 依赖，宏展开可能失败 | RESEARCH_REQUIRED |
+| pylatexenc / LatexWalker | M1 material normalization | 轻量 LaTeX AST、section、formula、citation 提取 | `pylatexenc.latexwalker.LatexWalker`, node traversal APIs | OPTIONAL_ADAPTER | 否 | 宏复杂时能力有限；不能替代完整 LaTeX 编译 | RESEARCH_REQUIRED |
+| Pandoc | M1 material normalization | LaTeX / Markdown / HTML 格式转换 | `pandoc` CLI, JSON AST; 必须调研 math block / citation 输出格式 | OPTIONAL_ADAPTER | 否 | 外部二进制；公式/引用 fidelity 依赖输入质量 | RESEARCH_REQUIRED |
+| MinerU | M1 material normalization | PDF/image 解析、公式转 LaTeX、表格、OCR、JSON/Markdown | MinerU CLI / API / JSON output；必须调研 formula bbox、Markdown、table 输出和 RTX 4060 8GB 可运行性 | OPTIONAL_ADAPTER | 否 | 依赖重；GPU/显存/模型下载；Windows 稳定性需验证 | RESEARCH_REQUIRED |
+| Marker | M1 material normalization | PDF -> Markdown/JSON/HTML，equations、inline math、tables | Marker CLI / JSON / chunks output；必须调研 equation blocks、bbox、license 约束 | OPTIONAL_ADAPTER | 否 | GPL-3.0 / 模型许可；不能作为默认依赖 | RESEARCH_REQUIRED |
+| Nougat | M1 material normalization | academic PDF -> MMD / Mathpix Markdown | `nougat` CLI, `.mmd` output；必须调研失败检测、公式输出、模型要求 | OPTIONAL_ADAPTER | 否 | 模型老、GPU 依赖、失败检测不稳定 | RESEARCH_REQUIRED |
+| pix2tex / LaTeX-OCR | M1 FormulaOCRAdapter | 公式图片 -> LaTeX | `pix2tex` CLI / Python API；必须调研 image input、timeout、confidence/beam 输出 | OPTIONAL_ADAPTER | 否 | 不定位 bbox；只负责公式图像识别；GPU/模型依赖 | RESEARCH_REQUIRED |
+| PyMuPDF | M1 material normalization / FormulaRegionDetector support | PDF 页面渲染、bbox crop、文本提取、低置信 fallback | `fitz.open`, `page.get_text`, `page.get_pixmap`, clipping/crop APIs | DIRECT_DEPENDENCY | 是 | 不识别 LaTeX 公式；fallback 不能产生高置信 formula_card | IMPLEMENTED |
+| GROBID | M1 material normalization | metadata、references、citation contexts、TEI XML | GROBID service API / TEI XML；必须调研 references/citation context endpoints | OPTIONAL_ADAPTER | 否 | Java/service 依赖；不是主公式 parser | RESEARCH_REQUIRED |
 
-1. **LaTeXSourceParser** — highest priority when LaTeX source is available
-2. **StructuredHTMLParser** — for structured HTML/XML
-3. **MinerUAdapter** — first PDF-only parser candidate for formula/table-heavy papers
-4. **DoclingAdapter** — structure/layout parser candidate when MinerU unavailable
-5. **GROBIDReferenceAdapter** — for metadata/references/citation contexts only
-6. **PyMuPDFLowConfidenceAdapter** — fallback only; cannot produce high-confidence formula cards
+## 4.5 Canonical Reader Priority
+
+M2.1 must read `canonical_paper.md`. It no longer chooses raw-source parsers as the primary path.
+
+1. **CanonicalPaperReader** — reads YAML front matter and Markdown body.
+2. **CanonicalPaperValidator** — validates required fields, section structure, `m2_ready`, formula origin, and degradation status.
+3. **CanonicalBlockBuilder** — converts sections, paragraphs, tables, figures, and formulas into `DocumentBlock`.
+4. **FormulaBlockReader** — preserves `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, context, OCR status, and explanation status.
+
+LaTeXSourceParser, StructuredHTMLParser, MinerUAdapter, MarkerAdapter, DoclingAdapter, GROBIDReferenceAdapter, PyMuPDFLowConfidenceAdapter, FormulaRegionDetector, and FormulaOCRAdapter are M1 material normalization components. M2.1 validates their canonical output.
 
 ## 5. 外部项目调研（详细）
 
+### CanonicalPaperReader
+
+- **Priority**: primary M2.1 input reader
+- **Input**: `canonical_paper.md`
+- **Responsible for**: YAML front matter parsing, Markdown section parsing, formula block metadata preservation, `m2_ready` validation
+- **Output**: `ParserResult` / `DocumentIngestion` / `DocumentBlock`
+- **Failure**: missing canonical file, malformed YAML, missing `paper_id/title/source_type/canonicalization_status`, `m2_ready=false`, formula block without `origin`
+- **Decision**: DOC_DESIGNED / NOT_IMPLEMENTED.
+
 ### LaTeXSourceParser
 
-- **Priority**: highest
+- **Priority**: M1 material normalization adapter
 - **Input**: `latex_source_path`, `latex_main_file`, `latex_aux_files`
 - **Responsible for**: section/subsection hierarchy, equations and display formulas, inline formulas, labels/refs/citations, bibliography/bibtex files, theorem/algorithm/table environments, formula source text
 - **Candidate tools**:
   - **LaTeXML**: candidate for LaTeX → XML/HTML/MathML/JATS/TEI conversion. Preferred for semantic XML/HTML/MathML if install/runtime is acceptable.
   - **pylatexenc / LatexWalker**: candidate for lightweight LaTeX AST parsing. Preferred for lightweight extraction of sections/formulas/citations if LaTeXML is too heavy.
   - **Pandoc**: candidate for LaTeX → Markdown/HTML conversion.
-- **Decision**: Do not hard-code one LaTeX parser as final yet. M2.1 must evaluate LaTeXML and lightweight LaTeX parsing.
+- **Decision**: OPTIONAL_ADAPTER, DOC_DESIGNED / NOT_IMPLEMENTED. LaTeX source parsing writes `canonical_paper.md` in M1, not raw M2 parser output.
 
 ### Docling
 
@@ -67,8 +109,9 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 - **导出格式**: Markdown / HTML / DocTags / lossless JSON
 - **典型调用**: `DocumentConverter().convert(source)` → `result.document.export_to_markdown()`
 - **安装复杂度**: 中等（`pip install docling`）
-- **是否适合当前接入**: 否 — 依赖和集成面较大，先保持 optional adapter
-- **未来 adapter 映射**: `DoclingDocument` / Markdown / JSON → `DocumentIngestion.blocks`
+- **是否适合默认依赖**: 否 — 依赖和集成面较大，保持 OPTIONAL_ADAPTER
+- **Adapter output mapping**: `DoclingDocument` / Markdown / JSON → `canonical_paper.md` sections and formula blocks in M1
+- **当前状态**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### Marker
 
@@ -77,8 +120,9 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 - **输出格式**: Markdown / JSON / chunks / HTML
 - **可选 LLM 模式**: 有，但 Marker LLM 增强不在 M2.1 默认路径中
 - **许可证风险**: 代码 GPL-3.0，模型许可另有限制，商用/分发前必须确认
-- **是否适合当前接入**: 否 — 许可证和依赖风险，不适合默认依赖
-- **未来 adapter 映射**: Marker JSON / chunks → `DocumentIngestion.blocks`
+- **是否适合默认依赖**: 否 — 许可证和依赖风险，不适合默认依赖
+- **Adapter output mapping**: Marker JSON / chunks → `canonical_paper.md` sections and formula blocks in M1
+- **当前状态**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### MinerU
 
@@ -88,7 +132,8 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 - **安装复杂度**: 较重
 - **优先级**: 首选 PDF-only parser，用于公式/表格密集论文
 - **必须评估**: 是否可在 RTX 4060 8GB VRAM 上运行、inline/display formula 输出、table 输出、section hierarchy、速度和内存
-- **未来 adapter 映射**: MinerU JSON / Markdown → `DocumentIngestion.blocks`
+- **Adapter output mapping**: MinerU JSON / Markdown → `canonical_paper.md` sections, formula bbox, table blocks in M1
+- **当前状态**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### GROBID
 
@@ -96,7 +141,8 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 - **主要能力**: PDF 元数据提取、参考文献解析、引用上下文
 - **输出格式**: TEI XML
 - **优先级**: 用于 metadata/references/citation contexts，不足以单独支撑深度阅读
-- **未来 adapter 映射**: GROBID TEI → `DocumentIngestion.blocks`（引用/元数据部分）
+- **Adapter output mapping**: GROBID TEI → canonical references / citation contexts in M1
+- **当前状态**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### PyMuPDF
 
@@ -113,7 +159,8 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 - **安装**: `pip install nougat-ocr`
 - **风险**: GPU / PyTorch / 模型依赖，失败检测有不稳定可能
 - **是否适合当前接入**: 否 — 需要 GPU，不适合默认安装
-- **未来 adapter 映射**: `.mmd` → `DocumentIngestion.blocks`，公式块尽量保留
+- **Adapter output mapping**: `.mmd` → `canonical_paper.md` formula blocks and sections in M1
+- **当前状态**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ## 6. 当前代码位置
 
@@ -127,7 +174,7 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 
 | 项 | 值 |
 |----|-----|
-| 输入 | `Path source`, `str paper_id` |
+| 输入 | `canonical_paper.md`, `str paper_id` |
 | 输出 | `ParserResult`（包含 `DocumentIngestion` + `ParseMetadata`） |
 | 不生成 paper_id | 调用者传入 |
 | 不写 artifact | 只返回 ParserResult |
@@ -135,19 +182,43 @@ M2.1 must select parser by `preferred_m2_input` from M1's `source_resolution.jso
 | 不调用 LLM | — |
 | 不联网 | — |
 
+Required front matter:
+- `paper_id`
+- `title`
+- `authors`
+- `year`
+- `venue`
+- `source_type`
+- `source_confidence`
+- `canonicalization_status`
+- `parser_used`
+- `m2_ready`
+- `degradation_reason`
+
+Blocked input:
+- missing front matter
+- malformed YAML
+- `source_type == metadata_only`
+- `m2_ready=false` without explicit override
+- formula block without `origin`
+- canonical body missing both abstract and body text
+
 ## 8. Artifact
 
 - ParserAdapter 本身不直接写 artifact。
 - `parsed_document.json` 由 pipeline / workspace 写入。
+- `canonical_paper.md` is retained as the M1 input artifact and must be referenced by `parsed_document.json`.
 - Parser 层新增字段必须兼容旧 `parsed_document.json`。
 - v2 artifact 应显式 `schema_version="v2"`；旧 artifact 无 `schema_version` 时按 v1 读取。
 - additive 字段通过默认值兼容，不需要 migration。
 
-### 外部 parser 约束
+### canonical reader constraints
 
-- 所有外部 parser 都必须通过 `ParserAdapter` 输出 `ParserResult`
-- 外部 parser 不能直接写 artifact，不能绕过 `DocumentIngestion`
-- 外部 parser 的结构化输出（bbox、table_html 等）通过 `DocumentBlock` 扩展字段保留
+- M2.1 primary path is `canonical_paper.md`.
+- M2.1 cannot bypass M1 to read raw PDF / LaTeX / HTML / DeepXiv.
+- All external parser/layout/OCR outputs must already be represented in canonical Markdown by M1.
+- M2.1 cannot silently repair missing formula origin.
+- Invalid canonical input must produce `BLOCKED_UNDERSTANDING`.
 
 ## 9. Schema / 数据结构
 
@@ -161,12 +232,15 @@ class ParseMetadata(SenseiModel):
     page_count: int = 0
     extra: dict = Field(default_factory=dict)
     # source-aware fields
-    parser_input_type: str = ""      # latex_source | structured_html | pdf | metadata_only
-    parser_adapter: str = ""         # latex_source_parser | structured_html_parser | mineru | docling | grobid | pymupdf_low_confidence
-    formula_fidelity: str = "unknown"  # source_latex | mathml | ocr_latex | plain_text | unknown
+    parser_input_type: str = "canonical_paper.md"
+    parser_adapter: str = "canonical_paper_reader"
+    formula_fidelity: str = "unknown"  # source_latex | parser_latex | ocr_latex | reconstructed | unknown
     source_level_formula_available: bool = False
     latex_parse_status: str = "not_applicable"  # not_applicable | parsed | partial | failed
     latex_parse_warnings: list[str] = Field(default_factory=list)
+    canonicalization_status: str = ""
+    m2_ready: bool = False
+    degradation_reason: list[WarningItem] = Field(default_factory=list)
 
 class ParserResult(SenseiModel):
     document: DocumentIngestion
@@ -193,6 +267,15 @@ class DocumentBlock(SenseiModel):
     table_html: str = ""
     figure_caption: str = ""
     reference_entries: list[str] = Field(default_factory=list)
+    formula_id: str = ""
+    formula_latex: str = ""
+    formula_origin: str = ""  # source_latex | parser_latex | ocr_latex | reconstructed | unknown
+    formula_bbox: tuple[float, float, float, float] | None = None
+    formula_page: int | None = None
+    formula_context_before: str = ""
+    formula_context_after: str = ""
+    formula_ocr_status: str = ""
+    formula_explanation_status: str = ""
 ```
 
 ### ParserAdapter
@@ -228,6 +311,12 @@ class LightweightParserAdapter(ParserAdapter):
 | 源文件不存在 | 沿用 LightweightIngestionService 行为 |
 | 空文件 | `degraded=True`, `NO_TEXT_EXTRACTED` |
 | PDF 解析失败 | `degraded=True`, `PDF_PARSE_FAILED` |
+| canonical_paper.md 缺失 | `BLOCKED_UNDERSTANDING`, `CANONICAL_INPUT_MISSING` |
+| front matter 缺必填字段 | `BLOCKED_UNDERSTANDING`, `CANONICAL_FRONT_MATTER_INVALID` |
+| m2_ready=false | `BLOCKED_UNDERSTANDING`, `M2_NOT_READY` |
+| metadata_only 输入 | `BLOCKED_UNDERSTANDING`, `METADATA_ONLY_NOT_ALLOWED` |
+| formula block 缺 origin | `DEGRADED_STRUCTURAL` 或 `BLOCKED_UNDERSTANDING`，取决于是否影响核心公式 |
+| formula_origin unknown | 允许正文证据链，详细公式推导 blocked |
 
 ## 11. 测试要求
 
@@ -265,20 +354,36 @@ class LightweightParserAdapter(ParserAdapter):
 | test_parser_adapter_injected_into_runner | runner uses adapter correctly |
 | test_unsupported_source_marks_job_failed | unsupported file type → job status FAILED or degraded |
 
+### CanonicalPaperReader / Validator 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_canonical_reader_reads_front_matter | reads required YAML fields |
+| test_canonical_reader_builds_sections | Markdown sections become DocumentBlock sections |
+| test_canonical_reader_preserves_formula_block | formula_id/formula_latex/formula_origin/page/bbox preserved |
+| test_canonical_reader_blocks_metadata_only | source_type=metadata_only → BLOCKED_UNDERSTANDING |
+| test_canonical_reader_blocks_missing_origin | formula block without origin → degraded or blocked |
+| test_canonical_reader_blocks_m2_not_ready | m2_ready=false → BLOCKED_UNDERSTANDING |
+| test_formula_origin_round_trip | source_latex/parser_latex/ocr_latex/reconstructed/unknown preserved |
+| test_formula_ocr_status_round_trip | formula_ocr_status preserved |
+
 ### 全局规则
 
 - Parser 接口 / schema round-trip 可以作为本地结构检查，但不能作为 M2.1 验收
-- M2.1 验收必须使用真实 PDF 输入，验证 parsed_document.json、warning、degraded 状态和 parser metadata
+- M2.1 验收必须使用 M1 生成的真实 `canonical_paper.md` 输入，验证 parsed_document.json、warning、degraded 状态、parser metadata、formula_origin
 - 不调用 LLM（parser 不需要 LLM）
 
 ## 12. 验收标准
 
 - ParserAdapter 接口抽象，不绑定具体 parser
 - LightweightParserAdapter 输出与原 LightweightIngestionService 一致
+- CanonicalPaperReader 读取 `canonical_paper.md`
+- CanonicalPaperValidator 校验 front matter、m2_ready、formula_origin
+- CanonicalBlockBuilder 输出 evidence-ready DocumentBlock
 - ParserResult 包含 DocumentIngestion + ParseMetadata
 - DocumentBlock 扩展字段向后兼容
 - 外部 parser 不能直接写 artifact
-- 真实验收必须真实解析 PDF（通过 real PDF e2e eval）
+- 真实验收必须走 M1 canonicalization → M2.1 canonical reader；PDF-focused path 只能证明当前 legacy/parser 能力，不能证明 canonical input reader 完成
 
 ## 13. 当前实现状态
 
@@ -286,8 +391,10 @@ class LightweightParserAdapter(ParserAdapter):
 - DocumentBlock 已扩展 Optional 字段（bbox, table_html, figure_caption, reference_entries）
 - pipeline 已接入（ParserAdapter 注入 SinglePaperIngestionRunner）
 - 测试已覆盖：11+ tests
+- 当前未实现：CanonicalPaperReader, CanonicalPaperValidator, CanonicalBlockBuilder
+- 当前未实现：formula_id/formula_latex/formula_origin/formula_bbox/formula_page/formula_context_before/formula_context_after/formula_ocr_status/formula_explanation_status 全链路
 - DoclingParserAdapter 未实现
-- 外部 parser 仍是 optional adapter
+- 外部 parser / OCR / layout detector 均为 DOC_DESIGNED / NOT_IMPLEMENTED adapter，归属 M1 material normalization
 
 ## 14. External Reference Implementation Notes
 
@@ -295,9 +402,9 @@ class LightweightParserAdapter(ParserAdapter):
 - **Reference use**: DO_NOT_REUSE for parser, EVALUATE_OTHER_PROJECTS for parser quality
 - **Borrowed behavior**: Only borrows "title / abstract / intro / method overview" initial reading order
 - **ResearchSensei-owned target**: `parsed_paper.json`, `section_blocks`, `passage_blocks`, `formula_blocks`
-- **Schema / artifact impact**: DocumentBlock fields (block_id, type, text, section, bbox, table_html, figure_caption, reference_entries)
-- **Boundary**: ARIS is not a dedicated parser. ARIS cannot replace ParserAdapter. Still needs evaluation of Docling / Marker / MinerU / DeepXiv for parser quality improvement.
-- **Validation implication**: Parser validation must use real PDF. Synthetic markdown is not acceptance. Must output section / passage / formula structure.
+- **Schema / artifact impact**: DocumentBlock fields (block_id, type, text, section, bbox, table_html, figure_caption, reference_entries, formula_id, formula_latex, formula_origin, formula_ocr_status)
+- **Boundary**: ARIS is not a dedicated parser. ARIS cannot replace canonical input reader. Docling / Marker / MinerU / DeepXiv belong to M1 adapter evaluation and must write canonical Markdown before M2.
+- **Validation implication**: M2.1 validation must use real M1-generated `canonical_paper.md`. Synthetic markdown is not acceptance. Must output section / passage / formula structure.
 
 ## 15. Survey Paper Support
 
@@ -332,6 +439,7 @@ Status: NOT_IMPLEMENTED
 ## 16. 当前未解决问题
 
 - Docling 本地样例验证需要哪些论文
-- 外部 parser 映射细节（DoclingDocument → DocumentIngestion.blocks）
+- 外部 parser 映射细节（DoclingDocument / Marker JSON / MinerU JSON / DeepXiv structured output → canonical_paper.md）
 - 重依赖隔离策略（Docling/MinerU 的依赖不污染主项目）
 - ParserAdapter 接口是否需要 `supports()` 还是只靠构造函数选择
+- CanonicalPaperReader 是否沿用 ParserAdapter 抽象，还是独立 `CanonicalInputReader` 接口

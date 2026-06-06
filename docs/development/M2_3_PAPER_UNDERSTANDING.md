@@ -4,17 +4,20 @@
 
 ## 1. 模块目标
 
-基于证据生成学习卡片，LLM 输出必须绑定 evidence，无 evidence 必须进入 BLOCKED_UNDERSTANDING，不允许生成最终解释。
+基于 `canonical_paper.md` 派生的证据生成学习卡片，LLM 输出必须绑定 evidence，无 evidence 必须进入 BLOCKED_UNDERSTANDING，不允许生成最终解释。
 
 ## 2. 非目标
 
 - 不新增依赖
 - 不改 frontend
+- 不直接读取原始 PDF / LaTeX / HTML / DeepXiv
+- 不绕过 M2.1 / M2.2 的 evidence_ref
+- 不解释 `unknown` 来源公式的详细推导
 
 ## External Reference Implementation Notes
 
 - **Reference source**: ARIS `skills/research-lit/SKILL.md`, `skills/idea-discovery/SKILL.md`
-- **Reference use**: PROMPT_BORROW, STRATEGY_BORROW
+- **Reference use**: STRATEGY_BORROW
 - **Borrowed behavior**: Problem / Method / Results / Relevance; What They Did; Key Results; Limitations & Open Questions; Potential Improvement Directions
 - **ResearchSensei-owned target**: `paper_card.json`, `formula_cards.json`, `teaching_cards.json`
 - **Schema / artifact impact**: paper_card should contain problem / method / results / relevance; teaching_card can absorb limitations / open_questions / potential_improvements; every core explanation must bind evidence_ref
@@ -23,16 +26,35 @@
 
 ## 3. 产品流程位置
 
-M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM → paper_card / formula_cards / teaching_cards。
+M2.3 承接 M2.2 的证据链路，生成论文卡片：
+
+```text
+canonical_paper.md
+-> parsed_document.json
+-> passage_index.json
+-> claim_evidence.json
+-> EvidencePack
+-> LLM
+-> paper_card / formula_cards / teaching_cards
+```
 
 ## 4. 可复用开源项目 / 外部服务调研
 
 | 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
 |------|------|---------------|----------|--------------|------|----------|
-| PaperQA | evidence-constrained answer | github.com/Future-House/paper-qa | REFERENCE_ONLY | 否 | — | 只借鉴 prompt 结构 |
-| ARIS | reviewer independence | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | REFERENCE_ONLY | 否 | — | 只借鉴 audit 思想 |
+| PaperQA | evidence-constrained answer | github.com/Future-House/paper-qa | STRATEGY_BORROW | 否 | — | 只借鉴 prompt 结构 |
+| ARIS | reviewer independence | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | STRATEGY_BORROW | 否 | — | 只借鉴 audit 思想 |
 
 未完成调研不得进入代码开发。
+
+## External Projects / Adapter Candidates
+
+| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
+|---|---|---|---|---|---|---|---|
+| PaperQA / PaperQA2 | M2.3 / M4 | evidence-grounded answer、Docs/add/query、source citation、answer provenance | PaperQA query/answer APIs；必须调研 citation schema、Docs object、local paper ingestion path | STRATEGY_BORROW | 否 | 是 QA 系统不是教学系统；不能用 fake agent 作为验收 | DOC_DESIGNED |
+| PaperQA adapter | M2.3 / M4 | 将 EvidencePack 与 PaperQA citation-backed answer 互相校验 | 必须调研 PaperQA Python API、settings、citation refs、failure handling | OPTIONAL_ADAPTER | 否 | 不能替代 ResearchSensei teaching schema；需 adapter 隔离 | RESEARCH_REQUIRED |
+| ARIS research-review | M2.3 / M2.4 / M4 | 导师式 review、claim matrix、实验/贡献/局限审查 | `skills/research-review/SKILL.md`; 必须调研 review output、weakness、claim matrix | STRATEGY_BORROW | 否 | 只能借鉴审查问题和字段；不能运行时依赖 | DOC_DESIGNED |
+| ARIS research-refine-pipeline | M2.3 / M4 | research question refinement、claim discipline、weak point追问 | `skills/research-refine-pipeline/SKILL.md`; 必须调研 problem anchor / dominant contribution / risk 字段 | STRATEGY_BORROW | 否 | 不替代 paper_card/formula_card 生成 | DOC_DESIGNED |
 
 ## 5. 外部项目调研（详细）
 
@@ -70,7 +92,7 @@ M2.3 承接 M2.2 的证据链路，生成论文卡片：EvidencePack → LLM →
 |----|-----|
 | 输入 | paper_skeleton.json, evidence_pack, existing card baseline |
 | 输出 | paper_card.json, formula_cards.json, teaching_cards.json, understanding_status.json |
-| LLM prompt 只能使用 | paper title/metadata, paper_skeleton, evidence_pack, existing baseline card |
+| LLM prompt 只能使用 | paper title/metadata, canonical status summary, paper_skeleton, evidence_pack, existing baseline card |
 | 禁止 | 直接整篇论文全文塞入 prompt |
 
 v2 prompt 额外约束：
@@ -79,6 +101,9 @@ v2 prompt 额外约束：
 - LLM 输出的 evidence_ref 必须从 Allowed evidence_ref values 中精确选择一个。
 - 不允许把多个 evidence_ref 用逗号、空格或列表拼接。
 - 如果证据不足，文本写 `INSUFFICIENT_EVIDENCE` 或不生成对应 card，不能编造 evidence_ref。
+- formula_card 只能基于 EvidencePack 中的 formula block / formula context。
+- formula_card 必须读取并输出 `formula_origin`、`formula_ocr_status`、`formula_explanation_status`。
+- M2 默认只深挖核心 top-K 公式，不默认解释全文所有公式。
 
 ## 8. Artifact
 
@@ -181,6 +206,11 @@ class FormulaCardLLMOutput(SenseiModel):
     intuition: str = ""
     numeric_example: str = ""
     evidence_ref: str = ""
+    formula_id: str = ""
+    formula_origin: str = ""  # source_latex | parser_latex | ocr_latex | reconstructed | unknown
+    formula_ocr_status: str = ""
+    formula_explanation_status: str = ""
+    confidence_policy: str = ""
 
 class TeachingCardLLMOutput(SenseiModel):
     human_explanation: str
@@ -228,6 +258,13 @@ class SinglePaperIngestionRunner:
 | LLM invalid JSON | BLOCKED_UNDERSTANDING，warning: "LLM_INVALID_JSON" |
 | LLM timeout | BLOCKED_UNDERSTANDING，warning: "LLM_TIMEOUT" |
 | evidence 不足 | INSUFFICIENT_EVIDENCE，不生成解释 |
+| canonical_paper.md 缺失或无效 | BLOCKED_UNDERSTANDING |
+| formula_origin == source_latex | 可高置信解释，但仍需 evidence_ref |
+| formula_origin == parser_latex | 可解释，必须保留 parser warning |
+| formula_origin == ocr_latex | 可解释，必须标注 OCR 来源，confidence 不得无依据升高 |
+| formula_origin == reconstructed | 只能作为推测解释，必须明确标注 |
+| formula_origin == unknown | 不能做详细公式推导 |
+| 非核心公式 | 不生成深挖 formula_card，保留摘要或跳过 |
 | rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
 | paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
 | paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
@@ -296,6 +333,13 @@ if not understanding_status.allowed_downstream.advisor_questions:
 | test_validate_formula_cards_llm_output_valid | valid output passes |
 | test_validate_teaching_cards_llm_output_valid | valid output passes |
 | test_llm_invalid_json_blocks | invalid JSON → BLOCKED_UNDERSTANDING |
+| test_formula_output_requires_formula_origin | formula output must include formula_origin |
+| test_source_latex_allows_high_confidence_with_evidence | source_latex + valid evidence can be high confidence |
+| test_parser_latex_keeps_warning | parser_latex formula includes parser warning |
+| test_ocr_latex_keeps_ocr_warning | ocr_latex formula includes OCR warning |
+| test_reconstructed_formula_is_speculative | reconstructed formula marked speculative |
+| test_unknown_formula_blocks_derivation | unknown origin blocks detailed derivation |
+| test_formula_top_k_only | non-core formula is skipped or summarized |
 
 ### Pipeline v2 路径测试
 
@@ -311,7 +355,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 
 ### 全局规则
 
-- M2.3 结构检查不能替代验收。M2.3 验收必须使用真实 PDF + 真实 LLM + 真实 EvidencePack + QualityAuditor。任何 simulated / synthetic / fake conversation 都不能作为 M2.3 完成依据
+- M2.3 结构检查不能替代验收。M2.3 验收必须使用 M1 生成的真实 `canonical_paper.md` + 真实 LLM + 真实 EvidencePack + QualityAuditor。任何 simulated / synthetic / fake conversation 都不能作为 M2.3 完成依据
 - BASELINE_ONLY is diagnostic only and is never user-facing completion
 - 不新增依赖
 - M2 真实验收入口：`RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
@@ -323,11 +367,13 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - empty evidence_pack → BLOCKED
 - baseline path 输出 BASELINE_ONLY
 - v2 path fail-closed，不 fallback
-- 真实验收必须使用真实 PDF 输入（不能只用 synthetic markdown）
+- 真实验收必须使用真实 `canonical_paper.md` 输入（不能只用 synthetic markdown）
 - 真实验收必须真实调用 LLM，生成 paper/formula/teaching cards
 - 真实验收必须通过 QualityAuditor 审计
 - 真实验收必须生成 understanding_status.json
 - evidence_ref 必须可追溯
+- formula_card 必须保留 formula_origin / formula_ocr_status / formula_explanation_status
+- 公式深挖必须只覆盖核心 top-K 公式
 - DEGRADED / BLOCKED 必须真实反映质量，不允许为通过测试放宽
 - real LLM smoke 必须记录 model、prompt version、schema version、token、cost、latency、失败原因
 - real LLM smoke 失败不能伪装成普通 mock 测试通过
@@ -347,6 +393,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - Real LLM smoke 已实现 opt-in 入口：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
 - v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
 - formula_is_core 判断未实现
+- canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、top-K 公式深挖策略为 DOC_DESIGNED / NOT_IMPLEMENTED
 
 ## 16. ARIS Alignment
 
@@ -385,9 +432,11 @@ These fields are optional in paper_card but required for direction framework upd
 formula_card and teaching_card must prefer `source_latex` formulas.
 
 Rules:
-- If `parser_input_type == latex_source`: formula_card should include `original_latex`; symbol explanation should use `source_latex`; formula confidence can be high if evidence_ref valid
-- If `parser_input_type == pdf` and `formula_origin == ocr_latex`: formula_card must include `ocr_warning`; confidence cannot be high unless verified by additional evidence
-- If `formula_origin == plain_text` or `unknown`: do not generate detailed formula derivation; mark formula explanation as degraded
+- If `formula_origin == source_latex`: formula_card should include `original_latex`; symbol explanation can be high confidence if evidence_ref valid
+- If `formula_origin == parser_latex`: formula_card must include parser/source warning
+- If `formula_origin == ocr_latex`: formula_card must include `ocr_warning`; confidence cannot be high unless verified by additional evidence
+- If `formula_origin == reconstructed`: formula_card must mark explanation as speculative
+- If `formula_origin == unknown`: do not generate detailed formula derivation; mark formula explanation as degraded or blocked
 
 Survey Deep Reading should extract method_taxonomy and key papers preferably from LaTeX/HTML structure when available; PDF-only extraction must record lower source confidence.
 

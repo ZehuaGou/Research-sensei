@@ -54,10 +54,11 @@ Output:
 - `query_plan.json`
 - `candidate_pool.json`
 - `source_resolution.json`
+- `canonical_paper.md` when a paper is selected for M2
 - `filtered_candidates.json` — final candidates with verification/LLM relevance/PDF fields
 - `reading_plan.json` — with `A_READ_FOR_M2` papers
 
-Boundary: Does not parse full papers. Does not generate paper cards.
+Boundary: Does not generate paper cards or teaching output. It does perform material normalization for selected papers and writes the M2 canonical input.
 
 **M1 Source Acquisition Contract**:
 
@@ -65,9 +66,10 @@ M1 must resolve best available source, not just PDF.
 
 Source priority:
 1. `latex_source`
-2. `structured_html`
-3. `pdf`
-4. `metadata_only`
+2. `structured_html` / `xml` / `deepxiv_structured`
+3. `pdf_parser_output`
+4. `low_confidence_text_fallback`
+5. `metadata_only`
 
 `source_resolution.json` must include:
 - `source_type`
@@ -78,10 +80,46 @@ Source priority:
 - `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`
 - `source_confidence`, `source_warning`
 
+**M1 Material Normalization Contract**:
+
+Input:
+- verified candidate metadata
+- best available source artifact
+- parser/layout output from LaTeX source, structured HTML/XML/DeepXiv, PDF parser, MinerU, Marker, or low-confidence text fallback
+
+Output:
+- `canonical_paper.md`
+- canonical front matter: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
+- canonical sections: Title, Abstract, Introduction, Related Work, Method, Experiments, Conclusion, References when available
+- formula blocks with `formula_id`, `origin`, `section`, `page`, `bbox`, `ocr_status`
+
+Status fields:
+- `canonicalization_status`: `SUCCESS`, `DEGRADED`, `BLOCKED`
+- `m2_ready`: boolean
+- `degradation_reason`: list or structured warning reason
+- `formula_ocr_status`: `not_required`, `queued`, `success`, `failed`, `skipped_by_policy`
+- `formula_origin`: `source_latex`, `parser_latex`, `ocr_latex`, `reconstructed`, `unknown`
+
+FormulaRegionDetector:
+- input: PDF parser / layout parser / MinerU / Marker blocks, page images, page metadata
+- output: formula bbox, page, section, detector confidence
+- failure: no bbox, bbox/page mismatch, low confidence, no section alignment
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+FormulaOCRAdapter:
+- input: formula region image, bbox, page, context, OCR config
+- output: OCR LaTeX, OCR confidence, `formula_origin=ocr_latex`, warnings
+- candidates: pix2tex / LaTeX-OCR through adapter
+- failure: timeout, GPU/resource error, low confidence, malformed LaTeX, context mismatch
+- run policy: `formula_ocr_enabled=true`, `default_formula_ocr_mode=on_demand`, `max_formula_ocr_per_paper=3`, `max_formula_ocr_batch=10`
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
 **Failure contract (source-aware)**:
 - If LaTeX source exists but download fails, record `latex_source_error` and continue to structured_html/pdf only as degraded path.
 - If only PDF is available, M2 must mark `parser_input_type=pdf` and cannot claim source-level formula fidelity.
 - `metadata_only` cannot enter M2 deep reading.
+- If `canonical_paper.md` cannot be produced with title, source status, and at least abstract or body text, set `m2_ready=false` and do not enter M2.
+- If formula source is unknown, the paper may enter M2, but formula explanation gates must be degraded.
 
 **Live validation contract**:
 
@@ -137,8 +175,9 @@ M2 supports two types of papers: ordinary research papers and survey/review pape
 
 **Schema / artifact contract**:
 
-Input: uploaded PDF / downloaded PDF / paper URL / paper metadata
+Input: `canonical_paper.md` produced by M1 material normalization, or a user-upload path that first passes through M1 canonicalization.
 Output:
+- `canonical_paper.md` (read-only input artifact retained)
 - `parsed_document.json`
 - `passage_index.json`
 - `claim_evidence.json`
@@ -158,37 +197,48 @@ M2.3 paper_card exposes direction-support fields when evidence exists:
 - `datasets_and_metrics`
 - `comparable_methods`
 
-**M2 source-aware parser**:
+**M2.1 canonical input reader / validator**:
 
-M2 must select parser by `preferred_m2_input`.
+M2 does not directly process raw PDF / LaTeX / HTML / DeepXiv input. M2.1 reads `canonical_paper.md`, validates the front matter and formula blocks, then converts Markdown sections, paragraphs, tables, figures, and formulas into `DocumentBlock` / evidence-ready blocks.
 
-Parser priority:
-1. `LaTeXSourceParser` — preferred when LaTeX source is available; best for formulas, citations, section hierarchy
-2. `StructuredHTMLParser` — preferred for structured HTML/XML
-3. `MinerUAdapter` — preferred for PDF-only papers where formulas/tables matter
-4. `DoclingAdapter` — preferred for structure/layout extraction if MinerU is unavailable
-5. `GROBIDReferenceAdapter` — for metadata/references/citation contexts, not as the only deep parser
-6. `PyMuPDFLowConfidenceAdapter` — fallback only; cannot produce high-confidence formula cards
+Required formula fields passed into M2:
+- `formula_id`
+- `formula_latex`
+- `formula_origin`
+- `formula_bbox`
+- `formula_page`
+- `formula_context_before`
+- `formula_context_after`
+- `formula_ocr_status`
+- `formula_explanation_status`
 
-PDF→LaTeX / PDF→Markdown is fallback, not the preferred route. If LaTeX source is available, M2 should prefer source for formulas, symbols, sections, citations, and bibliography.
+Formula explanation rules:
+- `source_latex`: high-confidence explanation allowed when evidence context exists
+- `parser_latex`: explanation allowed with parser warning
+- `ocr_latex`: explanation allowed with OCR warning and non-high confidence unless verified
+- `reconstructed`: speculative explanation only, must be clearly marked
+- `unknown`: detailed derivation is blocked
 
 **Live validation contract**:
 
-- real input (LaTeX source or PDF, depending on source availability)
-- real parser output
+- real `canonical_paper.md`
+- real M1 canonicalization status
+- real M2 canonical reader output
 - real LLM card generation
 - `evidence_ref` traceable
 - QualityAuditor runs on real artifacts
 
 **Failure contract**:
 
-- parser failure → `FAILED`
+- missing or invalid `canonical_paper.md` → `BLOCKED_UNDERSTANDING`
+- missing required front matter → `BLOCKED_UNDERSTANDING`
+- formula block without `formula_origin` → formula explanation degraded or blocked
 - no passages / no claims / empty evidence pack → `BLOCKED_UNDERSTANDING`
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
-- `PyMuPDFLowConfidenceAdapter` output cannot produce high-confidence formula explanation
+- `ocr_latex`, `reconstructed`, and `unknown` cannot produce high-confidence formula explanation without explicit verification
 
-**Current status**: partial code exists; LaTeXSourceParser not implemented; real PDF + real LLM + real audit e2e not yet verified
+**Current status**: partial code exists; canonical input reader / validator is DOC_DESIGNED / NOT_IMPLEMENTED; real canonical Markdown + real LLM + real audit e2e not yet verified
 
 ### Survey / Review Paper
 
@@ -265,7 +315,7 @@ Existing APIs:
 
 Future accepted inputs: title, DOI, publisher URL
 
-M3 must show: `download_status`, `verification_status`, `pdf_metadata_check`, `pdf_title_match`, `can_enter_m2`
+M3 must show: `download_status`, `verification_status`, `pdf_metadata_check`, `pdf_title_match`, `can_enter_m2`, `source_type`, `canonicalization_status`, `m2_ready`, `formula_origin`, `formula_ocr_status`, `degradation_reason`, `evidence_status`
 
 **Live validation contract**:
 
@@ -306,7 +356,7 @@ DirectionWorkspace, PaperWorkspace, and SeedExpansionPanel are parallel frontend
 
 M4 is entered from three frontend contexts:
 
-1. **PaperWorkspace**: M2 artifacts → paper-level selection explanation / formula explanation / single-paper Q&A / advisor drill
+1. **PaperWorkspace**: `canonical_paper.md` + M2 artifacts → paper-level selection explanation / formula explanation / single-paper Q&A / advisor drill
 2. **DirectionWorkspace**: M1 direction_landscape + selected survey / anchors → direction-level Q&A / method-family comparison / reading-order explanation
 3. **SeedExpansionPanel**: M1 paper_relation_graph → upstream/downstream explanation / follow-up paper recommendation / route explanation
 
@@ -323,6 +373,7 @@ M4 is entered from three frontend contexts:
 - real LLM
 - real M2 artifacts
 - real `evidence_ref` / memory references
+- M4 paper-level answers must use M2 outputs and canonical evidence; they must not bypass M2 to read raw PDF and produce ungrounded answers
 
 ### Direction-level interaction
 
@@ -337,6 +388,7 @@ Example questions:
 - real LLM
 - real direction_landscape artifact
 - real survey_landscape if available
+- when direction-level Q&A drills into a concrete paper, that paper must enter M1 canonicalization and M2 evidence pipeline before paper-level explanation
 
 ### Seed-expansion interaction
 
@@ -350,6 +402,7 @@ Example questions:
 - real LLM
 - real paper_relation_graph
 - real seed paper metadata
+- when seed-expansion Q&A drills into a concrete paper, that paper must enter M1 canonicalization and M2 evidence pipeline before paper-level explanation
 
 Direction-level and seed-expansion interaction do NOT replace formula/symbol explanation. Formula/symbol explanation remains M4.2 core capability.
 
@@ -444,6 +497,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 ### M2 Paper Deep Reading
 
 **Schema / artifact contract**:
+- `canonical_paper.md`
 - `parsed_document.json`
 - `passage_index.json`
 - `claim_evidence.json`
@@ -456,19 +510,40 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - `quality_report.json`
 
 **Live validation contract**:
-- real PDF input
-- real parser output
+- real `canonical_paper.md`
+- real M2 canonical reader output
 - real LLM card generation
 - `evidence_ref` traceable
 - QualityAuditor runs on real artifacts
+- formula_origin / formula_ocr_status preserved when formulas exist
 
 **Failure contract**:
-- parser failure → `FAILED`
+- missing or invalid canonical input → `BLOCKED_UNDERSTANDING`
 - no passages / no claims / empty evidence pack → `BLOCKED_UNDERSTANDING`
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
 **Current status**: NOT_REAL_E2E_VERIFIED
+
+### M1 / M2 Canonical Formula Chain
+
+**Schema / artifact contract**:
+- `canonical_paper.md`
+- formula block metadata: `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, `formula_context_before`, `formula_context_after`, `formula_ocr_status`, `formula_explanation_status`
+
+**Live validation contract**:
+- one real paper
+- one real formula region
+- FormulaRegionDetector output when parser/layout source provides bbox
+- FormulaOCRAdapter output when policy triggers
+- M2 reads formula block and preserves origin
+
+**Failure contract**:
+- missing formula origin → formula explanation degraded or blocked
+- OCR failure → `formula_ocr_status=failed`, not silent success
+- `unknown` origin → detailed derivation blocked
+
+**Current status**: DOC_DESIGNED / NOT_IMPLEMENTED
 
 ### M2 Survey Deep Reading
 
@@ -544,7 +619,8 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - CI release check result
 
 **Live validation contract**:
-- `python -m pytest -q` includes `tests_live`
+- `python -m pytest -q` includes stable small real chain
+- manual / nightly live validation covers network, LLM, OCR/parser heavy cases
 - real LLM tests run with real env
 - real network tests run with real network
 - frontend build and tests pass
@@ -559,4 +635,4 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 
 **Current status**: PARTIAL_INFRA / NOT_PRODUCTION_READY
 
-**Test policy**: `python -m pytest -q` runs all tests including `tests_live`. Missing env/key/network = failure, not skip. mock/fake/skip are not valid acceptance tests.
+**Test policy**: `python -m pytest -q` runs stable small real chain. Manual / nightly live validation runs network, LLM, OCR/parser heavy cases. Missing env/key/network in live validation = failure, not skip. mock/fake/skip are not valid module completion evidence.

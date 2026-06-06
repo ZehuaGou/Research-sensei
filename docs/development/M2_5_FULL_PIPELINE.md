@@ -15,6 +15,15 @@ M2.5 是 M2 的编排层：串联 M2.1-M2.4，管理 artifact 流转和状态门
 - 不实现新功能
 - 不改现有代码
 
+## External Projects / Adapter Candidates
+
+| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
+|---|---|---|---|---|---|---|---|
+| PaperQA / PaperQA2 | M2.5 / M4 | evidence-grounded QA、Docs/add/query、source citation、end-to-end grounded answer discipline | PaperQA docs/add/query APIs；必须调研 local corpus mode、citation schema、no-answer handling | STRATEGY_BORROW | 否 | 不能用 fake agent 作为验收；不能替代 ResearchSensei pipeline gates | DOC_DESIGNED |
+| PaperQA pipeline adapter | M2.5 / M4 | 将 PaperQA-style grounded QA 作为可选证据问答路径 | 必须调研 PaperQA Python API、settings、citation refs、failure path | OPTIONAL_ADAPTER | 否 | 依赖 embeddings/vector store；必须通过 adapter，不得深耦合 | RESEARCH_REQUIRED |
+| ARIS research-review | M2.5 / M4 | 导师式 review、claim matrix、状态门控参考、研究问题追问 | `skills/research-review/SKILL.md`; 必须调研 review tracing、claim matrix、failure reporting | STRATEGY_BORROW | 否 | 只能借鉴 gating/审查思想；不作为 runtime dependency | DOC_DESIGNED |
+| ARIS research-refine-pipeline | M2.5 / M4 | problem anchor、weak point、remaining risks、must-run ablations | `skills/research-refine-pipeline/SKILL.md`; 必须调研 risk/ablation/claim 字段 | STRATEGY_BORROW | 否 | 不替代 DownstreamGates / UnderstandingStatus | DOC_DESIGNED |
+
 ## 4. 当前代码位置
 
 - `src/researchsensei/ingestion/pipeline.py` — `SinglePaperIngestionRunner`
@@ -24,31 +33,33 @@ M2.5 是 M2 的编排层：串联 M2.1-M2.4，管理 artifact 流转和状态门
 
 ### Source-Aware Pipeline
 
-Input from M1: `preferred_m2_input`, `source_resolution.json`
+Input from M1: `canonical_paper.md`, `source_resolution.json`, canonicalization status.
 
 ```
-if preferred_m2_input == latex_source:
-    LaTeXSourceParser
-elif preferred_m2_input == structured_html:
-    StructuredHTMLParser
-elif preferred_m2_input == pdf:
-    MinerUAdapter or DoclingAdapter
+if canonical_paper.md exists and m2_ready == true:
+    CanonicalPaperReader
+    CanonicalPaperValidator
+    CanonicalBlockBuilder
 else:
     BLOCKED_UNDERSTANDING
 ```
 
+Raw LaTeX / HTML / DeepXiv / PDF / OCR material normalization belongs to M1. M2.5 does not invoke MinerU / Marker / pix2tex directly; it consumes their canonical Markdown output.
+
 ### Status rules
 
-- LaTeX source parse success: `formula_explanation_allowed` can be true; `survey_landscape_allowed` can be true if evidence exists
-- PDF-only parse success: `formula_explanation_allowed` depends on `formula_origin` and audit
-- PyMuPDF fallback: paper summary may be allowed only as degraded; `formula_explanation_allowed` must be false unless evidence is sufficient
+- `canonicalization_status=success`: M2.1 may proceed if required front matter and body exist
+- `canonicalization_status=degraded`: M2.1 may proceed with warnings; M2.3/M2.4 decide card gates
+- `canonicalization_status=blocked` or `m2_ready=false`: BLOCKED_UNDERSTANDING
+- `formula_explanation_allowed` depends on `formula_origin`, `formula_ocr_status`, core top-K selection, and audit
 
 ### Detailed chain
 
 ```
-source (LaTeX/HTML/PDF/MD/TXT)
-  → ParserAdapter.parse()
-    → ParserResult (DocumentIngestion + ParseMetadata)
+source resolved and normalized by M1
+  → canonical_paper.md
+    → CanonicalPaperReader / Validator
+      → ParserResult (DocumentIngestion + ParseMetadata)
       → parsed_document.json
         → build_passage_index()
           → passage_index.json (PassageIndex, v2)
@@ -73,14 +84,14 @@ source (LaTeX/HTML/PDF/MD/TXT)
 
 | 步骤 | 输入 | 输出 | 失败行为 |
 |------|------|------|----------|
-| ParserAdapter.parse | source file | ParserResult | 系统异常 → FAILED; degraded → DEGRADED_STRUCTURAL |
+| CanonicalPaperReader.validate | canonical_paper.md | ParserResult | invalid canonical input → BLOCKED_UNDERSTANDING; degraded → DEGRADED_STRUCTURAL |
 | build_passage_index | DocumentIngestion.blocks | PassageIndex → passage_index.json | NO_PASSAGES → BLOCKED |
 | extract_claims | PassageIndex.passages | ClaimEvidence v2 → claim_evidence.json | NO_CLAIMS → BLOCKED |
 | evidence_index wrapper | claim_evidence.json | evidence_index.json (v1) | — |
 | build_paper_skeleton | DocumentIngestion + EvidenceIndex | PaperSkeleton | section MISSING warnings |
 | build_evidence_pack | ClaimEvidence + PassageIndex | EvidencePack [runtime] | 空 → BLOCKED; 缺 METHOD → BLOCKED |
 | LLM paper_card | EvidencePack + skeleton | paper_card.json | LLM 失败 → BLOCKED |
-| LLM formula_cards | EvidencePack + skeleton | formula_cards.json | 核心公式失败 → BLOCKED; 无公式 → SKIPPED |
+| LLM formula_cards | EvidencePack + skeleton + formula_origin policy | formula_cards.json | 核心 top-K 公式失败 → BLOCKED; 无公式 → SKIPPED; unknown origin → derivation blocked |
 | LLM teaching_cards | EvidencePack + skeleton | teaching_cards.json | 失败 → DEGRADED_STRUCTURAL |
 | QualityAuditor.audit | cards + evidence + passages | quality_report.json | finding BLOCK → BLOCKED |
 | Runner → UnderstandingStatus | QualityReport + component_status | understanding_status.json | 映射 |
@@ -89,8 +100,10 @@ source (LaTeX/HTML/PDF/MD/TXT)
 
 | 上游状态 | 下游行为 |
 |----------|----------|
-| parser 系统异常 | FAILED |
-| parser degraded=True | DEGRADED_STRUCTURAL（如果理解成功） |
+| canonical_paper.md missing | BLOCKED_UNDERSTANDING |
+| canonical front matter invalid | BLOCKED_UNDERSTANDING |
+| m2_ready=false | BLOCKED_UNDERSTANDING |
+| canonicalization_status=degraded | DEGRADED_STRUCTURAL（如果理解成功） |
 | no passages | BLOCKED_UNDERSTANDING |
 | no claims | BLOCKED_UNDERSTANDING |
 | missing method evidence | BLOCKED_UNDERSTANDING |
@@ -103,6 +116,9 @@ source (LaTeX/HTML/PDF/MD/TXT)
 | paper_card LLM 失败 | BLOCKED_UNDERSTANDING |
 | formula_cards 核心公式失败 | BLOCKED_UNDERSTANDING |
 | formula_cards 无公式 | SKIPPED，不阻断 |
+| formula_origin=unknown | 详细公式推导 blocked |
+| formula_origin=reconstructed | 只能推测解释，audit 必须可见 |
+| formula_origin=ocr_latex | 必须带 OCR warning 和 confidence cap |
 | teaching_cards 失败 + paper_card 成功 | DEGRADED_STRUCTURAL |
 | audit finding effect=BLOCK | BLOCKED_UNDERSTANDING |
 | audit finding effect=WARNING only | 不阻断，warning 写入 warnings |
@@ -111,10 +127,10 @@ source (LaTeX/HTML/PDF/MD/TXT)
 
 | 状态 | artifact 数量 | 包含 |
 |------|--------------|------|
-| BASELINE_ONLY | 11 | source_status, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, paper_card, formula_cards, teaching_cards, understanding_status, quality_report |
-| SUCCESS | 11 | 同上（card 内容为 LLM 生成） |
-| DEGRADED_STRUCTURAL | 10 | 同上但 teaching_cards 不写（或标记 BASELINE） |
-| BLOCKED_UNDERSTANDING | 8 | source_status, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, understanding_status, quality_report |
+| BASELINE_ONLY | 12 | source_status, canonical_paper.md, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, paper_card, formula_cards, teaching_cards, understanding_status, quality_report |
+| SUCCESS | 12 | 同上（card 内容为 LLM 生成） |
+| DEGRADED_STRUCTURAL | 11 | 同上但 teaching_cards 不写（或标记 BASELINE） |
+| BLOCKED_UNDERSTANDING | 9 | source_status, canonical_paper.md when available, parsed_document, passage_index, claim_evidence, evidence_index, paper_skeleton, understanding_status, quality_report |
 | FAILED | 0-3 | 取决于失败点，可能只有 source_status |
 
 ### 下游判断规则
@@ -148,6 +164,8 @@ These gates require: SUCCESS or DEGRADED status, direction-support fields have e
 M1 reading_plan.json
   → A_READ papers
     → M1.3 原始材料获取
+      → M1 material normalization
+        → canonical_paper.md
       → M2 单篇精读链路
 ```
 
@@ -155,7 +173,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 ## 7. 与上下游模块接口
 
-- 上游：M1.3 原始材料获取（提供源文件）
+- 上游：M1.3 原始材料获取 + material normalization（提供 `canonical_paper.md`）
 - 下游：M3 frontend（消费 artifact JSON）
 - 下游：M4 interactive / drill / advisor（通过 DownstreamGates 判断可用性）
 
@@ -166,7 +184,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | 测试 | 断言 |
 |------|------|
 | test_no_llm_client_baseline_only | status == "BASELINE_ONLY" |
-| test_baseline_artifact_count | 11 artifacts written |
+| test_baseline_artifact_count | 12 artifacts written |
 | test_baseline_no_user_display | allowed_for_user_display is False |
 
 ### SUCCESS 路径测试
@@ -174,7 +192,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | 测试 | 断言 |
 |------|------|
 | test_v2_success_status | status == "SUCCESS" |
-| test_v2_success_artifact_count | 11 artifacts written |
+| test_v2_success_artifact_count | 12 artifacts written |
 | test_v2_success_cards_present | paper_card + formula_cards + teaching_cards written |
 | test_v2_success_user_display | allowed_for_user_display is True |
 
@@ -183,7 +201,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | 测试 | 断言 |
 |------|------|
 | test_degraded_teaching_failed | teaching_cards not written (or BASELINE) |
-| test_degraded_artifact_count | 10 artifacts written |
+| test_degraded_artifact_count | 11 artifacts written |
 | test_degraded_user_display | allowed_for_user_display is True (successful components only) |
 
 ### BLOCKED 路径测试
@@ -191,7 +209,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | 测试 | 断言 |
 |------|------|
 | test_blocked_no_card_artifacts | paper_card / formula_cards / teaching_cards NOT written |
-| test_blocked_artifact_count | 8 artifacts written |
+| test_blocked_artifact_count | 9 artifacts written |
 | test_blocked_no_user_display | allowed_for_user_display is False |
 | test_blocked_has_blocking_reason | blocking_reason is non-empty |
 
@@ -210,9 +228,20 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | test_audit_block_overrides_degraded | DEGRADED + audit BLOCK → BLOCKED |
 | test_audit_warning_does_not_block | WARNING only → not blocked |
 
+### Canonical / formula pipeline 测试
+
+| 测试 | 断言 |
+|------|------|
+| test_pipeline_requires_canonical_paper | missing canonical_paper.md → BLOCKED_UNDERSTANDING |
+| test_pipeline_blocks_invalid_front_matter | invalid front matter → BLOCKED_UNDERSTANDING |
+| test_pipeline_reads_formula_origin | formula_origin preserved into formula_cards/audit |
+| test_pipeline_unknown_formula_blocks_derivation | unknown origin blocks detailed formula derivation |
+| test_pipeline_ocr_formula_has_warning | ocr_latex keeps OCR warning |
+| test_pipeline_top_k_formula_only | only core top-K formulas get deep cards |
+
 ### 全局规则
 
-- M2.5 的结构性状态测试不能替代验收。M2.5 验收必须跑真实 PDF → parser → evidence → real LLM → QualityAuditor → understanding_status 的端到端链路
+- M2.5 的结构性状态测试不能替代验收。M2.5 验收必须跑真实 source acquisition → `canonical_paper.md` → M2.1 canonical reader → evidence → real LLM → QualityAuditor → understanding_status 的端到端链路
 - 不新增依赖
 
 ## 9. 验收标准
@@ -220,7 +249,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - 单篇链路不同状态 artifact 数量正确
 - 状态传递规则正确
 - DownstreamGates 正确
-- 真实验收必须端到端：真实 PDF → parser → evidence → LLM → audit → understanding_status
+- 真实验收必须端到端：真实 source acquisition → `canonical_paper.md` → M2.1 reader → evidence → LLM → audit → understanding_status
 - 真实验收通过 `RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_live_eval.py`
 
 ## 10. 当前实现状态
@@ -234,6 +263,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - understanding_status.json / quality_report.json 已写入
 - DownstreamGates 已实现
 - 测试已覆盖：15+ tests
+- canonical_paper.md pipeline / CanonicalPaperReader / formula_origin full chain / FormulaRegionDetector / FormulaOCRAdapter 为 DOC_DESIGNED / NOT_IMPLEMENTED
 
 ## 11. External Reference Implementation Notes
 

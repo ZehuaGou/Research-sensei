@@ -6,11 +6,11 @@ M1 has three modes:
 
 **Direction Exploration Mode**: Given a broad research direction, search for surveys first, then build a direction framework with method families, chronology stages, landscape anchors, and recommended reading order.
 
-**Focused Acquisition Mode**: Given a narrow query / title / DOI / URL / arXiv ID, find verified + relevant + PDF downloaded papers that can enter M2 for deep reading.
+**Focused Acquisition Mode**: Given a narrow query / title / DOI / URL / arXiv ID, find verified + relevant papers, resolve best available source, normalize raw material, and produce `canonical_paper.md` for M2.
 
 **Seed Paper Expansion Mode**: Given a seed paper (already read or being read), find upstream papers, downstream papers, related surveys, follow-up improvements, and build a local paper relation graph.
 
-M1 does not teach the paper, parse the full paper, or generate paper/formula/drill cards. Those belong to M2.
+M1 does not teach the paper or generate paper/formula/drill cards. M1 does own material normalization: raw PDF / LaTeX / HTML / DeepXiv / parser output is converted into `canonical_paper.md`. M2.1 reads and validates that canonical input.
 
 ## Three Modes
 
@@ -36,13 +36,27 @@ LandscapeAnchor serves direction understanding, not necessarily M2 entry. A Land
 
 ### Focused Acquisition Mode
 
-Status: REAL_E2E_VERIFIED
+Status: PARTIAL_REAL_E2E_VERIFIED
 
 Input: focused query / title / DOI / arXiv ID / URL
 
 Pipeline:
 ```
-user query -> real LLM query plan -> multi-source acquisition -> dedup -> verification -> LLM relevance judge -> download gate -> PDF validation -> reading_plan.json (A_READ_FOR_M2)
+user query
+  -> real LLM query plan
+  -> multi-source acquisition
+  -> dedup
+  -> verification
+  -> LLM relevance judge
+  -> quality ranking
+  -> best available source resolution
+  -> source download
+  -> material normalization
+  -> FormulaRegionDetector
+  -> FormulaOCRAdapter if triggered by policy
+  -> canonical_paper.md
+  -> m2_ready gate
+  -> reading_plan.json (A_READ_FOR_M2)
 ```
 
 A_READ_FOR_M2 must satisfy ALL:
@@ -60,6 +74,8 @@ A_READ_FOR_M2 must satisfy ALL:
 3. `pdf_downloaded == true` and `pdf_metadata_check == passed` and `pdf_title_match == match`
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
+
+Current implemented capability: PDF-focused focused acquisition live eval. DOC_DESIGNED / NOT_IMPLEMENTED capabilities: `canonical_paper.md` pipeline, material normalization, FormulaRegionDetector, FormulaOCRAdapter, MinerU/Marker/DeepXiv structured adapters, formula_origin full chain.
 
 ### Seed Paper Expansion Mode
 
@@ -80,12 +96,30 @@ Output:
 - Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
 - Search/acquisition must use mature projects or official clients through adapters.
 - Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed. arXiv uses a robust official endpoint adapter (ARIS-style) with full diagnostic discipline. OpenAlex uses `pyalex`. Semantic Scholar uses official REST API via httpx with proxy support. Crossref uses `habanero`.
-- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML, or validated PDF (fallback). Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
+- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML/XML/DeepXiv structured output, or validated PDF parser output. Current verified implementation uses PDF-only path; canonical material normalization is DOC_DESIGNED / NOT_IMPLEMENTED.
+- M1 must produce `canonical_paper.md` before M2. `metadata_only` cannot enter M2. A raw PDF cannot bypass M1 canonicalization.
+- Formula parsing, formula region detection, pix2tex/LaTeX-OCR, MinerU, Marker, and DeepXiv structured adapters are formal architecture components. They are adapter-based, status-gated, and policy-triggered; they are not default full-batch operations.
 - M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Mock/fake/skip are not valid test outcomes for M1.
 
 ## Reused Components
+
+## External Projects / Adapter Candidates
+
+| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
+|---|---|---|---|---|---|---|---|
+| ARIS / Auto-claude-code-research-in-sleep | M1.1-M1.5 | 科研自动化 workflow、文献搜索流程、verify_papers 三层验证、source diagnostics | `tools/arxiv_fetch.py`, `tools/semantic_scholar_fetch.py`, `tools/openalex_fetch.py`, `tools/deepxiv_fetch.py`, `tools/verify_papers.py`, `skills/research-lit/SKILL.md` | STRATEGY_BORROW | 否 | 不能把 ResearchSensei 改成 ARIS clone；只能借鉴流程、字段、失败处理 | DOC_DESIGNED |
+| ARIS verify_papers | M1.4 | arXiv ID / Crossref DOI / Semantic Scholar fuzzy title 三层验证 | `tools/verify_papers.py` | OPTIONAL_ADAPTER | 否 | 需适配 ResearchSensei Candidate schema；不能直接采用 ARIS artifact | RESEARCH_REQUIRED |
+| DeepXiv / deepxiv_sdk | M1.3 material normalization | arXiv 搜索、brief、head、section、raw markdown、structured JSON、progressive reading | `deepxiv_sdk/reader.py`, `deepxiv_sdk/cli.py`; 必须调研 reader 输出字段、CLI 参数、raw/json 格式 | OPTIONAL_ADAPTER | 否 | 不能作为唯一正式发表论文来源；不负责顶会顶刊质量判断；不保证 formula source fidelity | RESEARCH_REQUIRED |
+| Semantic Scholar | M1.2 / M1.4 | 正式发表论文、venue、citation、publicationTypes、openAccessPdf、fieldsOfStudy | Official Graph API `/graph/v1/paper/search`, `/graph/v1/paper/{id}`; existing `SemanticScholarAdapter` | DIRECT_DEPENDENCY | 是 | 免费层限流；API key 可选；字段缺失需要降级 | IMPLEMENTED |
+| OpenAlex | M1.2 / M1.4 | venue、OA URL、citation、topics、concepts、institution、metadata | `pyalex.Works`, inverted abstract reconstruction; existing `OpenAlexAdapter` | DIRECT_DEPENDENCY | 是 | topic/venue 字段需归一化；不是唯一质量源 | IMPLEMENTED |
+| Crossref | M1.2 / M1.4 | DOI、publisher metadata、container-title、正式出版验证 | `habanero.Crossref.works`, DOI lookup; existing `CrossrefAdapter` | DIRECT_DEPENDENCY | 是 | 覆盖偏出版 metadata；不提供完整全文 | IMPLEMENTED |
+| arXiv source/e-print | M1.3 source acquisition | LaTeX source / PDF 获取；preprint/source 获取 | arXiv API, e-print/source endpoint, PDF endpoint, existing `ArxivAdapter`; source adapter must inspect source package and main `.tex` | DIRECT_DEPENDENCY | 是 | arXiv 是 source/preprint 获取源，不是质量判断源；429/503 需要 retry/backoff | DOC_DESIGNED |
+| DBLP | M1.4 quality ranking | CS venue / publication venue metadata 校验 | DBLP API / XML dumps; 必须调研 venue field、conference/journal mapping、本地化数据方式 | OPTIONAL_ADAPTER | 否 | venue 缩写与论文 title 匹配易错；需要去重 | RESEARCH_REQUIRED |
+| OpenReview | M1.4 quality ranking | ICLR/NeurIPS workshop/review status、投稿/接收状态 | OpenReview API / venue group endpoints; 必须调研 forum/invitation/venueid 字段 | OPTIONAL_ADAPTER | 否 | 覆盖有限；不同 venue schema 不统一 | RESEARCH_REQUIRED |
+| CORE | M1.2 / M1.3 | open access metadata / OA source discovery | CORE API / provider metadata; 必须调研 API key、rate limit、OA URL 字段 | OPTIONAL_ADAPTER | 否 | API key / coverage / quality信号有限 | RESEARCH_REQUIRED |
+| CCF ranking data | M1.4 quality ranking | CCF A/B/C 会议期刊质量辅助判断 | CCF ranking dataset source; 必须调研可本地化 ranking 数据、license、更新频率 | OPTIONAL_ADAPTER | 否 | 不能凭空实现 ranking；非 CS 领域不适用 | RESEARCH_REQUIRED |
 
 | Capability | Implementation | Adapter |
 |---|---|---|
@@ -94,6 +128,10 @@ Output:
 | Semantic Scholar metadata/search | httpx REST API (custom adapter) | `SemanticScholarAdapter` |
 | Crossref DOI metadata | `habanero` | `CrossrefAdapter` |
 | Best available source resolution | arXiv source / structured HTML / PDF with retry/backoff | `PaperSourceResolver` |
+| Structured paper reading | DeepXiv structured output / publisher HTML/XML through adapter | `StructuredSourceAdapter` |
+| PDF/layout normalization | MinerU / Marker / Docling through adapter | `MaterialNormalizerAdapter` |
+| Formula region detection | layout/parser formula bbox extraction | `FormulaRegionDetector` |
+| Formula OCR | pix2tex / LaTeX-OCR through adapter | `FormulaOCRAdapter` |
 
 All third-party packages are isolated behind adapters so the core schemas and selection logic remain replaceable.
 
@@ -144,11 +182,20 @@ These strategies are not optional optimizations. They are part of M1 real valida
 - **Reference use**: STRATEGY_BORROW
 - **Borrowed behavior**: Download only top-relevant PDFs; PDF download uses User-Agent / retry / backoff; PDF size guard; PDF header validation
 - **ResearchSensei-owned target**: `source_resolution.json`
-- **Schema / artifact impact**: `source_type`, `source_priority`, `preferred_m2_input`, `latex_source_url`, `latex_source_downloaded`, `latex_source_path`, `latex_source_sha256`, `latex_source_format`, `latex_main_file`, `structured_html_url`, `structured_html_downloaded`, `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`, `source_confidence`, `source_warning`
+- **Schema / artifact impact**: `source_type`, `source_priority`, `preferred_m2_input=canonical_paper.md`, `latex_source_url`, `latex_source_downloaded`, `latex_source_path`, `latex_source_sha256`, `latex_source_format`, `latex_main_file`, `structured_html_url`, `structured_html_downloaded`, `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`, `source_confidence`, `canonicalization_status`, `m2_ready`, `source_warning`
 - **Boundary**: M1 does lightweight source validation only, not M2 full-text parsing. Source files not committed to git. Does not download all candidates.
 - **Validation implication**: M1 must try LaTeX source first, then structured HTML, then PDF. At least one deep-reading source downloaded. Metadata-only cannot enter M2.
 
 M1.3 不只下载 PDF。M1.3 必须优先尝试获取 LaTeX source / arXiv source。如果 source 不可得，再尝试 structured HTML / XML。最后才是 PDF。
+
+### M1.3.5 Material Normalization / canonical_paper.md
+
+- **Reference source**: DeepXiv structured reading ideas, MinerU / Marker layout extraction, pix2tex / LaTeX-OCR formula OCR, ARIS source verification discipline
+- **Reference use**: OPTIONAL_ADAPTER / STRATEGY_BORROW
+- **ResearchSensei-owned target**: `canonical_paper.md`
+- **Schema / artifact impact**: YAML front matter, normalized sections, formula blocks, source/confidence/status fields
+- **Boundary**: Does not force all papers into true LaTeX. LaTeX source yields `source_latex`; parser/OCR/reconstruction must be labelled.
+- **Validation implication**: M2 may only consume `canonical_paper.md` with `m2_ready=true` or explicit override. Metadata-only cannot enter M2.
 
 ### M1.4 Dedup / Verification / Relevance
 
@@ -194,6 +241,13 @@ PaperSourceResolver.resolve_many()
   -> then structured_html
   -> then pdf
   -> source_resolution.json
+MaterialNormalizationService.normalize()
+  -> read best available source
+  -> generate normalized Markdown sections
+  -> detect formula regions
+  -> run FormulaOCRAdapter when policy triggers
+  -> canonical_paper.md
+  -> canonicalization_status + m2_ready
 SelectionService.build_reading_plan()
   -> filtered_candidates.json + reading_plan.json
 ```
@@ -313,9 +367,10 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 ### M1.3 Source Priority
 
 1. **latex_source** — preferred when arXiv source / LaTeX source package is available; best for formulas, citations, section hierarchy, labels, references, and bibliography
-2. **structured_html** — preferred when publisher/arXiv HTML is available; useful for reading order and MathML/HTML structure
-3. **pdf** — acceptable for M2 only when source is unavailable; must pass PDF validation and title match; formula fidelity is lower than source
-4. **metadata_only** — can be used for landscape anchor or reference; cannot enter M2 deep reading
+2. **structured_html / xml / deepxiv_structured** — preferred when publisher/arXiv HTML/XML or DeepXiv structured output is available; useful for reading order and MathML/HTML structure
+3. **pdf_parser_output** — acceptable for M2 only when source is unavailable; must pass PDF validation, title match, parser status, and canonicalization gate
+4. **low_confidence_text_fallback** — can produce degraded `canonical_paper.md` only when sufficient body text exists; formula explanation is blocked or degraded
+5. **metadata_only** — can be used for landscape anchor or reference; cannot enter M2 deep reading
 
 ### source_resolution.json Schema
 
@@ -323,9 +378,9 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 {
   "paper_id": "",
   "title": "",
-  "source_type": "latex_source | structured_html | pdf | metadata_only",
+  "source_type": "latex_source | structured_html | xml | deepxiv_structured | pdf_parser_output | low_confidence_text_fallback | metadata_only",
   "source_priority": 1,
-  "preferred_m2_input": "latex_source | structured_html | pdf | none",
+  "preferred_m2_input": "canonical_paper.md | none",
 
   "latex_source_url": "",
   "latex_source_downloaded": false,
@@ -351,9 +406,184 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
   "pdf_error": "",
 
   "source_confidence": "high | medium | low",
+  "canonicalization_status": "not_started | success | degraded | blocked",
+  "m2_ready": false,
+  "degradation_reason": [],
   "source_warning": []
 }
 ```
+
+## M1.3.5 Material Normalization
+
+M1 Material Normalization converts the best available source into `canonical_paper.md`. This is the M1→M2 core contract.
+
+### Inputs
+
+- verified candidate metadata
+- `source_resolution.json`
+- downloaded LaTeX source / structured HTML / XML / DeepXiv structured output / validated PDF / parser output
+- optional parser/layout outputs from MinerU, Marker, Docling, GROBID, PyMuPDF
+- formula OCR policy config
+
+### Outputs
+
+- `canonical_paper.md`
+- normalization warnings
+- `canonicalization_status`
+- `m2_ready`
+- formula block metadata
+
+### canonical_paper.md front matter
+
+```yaml
+---
+paper_id:
+title:
+authors:
+year:
+venue:
+source_type:
+source_confidence:
+canonicalization_status:
+parser_used:
+m2_ready:
+degradation_reason:
+---
+```
+
+### canonical body
+
+The body should preserve these sections when available:
+
+- Title
+- Abstract
+- Introduction
+- Related Work
+- Method
+- Experiments
+- Conclusion
+- References
+
+Missing sections remain missing with warnings. Empty generated placeholders are not allowed.
+
+### Formula block format
+
+````markdown
+<!-- formula_id: eq1 | origin: ocr_latex | section: Method | page: 4 | bbox: [x1,y1,x2,y2] | ocr_status: success -->
+```latex
+\mathcal{L} = ...
+```
+````
+
+### Formula origin
+
+| origin | Meaning | M2 consequence |
+|---|---|---|
+| `source_latex` | From original LaTeX source | High-confidence formula explanation allowed with evidence |
+| `parser_latex` | From structured parser / MathML / PDF parser | Explanation allowed with parser warning |
+| `ocr_latex` | From FormulaOCRAdapter | Explanation allowed with OCR warning and confidence cap |
+| `reconstructed` | Reconstructed by model/rules from context | Speculative explanation only |
+| `unknown` | Formula detected but LaTeX unavailable | Detailed derivation blocked |
+
+### FormulaRegionDetector
+
+Input:
+- parser/layout blocks
+- page images if available
+- page size / text region metadata
+- section context
+
+Output:
+- `formula_id`
+- `formula_bbox`
+- `formula_page`
+- `formula_context_before`
+- `formula_context_after`
+- `detector_confidence`
+- warnings
+
+Failure conditions:
+- no bbox
+- bbox outside page bounds
+- duplicate or unstable formula_id
+- no section alignment
+- confidence below configured threshold
+
+Gate rules:
+- detector failure does not block `canonical_paper.md` when text is sufficient
+- detector failure sets formula extraction status degraded
+- formula explanation is blocked unless a reliable LaTeX source exists from another path
+
+Current status: DOC_DESIGNED / NOT_IMPLEMENTED.
+
+### FormulaOCRAdapter
+
+Input:
+- formula region image
+- bbox
+- page number
+- surrounding text
+- OCR config
+
+Output:
+- `formula_latex`
+- `formula_origin=ocr_latex`
+- `formula_ocr_status`
+- `ocr_confidence`
+- warnings
+
+Candidate implementations:
+- pix2tex / LaTeX-OCR
+
+Trigger conditions:
+- user requests formula explanation
+- M2 marks formula as core top-K
+- parser detected a formula region but did not provide reliable LaTeX
+- `parser_latex` conflicts with surrounding context and requires OCR verification
+- deep reading mode requests formula-level explanation
+
+Run policy:
+
+```yaml
+formula_ocr_enabled: true
+default_formula_ocr_mode: on_demand
+max_formula_ocr_per_paper: 3
+max_formula_ocr_batch: 10
+formula_ocr_timeout_seconds: configurable
+```
+
+Failure conditions:
+- timeout
+- GPU/resource error
+- low OCR confidence
+- malformed LaTeX
+- context mismatch
+
+Gate rules:
+- failed OCR writes `formula_ocr_status=failed`
+- OCR result never becomes `source_latex`
+- OCR result cannot silently upgrade to high-confidence explanation
+
+Current status: DOC_DESIGNED / NOT_IMPLEMENTED.
+
+### m2_ready gate
+
+`m2_ready=true` requires:
+
+- front matter contains `paper_id`, `title`, `source_type`, `source_confidence`, `canonicalization_status`
+- canonical body has abstract or enough body text
+- source is not `metadata_only`
+- formula blocks, if present, include `formula_id` and `origin`
+- degradation reasons are explicit
+
+Blocked conditions:
+
+- metadata-only input
+- missing title or paper identity
+- empty body
+- no source status
+- formula blocks without origin
+- security rejection or parser corruption
 
 ### Source Resolution Strategy
 
@@ -451,22 +681,27 @@ Priorities:
 A_READ_FOR_M2 must have one valid deep-reading input:
 
 **Either** (preferred):
-- `preferred_m2_input == latex_source`
+- `source_type == latex_source`
 - `latex_source_downloaded == true`
 - `latex_main_file` exists
 - `source_confidence in {high, medium}`
 
 **Or**:
-- `preferred_m2_input == structured_html`
+- `source_type in {structured_html, xml, deepxiv_structured}`
 - `structured_html_downloaded == true`
 - `source_confidence in {high, medium}`
 
 **Or** (fallback):
-- `preferred_m2_input == pdf`
+- `source_type == pdf_parser_output`
 - `pdf_downloaded == true`
 - `pdf_metadata_check == passed`
 - `pdf_title_match == match`
 - `source_confidence in {high, medium}`
+
+And in all cases:
+- `canonicalization_status in {success, degraded}`
+- `m2_ready == true`
+- `canonical_paper.md` exists
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
 
@@ -489,6 +724,7 @@ If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`
 | `query_plan.json` | Real LLM-generated query plan |
 | `candidate_pool.json` | Raw candidate pool and source metrics |
 | `source_resolution.json` | PDF/source acquisition status and download metadata |
+| `canonical_paper.md` | Markdown-first canonical input for M2 |
 | `filtered_candidates.json` | Final candidates with verification/LLM relevance/PDF fields |
 | `reading_plan.json` | Prioritized plan with A_READ_FOR_M2/B_SKIM/C_REFERENCE and warnings |
 
@@ -519,7 +755,7 @@ python scripts/run_live_eval.py
 
 当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
 
-未来验收必须满足：
+DOC_DESIGNED 验收要求：
 
 - broad direction query uses real LLM and real network
 - `survey_candidates.json` exists
@@ -533,25 +769,32 @@ python scripts/run_live_eval.py
 
 ### Focused Acquisition Mode 验收
 
-当前状态：REAL_E2E_VERIFIED。
+当前状态：PARTIAL_REAL_E2E_VERIFIED。
+
+当前 IMPLEMENTED 范围：PDF-focused focused acquisition live eval。完整 focused acquisition 的 canonical material normalization 能力为 DOC_DESIGNED / NOT_IMPLEMENTED。
 
 验收必须满足：
 
 - `query_plan.json` exists
 - `candidate_pool.json` exists
 - `source_resolution.json` exists
+- `canonical_paper.md` exists for each A_READ entering M2
 - `filtered_candidates.json` exists
 - `reading_plan.json` exists
 - `sources_success >= 3`
 - `verified_candidate_count` exists
 - `llm_judged_candidate_count` exists
 - at least one deep-reading source downloaded (latex_source or structured_html or pdf)
+- `canonicalization_status` recorded
+- `m2_ready=true` for every A_READ entering M2
 - every `A_READ_FOR_M2` satisfies:
   - `verification_status == verified`
   - `llm_relevance_score >= 0.65`
   - `llm_relevance_label in {HIGH, MEDIUM}`
   - `should_a_read == true`
-  - has one valid deep-reading input (latex_source or structured_html or pdf with title match)
+  - has one valid deep-reading input (latex_source or structured_html/deepxiv_structured/xml or pdf_parser_output with title match)
+  - has `canonical_paper.md`
+  - has explicit `source_type`, `source_confidence`, `canonicalization_status`, `m2_ready`
   - `can_enter_m2 == true`
 
 **degraded_passed**:
@@ -565,7 +808,8 @@ python scripts/run_live_eval.py
 **failed**:
 
 - `sources_success < 2`
-- or no validated PDF downloaded
+- or no valid deep-reading source downloaded
+- or no `canonical_paper.md` for A_READ
 - or no A_READ paper
 - or any A_READ has `can_enter_m2=false`
 
@@ -573,7 +817,7 @@ python scripts/run_live_eval.py
 
 当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
 
-未来验收必须满足：
+DOC_DESIGNED 验收要求：
 
 - seed paper metadata exists
 - `paper_relation_graph.json` exists
@@ -602,11 +846,20 @@ M1 real validation has observed:
 
 M1 still does not perform:
 
-- full PDF parsing
+- M2 evidence parsing
 - paper understanding
 - teaching card generation
 - formula explanation
 - direction synthesis
 - advisor/drill/interactive learning
+
+M1 DOC_DESIGNED / NOT_IMPLEMENTED capabilities:
+
+- `canonical_paper.md` generation
+- material normalization from LaTeX / structured HTML / XML / DeepXiv / PDF parser output
+- FormulaRegionDetector
+- FormulaOCRAdapter
+- MinerU / Marker / DeepXiv structured adapters
+- formula_origin full-chain propagation
 
 Those are later phases and must not be counted as completed by M1 live validation.
