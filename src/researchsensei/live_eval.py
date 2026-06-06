@@ -380,6 +380,8 @@ def run_m1_live_search(
 
     sample_a_read = [_a_read_sample(item) for item in a_read_items[: config.max_live_cases]]
 
+    run_dir = workspace.root / "runs" / "m1-live"
+
     # Canonical metrics from canonicalization_summary.json
     canon_summary_path = run_dir / "canonicalization_summary.json"
     canon_summary = {}
@@ -389,7 +391,6 @@ def run_m1_live_search(
         except Exception:
             pass
 
-    run_dir = workspace.root / "runs" / "m1-live"
     return {
         "name": "m1_live_search",
         "status": status,

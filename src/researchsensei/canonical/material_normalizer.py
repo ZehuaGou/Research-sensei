@@ -196,12 +196,19 @@ class MaterialNormalizer:
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
     ) -> SourcePriority:
         """Determine source priority from paper and source metadata."""
-        # Check for LaTeX source availability
+        # Check for LaTeX source availability (arXiv e-print tar.gz)
         if source and source.source_type.value == "ARXIV_SOURCE":
             if source.status in (PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,):
-                # arXiv source available — try to detect if we can get LaTeX
+                # Check if the downloaded file is actually a LaTeX source (tar.gz)
+                if source.local_path:
+                    from pathlib import Path
+                    local = Path(source.local_path)
+                    if local.exists() and local.suffix in ('.gz', '.tar', '.tgz'):
+                        return SourcePriority.LATEX_SOURCE
+                    # Otherwise it's a PDF downloaded from arXiv
+                    return SourcePriority.PDF
                 if paper.arxiv_id:
-                    return SourcePriority.LATEX_SOURCE
+                    return SourcePriority.PDF  # PDF, not LaTeX source
 
         # Check for structured HTML
         if source and source.content_type and "html" in source.content_type.lower():
@@ -255,26 +262,31 @@ class MaterialNormalizer:
         formula_blocks: list[FormulaBlock] = []
         sections: dict[str, str] = {}
 
-        # Try to download arXiv source
+        # Check if we have a local LaTeX source (tar.gz)
         source_path = None
         if source and source.local_path:
             source_path = Path(source.local_path)
-
-        if not source_path or not source_path.exists():
-            # Try to download arXiv source
-            if paper.arxiv_id:
+            if source_path.exists() and source_path.suffix in ('.gz', '.tar', '.tgz'):
+                # This is a LaTeX source archive
                 try:
-                    source_path = self._download_arxiv_source(paper.arxiv_id, source)
+                    sections, formula_blocks = self._parse_latex_source(source_path)
+                    return sections, formula_blocks, "latex_source_parser", warnings
                 except Exception as exc:
-                    warnings.append(f"Failed to download arXiv source: {exc}")
-                    return self._extract_from_pdf(paper, source)
+                    warnings.append(f"LaTeX source parsing failed: {exc}")
+            elif source_path.exists() and source_path.suffix == '.pdf':
+                # This is a PDF, not LaTeX source - fall back to PDF extraction
+                warnings.append("arXiv source is PDF, not LaTeX archive. Using PDF extraction.")
+                return self._extract_from_pdf(paper, source)
 
-        if source_path and source_path.exists():
+        # Try to download arXiv source (tar.gz)
+        if paper.arxiv_id:
             try:
-                sections, formula_blocks = self._parse_latex_source(source_path)
-                return sections, formula_blocks, "latex_source_parser", warnings
+                source_path = self._download_arxiv_source(paper.arxiv_id, source)
+                if source_path and source_path.exists():
+                    sections, formula_blocks = self._parse_latex_source(source_path)
+                    return sections, formula_blocks, "latex_source_parser", warnings
             except Exception as exc:
-                warnings.append(f"LaTeX source parsing failed: {exc}")
+                warnings.append(f"Failed to download arXiv source: {exc}")
 
         # Fallback to PDF
         warnings.append("LaTeX source unavailable, falling back to PDF.")

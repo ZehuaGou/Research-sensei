@@ -45,7 +45,7 @@ class ArxivAdapter:
             try:
                 results = self._fetch_atom(q, max_results=max_results)
                 for r in results:
-                    aid = r.get("arxiv_id", "")
+                    aid = r.arxiv_id if hasattr(r, 'arxiv_id') else ""
                     if aid and aid not in seen_ids:
                         seen_ids.add(aid)
                         all_results.append(r)

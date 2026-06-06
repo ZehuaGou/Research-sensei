@@ -81,7 +81,7 @@ class TestSourcePriority:
         result = normalizer.normalize(paper, source)
         assert result.source_priority in (SourcePriority.PDF, SourcePriority.LATEX_SOURCE)
 
-    def test_arxiv_source_gets_latex_priority(self):
+    def test_arxiv_source_gets_pdf_priority_when_pdf(self):
         normalizer = MaterialNormalizer()
         paper = _make_paper(arxiv_id="2401.12345", pdf_downloaded=True)
         source = _make_source(
@@ -89,7 +89,8 @@ class TestSourcePriority:
             status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
         )
         result = normalizer.normalize(paper, source)
-        assert result.source_priority == SourcePriority.LATEX_SOURCE
+        # arXiv PDF download gets PDF priority (not LATEX_SOURCE unless it's a tar.gz)
+        assert result.source_priority == SourcePriority.PDF
 
 
 class TestCanonicalPaperGeneration:

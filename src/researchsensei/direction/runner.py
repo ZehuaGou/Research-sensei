@@ -94,10 +94,10 @@ class DirectionRunner:
         )
 
         # Step 5: Select candidates for download
-        # Only download: verified/relevant + should_download=true
+        # Download: verified/relevant + should_download=true, OR arxiv papers with PDF URLs
         download_candidates = [
             c for c in llm_judged_candidates
-            if self._should_download(c)
+            if self._should_download(c) or self._should_download_arxiv(c)
         ]
         download_ids = {c.paper_id for c in download_candidates}
 
@@ -214,6 +214,16 @@ class DirectionRunner:
             and candidate.llm_relevance_score >= 0.65
             and candidate.llm_relevance_label in ("HIGH", "MEDIUM")
             and candidate.rule_relevance_score >= 0.45
+        )
+
+    @staticmethod
+    def _should_download_arxiv(candidate: CandidatePaper) -> bool:
+        """Always try to download arXiv papers with PDF URLs (reliable source)."""
+        return (
+            candidate.verification_status == VerificationStatus.VERIFIED
+            and bool(candidate.arxiv_id)
+            and bool(candidate.pdf_url)
+            and candidate.rule_relevance_score >= 0.3
         )
 
     def _acquire(
