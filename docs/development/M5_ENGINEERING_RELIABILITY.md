@@ -146,8 +146,6 @@ Parser evaluation must record:
 - CI
 - no PDF/report/API key committed
 
-## 4. 可复用开源项目 / 外部服务调研
-
 ## External Projects / Adapter Candidates
 
 | 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
@@ -158,14 +156,6 @@ Parser evaluation must record:
 | Playwright | M5.2 / M5.7 | 真实前端 E2E；上传、学习页、方向页、seed expansion 页面验收 | `playwright test`, trace/screenshot/video, fixtures；必须调研 Vite+FastAPI 启动 fixture | DIRECT_DEPENDENCY | 否 | 浏览器安装和运行时间；需要隔离 artifacts | DOC_DESIGNED |
 | gitleaks | M5.5 / M5.7 | secret scanning | `gitleaks detect`, config file, baseline support；必须调研 Windows CLI、CI exit code、allowlist | DIRECT_DEPENDENCY | 否 | 误报需要 allowlist；不能扫描进大文件 artifact | DOC_DESIGNED |
 | TruffleHog | M5.5 / M5.7 | secret scanning / verification | `trufflehog git/filesystem`; 必须调研 AGPL/license、verification mode、CI exit code | OPTIONAL_ADAPTER | 否 | AGPL / 扫描重 / 网络 verification 成本 | RESEARCH_REQUIRED |
-
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| Vitest | 前端测试 | vitest.dev | devDependency | 否 | 无 | ✅ 已引入 |
-| pytest | 后端测试 | pytest.org | devDependency | 是 | 无 | ✅ 已使用 |
-| gitleaks | secret scanning | github.com/gitleaks/gitleaks | CI tool | 否 | — | 待引入 |
-
----
 
 ## 5. M5.1 后端测试
 
@@ -191,7 +181,7 @@ Parser evaluation must record:
 ### 核心工具 / 命令
 
 ```bash
-# 默认小样本真实回归
+# Current default tests
 python -m pytest -q
 
 # manual / nightly / optional live validation
@@ -200,7 +190,8 @@ RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_l
 
 ### 状态流 / 错误策略
 
-- `python -m pytest -q` 默认运行稳定小样本真实链路，不把 heavy OCR / GPU parser / batch live eval 放入默认阻塞项
+- `python -m pytest -q` 当前默认运行已实现的稳定单元/API/组件回归，不要求未实现的 canonical pipeline 通过
+- Target default tests after canonical pipeline implementation 必须包含稳定小样本真实链路，但不把 heavy OCR / GPU parser / batch live eval 放入默认阻塞项
 - mock/fake/skip 不是模块完成依据
 - 缺 key / 缺网络 / 额度不足 / API 限流 / PDF 下载失败不能被汇报为真实验收通过
 - MockLLMClient 已从 src/ 和 tests/ 中删除
@@ -209,9 +200,21 @@ RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1 python scripts/run_l
 - 涉及 PDF/source 的完成验收必须真实下载或读取材料
 - default structural/real-smoke 和 manual/nightly live validation 必须在报告中明确区分
 
-### Default small real chain
+### Current default tests
 
-Default tests must include a stable small real chain:
+Current default tests cover implemented behavior only:
+
+```text
+existing backend pytest suite
+existing frontend component tests when invoked separately
+implemented API/workspace/parser/status checks
+no requirement to generate canonical_paper.md until canonical pipeline code exists
+no requirement to run FormulaRegionDetector / FormulaOCRAdapter until those adapters exist
+```
+
+### Target default tests after canonical pipeline implementation
+
+After the canonical pipeline is implemented, default tests must include a stable small real chain:
 
 ```text
 search / load one real paper
@@ -220,7 +223,7 @@ M2 reads canonical_paper.md
 generate basic paper_card
 ```
 
-Formula chain default test:
+Target formula chain default test:
 
 ```text
 1 real paper
@@ -231,7 +234,7 @@ real canonical_paper.md write
 M2 reads that formula block
 ```
 
-### Manual / nightly / optional heavy tests
+### Manual/nightly heavy tests
 
 These are formal validation targets but not default full-batch blockers:
 
@@ -258,7 +261,8 @@ multi-formula OCR batch
 ### 验收标准
 
 - `python -m pytest -q` 全部通过
-- 默认测试包含稳定小样本真实链路
+- Current default tests 只要求当前已实现能力通过
+- Target default tests after canonical pipeline implementation 包含稳定小样本真实链路
 - manual / nightly / optional live validation 真实联网、真实 LLM、真实 PDF/source、真实 OCR/parser when configured
 - live validation 缺 env/key/network 时必须报告失败，不能汇报为通过
 
@@ -398,8 +402,8 @@ python scripts/run_live_eval.py
 | test_m2_real_llm_smoke | 显式开启后真实 LLM 走 M2 parser/evidence/v2 builders/audit/status |
 | test_real_pdf_end_to_end | 真实搜索 → 真实 PDF 下载 → parser → evidence → LLM → audit → status |
 | test_full_live_eval_writes_report | 写出 live eval report 且不包含 secret 值 |
-| test_default_real_canonical_chain | one real paper → canonical_paper.md → M2 reader → basic paper_card |
-| test_default_formula_chain_one_region | one real formula region → FormulaRegionDetector → FormulaOCRAdapter when triggered → canonical block → M2 read |
+| test_target_default_real_canonical_chain | after canonical pipeline implementation: one real paper → canonical_paper.md → M2 reader → basic paper_card |
+| test_target_default_formula_chain_one_region | after formula pipeline implementation: one real formula region → FormulaRegionDetector → FormulaOCRAdapter when triggered → canonical block → M2 read |
 | test_nightly_formula_ocr_batch | multi-formula OCR batch under nightly/manual marker |
 | test_nightly_mineru_marker_pipeline | MinerU/Marker full flow under nightly/manual marker |
 
@@ -412,7 +416,7 @@ python scripts/run_live_eval.py
 - live eval 能区分 mock 回归和真实效果评估
 - live eval report 不提交 git
 - 真实 PDF e2e 必须真实下载 PDF，不能用 synthetic 替代
-- canonical_paper.md chain 必须真实写入并被 M2 读取
+- Target canonical_paper.md chain 必须真实写入并被 M2 读取；当前代码未实现时不得作为 current default gate
 - formula OCR/parser heavy validation 按 manual / nightly / optional 运行策略执行
 
 ### 当前实现状态
@@ -679,7 +683,7 @@ python scripts/run_live_eval.py
 CI / release readiness 必须区分三类结果：
 
 1. local structural check: 可以只证明代码结构和构建没有明显错误；不能标记模块完成；不能标记 release ready
-2. default small real chain: 必须跑稳定小样本真实链路，包括 `canonical_paper.md` 写入与 M2 读取；可以作为日常回归基础
+2. target default small real chain after canonical pipeline implementation: 必须跑稳定小样本真实链路，包括 `canonical_paper.md` 写入与 M2 读取；当前未实现时不能作为 current default gate
 3. real release validation: 必须真实联网；必须真实调用 LLM；必须真实下载/解析 source/PDF；必须按配置运行 OCR/parser live validation；必须运行 frontend build/test；必须运行 secret scan；失败则不得发布
 
 如果 CI 环境没有配置 API key / network / live env，只能报告 "real release validation not run"，不能报告 release ready

@@ -54,11 +54,12 @@ Output:
 - `query_plan.json`
 - `candidate_pool.json`
 - `source_resolution.json`
-- `canonical_paper.md` when a paper is selected for M2
+- current verified artifact path: validated PDF source for selected papers
+- target canonical artifact path: `canonical_paper.md` when material normalization succeeds or degrades acceptably
 - `filtered_candidates.json` — final candidates with verification/LLM relevance/PDF fields
 - `reading_plan.json` — with `A_READ_FOR_M2` papers
 
-Boundary: Does not generate paper cards or teaching output. It does perform material normalization for selected papers and writes the M2 canonical input.
+Boundary: Does not generate paper cards or teaching output. Current verified implementation gates selected papers by PDF availability and title/metadata checks. Target implementation performs material normalization for selected papers and writes the M2 canonical input.
 
 **M1 Source Acquisition Contract**:
 
@@ -121,7 +122,7 @@ FormulaOCRAdapter:
 - If `canonical_paper.md` cannot be produced with title, source status, and at least abstract or body text, set `m2_ready=false` and do not enter M2.
 - If formula source is unknown, the paper may enter M2, but formula explanation gates must be degraded.
 
-**Live validation contract**:
+**Current verified PDF-only gate**:
 
 - focused query uses real LLM and real network
 - `sources_success >= 3`
@@ -129,6 +130,18 @@ FormulaOCRAdapter:
 - `llm_judged_candidate_count` exists
 - `pdf_download_success_count >= 1`
 - every `A_READ_FOR_M2` has: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `pdf_downloaded == true`, `pdf_metadata_check == passed`, `pdf_title_match == match`, `can_enter_m2 == true`
+
+This PDF-only gate is the current live-verified gate. It must not be treated as the future M1→M2 canonical contract.
+
+**Target canonical_paper.md gate**:
+
+- focused query uses real LLM and real network
+- `sources_success >= 3`
+- `verified_candidate_count` exists
+- `llm_judged_candidate_count` exists
+- every `A_READ_FOR_M2` has: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `source_type != metadata_only`, `canonical_paper.md exists`, `canonicalization_status in {success, degraded}`, `m2_ready==true`
+
+This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 
 **Failure contract**:
 
@@ -138,6 +151,7 @@ FormulaOCRAdapter:
 - PDF download failure → `FAILED_DOWNLOAD` status, not silently skipped
 - Verification API failure → `verify_pending`, not `unverified`
 - PDF mismatch cannot enter `A_READ_FOR_M2`
+- canonical target failure (`metadata_only`, missing `canonical_paper.md`, `canonicalization_status=blocked`, or `m2_ready=false`) cannot enter M2
 
 **Current status**: REAL_E2E_VERIFIED
 
@@ -458,20 +472,34 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - `query_plan.json`
 - `candidate_pool.json`
 - `source_resolution.json`
+- current verified artifact path: validated PDF source for selected papers
+- target canonical artifact path: `canonical_paper.md`
 - `filtered_candidates.json`
 - `reading_plan.json` with `A_READ_FOR_M2`
 
-**Live validation contract**:
+**Current verified PDF-only gate**:
 - focused query uses real LLM and real network
 - `sources_success >= 3`
 - `pdf_download_success_count >= 1`
 - every `A_READ_FOR_M2` is verified, relevant, PDF downloaded, `pdf_metadata_check=passed`, `pdf_title_match=match`, `can_enter_m2=true`
+
+**Target canonical_paper.md gate**:
+- focused query uses real LLM and real network
+- `sources_success >= 3`
+- every `A_READ_FOR_M2` is verified and relevant
+- `source_type != metadata_only`
+- `canonical_paper.md exists`
+- `canonicalization_status in {success, degraded}`
+- `m2_ready==true`
+
+This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 
 **Failure contract**:
 - missing LLM client → fail
 - no verified relevant PDF → fail
 - API 429/503 must be recorded with source metrics
 - PDF mismatch cannot enter `A_READ_FOR_M2`
+- canonical target failure (`metadata_only`, missing `canonical_paper.md`, `canonicalization_status=blocked`, or `m2_ready=false`) cannot enter M2
 
 **Current status**: REAL_E2E_VERIFIED
 

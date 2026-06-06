@@ -37,7 +37,7 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M2 | canonical input reader / validator | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | M2.1 读取并校验 canonical_paper.md、转换 evidence-ready blocks，代码未实现 |
 | M2 | formula_origin full chain | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | source_latex/parser_latex/ocr_latex/reconstructed/unknown 规则已设计，端到端未实现 |
 | M2 | LaTeXSourceParser | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 职责前移到 M1 material normalization，文档已设计，代码未实现 |
-| M2 | MinerUAdapter / MarkerAdapter / DoclingAdapter | not implemented | — | EVALUATED_IN_DOC, NOT_IMPLEMENTED | 作为 M1 normalization 候选 adapter 评估，代码未实现 |
+| M2 | MinerUAdapter / MarkerAdapter / DoclingAdapter | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 作为 M1 normalization 候选 adapter 评估，代码未实现 |
 | M2 | Source-aware parser selection | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 职责调整为 M1 source/material selection，M2 不直接处理混乱原始输入 |
 | M2 | Survey Deep Reading | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 综述论文精读文档已设计，代码未实现 |
 | M3 | PaperWorkspace | partial API/frontend code | component tests | PARTIAL_CODE_NOT_REAL_VALIDATED | 部分 API/前端代码存在，StatusBanner 测试存在，页面级真实后端验证缺失 |
@@ -63,9 +63,11 @@ Focused query: "时间序列异常检测 transformer 方法"
 - Classification paper "Improving position encoding of transformers for multivariate time series classification" was excluded from A_READ by LLM relevance judge
 - LLM: mimo-v2.5-pro, 3265 tokens (3 calls: query planning + relevance judge)
 
-## M1 A_READ Gate (strict, AND logic)
+## Current verified PDF-only A_READ Gate
 
-Every A_READ must satisfy ALL:
+当前已真实验证的 Focused Acquisition gate 是 PDF-only gate。它证明系统能完成窄 query 的多源检索、候选验证、LLM 相关性判断和 PDF 下载校验；它不是目标态 M1→M2 `canonical_paper.md` 契约。
+
+Every current PDF-only A_READ must satisfy ALL:
 
 - `verification_status == verified`
 - `scoring_breakdown.relevance_score >= 0.45` (rule-based)
@@ -79,6 +81,26 @@ Every A_READ must satisfy ALL:
 - `source_confidence >= medium`
 - `metadata_confidence >= medium`
 - `role != IRRELEVANT`
+
+## Target canonical A_READ_FOR_M2 Gate
+
+目标态 `A_READ_FOR_M2` 必须通过 canonical gate 后才能进入 M2 deep reading。该 gate 目前为 DOC_DESIGNED / NOT_IMPLEMENTED。
+
+Every target canonical A_READ_FOR_M2 must satisfy ALL:
+
+- `verification_status == verified`
+- `scoring_breakdown.relevance_score >= 0.45` (rule-based)
+- `llm_relevance_score >= 0.65` (LLM-based)
+- `llm_relevance_label in {HIGH, MEDIUM}`
+- `should_a_read == true`
+- `source_type != metadata_only`
+- `source_confidence >= medium`
+- `metadata_confidence >= medium`
+- `role != IRRELEVANT`
+- `canonical_paper.md exists`
+- `canonicalization_status in {success, degraded}`
+- `m2_ready == true`
+- `degradation_reason` is empty or explicitly acceptable for M2 evidence-only/degraded mode
 
 ## Hard Rules
 
@@ -101,9 +123,9 @@ ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`) is one external reference
 | Module | ARIS overlap | Reference use | ResearchSensei-owned boundary |
 |---|---|---|---|
 | M1 | High | STRATEGY_BORROW | Search remains best-of-breed. ARIS only informs verification, source discipline, and download discipline. |
-| M2 | Medium-High | STRATEGY_BORROW / PROMPT_BORROW | Parser, evidence_ref, formula_card, QualityAuditor, and artifacts remain ResearchSensei-owned. |
+| M2 | Medium-High | STRATEGY_BORROW | Parser, evidence_ref, formula_card, QualityAuditor, and artifacts remain ResearchSensei-owned. |
 | M3 | Low code, medium schema | STRATEGY_BORROW | No ARIS UI dependency. Only source/relevance/verification display concepts are referenced. |
-| M4 | High for advisor/memory, low for formula UI | PROMPT_BORROW / STRATEGY_BORROW | M4 remains a paper-learning interaction module. ARIS informs advisor/review/memory patterns only. |
+| M4 | High for advisor/memory, low for formula UI | STRATEGY_BORROW | M4 remains a paper-learning interaction module. ARIS informs advisor/review/memory patterns only. |
 | M5 | Medium | STRATEGY_BORROW | Run discipline can be referenced. ResearchSensei keeps stricter real-test policy. |
 
 Other external projects remain open for evaluation. For example, M2 parser quality may require Docling / Marker / DeepXiv; M4 formula teaching may require a different specialized reference. ARIS must not block evaluation of better-fit projects.

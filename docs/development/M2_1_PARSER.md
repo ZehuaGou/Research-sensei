@@ -38,22 +38,6 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | 生成 evidence-ready `DocumentBlock` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 现有 md/txt/pdf LightweightParserAdapter | M2.1 legacy/current code | IMPLEMENTED |
 
-## 4. 可复用开源项目 / 外部服务调研
-
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| LaTeXML | LaTeX → XML/HTML/MathML/JATS/TEI | github.com/brucemiller/LaTeXML | OPTIONAL_ADAPTER | 否 | 安装复杂 | 候选 LaTeX source parser |
-| pylatexenc / LatexWalker | 轻量 LaTeX AST 解析 | pypi.org/project/pylatexenc | OPTIONAL_ADAPTER | 否 | 功能有限 | 候选轻量 LaTeX parser |
-| Pandoc | LaTeX → Markdown/HTML | github.com/jgm/pandoc | OPTIONAL_ADAPTER | 否 | 外部二进制 | 候选格式转换 |
-| Docling | 多格式文档解析 | github.com/docling-project/docling | OPTIONAL_ADAPTER | 否 | 依赖较重 | 候选结构 parser |
-| MinerU | PDF/image 解析 | github.com/opendatalab/MinerU | OPTIONAL_ADAPTER | 否 | 依赖重 | 首选 PDF-only 公式/表格 parser |
-| GROBID | PDF 元数据/引用 | github.com/kermitt2/grobid | OPTIONAL_ADAPTER | 否 | Java 依赖 | 元数据/引用 parser |
-| PyMuPDF | PDF 文本提取 | pymupdf.readthedocs.io | OPTIONAL_ADAPTER | 否 | 无 | 低置信 fallback |
-| Marker | PDF 转 Markdown | github.com/datalab-to/marker | OPTIONAL_ADAPTER | 否 | GPL-3.0 license | DOC_DESIGNED / NOT_IMPLEMENTED |
-| Nougat | 学术 PDF 解析 | github.com/facebookresearch/nougat | OPTIONAL_ADAPTER | 否 | GPU 依赖 | DOC_DESIGNED / NOT_IMPLEMENTED |
-
-未完成调研不得进入代码开发。
-
 ## External Projects / Adapter Candidates
 
 | 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |

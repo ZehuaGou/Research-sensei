@@ -91,15 +91,6 @@ M4 的下游 gates 由 M2 的 DownstreamGates 控制（legacy field names）：
 | Letta / MemGPT | M4.5 / M4.6 | memory 分层思想、session memory、agent memory organization | `cpacker/MemGPT` / Letta docs；必须调研 memory object、archival memory、recall memory 概念 | STRATEGY_BORROW | 否 | 不作为 runtime dependency；过重；不能让外部 agent 接管交互 | DOC_DESIGNED |
 | LangChain Memory | M4.5 / M4.6 | memory abstraction / retriever-memory pattern | LangChain memory docs/classes；必须调研 memory key、retriever memory API | STRATEGY_BORROW | 否 | LangChain runtime 过重；只借鉴抽象 | DOC_DESIGNED |
 
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| LangChain Memory | 长期记忆框架 | github.com/langchain-ai/langchain | STRATEGY_BORROW | 否 | 过重 | 只借鉴 memory 模块设计 |
-| MemGPT / Letta | 会话记忆管理 | github.com/cpacker/MemGPT | STRATEGY_BORROW | 否 | 过重 | 只借鉴 session memory 设计 |
-| STORM | 多视角追问 | github.com/stanford-oval/storm | STRATEGY_BORROW | 否 | — | 只借鉴 multi-perspective questioning |
-| ARIS research-review | 对抗式评估 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | STRATEGY_BORROW | 否 | — | 参考 advisor 评估思路 |
-
-未完成调研不得进入代码开发。
-
 ## 5. 当前代码位置
 
 ### 已存在（M3 前端占位）
