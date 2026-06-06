@@ -29,16 +29,6 @@ canonical_paper.md
 -> M2.3 LLM builder
 ```
 
-## 4. 可复用开源项目 / 外部服务调研
-
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| PaperQA | passage retrieval | github.com/Future-House/paper-qa | STRATEGY_BORROW | 否 | — | 只借鉴 chunk/retrieve 思路 |
-| ARIS result-to-claim | claim audit | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | STRATEGY_BORROW | 否 | — | 只借鉴 claim-evidence binding |
-| OpenScholar | citation accuracy | 未确认 repo | STRATEGY_BORROW | 否 | — | 只借鉴 citation accuracy |
-
-未完成调研不得进入代码开发。
-
 ## External Projects / Adapter Candidates
 
 | 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |

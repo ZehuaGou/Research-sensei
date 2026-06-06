@@ -159,8 +159,6 @@ output:
 
 Status: DOC_DESIGNED / NOT_IMPLEMENTED
 
-## 5. 可复用开源项目 / 外部服务调研
-
 ## External Projects / Adapter Candidates
 
 | 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
@@ -169,12 +167,6 @@ Status: DOC_DESIGNED / NOT_IMPLEMENTED
 | Vitest | M3 / M5 | 组件级测试 | `vitest`, `frontend/src/components/tests/*` | DIRECT_DEPENDENCY | 是 | 组件测试不能替代真实页面级验收 | IMPLEMENTED |
 | Vue Test Utils | M3 | Vue 组件测试 | `@vue/test-utils`, mount APIs | DIRECT_DEPENDENCY | 是 | 只适合组件级断言 | IMPLEMENTED |
 | Playwright | M3 / M5 | 真实页面级 E2E；DirectionWorkspace / PaperWorkspace / SeedExpansionPanel 页面验收 | `playwright test`, page navigation/click/screenshot APIs；必须调研 Vite dev server fixture、后端 API fixture、trace/screenshot artifacts | DIRECT_DEPENDENCY | 否 | 浏览器依赖和运行时间；不得替代后端契约测试 | DOC_DESIGNED |
-
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| Vue 3 | 前端框架 | vuejs.org | 已使用 | 是 | 无 | ✅ 已使用 |
-| Vitest | 前端测试 | vitest.dev | devDependency | 否 | 无 | ✅ 已引入 |
-| Vue Test Utils | 组件测试 | test-utils.vuejs.org | devDependency | 否 | 无 | ✅ 已引入 |
 
 ## 6. 当前代码位置
 

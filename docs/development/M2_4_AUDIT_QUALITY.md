@@ -32,18 +32,6 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts + ca
 - 不替代 M5 live eval
 - 不新增依赖
 
-## 4. 可复用开源项目 / 外部服务调研
-
-| 项目 | 用途 | GitHub / 官网 | 接入方式 | 是否默认依赖 | 风险 | 当前结论 |
-|------|------|---------------|----------|--------------|------|----------|
-| ARIS audit chain | 5 层审计 | github.com/wanshuiyin/Auto-claude-code-research-in-sleep | STRATEGY_BORROW | 否 | — | 只借鉴 audit 分层思想 |
-| ARIS reviewer independence | 审计独立性 | 同上 | STRATEGY_BORROW | 否 | — | 原则可直接应用 |
-| ARIS research-review | 对抗式评估 | 同上 | STRATEGY_BORROW | 否 | — | 参考 advisor 评估 |
-| OpenScholar | citation accuracy | 未确认 repo | STRATEGY_BORROW | 否 | — | 参考 evidence_ref 评估 |
-| PaperQA | citation/provenance | github.com/Future-House/paper-qa | STRATEGY_BORROW | 否 | — | 参考 provenance tracking |
-
-未完成调研不得进入代码开发。
-
 ## External Projects / Adapter Candidates
 
 | 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
