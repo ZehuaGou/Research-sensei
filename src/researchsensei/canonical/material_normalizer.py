@@ -116,7 +116,7 @@ class MaterialNormalizer:
             m2_ready=m2_ready,
             degradation_reason=degradation_reason,
             # Parser quality selection fields
-            parser_candidates=getattr(self, '_parser_quality_scores', []),
+            parser_candidates=[c.parser_name for c in getattr(self, '_parser_quality_scores', [])],
             selected_parser=parser_used,
             parser_quality_score=getattr(self, '_selected_parser_score', 0.0),
             parser_selection_reason=getattr(self, '_parser_selection_reason', ''),
@@ -375,21 +375,38 @@ class MaterialNormalizer:
         except Exception as exc:
             warnings.append(f"PyMuPDF failed: {exc}")
 
-        # Run Marker only if quality is low (heavy parser, ~16min)
-        # Check quality first
+        # Run Marker based on trigger strategy
         from researchsensei.canonical.parser_quality import score_parser_output
         md_score = score_parser_output(md_text, "markitdown_pdf")
         pm_score = score_parser_output(pm_text, "pymupdf")
 
-        # If both parsers have poor quality, try Marker
-        if md_score.overall_score < 40 and pm_score.overall_score < 40:
+        # Marker trigger conditions:
+        # 1. heavy_parse=True (not implemented yet, default False)
+        # 2. Both light parsers have very low quality (< 30)
+        # 3. Formula candidates detected but no LaTeX formulas found
+        should_trigger_marker = False
+        trigger_reason = ""
+
+        # Condition 1: Both parsers very low quality
+        if md_score.overall_score < 30 and pm_score.overall_score < 30:
+            should_trigger_marker = True
+            trigger_reason = "both light parsers have very low quality"
+
+        # Condition 2: Formula candidates exist but no LaTeX formulas
+        md_formula_count = md_score.formula_candidate_count
+        pm_formula_count = pm_score.formula_candidate_count
+        if (md_formula_count > 5 or pm_formula_count > 5) and md_score.overall_score < 60:
+            should_trigger_marker = True
+            trigger_reason = "formula candidates detected but light parser quality is low"
+
+        if should_trigger_marker:
             marker_adapter = MarkerPdfAdapter()
             if marker_adapter.is_available():
                 try:
                     mk_result = marker_adapter.process(pdf_path)
                     if mk_result.succeeded:
                         mk_text = "\n".join(mk_result.sections.values())
-                        warnings.append("Marker triggered due to low quality from MarkItDown/PyMuPDF")
+                        warnings.append(f"Marker triggered: {trigger_reason}")
                     else:
                         warnings.append(f"Marker: {mk_result.blocking_reason}")
                 except Exception as exc:
@@ -398,7 +415,7 @@ class MaterialNormalizer:
         # Select best parser
         selection = select_best_parser(md_text, pm_text, mk_text)
         self._last_parser_used = selection.selected_parser
-        self._parser_quality_scores = [c.parser_name for c in selection.candidates]
+        self._parser_quality_scores = selection.candidates  # Store full score objects
         self._selected_parser_score = next(c.overall_score for c in selection.candidates if c.parser_name == selection.selected_parser)
         self._parser_selection_reason = selection.selection_reason
 
@@ -408,12 +425,28 @@ class MaterialNormalizer:
         # Extract formula candidates
         for fc in selection.formula_candidates:
             origin = FormulaOrigin(fc["origin"]) if fc["origin"] in [e.value for e in FormulaOrigin] else FormulaOrigin.UNKNOWN
-            formula_blocks.append(FormulaBlock(
-                formula_id=f"fc_{len(formula_blocks)+1}",
-                latex=fc["latex"],
-                origin=origin,
-                section="",
-            ))
+            if origin == FormulaOrigin.RAW_FORMULA_TEXT:
+                # Raw text goes to raw_formula_text field, not latex
+                formula_blocks.append(FormulaBlock(
+                    formula_id=f"fc_{len(formula_blocks)+1}",
+                    latex="",
+                    raw_formula_text=fc.get("raw_formula_text", ""),
+                    is_latex=False,
+                    confidence=fc.get("confidence", 0.3),
+                    origin=origin,
+                    section="",
+                ))
+            else:
+                # LaTeX goes to latex field
+                formula_blocks.append(FormulaBlock(
+                    formula_id=f"fc_{len(formula_blocks)+1}",
+                    latex=fc.get("latex", ""),
+                    raw_formula_text="",
+                    is_latex=fc.get("is_latex", True),
+                    confidence=fc.get("confidence", 0.7),
+                    origin=origin,
+                    section="",
+                ))
 
         # Also detect formulas in text using math-token density
         formula_pages = self._find_formula_dense_pages(selection.selected_text)
@@ -682,7 +715,7 @@ class MaterialNormalizer:
         return formula_blocks
 
     def _find_formula_dense_pages(self, text: str) -> list[int]:
-        """Find pages with high math-token density.
+        """Find pages with high math-token density using page markers in text.
 
         Math tokens include:
         - =, ∑, √, σ, λ, τ, π, ∈, ⊙, KL
@@ -713,6 +746,60 @@ class MaterialNormalizer:
         page_scores.sort(key=lambda x: x[1], reverse=True)
         # Return pages with score > 0, up to 5 pages
         return [p for p, s in page_scores if s > 0][:5]
+
+    def find_formula_dense_pages_from_pdf(self, pdf_path: Path) -> list[dict]:
+        """Find formula-dense pages directly from PDF using PyMuPDF.
+
+        Returns list of dicts with:
+        - page_num: 1-indexed page number
+        - math_token_count: number of math tokens found
+        - density: math tokens per 1000 chars
+        - sample_lines: sample formula-like lines
+        """
+        results = []
+        try:
+            import fitz
+            with fitz.open(str(pdf_path)) as doc:
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
+                    page_text = page.get_text()
+
+                    math_patterns = [
+                        r'[=∑√σλτπ∈⊙]', r'KL\s*\(', r'Softmax', r'Attention', r'MultiHead',
+                        r'Gumbel', r'argmax', r'argmin', r'AssDis', r'AnomalyScore',
+                        r'R\^?\{?[NM×x]\s*[×x]\s*[dn]\}?', r'\b[QKV]\b',
+                        r'\\frac', r'\\sum', r'\\int', r'\\partial',
+                        r'\\alpha', r'\\beta', r'\\gamma', r'\\delta',
+                    ]
+
+                    math_count = 0
+                    for pattern in math_patterns:
+                        math_count += len(re.findall(pattern, page_text, re.IGNORECASE))
+
+                    text_len = max(len(page_text), 1)
+                    density = (math_count / text_len) * 1000
+
+                    # Find sample formula-like lines
+                    sample_lines = []
+                    for line in page_text.split('\n'):
+                        line = line.strip()
+                        if len(line) > 10 and any(re.search(p, line, re.IGNORECASE) for p in math_patterns):
+                            sample_lines.append(line[:150])
+                        if len(sample_lines) >= 3:
+                            break
+
+                    results.append({
+                        "page_num": page_num + 1,
+                        "math_token_count": math_count,
+                        "density": round(density, 2),
+                        "sample_lines": sample_lines,
+                    })
+        except Exception as exc:
+            logger.warning("Failed to scan PDF pages: %s", exc)
+
+        # Sort by density and return
+        results.sort(key=lambda x: x["density"], reverse=True)
+        return results
 
     def _get_page_text(self, text: str, page_num: int) -> str:
         """Get text for a specific page."""
@@ -795,6 +882,15 @@ class MaterialNormalizer:
         lines.append(f"m2_ready: {'true' if fm.m2_ready else 'false'}")
         if fm.degradation_reason:
             lines.append(f'degradation_reason: "{fm.degradation_reason}"')
+        # Parser quality selection fields
+        if fm.parser_candidates:
+            lines.append(f"parser_candidates: {fm.parser_candidates}")
+        if fm.selected_parser:
+            lines.append(f"selected_parser: {fm.selected_parser}")
+        if fm.parser_quality_score > 0:
+            lines.append(f"parser_quality_score: {fm.parser_quality_score:.1f}")
+        if fm.parser_selection_reason:
+            lines.append(f'parser_selection_reason: "{fm.parser_selection_reason}"')
         lines.append("---")
         lines.append("")
 
@@ -830,10 +926,20 @@ class MaterialNormalizer:
             lines.append("")
             for fb in paper.formula_blocks:
                 bbox_str = str(fb.bbox) if fb.bbox else "[]"
-                lines.append(f"<!-- formula_id: {fb.formula_id} | origin: {fb.origin.value} | section: {fb.section} | page: {fb.page or 'N/A'} | bbox: {bbox_str} | ocr_status: {fb.ocr_status.value} -->")
-                lines.append("```latex")
-                lines.append(fb.latex)
-                lines.append("```")
+                lines.append(f"<!-- formula_id: {fb.formula_id} | origin: {fb.origin.value} | section: {fb.section} | page: {fb.page or 'N/A'} | bbox: {bbox_str} | ocr_status: {fb.ocr_status.value} | is_latex: {fb.is_latex} | confidence: {fb.confidence} -->")
+                if fb.origin == FormulaOrigin.RAW_FORMULA_TEXT:
+                    # Raw text uses ```text block
+                    lines.append("```text")
+                    lines.append(fb.raw_formula_text)
+                    lines.append("```")
+                elif fb.is_latex and fb.latex:
+                    # LaTeX uses ```latex block
+                    lines.append("```latex")
+                    lines.append(fb.latex)
+                    lines.append("```")
+                else:
+                    # Unknown/empty - skip
+                    lines.append(f"<!-- No formula content -->")
                 lines.append("")
 
         return "\n".join(lines)

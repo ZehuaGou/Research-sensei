@@ -19,7 +19,10 @@ class FormulaBlock(SenseiModel):
     """A formula block in canonical_paper.md."""
 
     formula_id: str
-    latex: str
+    latex: str = ""  # LaTeX formula (only for source_latex/parser_latex/ocr_latex)
+    raw_formula_text: str = ""  # Raw text for raw_formula_text origin
+    is_latex: bool = False  # True if latex field contains valid LaTeX
+    confidence: float = 0.0  # 0-1 confidence score
     origin: FormulaOrigin = FormulaOrigin.UNKNOWN
     section: str = ""
     page: int | None = None

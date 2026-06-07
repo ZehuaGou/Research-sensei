@@ -97,6 +97,7 @@ class FormulaOrigin(str, Enum):
     PARSER_LATEX = "parser_latex"
     OCR_LATEX = "ocr_latex"
     RECONSTRUCTED = "reconstructed"
+    RAW_FORMULA_TEXT = "raw_formula_text"
     UNKNOWN = "unknown"
 
 

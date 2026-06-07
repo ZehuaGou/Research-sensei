@@ -252,34 +252,39 @@ def extract_formula_candidates(
     """Extract formula candidates from parser outputs.
 
     Returns a list of formula candidates with:
-    - latex: the formula text
-    - origin: source_latex | parser_latex | raw_formula_text
+    - latex: the LaTeX formula (only for parser_latex)
+    - raw_formula_text: the raw text (only for raw_formula_text)
+    - origin: parser_latex | raw_formula_text
     - source: which parser found it
     - confidence: 0-1
     """
     candidates = []
 
-    # From MarkItDown
+    # From MarkItDown - LaTeX formulas
     for m in re.finditer(r'\$\$(.*?)\$\$', markitdown_text, re.DOTALL):
         latex = m.group(1).strip()
         if latex:
             candidates.append({
                 "latex": latex,
+                "raw_formula_text": "",
                 "origin": "parser_latex",
                 "source": "markitdown",
                 "confidence": 0.7,
+                "is_latex": True,
             })
 
-    # From Marker (if available)
+    # From Marker (if available) - LaTeX formulas
     if marker_text:
         for m in re.finditer(r'\$\$(.*?)\$\$', marker_text, re.DOTALL):
             latex = m.group(1).strip()
             if latex:
                 candidates.append({
                     "latex": latex,
+                    "raw_formula_text": "",
                     "origin": "parser_latex",
                     "source": "marker",
                     "confidence": 0.8,
+                    "is_latex": True,
                 })
 
     # Raw formula text from all parsers
@@ -287,10 +292,12 @@ def extract_formula_candidates(
         raw_formulas = _extract_raw_formula_text(text)
         for rf in raw_formulas:
             candidates.append({
-                "latex": rf,
+                "latex": "",
+                "raw_formula_text": rf,
                 "origin": "raw_formula_text",
                 "source": source,
                 "confidence": 0.3,
+                "is_latex": False,
             })
 
     return candidates
