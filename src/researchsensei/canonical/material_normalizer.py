@@ -123,19 +123,7 @@ class MaterialNormalizer:
             formula_blocks=formula_blocks,
         )
 
-        # Generate markdown
-        raw_md = self._render_markdown(canonical)
-        canonical.raw_markdown = raw_md
-
-        # Write to file if output_dir specified
-        canonical_path = ""
-        if output_dir:
-            output_dir.mkdir(parents=True, exist_ok=True)
-            md_path = output_dir / "canonical_paper.md"
-            md_path.write_text(raw_md, encoding="utf-8")
-            canonical_path = str(md_path)
-
-        # Run formula region detection if detector available
+        # Run formula region detection BEFORE writing file
         formula_region_results = []
         if self.formula_region_detector and formula_blocks:
             for fb in formula_blocks:
@@ -149,8 +137,9 @@ class MaterialNormalizer:
                 except Exception as exc:
                     logger.warning("FormulaRegionDetector failed for %s: %s", fb.formula_id, exc)
 
-        # Run formula OCR if available and needed
+        # Run formula OCR BEFORE writing file (may update formula_blocks in-place)
         formula_ocr_results = []
+        formulas_updated = False
         if self.formula_ocr_adapter and formula_blocks:
             for fb in formula_blocks:
                 if fb.origin == FormulaOrigin.UNKNOWN or not fb.latex.strip():
@@ -167,8 +156,29 @@ class MaterialNormalizer:
                             fb.origin = ocr_result.formula_origin
                             fb.ocr_status = ocr_result.formula_ocr_status
                             fb.ocr_confidence = ocr_result.ocr_confidence
+                            formulas_updated = True
                     except Exception as exc:
                         logger.warning("FormulaOCRAdapter failed for %s: %s", fb.formula_id, exc)
+
+        # Re-render markdown if formulas were updated
+        if formulas_updated:
+            canonical = CanonicalPaper(
+                front_matter=front_matter,
+                sections=sections,
+                formula_blocks=formula_blocks,
+            )
+
+        # Generate markdown AFTER all formula updates
+        raw_md = self._render_markdown(canonical)
+        canonical.raw_markdown = raw_md
+
+        # Write to file AFTER formula detection and OCR
+        canonical_path = ""
+        if output_dir:
+            output_dir.mkdir(parents=True, exist_ok=True)
+            md_path = output_dir / "canonical_paper.md"
+            md_path.write_text(raw_md, encoding="utf-8")
+            canonical_path = str(md_path)
 
         # Build adapter info
         adapter_info = self._build_adapter_info()
@@ -772,33 +782,64 @@ class MaterialNormalizer:
             attempt_details=["Basic text-based formula detection; layout-based detection not yet implemented"],
         ))
 
-        # Formula OCR
-        adapters.append(AdapterInfo(
-            name="formula_ocr",
-            status=AdapterStatus.NOT_IMPLEMENTED,
-            blocking_reason="pix2tex/LaTeX-OCR not yet integrated",
-        ))
+        # Formula OCR (pix2tex)
+        try:
+            from pix2tex.cli import LatexOCR
+            adapters.append(AdapterInfo(
+                name="formula_ocr",
+                status=AdapterStatus.IMPLEMENTED,
+                attempt_details=["pix2tex installed, LatexOCR class available"],
+            ))
+        except ImportError:
+            adapters.append(AdapterInfo(
+                name="formula_ocr",
+                status=AdapterStatus.BLOCKED,
+                blocking_reason="pix2tex not installed (pip install pix2tex)",
+            ))
+        except Exception as exc:
+            adapters.append(AdapterInfo(
+                name="formula_ocr",
+                status=AdapterStatus.DEGRADED_IMPLEMENTED,
+                blocking_reason=f"pix2tex installed but load failed: {str(exc)[:100]}",
+                attempt_details=[f"pix2tex import error: {type(exc).__name__}"],
+            ))
 
         # DeepXiv
         adapters.append(AdapterInfo(
             name="deepxiv",
-            status=AdapterStatus.NOT_IMPLEMENTED,
-            blocking_reason="DeepXiv API not yet integrated",
+            status=AdapterStatus.BLOCKED,
+            blocking_reason="DeepXiv pip package does not exist (No matching distribution found for deepxiv). No confirmed public API.",
         ))
 
         # Marker
-        adapters.append(AdapterInfo(
-            name="marker",
-            status=AdapterStatus.NOT_IMPLEMENTED,
-            blocking_reason="Marker not yet integrated",
-        ))
+        try:
+            import marker
+            adapters.append(AdapterInfo(
+                name="marker",
+                status=AdapterStatus.IMPLEMENTED,
+                attempt_details=["marker-pdf installed"],
+            ))
+        except ImportError:
+            adapters.append(AdapterInfo(
+                name="marker",
+                status=AdapterStatus.BLOCKED,
+                blocking_reason="marker-pdf not installed. GPL-3.0 license. pip install marker-pdf",
+            ))
 
         # MinerU
-        adapters.append(AdapterInfo(
-            name="mineru",
-            status=AdapterStatus.NOT_IMPLEMENTED,
-            blocking_reason="MinerU not yet integrated",
-        ))
+        try:
+            import magic_pdf
+            adapters.append(AdapterInfo(
+                name="mineru",
+                status=AdapterStatus.IMPLEMENTED,
+                attempt_details=["magic-pdf (MinerU) installed"],
+            ))
+        except ImportError:
+            adapters.append(AdapterInfo(
+                name="mineru",
+                status=AdapterStatus.BLOCKED,
+                blocking_reason="magic-pdf not installed. AGPL-3.0 license. pip install magic-pdf",
+            ))
 
         return adapters
 

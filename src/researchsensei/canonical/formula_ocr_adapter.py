@@ -158,7 +158,7 @@ class FormulaOCRAdapter:
         except ImportError:
             logger.debug("pix2tex not available.")
         except Exception as exc:
-            logger.debug("pix2tex load failed: %s", exc)
+            logger.warning("pix2tex load failed (likely dependency issue): %s", exc)
 
         try:
             # Try latex_ocr
