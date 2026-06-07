@@ -326,8 +326,8 @@ class MaterialNormalizer:
     def _extract_from_pdf(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
     ) -> tuple[dict[str, str], list[FormulaBlock], str, list[str]]:
-        """Extract from PDF using Marker -> MinerU -> PyMuPDF fallback chain."""
-        from researchsensei.canonical.adapters import MarkerPdfAdapter, MinerUPdfAdapter
+        """Extract from PDF using MarkItDown -> Marker -> MinerU -> PyMuPDF fallback chain."""
+        from researchsensei.canonical.adapters import MarkItDownAdapter, MarkerPdfAdapter, MinerUPdfAdapter
 
         warnings: list[str] = []
         formula_blocks: list[FormulaBlock] = []
@@ -341,7 +341,20 @@ class MaterialNormalizer:
             warnings.append("No PDF available for extraction.")
             return sections, formula_blocks, "none", warnings
 
-        # Try Marker first (best quality for structure/equations)
+        # Try MarkItDown first (fast, MIT, good content/formula coverage)
+        markitdown_adapter = MarkItDownAdapter()
+        if markitdown_adapter.is_available():
+            try:
+                md_result = markitdown_adapter.process(pdf_path)
+                if md_result.succeeded and md_result.sections:
+                    self._last_parser_used = md_result.parser_used
+                    return md_result.sections, md_result.formula_blocks, md_result.parser_used, warnings
+                else:
+                    warnings.append(f"MarkItDown: {md_result.blocking_reason}")
+            except Exception as exc:
+                warnings.append(f"MarkItDown failed: {exc}")
+
+        # Try Marker (best structure, but slow ~16min per paper, GPL-3.0)
         marker_adapter = MarkerPdfAdapter()
         if marker_adapter.is_available():
             try:
@@ -753,7 +766,7 @@ class MaterialNormalizer:
     def _build_adapter_info(self) -> list[AdapterInfo]:
         """Build adapter status report using real adapter probes."""
         from researchsensei.canonical.adapters import (
-            MarkerPdfAdapter, MinerUPdfAdapter, Pix2TexFormulaOCRAdapter, DeepXivProbe,
+            MarkItDownAdapter, MarkerPdfAdapter, MinerUPdfAdapter, Pix2TexFormulaOCRAdapter, DeepXivProbe,
         )
 
         adapters = []
@@ -785,6 +798,23 @@ class MaterialNormalizer:
             status=AdapterStatus.IMPLEMENTED,
             attempt_details=["Uses habanero library"],
         ))
+
+        # MarkItDown - real probe
+        markitdown_adapter = MarkItDownAdapter()
+        if markitdown_adapter.is_available():
+            md_used = getattr(self, '_last_parser_used', '') == 'markitdown_pdf'
+            adapters.append(AdapterInfo(
+                name="markitdown",
+                status=AdapterStatus.IMPLEMENTED if md_used else AdapterStatus.DEPENDENCY_AVAILABLE_NOT_WIRED,
+                blocking_reason="" if md_used else "markitdown installed but not yet invoked in this run",
+                attempt_details=["markitdown installed (MIT)", f"invoked={md_used}"],
+            ))
+        else:
+            adapters.append(AdapterInfo(
+                name="markitdown",
+                status=AdapterStatus.BLOCKED,
+                blocking_reason="markitdown not installed (pip install 'markitdown[pdf]'). MIT license.",
+            ))
 
         # LaTeX parser
         adapters.append(AdapterInfo(

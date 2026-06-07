@@ -35,6 +35,143 @@ class AdapterResult:
     warnings: list[str] = field(default_factory=list)
 
 
+class MarkItDownAdapter:
+    """Adapter for Microsoft MarkItDown PDF to markdown conversion.
+
+    MarkItDown is fast (0.6-2.9s), MIT licensed, extracts text and formulas well.
+    Best for: speed, content coverage, formula detection.
+    Weakness: no section structure detection (uses pdfplumber under the hood).
+    """
+
+    NAME = "markitdown"
+
+    def is_available(self) -> bool:
+        try:
+            import importlib
+            spec = importlib.util.find_spec("markitdown")
+            return spec is not None
+        except (ImportError, ValueError):
+            return False
+
+    def process(self, pdf_path: str | Path) -> AdapterResult:
+        pdf_path = Path(pdf_path)
+        result = AdapterResult(adapter_name=self.NAME)
+
+        if not self.is_available():
+            result.status = AdapterStatus.BLOCKED
+            result.blocking_reason = "markitdown not installed (pip install 'markitdown[pdf]'). MIT license."
+            return result
+
+        result.available = True
+
+        if not pdf_path.exists():
+            result.status = AdapterStatus.BLOCKED
+            result.blocking_reason = f"PDF file not found: {pdf_path}"
+            return result
+
+        try:
+            result.invoked = True
+            from markitdown import MarkItDown
+
+            md = MarkItDown(enable_plugins=False)
+            converted = md.convert(str(pdf_path))
+            text = converted.text_content
+
+            if not text or not text.strip():
+                result.status = AdapterStatus.DEGRADED_IMPLEMENTED
+                result.blocking_reason = "MarkItDown returned empty output"
+                result.warnings.append("MarkItDown returned empty text")
+                return result
+
+            result.succeeded = True
+            result.status = AdapterStatus.IMPLEMENTED
+            result.parser_used = "markitdown_pdf"
+            result.sections = self._parse_sections(text)
+            result.formula_blocks = self._extract_formulas(text)
+
+        except Exception as exc:
+            result.status = AdapterStatus.BLOCKED
+            result.blocking_reason = f"MarkItDown processing failed: {type(exc).__name__}: {str(exc)[:200]}"
+            result.warnings.append(f"MarkItDown error: {exc}")
+
+        return result
+
+    def _parse_sections(self, text: str) -> dict[str, str]:
+        """Parse text into sections. MarkItDown doesn't produce headers, so use heuristics."""
+        import re
+        sections: dict[str, str] = {}
+
+        # Try to find section-like patterns
+        lines = text.split("\n")
+        current_section = "Other"
+        current_content: list[str] = []
+
+        for line in lines:
+            stripped = line.strip()
+            # Check for common section headers
+            if re.match(r'^(?:\d+\.?\s+)?(?:Abstract|摘要)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Abstract"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:Introduction|引言)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Introduction"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:Related Work|相关工作)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Related Work"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:Method|方法|Approach|Methodology)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Method"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:Experiment|实验|Results|Evaluation)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Experiments"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:Conclusion|结论|Discussion)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "Conclusion"
+                current_content = []
+            elif re.match(r'^(?:\d+\.?\s+)?(?:References|参考文献|Bibliography)', stripped, re.IGNORECASE):
+                if current_content:
+                    sections[current_section] = "\n".join(current_content).strip()
+                current_section = "References"
+                current_content = []
+            else:
+                current_content.append(line)
+
+        if current_content:
+            sections[current_section] = "\n".join(current_content).strip()
+
+        return sections
+
+    def _extract_formulas(self, text: str) -> list[FormulaBlock]:
+        """Extract formula blocks from MarkItDown output."""
+        import re
+        formulas: list[FormulaBlock] = []
+        counter = 0
+
+        # MarkItDown may produce $$ for display math
+        for match in re.finditer(r"\$\$(.*?)\$\$", text, re.DOTALL):
+            counter += 1
+            latex = match.group(1).strip()
+            if latex:
+                formulas.append(FormulaBlock(
+                    formula_id=f"md_eq{counter}",
+                    latex=latex,
+                    origin=FormulaOrigin.PARSER_LATEX,
+                ))
+
+        return formulas
+
+
 class MarkerPdfAdapter:
     """Adapter for Marker (marker-pdf) PDF to markdown conversion.
 
