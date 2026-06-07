@@ -6,6 +6,7 @@ metadata_only cannot enter M2.
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from pathlib import Path
@@ -120,6 +121,8 @@ class MaterialNormalizer:
             selected_parser=parser_used,
             parser_quality_score=getattr(self, '_selected_parser_score', 0.0),
             parser_selection_reason=getattr(self, '_parser_selection_reason', ''),
+            # Store detailed scores as JSON
+            parser_quality_details_json=json.dumps(getattr(self, '_parser_quality_details', {})),
         )
 
         canonical = CanonicalPaper(
@@ -380,24 +383,28 @@ class MaterialNormalizer:
         md_score = score_parser_output(md_text, "markitdown_pdf")
         pm_score = score_parser_output(pm_text, "pymupdf")
 
-        # Marker trigger conditions:
-        # 1. heavy_parse=True (not implemented yet, default False)
-        # 2. Both light parsers have very low quality (< 30)
-        # 3. Formula candidates detected but no LaTeX formulas found
+        # Marker configuration (default: disabled for speed)
+        marker_enabled = getattr(self, '_marker_enabled', False)
+        marker_trigger_mode = getattr(self, '_marker_trigger_mode', 'never')  # never / on_demand / a_read / always
+        marker_timeout_seconds = getattr(self, '_marker_timeout_seconds', 120)
+
         should_trigger_marker = False
         trigger_reason = ""
 
-        # Condition 1: Both parsers very low quality
-        if md_score.overall_score < 30 and pm_score.overall_score < 30:
-            should_trigger_marker = True
-            trigger_reason = "both light parsers have very low quality"
+        if marker_enabled and marker_trigger_mode != 'never':
+            # Condition 1: Both parsers very low quality
+            if md_score.overall_score < 30 and pm_score.overall_score < 30:
+                should_trigger_marker = True
+                trigger_reason = "both light parsers have very low quality"
 
-        # Condition 2: Formula candidates exist but no LaTeX formulas
-        md_formula_count = md_score.formula_candidate_count
-        pm_formula_count = pm_score.formula_candidate_count
-        if (md_formula_count > 5 or pm_formula_count > 5) and md_score.overall_score < 60:
-            should_trigger_marker = True
-            trigger_reason = "formula candidates detected but light parser quality is low"
+            # Condition 2: Formula candidates exist but no LaTeX formulas
+            md_formula_count = md_score.formula_candidate_count
+            pm_formula_count = pm_score.formula_candidate_count
+            if (md_formula_count > 5 or pm_formula_count > 5) and md_score.overall_score < 60:
+                should_trigger_marker = True
+                trigger_reason = "formula candidates detected but light parser quality is low"
+        elif not marker_enabled:
+            warnings.append("marker_status=skipped_by_policy (marker_enabled=false)")
 
         if should_trigger_marker:
             marker_adapter = MarkerPdfAdapter()
@@ -416,8 +423,23 @@ class MaterialNormalizer:
         selection = select_best_parser(md_text, pm_text, mk_text)
         self._last_parser_used = selection.selected_parser
         self._parser_quality_scores = selection.candidates  # Store full score objects
-        self._selected_parser_score = next(c.overall_score for c in selection.candidates if c.parser_name == selection.selected_parser)
+        selected_score = next(c for c in selection.candidates if c.parser_name == selection.selected_parser)
+        self._selected_parser_score = selected_score.overall_score
         self._parser_selection_reason = selection.selection_reason
+        # Store detailed scores for front matter
+        self._parser_quality_details = {
+            c.parser_name: {
+                "overall_score": round(c.overall_score, 1),
+                "output_length": c.output_length,
+                "section_count": c.section_count,
+                "long_concat_count": c.long_concat_count,
+                "spacing_quality": round(c.spacing_quality, 3),
+                "cid_token_count": c.cid_token_count,
+                "formula_candidate_count": c.formula_candidate_count,
+                "garbled_line_ratio": round(c.garbled_line_ratio, 3),
+            }
+            for c in selection.candidates
+        }
 
         # Parse sections from selected text
         sections = self._parse_text_sections(selection.selected_text, paper.title or "")
@@ -891,6 +913,18 @@ class MaterialNormalizer:
             lines.append(f"parser_quality_score: {fm.parser_quality_score:.1f}")
         if fm.parser_selection_reason:
             lines.append(f'parser_selection_reason: "{fm.parser_selection_reason}"')
+        # Detailed parser quality scores
+        if fm.parser_quality_details_json:
+            try:
+                details = json.loads(fm.parser_quality_details_json)
+                if details:
+                    lines.append("parser_quality_details:")
+                    for parser_name, scores in details.items():
+                        lines.append(f"  {parser_name}:")
+                        for key, value in scores.items():
+                            lines.append(f"    {key}: {value}")
+            except json.JSONDecodeError:
+                pass
         lines.append("---")
         lines.append("")
 

@@ -76,6 +76,8 @@ class CanonicalPaperFrontMatter(SenseiModel):
     selected_parser: str = ""  # The parser that was selected
     parser_quality_score: float = 0.0  # Quality score of selected parser (0-100)
     parser_selection_reason: str = ""  # Why this parser was selected
+    # Detailed parser quality scores (stored as JSON string for serialization)
+    parser_quality_details_json: str = ""  # JSON string of detailed scores
 
 
 class CanonicalPaper(SenseiModel):
