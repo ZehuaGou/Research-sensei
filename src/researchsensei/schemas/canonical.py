@@ -68,6 +68,11 @@ class CanonicalPaperFrontMatter(SenseiModel):
     parser_used: str = ""
     m2_ready: bool = False
     degradation_reason: str = ""
+    # Parser quality selection fields
+    parser_candidates: list[str] = Field(default_factory=list)  # List of parser names evaluated
+    selected_parser: str = ""  # The parser that was selected
+    parser_quality_score: float = 0.0  # Quality score of selected parser (0-100)
+    parser_selection_reason: str = ""  # Why this parser was selected
 
 
 class CanonicalPaper(SenseiModel):

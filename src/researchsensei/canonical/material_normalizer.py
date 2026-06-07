@@ -115,6 +115,11 @@ class MaterialNormalizer:
             parser_used=parser_used,
             m2_ready=m2_ready,
             degradation_reason=degradation_reason,
+            # Parser quality selection fields
+            parser_candidates=getattr(self, '_parser_quality_scores', []),
+            selected_parser=parser_used,
+            parser_quality_score=getattr(self, '_selected_parser_score', 0.0),
+            parser_selection_reason=getattr(self, '_parser_selection_reason', ''),
         )
 
         canonical = CanonicalPaper(
@@ -326,8 +331,13 @@ class MaterialNormalizer:
     def _extract_from_pdf(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
     ) -> tuple[dict[str, str], list[FormulaBlock], str, list[str]]:
-        """Extract from PDF using MarkItDown -> Marker -> MinerU -> PyMuPDF fallback chain."""
+        """Extract from PDF using parser quality selection.
+
+        Runs MarkItDown and PyMuPDF in parallel, scores quality, selects best.
+        Only triggers Marker if quality is low and paper is high priority.
+        """
         from researchsensei.canonical.adapters import MarkItDownAdapter, MarkerPdfAdapter, MinerUPdfAdapter
+        from researchsensei.canonical.parser_quality import select_best_parser, extract_formula_candidates
 
         warnings: list[str] = []
         formula_blocks: list[FormulaBlock] = []
@@ -341,67 +351,81 @@ class MaterialNormalizer:
             warnings.append("No PDF available for extraction.")
             return sections, formula_blocks, "none", warnings
 
-        # Try MarkItDown first (fast, MIT, good content/formula coverage)
+        # Run MarkItDown and PyMuPDF in parallel
+        md_text = ""
+        pm_text = ""
+        mk_text = None
+
         markitdown_adapter = MarkItDownAdapter()
         if markitdown_adapter.is_available():
             try:
                 md_result = markitdown_adapter.process(pdf_path)
-                if md_result.succeeded and md_result.sections:
-                    self._last_parser_used = md_result.parser_used
-                    return md_result.sections, md_result.formula_blocks, md_result.parser_used, warnings
+                if md_result.succeeded:
+                    md_text = "\n".join(md_result.sections.values())
                 else:
                     warnings.append(f"MarkItDown: {md_result.blocking_reason}")
             except Exception as exc:
                 warnings.append(f"MarkItDown failed: {exc}")
 
-        # Try Marker (best structure, but slow ~16min per paper, GPL-3.0)
-        marker_adapter = MarkerPdfAdapter()
-        if marker_adapter.is_available():
-            try:
-                marker_result = marker_adapter.process(pdf_path)
-                if marker_result.succeeded and marker_result.sections:
-                    self._last_parser_used = marker_result.parser_used
-                    return marker_result.sections, marker_result.formula_blocks, marker_result.parser_used, warnings
-                else:
-                    warnings.append(f"Marker: {marker_result.blocking_reason}")
-            except Exception as exc:
-                warnings.append(f"Marker failed: {exc}")
-
-        # Try MinerU (good for formulas/tables)
-        mineru_adapter = MinerUPdfAdapter()
-        if mineru_adapter.is_available():
-            try:
-                mineru_result = mineru_adapter.process(pdf_path)
-                if mineru_result.succeeded and mineru_result.sections:
-                    self._last_parser_used = mineru_result.parser_used
-                    return mineru_result.sections, mineru_result.formula_blocks, mineru_result.parser_used, warnings
-                else:
-                    warnings.append(f"MinerU: {mineru_result.blocking_reason}")
-            except Exception as exc:
-                warnings.append(f"MinerU failed: {exc}")
-
-        # Fallback to PyMuPDF
         try:
-            import fitz  # PyMuPDF
-
+            import fitz
             with fitz.open(str(pdf_path)) as doc:
-                full_text = ""
-                for page_num, page in enumerate(doc):
-                    page_text = page.get_text()
-                    full_text += f"\n--- Page {page_num + 1} ---\n{page_text}"
-
-                    # Extract formula-like content from page
-                    page_formulas = self._detect_formulas_in_text(page_text, page_num + 1)
-                    formula_blocks.extend(page_formulas)
-
-                sections = self._parse_text_sections(full_text, paper.title or "")
-                return sections, formula_blocks, "pymupdf", warnings
-        except ImportError:
-            warnings.append("PyMuPDF (fitz) not available.")
+                for page in doc:
+                    pm_text += page.get_text()
         except Exception as exc:
-            warnings.append(f"PDF extraction failed: {exc}")
+            warnings.append(f"PyMuPDF failed: {exc}")
 
-        return sections, formula_blocks, "none", warnings
+        # Run Marker only if quality is low (heavy parser, ~16min)
+        # Check quality first
+        from researchsensei.canonical.parser_quality import score_parser_output
+        md_score = score_parser_output(md_text, "markitdown_pdf")
+        pm_score = score_parser_output(pm_text, "pymupdf")
+
+        # If both parsers have poor quality, try Marker
+        if md_score.overall_score < 40 and pm_score.overall_score < 40:
+            marker_adapter = MarkerPdfAdapter()
+            if marker_adapter.is_available():
+                try:
+                    mk_result = marker_adapter.process(pdf_path)
+                    if mk_result.succeeded:
+                        mk_text = "\n".join(mk_result.sections.values())
+                        warnings.append("Marker triggered due to low quality from MarkItDown/PyMuPDF")
+                    else:
+                        warnings.append(f"Marker: {mk_result.blocking_reason}")
+                except Exception as exc:
+                    warnings.append(f"Marker failed: {exc}")
+
+        # Select best parser
+        selection = select_best_parser(md_text, pm_text, mk_text)
+        self._last_parser_used = selection.selected_parser
+        self._parser_quality_scores = [c.parser_name for c in selection.candidates]
+        self._selected_parser_score = next(c.overall_score for c in selection.candidates if c.parser_name == selection.selected_parser)
+        self._parser_selection_reason = selection.selection_reason
+
+        # Parse sections from selected text
+        sections = self._parse_text_sections(selection.selected_text, paper.title or "")
+
+        # Extract formula candidates
+        for fc in selection.formula_candidates:
+            origin = FormulaOrigin(fc["origin"]) if fc["origin"] in [e.value for e in FormulaOrigin] else FormulaOrigin.UNKNOWN
+            formula_blocks.append(FormulaBlock(
+                formula_id=f"fc_{len(formula_blocks)+1}",
+                latex=fc["latex"],
+                origin=origin,
+                section="",
+            ))
+
+        # Also detect formulas in text using math-token density
+        formula_pages = self._find_formula_dense_pages(selection.selected_text)
+        for page_num in formula_pages:
+            page_text = self._get_page_text(selection.selected_text, page_num)
+            if page_text:
+                page_formulas = self._detect_formulas_in_text(page_text, page_num)
+                formula_blocks.extend(page_formulas)
+
+        warnings.append(f"Selected parser: {selection.selected_parser} ({selection.selection_reason})")
+
+        return sections, formula_blocks, selection.selected_parser, warnings
 
     def _extract_from_text(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
@@ -569,18 +593,29 @@ class MaterialNormalizer:
         return sections
 
     def _parse_text_sections(self, text: str, title: str) -> dict[str, str]:
-        """Parse plain text into sections using heuristics."""
+        """Parse plain text into sections using heuristics.
+
+        Supports multiple section header formats:
+        - I. INTRODUCTION
+        - II. RELATED WORK
+        - 1 Introduction
+        - 5 CONCLUSION AND FUTURE WORK
+        - Table-style headers (| 5 CONCLUSION |)
+        """
         sections: dict[str, str] = {}
 
-        # Try to find section headers
+        # Try to find section headers - support numbered and Roman numeral formats
         section_patterns = [
-            r"(?i)^(?:\d+\.?\s*)?(?:abstract|摘要)",
-            r"(?i)^(?:\d+\.?\s*)?(?:introduction|引言)",
-            r"(?i)^(?:\d+\.?\s*)?(?:related\s+work|相关工作)",
-            r"(?i)^(?:\d+\.?\s*)?(?:method|方法|approach)",
-            r"(?i)^(?:\d+\.?\s*)?(?:experiment|实验|evaluation)",
-            r"(?i)^(?:\d+\.?\s*)?(?:conclusion|结论|discussion)",
-            r"(?i)^(?:\d+\.?\s*)?(?:reference|参考文献|bibliography)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:abstract|摘要)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:introduction|引言)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:related\s+work|相关工作)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:method(?:ology)?|方法|approach)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:experiment(?:s)?|实验|evaluation|results)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:conclusion|结论|discussion|future\s+work)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:reference|参考文献|bibliography)",
+            r"(?i)^(?:[IVX]+\.?\s+)?(?:appendix|附录)",
+            # Also match with numbers
+            r"(?i)^(?:\d+\.?\s+)(?:abstract|introduction|related\s+work|method|experiment|conclusion|reference|appendix)",
         ]
 
         lines = text.split("\n")
@@ -645,6 +680,46 @@ class MaterialNormalizer:
                     ))
 
         return formula_blocks
+
+    def _find_formula_dense_pages(self, text: str) -> list[int]:
+        """Find pages with high math-token density.
+
+        Math tokens include:
+        - =, ∑, √, σ, λ, τ, π, ∈, ⊙, KL
+        - Softmax, Attention, MultiHead
+        - Gumbel, argmax
+        - AssDis, AnomalyScore
+        - Q, K, V
+        - R^{N×d}, R^{M×n}
+        """
+        pages = text.split("--- Page ")
+        page_scores = []
+
+        math_patterns = [
+            r'[=∑√σλτπ∈⊙]', r'KL\s*\(', r'Softmax', r'Attention', r'MultiHead',
+            r'Gumbel', r'argmax', r'argmin', r'AssDis', r'AnomalyScore',
+            r'R\^?\{?[NM×x]\s*[×x]\s*[dn]\}?', r'\b[QKV]\b',
+            r'\\frac', r'\\sum', r'\\int', r'\\partial',
+            r'\\alpha', r'\\beta', r'\\gamma', r'\\delta',
+        ]
+
+        for i, page_text in enumerate(pages[1:], 1):
+            score = 0
+            for pattern in math_patterns:
+                score += len(re.findall(pattern, page_text, re.IGNORECASE))
+            page_scores.append((i, score))
+
+        # Sort by score and return top pages
+        page_scores.sort(key=lambda x: x[1], reverse=True)
+        # Return pages with score > 0, up to 5 pages
+        return [p for p, s in page_scores if s > 0][:5]
+
+    def _get_page_text(self, text: str, page_num: int) -> str:
+        """Get text for a specific page."""
+        pages = text.split("--- Page ")
+        if 1 <= page_num < len(pages):
+            return pages[page_num]
+        return ""
 
     def _map_section_name(self, name: str) -> str:
         """Map a section name to a standard section."""
