@@ -449,6 +449,7 @@ def run_m1_live_search(
         "metadata_only_blocked_count": canon_summary.get("metadata_only_blocked_count", 0),
         "source_type_distribution": canon_summary.get("source_type_distribution", {}),
         "canonicalization_status_distribution": canon_summary.get("canonicalization_status_distribution", {}),
+        "canonical_quality_status_distribution": canon_summary.get("canonical_quality_status_distribution", {}),
         "adapter_status": canon_summary.get("adapter_status", {}),
         "artifacts": {
             "run_dir": str(run_dir),

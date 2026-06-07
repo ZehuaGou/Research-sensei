@@ -12,6 +12,15 @@ import re
 from dataclasses import dataclass, field
 
 
+_LATEX_FORMULA_PATTERNS: list[tuple[str, int]] = [
+    (r"\$\$(.*?)\$\$", re.DOTALL),
+    (r"\\\[(.*?)\\\]", re.DOTALL),
+    (r"\\\((.*?)\\\)", re.DOTALL),
+    (r"\\begin\{(equation\*?|align\*?|aligned|gather\*?|multline\*?|cases)\}(.*?)\\end\{\1\}", re.DOTALL),
+    (r"(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)", re.DOTALL),
+]
+
+
 @dataclass
 class ParserQualityScore:
     """Quality score for a parser output."""
@@ -97,13 +106,7 @@ def count_formula_candidates(text: str) -> int:
     """
     count = 0
 
-    # Display math patterns
-    count += len(re.findall(r'\$\$.*?\$\$', text, re.DOTALL))
-    count += len(re.findall(r'\\\[.*?\\\]', text, re.DOTALL))
-    count += len(re.findall(r'\\begin\{equation\}.*?\\end\{equation\}', text, re.DOTALL))
-
-    # LaTeX-like inline formulas
-    count += len(re.findall(r'\$[^$]+[\\{}^_][^$]*\$', text))
+    count += len(_extract_latex_formula_texts(text))
 
     # Raw formula text patterns (common in academic papers)
     raw_patterns = [
@@ -114,8 +117,11 @@ def count_formula_candidates(text: str) -> int:
         r'arg\s*min\s',
         r'KL\s*\(',
         r'Gumbel[\s-]softmax',
+        r'Prior[\s-]Associations?',
+        r'Series[\s-]Associations?',
         r'AssDis\s*\(',
         r'AnomalyScore\s*\(',
+        r'\bAnomalyScore\b',
         r'[A-Z][a-z]*\s*=\s*[A-Z][a-z]*\s*\(',  # e.g., f(x) = g(x)
     ]
     for pattern in raw_patterns:
@@ -260,35 +266,23 @@ def extract_formula_candidates(
     """
     candidates = []
 
-    # From MarkItDown - LaTeX formulas
-    for m in re.finditer(r'\$\$(.*?)\$\$', markitdown_text, re.DOTALL):
-        latex = m.group(1).strip()
-        if latex:
+    for text, source, confidence in [
+        (markitdown_text, "markitdown", 0.7),
+        (pymupdf_text, "pymupdf", 0.45),
+        (marker_text or "", "marker", 0.8),
+    ]:
+        for latex in _extract_latex_formula_texts(text):
             candidates.append({
                 "latex": latex,
                 "raw_formula_text": "",
                 "origin": "parser_latex",
-                "source": "markitdown",
-                "confidence": 0.7,
+                "source": source,
+                "confidence": confidence,
                 "is_latex": True,
             })
 
-    # From Marker (if available) - LaTeX formulas
-    if marker_text:
-        for m in re.finditer(r'\$\$(.*?)\$\$', marker_text, re.DOTALL):
-            latex = m.group(1).strip()
-            if latex:
-                candidates.append({
-                    "latex": latex,
-                    "raw_formula_text": "",
-                    "origin": "parser_latex",
-                    "source": "marker",
-                    "confidence": 0.8,
-                    "is_latex": True,
-                })
-
     # Raw formula text from all parsers
-    for text, source in [(markitdown_text, "markitdown"), (pymupdf_text, "pymupdf")]:
+    for text, source in [(markitdown_text, "markitdown"), (pymupdf_text, "pymupdf"), (marker_text or "", "marker")]:
         raw_formulas = _extract_raw_formula_text(text)
         for rf in raw_formulas:
             candidates.append({
@@ -300,7 +294,59 @@ def extract_formula_candidates(
                 "is_latex": False,
             })
 
-    return candidates
+    return _dedupe_formula_candidates(candidates)
+
+
+def _extract_latex_formula_texts(text: str) -> list[str]:
+    """Extract parser-provided LaTeX/math snippets from Markdown-like text."""
+    if not text:
+        return []
+
+    formulas: list[str] = []
+    used_spans: list[tuple[int, int]] = []
+
+    for pattern, flags in _LATEX_FORMULA_PATTERNS:
+        for match in re.finditer(pattern, text, flags):
+            if _span_overlaps(match.span(), used_spans):
+                continue
+            latex = match.group(2 if pattern.startswith(r"\\begin") else 1).strip()
+            if not _looks_like_formula_latex(latex):
+                continue
+            formulas.append(latex)
+            used_spans.append(match.span())
+
+    return formulas
+
+
+def _looks_like_formula_latex(value: str) -> bool:
+    if not value or len(value.strip()) < 2:
+        return False
+    stripped = value.strip()
+    if len(stripped) > 2000:
+        return False
+    math_markers = [
+        "\\", "_", "^", "=", "|", "\\tag", "\\begin", "\\frac", "\\sum",
+        "\\mathbb", "\\mathbf", "\\operatorname", "p(", "P(", "q(", "I(",
+    ]
+    return any(marker in stripped for marker in math_markers)
+
+
+def _span_overlaps(span: tuple[int, int], used_spans: list[tuple[int, int]]) -> bool:
+    start, end = span
+    return any(start < used_end and end > used_start for used_start, used_end in used_spans)
+
+
+def _dedupe_formula_candidates(candidates: list[dict]) -> list[dict]:
+    seen: set[tuple[str, str]] = set()
+    unique: list[dict] = []
+    for candidate in candidates:
+        content = candidate.get("latex") or candidate.get("raw_formula_text") or ""
+        key = (candidate.get("origin", ""), normalize_formula_text(content))
+        if not key[1] or key in seen:
+            continue
+        seen.add(key)
+        unique.append(candidate)
+    return unique
 
 
 def _extract_raw_formula_text(text: str) -> list[str]:
@@ -319,13 +365,16 @@ def _extract_raw_formula_text(text: str) -> list[str]:
     for m in re.finditer(r'([A-Za-z][A-Za-z0-9,;()\s]{5,50})\s*=\s*([^\n]{5,100})', text):
         expr = m.group(0).strip()
         # Filter out normal sentences
-        if any(kw in expr.lower() for kw in ['is', 'are', 'was', 'were', 'the', 'a', 'an']):
+        if re.search(r'\b(?:is|are|was|were|the|a|an)\b', expr.lower()):
             continue
         if len(expr) > 10:
             formulas.append(expr[:200])
 
     # Pattern: function calls with math content
     for m in re.finditer(r'((?:Attention|MultiHead|Softmax|argmax|argmin|KL|Gumbel|AssDis|AnomalyScore)\s*\([^)]{3,50}\))', text, re.IGNORECASE):
+        formulas.append(m.group(1)[:200])
+
+    for m in re.finditer(r'\b(Prior[\s-]Associations?|Series[\s-]Associations?|AnomalyScore)\b', text, re.IGNORECASE):
         formulas.append(m.group(1)[:200])
 
     # Deduplicate
@@ -337,3 +386,43 @@ def _extract_raw_formula_text(text: str) -> list[str]:
             unique.append(f)
 
     return unique[:20]  # Limit to 20 candidates
+
+
+def normalize_formula_text(text: str) -> str:
+    """Normalize formula text for coverage matching.
+
+    The goal is tolerant matching across parser formatting differences:
+    whitespace/newlines, punctuation, case, common Unicode math symbols, and
+    simple LaTeX wrappers should not make an obvious match look missing.
+    """
+    normalized = text.lower()
+    replacements = {
+        "√": "sqrt",
+        "×": "x",
+        "✕": "x",
+        "−": "-",
+        "–": "-",
+        "—": "-",
+        "∣": "|",
+        "｜": "|",
+        "，": ",",
+        "；": ";",
+    }
+    for old, new in replacements.items():
+        normalized = normalized.replace(old, new)
+    normalized = re.sub(r"\\(?:mathbf|mathrm|mathit|mathbb|operatorname|text)\s*\{([^{}]*)\}", r"\1", normalized)
+    normalized = normalized.replace("\\", "")
+    normalized = normalized.replace("{", "").replace("}", "")
+    normalized = normalized.replace("_", "")
+    normalized = normalized.replace("^", "")
+    normalized = re.sub(r"\bsqrt\s*\(", "sqrt", normalized)
+    return re.sub(r"[^a-z0-9]+", "", normalized)
+
+
+def formula_text_matches(query: str, candidate: str) -> bool:
+    """Return True when two formula strings are equivalent enough for coverage."""
+    q = normalize_formula_text(query)
+    c = normalize_formula_text(candidate)
+    if not q or not c:
+        return False
+    return q in c or c in q

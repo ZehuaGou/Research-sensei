@@ -154,20 +154,17 @@ class MarkItDownAdapter:
 
     def _extract_formulas(self, text: str) -> list[FormulaBlock]:
         """Extract formula blocks from MarkItDown output."""
-        import re
+        from researchsensei.canonical.parser_quality import _extract_latex_formula_texts
         formulas: list[FormulaBlock] = []
-        counter = 0
 
-        # MarkItDown may produce $$ for display math
-        for match in re.finditer(r"\$\$(.*?)\$\$", text, re.DOTALL):
-            counter += 1
-            latex = match.group(1).strip()
-            if latex:
-                formulas.append(FormulaBlock(
-                    formula_id=f"md_eq{counter}",
-                    latex=latex,
-                    origin=FormulaOrigin.PARSER_LATEX,
-                ))
+        for counter, latex in enumerate(_extract_latex_formula_texts(text), 1):
+            formulas.append(FormulaBlock(
+                formula_id=f"md_eq{counter}",
+                latex=latex,
+                origin=FormulaOrigin.PARSER_LATEX,
+                is_latex=True,
+                confidence=0.7,
+            ))
 
         return formulas
 
@@ -284,19 +281,17 @@ class MarkerPdfAdapter:
 
     def _extract_formulas(self, markdown: str) -> list[FormulaBlock]:
         """Extract formula blocks from Marker markdown."""
+        from researchsensei.canonical.parser_quality import _extract_latex_formula_texts
         formulas: list[FormulaBlock] = []
-        counter = 0
 
-        # Marker uses $$ for display math and $ for inline
-        for match in re.finditer(r"\$\$(.*?)\$\$", markdown, re.DOTALL):
-            counter += 1
-            latex = match.group(1).strip()
-            if latex:
-                formulas.append(FormulaBlock(
-                    formula_id=f"marker_eq{counter}",
-                    latex=latex,
-                    origin=FormulaOrigin.PARSER_LATEX,
-                ))
+        for counter, latex in enumerate(_extract_latex_formula_texts(markdown), 1):
+            formulas.append(FormulaBlock(
+                formula_id=f"marker_eq{counter}",
+                latex=latex,
+                origin=FormulaOrigin.PARSER_LATEX,
+                is_latex=True,
+                confidence=0.8,
+            ))
 
         return formulas
 
@@ -428,18 +423,17 @@ class MinerUPdfAdapter:
         return name.title() if len(name) < 50 else "Other"
 
     def _extract_formulas(self, markdown: str) -> list[FormulaBlock]:
+        from researchsensei.canonical.parser_quality import _extract_latex_formula_texts
         formulas: list[FormulaBlock] = []
-        counter = 0
 
-        for match in re.finditer(r"\$\$(.*?)\$\$", markdown, re.DOTALL):
-            counter += 1
-            latex = match.group(1).strip()
-            if latex:
-                formulas.append(FormulaBlock(
-                    formula_id=f"mineru_eq{counter}",
-                    latex=latex,
-                    origin=FormulaOrigin.PARSER_LATEX,
-                ))
+        for counter, latex in enumerate(_extract_latex_formula_texts(markdown), 1):
+            formulas.append(FormulaBlock(
+                formula_id=f"mineru_eq{counter}",
+                latex=latex,
+                origin=FormulaOrigin.PARSER_LATEX,
+                is_latex=True,
+                confidence=0.8,
+            ))
 
         return formulas
 

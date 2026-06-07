@@ -6,7 +6,7 @@ from pydantic import Field
 
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.enums import CanonicalizationStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
+from researchsensei.schemas.enums import CanonicalQualityStatus, CanonicalizationStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
 
 
 class QueryPlan(SenseiModel):
@@ -83,6 +83,7 @@ class CandidatePaper(SenseiModel):
     structured_html_downloaded: bool = False
     metadata_only: bool = True
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
     m2_ready: bool = False
     degradation_reason: str = ""
@@ -173,6 +174,7 @@ class ResolvedPaperSource(SenseiModel):
     structured_html_downloaded: bool = False
     structured_html_path: str = ""
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
     m2_ready: bool = False
     degradation_reason: str = ""

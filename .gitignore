@@ -17,6 +17,7 @@ config/local.toml
 /runs/
 /outputs/
 /reports/live_eval/
+/reports/m1_parser_review/
 /artifacts/
 /tmp/
 *.ckpt

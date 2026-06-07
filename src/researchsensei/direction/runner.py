@@ -178,6 +178,7 @@ class DirectionRunner:
                 "metadata_only_blocked_count": sum(1 for cr in canonicalization_results if cr.source_priority == SourcePriority.METADATA_ONLY),
                 "source_type_distribution": {},
                 "canonicalization_status_distribution": {},
+                "canonical_quality_status_distribution": {},
                 "adapter_status": {},
             }
             for cr in canonicalization_results:
@@ -185,6 +186,8 @@ class DirectionRunner:
                 canon_summary["source_type_distribution"][st] = canon_summary["source_type_distribution"].get(st, 0) + 1
                 cs = cr.canonicalization_status.value
                 canon_summary["canonicalization_status_distribution"][cs] = canon_summary["canonicalization_status_distribution"].get(cs, 0) + 1
+                qs = cr.canonical_quality_status.value
+                canon_summary["canonical_quality_status_distribution"][qs] = canon_summary["canonical_quality_status_distribution"].get(qs, 0) + 1
                 for ai in cr.adapter_info:
                     canon_summary["adapter_status"][ai.name] = ai.status.value
             self.workspace.write_json(run_dir / "canonicalization_summary.json", canon_summary)
@@ -303,6 +306,7 @@ class DirectionRunner:
                         "preferred_m2_input": canon.preferred_m2_input,
                         "has_valid_deep_reading_source": canon.has_valid_deep_reading_source,
                         "canonicalization_status": canon.canonicalization_status,
+                        "canonical_quality_status": canon.canonical_quality_status,
                         "canonical_paper_path": canon.canonical_paper_path,
                         "m2_ready": canon.m2_ready,
                         "degradation_reason": canon.degradation_reason,

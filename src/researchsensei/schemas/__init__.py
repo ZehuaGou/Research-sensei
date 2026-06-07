@@ -3,7 +3,7 @@ from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEn
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
+from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
 from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
@@ -19,6 +19,7 @@ __all__ = [
     "AuditFinding",
     "BlockType",
     "CanonicalizationStatus",
+    "CanonicalQualityStatus",
     "CanonicalPaper",
     "CanonicalPaperFrontMatter",
     "CanonicalizationResult",

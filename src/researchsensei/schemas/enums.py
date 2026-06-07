@@ -91,6 +91,13 @@ class CanonicalizationStatus(str, Enum):
     NOT_ATTEMPTED = "not_attempted"
 
 
+class CanonicalQualityStatus(str, Enum):
+    """Quality gate status for whether canonical_paper.md may enter M2."""
+    PASS = "PASS"
+    DEGRADED = "DEGRADED"
+    FAIL = "FAIL"
+
+
 class FormulaOrigin(str, Enum):
     """Origin of formula content in canonical_paper.md."""
     SOURCE_LATEX = "source_latex"

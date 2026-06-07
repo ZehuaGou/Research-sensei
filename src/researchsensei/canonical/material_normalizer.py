@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import multiprocessing
 import re
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from researchsensei.schemas.common import WarningItem
 from researchsensei.schemas.direction import CandidatePaper, ResolvedPaperSource
 from researchsensei.schemas.enums import (
     AdapterStatus,
+    CanonicalQualityStatus,
     CanonicalizationStatus,
     FormulaOrigin,
     FormulaOcrStatus,
@@ -30,6 +32,27 @@ from researchsensei.schemas.enums import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _run_marker_pdf_adapter_worker(pdf_path: str, queue) -> None:
+    """Run Marker in a child process so timeout can terminate heavy work."""
+    try:
+        from researchsensei.canonical.adapters import MarkerPdfAdapter
+
+        result = MarkerPdfAdapter().process(Path(pdf_path))
+        queue.put({
+            "succeeded": result.succeeded,
+            "text": "\n".join(result.sections.values()) if result.sections else "",
+            "blocking_reason": result.blocking_reason,
+            "warnings": result.warnings,
+        })
+    except Exception as exc:  # pragma: no cover - defensive child-process boundary
+        queue.put({
+            "succeeded": False,
+            "text": "",
+            "blocking_reason": f"{type(exc).__name__}: {str(exc)[:300]}",
+            "warnings": [f"Marker worker failed: {exc}"],
+        })
 
 _STANDARD_SECTIONS = [
     "Abstract",
@@ -58,9 +81,18 @@ class MaterialNormalizer:
         *,
         formula_region_detector=None,
         formula_ocr_adapter=None,
+        marker_enabled: bool = False,
+        marker_trigger_mode: str = "never",
+        marker_timeout_seconds: float = 90.0,
     ) -> None:
         self.formula_region_detector = formula_region_detector
         self.formula_ocr_adapter = formula_ocr_adapter
+        self.marker_enabled = marker_enabled
+        self.marker_trigger_mode = marker_trigger_mode
+        self.marker_timeout_seconds = marker_timeout_seconds
+        self._marker_enabled = marker_enabled
+        self._marker_trigger_mode = marker_trigger_mode
+        self._marker_timeout_seconds = marker_timeout_seconds
 
     def normalize(
         self,
@@ -92,17 +124,27 @@ class MaterialNormalizer:
                 preferred_m2_input=source_priority.value,
                 has_valid_deep_reading_source=False,
                 canonicalization_status=CanonicalizationStatus.FAILED,
+                canonical_quality_status=CanonicalQualityStatus.FAIL,
                 m2_ready=False,
                 degradation_reason="No content extracted from source.",
                 warnings=parse_warnings,
             )
 
-        # Determine degradation
+        sections, quality_status, quality_reasons = self._repair_and_assess_sections(sections)
+
+        # Determine degradation and M2 gate.
         missing_sections = [s for s in _STANDARD_SECTIONS if not sections.get(s, "").strip()]
-        degraded = len(missing_sections) > 3
-        status = CanonicalizationStatus.DEGRADED if degraded else CanonicalizationStatus.SUCCESS
-        m2_ready = has_content and source_priority != SourcePriority.METADATA_ONLY
-        degradation_reason = f"Missing sections: {', '.join(missing_sections)}" if missing_sections else ""
+        degraded = len(missing_sections) > 3 or quality_status == CanonicalQualityStatus.DEGRADED
+        if quality_status == CanonicalQualityStatus.FAIL:
+            status = CanonicalizationStatus.FAILED
+        else:
+            status = CanonicalizationStatus.DEGRADED if degraded else CanonicalizationStatus.SUCCESS
+        m2_ready = has_content and source_priority != SourcePriority.METADATA_ONLY and quality_status != CanonicalQualityStatus.FAIL
+        degradation_parts: list[str] = []
+        if missing_sections:
+            degradation_parts.append(f"Missing sections: {', '.join(missing_sections)}")
+        degradation_parts.extend(quality_reasons)
+        degradation_reason = "; ".join(degradation_parts)
 
         front_matter = CanonicalPaperFrontMatter(
             paper_id=paper.paper_id,
@@ -113,6 +155,7 @@ class MaterialNormalizer:
             source_type=source_priority.value,
             source_confidence=paper.source_confidence,
             canonicalization_status=status,
+            canonical_quality_status=quality_status,
             parser_used=parser_used,
             m2_ready=m2_ready,
             degradation_reason=degradation_reason,
@@ -201,6 +244,7 @@ class MaterialNormalizer:
             canonical_paper=canonical,
             canonical_paper_path=canonical_path,
             canonicalization_status=status,
+            canonical_quality_status=quality_status,
             m2_ready=m2_ready,
             degradation_reason=degradation_reason,
             formula_blocks=formula_blocks,
@@ -384,16 +428,19 @@ class MaterialNormalizer:
         pm_score = score_parser_output(pm_text, "pymupdf")
 
         # Marker configuration (default: disabled for speed)
-        marker_enabled = getattr(self, '_marker_enabled', False)
-        marker_trigger_mode = getattr(self, '_marker_trigger_mode', 'never')  # never / on_demand / a_read / always
-        marker_timeout_seconds = getattr(self, '_marker_timeout_seconds', 120)
+        marker_enabled = self.marker_enabled
+        marker_trigger_mode = self.marker_trigger_mode  # never / on_demand / a_read / review / heavy / always
+        marker_timeout_seconds = self.marker_timeout_seconds
 
         should_trigger_marker = False
         trigger_reason = ""
 
         if marker_enabled and marker_trigger_mode != 'never':
             # Condition 1: Both parsers very low quality
-            if md_score.overall_score < 30 and pm_score.overall_score < 30:
+            if marker_trigger_mode in {"always", "review", "heavy"}:
+                should_trigger_marker = True
+                trigger_reason = f"marker trigger_mode={marker_trigger_mode}"
+            elif md_score.overall_score < 30 and pm_score.overall_score < 30:
                 should_trigger_marker = True
                 trigger_reason = "both light parsers have very low quality"
 
@@ -404,20 +451,22 @@ class MaterialNormalizer:
                 should_trigger_marker = True
                 trigger_reason = "formula candidates detected but light parser quality is low"
         elif not marker_enabled:
-            warnings.append("marker_status=skipped_by_policy (marker_enabled=false)")
+            warnings.append(
+                "marker_status=skipped_by_policy "
+                f"(marker_enabled=false, trigger_mode={marker_trigger_mode}, timeout_seconds={marker_timeout_seconds})"
+            )
 
         if should_trigger_marker:
             marker_adapter = MarkerPdfAdapter()
             if marker_adapter.is_available():
-                try:
-                    mk_result = marker_adapter.process(pdf_path)
-                    if mk_result.succeeded:
-                        mk_text = "\n".join(mk_result.sections.values())
-                        warnings.append(f"Marker triggered: {trigger_reason}")
-                    else:
-                        warnings.append(f"Marker: {mk_result.blocking_reason}")
-                except Exception as exc:
-                    warnings.append(f"Marker failed: {exc}")
+                mk_text, marker_warning = self._run_marker_with_timeout(pdf_path, marker_timeout_seconds)
+                warnings.append(f"Marker triggered: {trigger_reason}; timeout_seconds={marker_timeout_seconds}")
+                if mk_text:
+                    warnings.append("marker_status=completed")
+                if marker_warning:
+                    warnings.append(marker_warning)
+            else:
+                warnings.append("marker_status=blocked (marker-pdf not installed)")
 
         # Select best parser
         selection = select_best_parser(md_text, pm_text, mk_text)
@@ -481,6 +530,29 @@ class MaterialNormalizer:
         warnings.append(f"Selected parser: {selection.selected_parser} ({selection.selection_reason})")
 
         return sections, formula_blocks, selection.selected_parser, warnings
+
+    def _run_marker_with_timeout(self, pdf_path: Path, timeout_seconds: float) -> tuple[str | None, str]:
+        """Run Marker with a hard timeout and return markdown text plus warning."""
+        ctx = multiprocessing.get_context("spawn")
+        queue = ctx.Queue()
+        process = ctx.Process(target=_run_marker_pdf_adapter_worker, args=(str(pdf_path), queue))
+        process.start()
+        process.join(timeout_seconds)
+
+        if process.is_alive():
+            process.terminate()
+            process.join(5)
+            return None, f"marker_status=timeout_degraded (timeout_seconds={timeout_seconds})"
+
+        if queue.empty():
+            return None, "marker_status=failed (no result returned)"
+
+        payload = queue.get()
+        if payload.get("succeeded") and payload.get("text"):
+            return str(payload["text"]), ""
+
+        reason = payload.get("blocking_reason", "unknown Marker failure")
+        return None, f"marker_status=failed ({reason})"
 
     def _extract_from_text(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
@@ -602,6 +674,8 @@ class MaterialNormalizer:
                         formula_id=f"eq{formula_counter}",
                         latex=latex,
                         origin=FormulaOrigin.SOURCE_LATEX,
+                        is_latex=True,
+                        confidence=0.95,
                         section=self._find_section_for_position(content, match.start()),
                     ))
 
@@ -617,6 +691,8 @@ class MaterialNormalizer:
                     formula_id=f"inline{inline_count}",
                     latex=latex,
                     origin=FormulaOrigin.SOURCE_LATEX,
+                    is_latex=True,
+                    confidence=0.9,
                     section=self._find_section_for_position(content, match.start()),
                 ))
 
@@ -647,68 +723,6 @@ class MaterialNormalizer:
 
         return sections
 
-    def _parse_text_sections(self, text: str, title: str) -> dict[str, str]:
-        """Parse plain text into sections using heuristics.
-
-        Supports multiple section header formats:
-        - I. INTRODUCTION
-        - II. RELATED WORK
-        - 1 Introduction
-        - 5 CONCLUSION AND FUTURE WORK
-        - Table-style headers (| 5 CONCLUSION |)
-        """
-        sections: dict[str, str] = {}
-
-        # Try to find section headers - support numbered and Roman numeral formats
-        section_patterns = [
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:abstract|摘要)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:introduction|引言)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:related\s+work|相关工作)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:method(?:ology)?|方法|approach)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:experiment(?:s)?|实验|evaluation|results)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:conclusion|结论|discussion|future\s+work)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:reference|参考文献|bibliography)",
-            r"(?i)^(?:[IVX]+\.?\s+)?(?:appendix|附录)",
-            # Also match with numbers
-            r"(?i)^(?:\d+\.?\s+)(?:abstract|introduction|related\s+work|method|experiment|conclusion|reference|appendix)",
-        ]
-
-        lines = text.split("\n")
-        current_section = "Other"
-        current_content: list[str] = []
-
-        for line in lines:
-            stripped = line.strip()
-            if not stripped:
-                continue
-
-            # Check if this line is a section header
-            is_header = False
-            for pattern in section_patterns:
-                if re.match(pattern, stripped, re.IGNORECASE):
-                    # Save previous section
-                    if current_content:
-                        sections[current_section] = "\n".join(current_content)
-
-                    # Start new section
-                    current_section = self._map_section_name(stripped)
-                    current_content = []
-                    is_header = True
-                    break
-
-            if not is_header:
-                current_content.append(stripped)
-
-        # Save last section
-        if current_content:
-            sections[current_section] = "\n".join(current_content)
-
-        # If no sections found, put everything in "Other"
-        if not sections:
-            sections["Other"] = text[:5000]  # Limit to 5000 chars
-
-        return sections
-
     def _detect_formulas_in_text(self, text: str, page: int) -> list[FormulaBlock]:
         """Detect formula-like content in text."""
         formula_blocks: list[FormulaBlock] = []
@@ -731,6 +745,8 @@ class MaterialNormalizer:
                         formula_id=f"pdf_eq{formula_counter}",
                         latex=latex,
                         origin=FormulaOrigin.PARSER_LATEX,
+                        is_latex=True,
+                        confidence=0.6,
                         page=page,
                     ))
 
@@ -811,6 +827,7 @@ class MaterialNormalizer:
                             break
 
                     results.append({
+                        "page": page_num + 1,
                         "page_num": page_num + 1,
                         "math_token_count": math_count,
                         "density": round(density, 2),
@@ -829,6 +846,181 @@ class MaterialNormalizer:
         if 1 <= page_num < len(pages):
             return pages[page_num]
         return ""
+
+    def _parse_text_sections(self, text: str, title: str) -> dict[str, str]:
+        """Parse plain text into canonical sections using conservative headings."""
+        sections: dict[str, str] = {}
+        current_section = "Other"
+        current_content: list[str] = []
+
+        for line in text.split("\n"):
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            header = self._detect_section_header(stripped, current_section)
+            if header:
+                next_section, inline_content = header
+                self._flush_section(sections, current_section, current_content)
+                current_section = next_section
+                current_content = []
+                if inline_content:
+                    current_content.append(inline_content)
+                continue
+
+            current_content.append(stripped)
+
+        self._flush_section(sections, current_section, current_content)
+
+        if not sections:
+            sections["Other"] = text[:5000]
+
+        return sections
+
+    def _flush_section(self, sections: dict[str, str], section: str, content: list[str]) -> None:
+        text = "\n".join(line for line in content if line.strip()).strip()
+        if not text:
+            return
+        if section in sections and sections[section].strip():
+            sections[section] = sections[section].rstrip() + "\n" + text
+        else:
+            sections[section] = text
+
+    def _detect_section_header(self, line: str, current_section: str) -> tuple[str, str] | None:
+        candidate = self._clean_heading_candidate(line)
+        if not candidate or len(candidate) > 140:
+            return None
+        if self._looks_like_reference_line(candidate):
+            return None
+        if re.match(r"(?i)^(?:table|figure|fig\.|algorithm)\b", candidate):
+            return None
+        if current_section == "Experiments" and candidate.lower() in {"method", "methods", "model", "dataset", "datasets"}:
+            return None
+
+        heading_re = re.compile(
+            r"^(?:(?:section\s+)?(?:[ivxlcdm]+|\d+|[a-z])[\.\)]?\s+)?"
+            r"(?P<title>abstract|introduction|related\s+work|background|"
+            r"methodology|methods?|approach|proposed\s+method|"
+            r"experiments?|experimental\s+results|evaluation|results|"
+            r"discussion|conclusion(?:\s+and\s+future\s+work)?|"
+            r"references?|bibliography|appendix)"
+            r"\b(?P<rest>.*)$",
+            re.IGNORECASE,
+        )
+        match = heading_re.match(candidate)
+        if not match:
+            return None
+
+        mapped = self._map_section_name(match.group("title"))
+        if current_section == "References" and mapped != "Appendix":
+            return None
+
+        rest = match.group("rest").strip()
+        rest = re.sub(r"^\s*[:.\-–—]\s*", "", rest)
+        if rest and len(rest.split()) > 35:
+            return None
+        return mapped, rest
+
+    def _clean_heading_candidate(self, line: str) -> str:
+        candidate = line.strip()
+        candidate = re.sub(r"^#{1,6}\s*", "", candidate)
+        candidate = re.sub(r"<[^>]+>", " ", candidate)
+        candidate = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", candidate)
+        candidate = candidate.replace("&nbsp;", " ")
+        if candidate.startswith("|") and candidate.endswith("|"):
+            candidate = candidate.strip("|")
+            candidate = " ".join(part.strip() for part in candidate.split("|") if part.strip())
+        candidate = candidate.strip("*_` ")
+        candidate = re.sub(r"\s+", " ", candidate)
+        return candidate.strip()
+
+    def _repair_and_assess_sections(
+        self,
+        sections: dict[str, str],
+    ) -> tuple[dict[str, str], CanonicalQualityStatus, list[str]]:
+        repaired = dict(sections)
+        reasons: list[str] = []
+        status = CanonicalQualityStatus.PASS
+
+        for section in ("Introduction", "Method", "Experiments"):
+            content = repaired.get(section, "")
+            if not content.strip() or not self._section_is_reference_contaminated(content):
+                continue
+            kept, references = self._split_reference_contamination(content)
+            if references:
+                repaired["References"] = "\n".join(
+                    part for part in [repaired.get("References", "").strip(), references.strip()] if part
+                )
+            if len(kept) >= 200 and not self._section_is_reference_contaminated(kept):
+                repaired[section] = kept
+                reasons.append(f"{section} repaired by moving trailing reference entries to References")
+                if status != CanonicalQualityStatus.FAIL:
+                    status = CanonicalQualityStatus.DEGRADED
+            else:
+                repaired[section] = ""
+                reasons.append(f"{section} contaminated by reference entries")
+                status = CanonicalQualityStatus.FAIL
+
+        selected = getattr(self, "_last_parser_used", "")
+        selected_score = next(
+            (score for score in getattr(self, "_parser_quality_scores", []) if score.parser_name == selected),
+            None,
+        )
+        if selected_score:
+            if selected_score.long_concat_count > 80 or selected_score.spacing_quality < 0.5:
+                reasons.append("Body text has large-scale concatenation")
+                status = CanonicalQualityStatus.FAIL
+            elif selected_score.long_concat_count > 20 or selected_score.spacing_quality < 0.75:
+                reasons.append("Body text has noticeable concatenation")
+                if status != CanonicalQualityStatus.FAIL:
+                    status = CanonicalQualityStatus.DEGRADED
+
+            if selected_score.garbled_line_ratio > 0.55:
+                reasons.append("Body text has high garbled-line ratio")
+                status = CanonicalQualityStatus.FAIL
+            elif selected_score.garbled_line_ratio > 0.3 and status != CanonicalQualityStatus.FAIL:
+                reasons.append("Body text has elevated garbled-line ratio")
+                status = CanonicalQualityStatus.DEGRADED
+
+        if not repaired.get("Introduction", "").strip():
+            reasons.append("Introduction missing or unusable")
+            if status != CanonicalQualityStatus.FAIL:
+                status = CanonicalQualityStatus.DEGRADED
+
+        return repaired, status, reasons
+
+    def _section_is_reference_contaminated(self, content: str) -> bool:
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        if len(lines) < 4:
+            return False
+        refish = sum(1 for line in lines if self._looks_like_reference_line(line))
+        first_ref_index = next((i for i, line in enumerate(lines) if re.match(r"^\[\d+\]", line)), None)
+        early_ref_entries = sum(1 for line in lines[:20] if re.match(r"^\[\d+\]", line))
+        return (
+            refish / len(lines) >= 0.35
+            or early_ref_entries >= 2
+            or (first_ref_index is not None and first_ref_index <= 5 and refish / len(lines) >= 0.2)
+        )
+
+    def _split_reference_contamination(self, content: str) -> tuple[str, str]:
+        lines = [line.rstrip() for line in content.splitlines()]
+        first_ref_index = next((i for i, line in enumerate(lines) if re.match(r"^\s*\[\d+\]", line)), None)
+        if first_ref_index is None:
+            return "", content
+        kept = "\n".join(lines[:first_ref_index]).strip()
+        refs = "\n".join(lines[first_ref_index:]).strip()
+        return kept, refs
+
+    def _looks_like_reference_line(self, line: str) -> bool:
+        stripped = line.strip()
+        lower = stripped.lower()
+        if re.match(r"^\[\d+\]\s+", stripped):
+            return True
+        if re.search(r"\b(?:corr|vol\.|pp\.|proceedings|conference|journal|trans\.|doi:|arxiv|iclr|neurips|sigkdd|vldb)\b", lower):
+            return True
+        if re.match(r"^[A-Z][A-Za-z'`\-]+,\s+[A-Z](?:\.|\s)", stripped):
+            return True
+        return False
 
     def _map_section_name(self, name: str) -> str:
         """Map a section name to a standard section."""
@@ -856,8 +1048,10 @@ class MaterialNormalizer:
             "结论": "Conclusion",
             "discussion": "Conclusion",
             "references": "References",
+            "reference": "References",
             "参考文献": "References",
             "bibliography": "References",
+            "appendix": "Appendix",
         }
 
         for key, value in mapping.items():
@@ -900,6 +1094,7 @@ class MaterialNormalizer:
         lines.append(f"source_type: {fm.source_type}")
         lines.append(f"source_confidence: {fm.source_confidence}")
         lines.append(f"canonicalization_status: {fm.canonicalization_status.value}")
+        lines.append(f"canonical_quality_status: {fm.canonical_quality_status.value}")
         lines.append(f"parser_used: {fm.parser_used}")
         lines.append(f"m2_ready: {'true' if fm.m2_ready else 'false'}")
         if fm.degradation_reason:
@@ -1135,6 +1330,7 @@ class MaterialNormalizer:
             preferred_m2_input="none",
             has_valid_deep_reading_source=False,
             canonicalization_status=CanonicalizationStatus.FAILED,
+            canonical_quality_status=CanonicalQualityStatus.FAIL,
             m2_ready=False,
             degradation_reason="metadata_only: no full-text source available. Cannot enter M2.",
             adapter_info=self._build_adapter_info(),

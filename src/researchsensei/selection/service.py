@@ -7,6 +7,7 @@ from typing import Iterable
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
+    CanonicalQualityStatus,
     QueryPlan,
     ReadingPlan,
     ReadingPlanItem,
@@ -301,6 +302,7 @@ class SelectionService:
         - has_valid_deep_reading_source == True
         - canonical_paper_path exists (non-empty)
         - m2_ready == True
+        - canonical_quality_status != FAIL
         - source_priority != METADATA_ONLY
 
         Legacy gate (still checked):
@@ -320,6 +322,7 @@ class SelectionService:
         has_valid_source = paper.has_valid_deep_reading_source
         has_canonical = bool(paper.canonical_paper_path)
         m2_ready = paper.m2_ready
+        quality_ok = paper.canonical_quality_status != CanonicalQualityStatus.FAIL
         not_metadata_only = paper.source_priority != SourcePriority.METADATA_ONLY
 
         # Legacy checks
@@ -337,6 +340,7 @@ class SelectionService:
             has_valid_source,
             has_canonical,
             m2_ready,
+            quality_ok,
             not_metadata_only,
             # Legacy gate
             verified,

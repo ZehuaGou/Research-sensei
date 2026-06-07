@@ -8,6 +8,7 @@ from pydantic import Field
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.enums import (
     AdapterStatus,
+    CanonicalQualityStatus,
     CanonicalizationStatus,
     FormulaOcrStatus,
     FormulaOrigin,
@@ -68,6 +69,7 @@ class CanonicalPaperFrontMatter(SenseiModel):
     source_type: str = ""  # latex_source | structured_html | pdf | metadata_only
     source_confidence: str = ""  # high | medium | low
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     parser_used: str = ""
     m2_ready: bool = False
     degradation_reason: str = ""
@@ -111,6 +113,7 @@ class CanonicalizationResult(SenseiModel):
     canonical_paper: CanonicalPaper | None = None
     canonical_paper_path: str = ""
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
+    canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     m2_ready: bool = False
     degradation_reason: str = ""
     formula_blocks: list[FormulaBlock] = Field(default_factory=list)
