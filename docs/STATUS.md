@@ -29,9 +29,11 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
 | M1 | canonical_paper.md pipeline | implemented | unit tested | IMPLEMENTED | MaterialNormalizer 已实现，canonical_paper.md 生成已实现，front matter 和 formula block 支持已实现 |
+| M1 | MarkerPdfAdapter | implemented | live tested | IMPLEMENTED | marker-pdf 已安装，Marker PDF→markdown 已接入 pipeline，live eval 中真实处理 PDF |
+| M1 | MinerUPdfAdapter | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | magic-pdf 已安装，do_parse API 可用，但 live eval 中未被触发（Marker 优先） |
 | M1 | FormulaRegionDetector | implemented | unit tested | DEGRADED_IMPLEMENTED | 基于 PyMuPDF 的文本公式检测已实现，layout-based 检测未实现 |
-| M1 | FormulaOCRAdapter / pix2tex / LaTeX-OCR | not implemented | — | NOT_IMPLEMENTED | OCR adapter 接口已实现，pix2tex/LaTeX-OCR 模型未集成 |
-| M1 | MinerU / Marker / DeepXiv structured adapter | not implemented | — | NOT_IMPLEMENTED | 作为 material normalization adapter 设计，代码未实现 |
+| M1 | FormulaOCRAdapter / pix2tex | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | pix2tex 已安装，LatexOCR 类可用，模型权重需下载，live eval 中未触发 OCR |
+| M1 | DeepXiv | — | — | BLOCKED | pip 包不存在，无确认的公开 API |
 | M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
 | M2 | Paper Deep Reading | partial code exists | structural tests exist, not completion | NOT_REAL_E2E_VERIFIED | 文档存在，部分代码存在，结构性测试不能替代验收；真实 PDF + 真实 LLM + 真实 audit e2e 尚未验证 |
 | M2 | canonical input reader / validator | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | M2.1 读取并校验 canonical_paper.md、转换 evidence-ready blocks，代码未实现 |

@@ -1,7 +1,7 @@
 """M1.4 Material Normalizer — converts raw sources to canonical_paper.md.
 
 M1 must produce a normalized canonical_paper.md for M2 consumption.
-Source priority: latex_source > structured_html > pdf > low_confidence_text > metadata_only.
+Source priority: latex_source > structured_html > marker_pdf > mineru_pdf > pymupdf > low_confidence_text > metadata_only.
 metadata_only cannot enter M2.
 """
 from __future__ import annotations
@@ -326,7 +326,9 @@ class MaterialNormalizer:
     def _extract_from_pdf(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
     ) -> tuple[dict[str, str], list[FormulaBlock], str, list[str]]:
-        """Extract from PDF using PyMuPDF."""
+        """Extract from PDF using Marker -> MinerU -> PyMuPDF fallback chain."""
+        from researchsensei.canonical.adapters import MarkerPdfAdapter, MinerUPdfAdapter
+
         warnings: list[str] = []
         formula_blocks: list[FormulaBlock] = []
         sections: dict[str, str] = {}
@@ -339,6 +341,33 @@ class MaterialNormalizer:
             warnings.append("No PDF available for extraction.")
             return sections, formula_blocks, "none", warnings
 
+        # Try Marker first (best quality for structure/equations)
+        marker_adapter = MarkerPdfAdapter()
+        if marker_adapter.is_available():
+            try:
+                marker_result = marker_adapter.process(pdf_path)
+                if marker_result.succeeded and marker_result.sections:
+                    self._last_parser_used = marker_result.parser_used
+                    return marker_result.sections, marker_result.formula_blocks, marker_result.parser_used, warnings
+                else:
+                    warnings.append(f"Marker: {marker_result.blocking_reason}")
+            except Exception as exc:
+                warnings.append(f"Marker failed: {exc}")
+
+        # Try MinerU (good for formulas/tables)
+        mineru_adapter = MinerUPdfAdapter()
+        if mineru_adapter.is_available():
+            try:
+                mineru_result = mineru_adapter.process(pdf_path)
+                if mineru_result.succeeded and mineru_result.sections:
+                    self._last_parser_used = mineru_result.parser_used
+                    return mineru_result.sections, mineru_result.formula_blocks, mineru_result.parser_used, warnings
+                else:
+                    warnings.append(f"MinerU: {mineru_result.blocking_reason}")
+            except Exception as exc:
+                warnings.append(f"MinerU failed: {exc}")
+
+        # Fallback to PyMuPDF
         try:
             import fitz  # PyMuPDF
 
@@ -722,7 +751,11 @@ class MaterialNormalizer:
         return "\n".join(lines)
 
     def _build_adapter_info(self) -> list[AdapterInfo]:
-        """Build adapter status report."""
+        """Build adapter status report using real adapter probes."""
+        from researchsensei.canonical.adapters import (
+            MarkerPdfAdapter, MinerUPdfAdapter, Pix2TexFormulaOCRAdapter, DeepXivProbe,
+        )
+
         adapters = []
 
         # arXiv source
@@ -782,59 +815,63 @@ class MaterialNormalizer:
             attempt_details=["Basic text-based formula detection; layout-based detection not yet implemented"],
         ))
 
-        # Formula OCR (pix2tex)
-        try:
-            from pix2tex.cli import LatexOCR
+        # Formula OCR (pix2tex) - real probe
+        pix2tex = Pix2TexFormulaOCRAdapter()
+        if pix2tex.is_available():
+            ocr_invoked = getattr(self, '_last_ocr_invoked', False)
+            ocr_succeeded = getattr(self, '_last_ocr_succeeded', False)
             adapters.append(AdapterInfo(
                 name="formula_ocr",
-                status=AdapterStatus.IMPLEMENTED,
-                attempt_details=["pix2tex installed, LatexOCR class available"],
+                status=AdapterStatus.IMPLEMENTED if ocr_succeeded else (AdapterStatus.DEGRADED_IMPLEMENTED if ocr_invoked else AdapterStatus.DEPENDENCY_AVAILABLE_NOT_WIRED),
+                blocking_reason="" if ocr_succeeded else ("OCR attempted but failed" if ocr_invoked else "pix2tex installed but not yet invoked"),
+                attempt_details=["pix2tex installed", f"invoked={ocr_invoked}", f"succeeded={ocr_succeeded}"],
             ))
-        except ImportError:
+        else:
             adapters.append(AdapterInfo(
                 name="formula_ocr",
                 status=AdapterStatus.BLOCKED,
                 blocking_reason="pix2tex not installed (pip install pix2tex)",
             ))
-        except Exception as exc:
-            adapters.append(AdapterInfo(
-                name="formula_ocr",
-                status=AdapterStatus.DEGRADED_IMPLEMENTED,
-                blocking_reason=f"pix2tex installed but load failed: {str(exc)[:100]}",
-                attempt_details=[f"pix2tex import error: {type(exc).__name__}"],
-            ))
 
-        # DeepXiv
+        # DeepXiv - real probe
+        deepxiv = DeepXivProbe()
+        deepxiv_result = deepxiv.probe()
         adapters.append(AdapterInfo(
             name="deepxiv",
-            status=AdapterStatus.BLOCKED,
-            blocking_reason="DeepXiv pip package does not exist (No matching distribution found for deepxiv). No confirmed public API.",
+            status=deepxiv_result.status,
+            blocking_reason=deepxiv_result.blocking_reason,
+            attempt_details=deepxiv_result.warnings,
         ))
 
-        # Marker
-        try:
-            import marker
+        # Marker - real probe
+        marker_adapter = MarkerPdfAdapter()
+        if marker_adapter.is_available():
+            # Check if Marker was actually used in this run
+            marker_used = getattr(self, '_last_parser_used', '') == 'marker_pdf'
             adapters.append(AdapterInfo(
                 name="marker",
-                status=AdapterStatus.IMPLEMENTED,
-                attempt_details=["marker-pdf installed"],
+                status=AdapterStatus.IMPLEMENTED if marker_used else AdapterStatus.DEPENDENCY_AVAILABLE_NOT_WIRED,
+                blocking_reason="" if marker_used else "marker-pdf installed but not yet invoked in this run",
+                attempt_details=["marker-pdf installed", f"invoked={marker_used}"],
             ))
-        except ImportError:
+        else:
             adapters.append(AdapterInfo(
                 name="marker",
                 status=AdapterStatus.BLOCKED,
                 blocking_reason="marker-pdf not installed. GPL-3.0 license. pip install marker-pdf",
             ))
 
-        # MinerU
-        try:
-            import magic_pdf
+        # MinerU - real probe
+        mineru_adapter = MinerUPdfAdapter()
+        if mineru_adapter.is_available():
+            mineru_used = getattr(self, '_last_parser_used', '') == 'mineru_pdf'
             adapters.append(AdapterInfo(
                 name="mineru",
-                status=AdapterStatus.IMPLEMENTED,
-                attempt_details=["magic-pdf (MinerU) installed"],
+                status=AdapterStatus.IMPLEMENTED if mineru_used else AdapterStatus.DEPENDENCY_AVAILABLE_NOT_WIRED,
+                blocking_reason="" if mineru_used else "magic-pdf installed but not yet invoked in this run",
+                attempt_details=["magic-pdf installed", f"invoked={mineru_used}"],
             ))
-        except ImportError:
+        else:
             adapters.append(AdapterInfo(
                 name="mineru",
                 status=AdapterStatus.BLOCKED,
