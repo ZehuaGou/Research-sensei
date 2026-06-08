@@ -1,0 +1,971 @@
+{
+  "block_formulas": [],
+  "markdown_formulas": [
+    {
+      "type": "latex_display",
+      "content": "I(X,Y) = \\sum_{x \\in X} \\sum_{y \\in Y} \\mathbb{P}(x,y) \\log \\left( \\frac{\\mathbb{P}(x,y)}{\\mathbb{P}(x)\\mathbb{P}(y)} \\right)",
+      "start": 13837,
+      "end": 13966
+    },
+    {
+      "type": "latex_display",
+      "content": "I_{\\text{UBA}}(X,Y) \\triangleq \\mathbb{E}_{p(x,y)}[\\log q(x|y)] + h(X)",
+      "start": 15848,
+      "end": 15922
+    },
+    {
+      "type": "latex_display",
+      "content": "= \\mathbb{E}_{p(x,y)}[\\log p(x) - \\log Z(y) + f(x,y)] + h(X)",
+      "start": 15924,
+      "end": 15988
+    },
+    {
+      "type": "latex_display",
+      "content": "= \\mathbb{E}_{p(x,y)}[f(x,y)] - \\mathbb{E}_{p(y)}[\\log Z(y)]",
+      "start": 15990,
+      "end": 16054
+    },
+    {
+      "type": "latex_display",
+      "content": "q(x|y) = \\frac{p(x)}{Z(y)}e^{f(x,y)}",
+      "start": 16288,
+      "end": 16328
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{H}_{t:t+B} = \\frac{\\mathbf{s}_{t:t+B} - \\mathbb{E}[\\mathbf{s}_{t:t+B}]}{\\sqrt{\\text{Var}[\\mathbf{s}_{t:t+B}] + \\epsilon}} \\cdot \\gamma_1 + \\beta_1",
+      "start": 20051,
+      "end": 20209
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{H}_{\\text{emb}} = \\mathbf{W}_{\\text{emb}} \\cdot \\mathbf{H} \\tag{5}",
+      "start": 21116,
+      "end": 21194
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{Q} = \\mathbf{W}_{\\mathbf{Q}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21342,
+      "end": 21412
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{K} = \\mathbf{W}_{\\mathbf{K}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21414,
+      "end": 21484
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{V} = \\mathbf{W}_{\\mathbf{V}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21486,
+      "end": 21556
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{S} = \\operatorname{softmax} \\left( \\frac{\\mathbf{Q} \\cdot \\mathbf{K}^{\\top}}{\\sqrt{d}} \\right)",
+      "start": 21558,
+      "end": 21664
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{Y}_{1} = \\mathbf{S} \\cdot \\mathbf{V}",
+      "start": 21666,
+      "end": 21714
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{Y}_1 = \\mathbf{W}_{\\text{mult}} \\cdot [\\mathbf{Y}_1^1, \\dots, \\mathbf{Y}_1^M]^\\top \\tag{7}",
+      "start": 22338,
+      "end": 22440
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{Y}_{2} = \\mathbf{Y}_{1} + \\frac{\\mathbf{Y}_{1} - \\mathbb{E}[\\mathbf{Y}_{1}]}{\\sqrt{\\operatorname{Var}[\\mathbf{Y}_{1}] + \\epsilon}} \\cdot \\gamma_{2} + \\beta_{2}",
+      "start": 22736,
+      "end": 22907
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathbf{Y}_3 = \\mathbf{W}_2 \\cdot \\text{ReLU}(\\mathbf{W}_1 \\cdot \\mathbf{Y}_2) \\tag{9}",
+      "start": 23325,
+      "end": 23415
+    },
+    {
+      "type": "latex_display",
+      "content": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{aux}} &= \\t",
+      "start": 26797,
+      "end": 27114
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathcal{L}_{aux} = \\|\\text{shuffle}(\\mathbf{Y}) - \\hat{\\mathbf{Y}}_{aux}\\|_{\\mathcal{F}}^{2}",
+      "start": 27256,
+      "end": 27353
+    },
+    {
+      "type": "latex_display",
+      "content": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{sta}} &= \\t",
+      "start": 28140,
+      "end": 28457
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathcal{L}_{\\text{sta}} = \\|\\mathbf{Y} - \\hat{\\mathbf{Y}}_{\\text{sta}}\\|_{\\mathcal{F}}^2 - I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})",
+      "start": 29522,
+      "end": 29665
+    },
+    {
+      "type": "latex_display",
+      "content": "I_{\\text{InfoNCE}} = \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}[f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})] - \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}_{\\text{sta}})}[\\mathbb{E}_{\\mathb",
+      "start": 30075,
+      "end": 30350
+    },
+    {
+      "type": "latex_display",
+      "content": "f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}}) = \\phi_{\\theta}(\\mathbf{Y})^{\\top} \\phi_{\\theta}(\\mathbf{Y}_{\\text{sta}}),",
+      "start": 30506,
+      "end": 30632
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathcal{L}_{\\text{reg}} = \\|\\mathbf{Y}'_{u} \\cdot \\mathbf{W}_{p} - \\mathbf{Y}'_{y} \\cdot \\mathbf{W}_{p}\\|_{\\mathcal{F}}^{2}",
+      "start": 33851,
+      "end": 33979
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathcal{L} = \\lambda_1 \\cdot \\mathcal{L}_{\\text{sta}} + \\lambda_2 \\cdot \\mathcal{L}_{\\text{aux}} + \\lambda_3 \\cdot \\mathcal{L}_{\\text{reg}}",
+      "start": 34543,
+      "end": 34687
+    },
+    {
+      "type": "latex_display",
+      "content": "\\mathcal{AS}(\\mathbf{s}_i) = -I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{aux}}) \\tag{18}",
+      "start": 36467,
+      "end": 36557
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{T} = \\langle \\mathbf{s}_1, \\mathbf{s}_2, \\dots, \\mathbf{s}_N \\rangle",
+      "start": 11995,
+      "end": 12074
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{s}_i \\in \\mathbb{R}^D",
+      "start": 12146,
+      "end": 12177
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{T}",
+      "start": 12228,
+      "end": 12241
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{T}",
+      "start": 12269,
+      "end": 12282
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{T} = \\langle \\mathbf{s}_1, \\mathbf{s}_2, \\dots, \\mathbf{s}_N \\rangle",
+      "start": 12381,
+      "end": 12460
+    },
+    {
+      "type": "latex_inline",
+      "content": "AS(s_i)",
+      "start": 12501,
+      "end": 12510
+    },
+    {
+      "type": "latex_inline",
+      "content": "AS(s_i)",
+      "start": 12562,
+      "end": 12571
+    },
+    {
+      "type": "latex_inline",
+      "content": "I(X,Y) = \\sum_{x \\in X} \\sum_{y \\in Y} \\mathbb{P}(x,y) \\log \\left( \\frac{\\mathbb{P}(x,y)}{\\mathbb{P}(x)\\mathbb{P}(y)} \\right)",
+      "start": 13838,
+      "end": 13965
+    },
+    {
+      "type": "latex_inline",
+      "content": "(1)\n\nHere,",
+      "start": 13965,
+      "end": 13980
+    },
+    {
+      "type": "latex_inline",
+      "content": "indicate the joint distribution, and",
+      "start": 13995,
+      "end": 14037
+    },
+    {
+      "type": "latex_inline",
+      "content": "are the marginal distributions of X and Y obtained through a marginalization process. Note that in the context of time series, both X and Y are continuous variables.\n\nConceptually, MI quantifies the a",
+      "start": 14072,
+      "end": 15711
+    },
+    {
+      "type": "latex_inline",
+      "content": "to approximate the mutual information I(X,Y) between random variables X and Y [52].\n\n<span id=\"page-2-2\"></span>",
+      "start": 15732,
+      "end": 15849
+    },
+    {
+      "type": "latex_inline",
+      "content": "I_{\\text{UBA}}(X,Y) \\triangleq \\mathbb{E}_{p(x,y)}[\\log q(x|y)] + h(X)",
+      "start": 15849,
+      "end": 15921
+    },
+    {
+      "type": "latex_inline",
+      "content": "= \\mathbb{E}_{p(x,y)}[\\log p(x) - \\log Z(y) + f(x,y)] + h(X)",
+      "start": 15925,
+      "end": 15987
+    },
+    {
+      "type": "latex_inline",
+      "content": "= \\mathbb{E}_{p(x,y)}[f(x,y)] - \\mathbb{E}_{p(y)}[\\log Z(y)]",
+      "start": 15991,
+      "end": 16053
+    },
+    {
+      "type": "latex_inline",
+      "content": "(2)\n\nHere,",
+      "start": 16053,
+      "end": 16068
+    },
+    {
+      "type": "latex_inline",
+      "content": "is the differential entropy of",
+      "start": 16116,
+      "end": 16152
+    },
+    {
+      "type": "latex_inline",
+      "content": ", and q(x|y) denotes the conditional probability of X given Y, which is defined as follows.",
+      "start": 16193,
+      "end": 16289
+    },
+    {
+      "type": "latex_inline",
+      "content": "q(x|y) = \\frac{p(x)}{Z(y)}e^{f(x,y)}",
+      "start": 16289,
+      "end": 16327
+    },
+    {
+      "type": "latex_inline",
+      "content": "(3)\n\nHere, q(x|y) is considered as an energy function in system [13],",
+      "start": 16327,
+      "end": 16401
+    },
+    {
+      "type": "latex_inline",
+      "content": "is a tilting function,",
+      "start": 16411,
+      "end": 16439
+    },
+    {
+      "type": "latex_inline",
+      "content": "is a critic function aiming to distinguish whether the x and y come from the same joint distribution, and Z(y) is the associated partition function.\n\nIf we use different techniques to deal with the fa",
+      "start": 16492,
+      "end": 18831
+    },
+    {
+      "type": "latex_inline",
+      "content": "is treated as D univariate time series",
+      "start": 18870,
+      "end": 18914
+    },
+    {
+      "type": "latex_inline",
+      "content": ". The univariate time series are each standardized and partitioned into overlapping subsequences by using a sliding window of length B. Then, the resulting sequences of length B, are fed into the mode",
+      "start": 18973,
+      "end": 20052
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{H}_{t:t+B} = \\frac{\\mathbf{s}_{t:t+B} - \\mathbb{E}[\\mathbf{s}_{t:t+B}]}{\\sqrt{\\text{Var}[\\mathbf{s}_{t:t+B}] + \\epsilon}} \\cdot \\gamma_1 + \\beta_1",
+      "start": 20052,
+      "end": 20208
+    },
+    {
+      "type": "latex_inline",
+      "content": "(4)\n\nHere, the",
+      "start": 20208,
+      "end": 20228
+    },
+    {
+      "type": "latex_inline",
+      "content": "are learnable parameter vectors, and",
+      "start": 20252,
+      "end": 20294
+    },
+    {
+      "type": "latex_inline",
+      "content": "are the expectation and variance\n\nof a time series subsequences, respectively. The output of Equation 4 for",
+      "start": 20365,
+      "end": 20478
+    },
+    {
+      "type": "latex_inline",
+      "content": ". However, for simplicity, we omit t:t+B in the following.\n\n1) Attention Module: The reason for using attention mechanisms is twofold. First, attention mechanisms offer high parallelism and the abilit",
+      "start": 20522,
+      "end": 21071
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{H}_{\\text{emb}} = \\mathbf{W}_{\\text{emb}} \\cdot \\mathbf{H} \\tag{5}",
+      "start": 21117,
+      "end": 21193
+    },
+    {
+      "type": "latex_inline",
+      "content": "is the weight matrix of the linear embedding layer. Subsequently, self-attention operations are performed as follows.",
+      "start": 21220,
+      "end": 21343
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{Q} = \\mathbf{W}_{\\mathbf{Q}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21343,
+      "end": 21411
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{K} = \\mathbf{W}_{\\mathbf{K}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21415,
+      "end": 21483
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{V} = \\mathbf{W}_{\\mathbf{V}} \\cdot \\mathbf{H}_{\\text{emb}}",
+      "start": 21487,
+      "end": 21555
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{S} = \\operatorname{softmax} \\left( \\frac{\\mathbf{Q} \\cdot \\mathbf{K}^{\\top}}{\\sqrt{d}} \\right)",
+      "start": 21559,
+      "end": 21663
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{Y}_{1} = \\mathbf{S} \\cdot \\mathbf{V}",
+      "start": 21667,
+      "end": 21713
+    },
+    {
+      "type": "latex_inline",
+      "content": "(6)\n\nHere,",
+      "start": 21713,
+      "end": 21728
+    },
+    {
+      "type": "latex_inline",
+      "content": "are projection matrices for query, key, and value, respectively. In the specific implementation, we employ a multi-head self-attention mechanism, assuming a total of M heads producing M outputs",
+      "start": 21864,
+      "end": 22063
+    },
+    {
+      "type": "latex_inline",
+      "content": ", where each attention head operates in a",
+      "start": 22102,
+      "end": 22148
+    },
+    {
+      "type": "latex_inline",
+      "content": "dimensional space. Then, the outputs of the M attention heads are concatenated and projected with a linear transformation, as shown in Equation 7.\n\n<span id=\"page-3-2\"></span>",
+      "start": 22159,
+      "end": 22339
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{Y}_1 = \\mathbf{W}_{\\text{mult}} \\cdot [\\mathbf{Y}_1^1, \\dots, \\mathbf{Y}_1^M]^\\top \\tag{7}",
+      "start": 22339,
+      "end": 22439
+    },
+    {
+      "type": "latex_inline",
+      "content": "is a learnable parameter to conduct the linear transformation.\n\nThe output of multi-head self-attention is then fed to an addition and normalization layer to conduct a residual connection and normaliz",
+      "start": 22474,
+      "end": 22737
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{Y}_{2} = \\mathbf{Y}_{1} + \\frac{\\mathbf{Y}_{1} - \\mathbb{E}[\\mathbf{Y}_{1}]}{\\sqrt{\\operatorname{Var}[\\mathbf{Y}_{1}] + \\epsilon}} \\cdot \\gamma_{2} + \\beta_{2}",
+      "start": 22737,
+      "end": 22906
+    },
+    {
+      "type": "latex_inline",
+      "content": "(8)\n\nHere, the",
+      "start": 22906,
+      "end": 22926
+    },
+    {
+      "type": "latex_inline",
+      "content": "are learnable parameter vectors,",
+      "start": 22950,
+      "end": 22988
+    },
+    {
+      "type": "latex_inline",
+      "content": "are the expectation and variance of matrix",
+      "start": 23047,
+      "end": 23095
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nThe output of the addition and normalizing layer is fed to a multi-layer perceptron (MLP) to conduct a sequence of k linear transformations. We use an MLP with two linear layers and the ReLU activa",
+      "start": 23107,
+      "end": 23326
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{Y}_3 = \\mathbf{W}_2 \\cdot \\text{ReLU}(\\mathbf{W}_1 \\cdot \\mathbf{Y}_2) \\tag{9}",
+      "start": 23326,
+      "end": 23414
+    },
+    {
+      "type": "latex_inline",
+      "content": "are the learnable weight matrices of the MLP. Finally, the output",
+      "start": 23458,
+      "end": 23529
+    },
+    {
+      "type": "latex_inline",
+      "content": "of the MLP is fed into the second\n\n<span id=\"page-4-0\"></span>![](_page_4_Figure_0.jpeg)\n\nFigure 3: EDAD overview.\n\naddition and normalization layer, where the computation is similar to that in the fi",
+      "start": 23541,
+      "end": 23794
+    },
+    {
+      "type": "latex_inline",
+      "content": "(see Equation 8).\n\n2) Stable and Auxiliary Feature Modules: The output of the attention module, **Y**, is partitioned into two parts, and each part is fed into one of the two modules\u2014the stable featur",
+      "start": 23804,
+      "end": 24248
+    },
+    {
+      "type": "latex_inline",
+      "content": ", where",
+      "start": 24311,
+      "end": 24323
+    },
+    {
+      "type": "latex_inline",
+      "content": "represent the separated representations that will be fed into the stable and auxiliary modules, respectively.\n\nTo facilitate the model's effective learning of these two representations, we have design",
+      "start": 24454,
+      "end": 25276
+    },
+    {
+      "type": "latex_inline",
+      "content": "), performs random shuffling along the time dimension. The identity operation, identity(",
+      "start": 25281,
+      "end": 25373
+    },
+    {
+      "type": "latex_inline",
+      "content": "), represents no change to the input. The shuffle operation is applied along the time dimension within each subsequence window, while all feature dimensions are treated separately. This ensures that t",
+      "start": 25378,
+      "end": 25908
+    },
+    {
+      "type": "latex_inline",
+      "content": "and perform a shuffle operation on",
+      "start": 25922,
+      "end": 25962
+    },
+    {
+      "type": "latex_inline",
+      "content": ". Since the auxiliary features contain information related to specific timestamps, the shuffling of auxiliary features affects the final output sequence. Thus, we apply a shuffle operation to the inpu",
+      "start": 25976,
+      "end": 26220
+    },
+    {
+      "type": "latex_inline",
+      "content": "to maintain consistency. By doing so, we aim to emphasize that the auxiliary features are strongly affected by shuffling because auxiliary features are associated with individual data points. When we ",
+      "start": 26234,
+      "end": 26740
+    },
+    {
+      "type": "latex_inline",
+      "content": "can capture rapidly changing features.",
+      "start": 26754,
+      "end": 26798
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{aux}} &= \\t",
+      "start": 26798,
+      "end": 27113
+    },
+    {
+      "type": "latex_inline",
+      "content": "Then, we formulate the auxiliary loss that measures the closeness between the two representations, as follows.\n\n<span id=\"page-4-1\"></span>",
+      "start": 27113,
+      "end": 27257
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{L}_{aux} = \\|\\text{shuffle}(\\mathbf{Y}) - \\hat{\\mathbf{Y}}_{aux}\\|_{\\mathcal{F}}^{2}",
+      "start": 27257,
+      "end": 27352
+    },
+    {
+      "type": "latex_inline",
+      "content": "(11)\n\n**Stable Module:** By definition, stable features remain relatively stable over a long period. Therefore a random perturbation of the stable features at a particular timestamp i, denoted as",
+      "start": 27352,
+      "end": 27553
+    },
+    {
+      "type": "latex_inline",
+      "content": ", should be interchangeable with its pre-perturbation stable feature",
+      "start": 27582,
+      "end": 27655
+    },
+    {
+      "type": "latex_inline",
+      "content": ". Therefore, in the stable feature module, we only shuffle",
+      "start": 27682,
+      "end": 27745
+    },
+    {
+      "type": "latex_inline",
+      "content": "while keeping",
+      "start": 27770,
+      "end": 27789
+    },
+    {
+      "type": "latex_inline",
+      "content": "unchanged. By doing this, we aim to emphasize that the stable features are persistent and cannot be changed by shuffling because they are contained\n\nin long sequences. Finally, after concatenating the",
+      "start": 27814,
+      "end": 28106
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{sta}} &= \\t",
+      "start": 28141,
+      "end": 28456
+    },
+    {
+      "type": "latex_inline",
+      "content": "The stable feature module lacks the self-supervisory information (i.e., shuffle) compared to the auxiliary module, which considers the shuffled",
+      "start": 28456,
+      "end": 28605
+    },
+    {
+      "type": "latex_inline",
+      "content": "as self-supervisory information. Using a loss function like the one used in the auxiliary module (Equation 11) makes it susceptible to learning a trivial solution that simply copies",
+      "start": 28615,
+      "end": 28802
+    },
+    {
+      "type": "latex_inline",
+      "content": ", resulting in meaningless stable features. To avoid this issue, we follow the *infomax principle* [8], to maximize the mutual information between the input and output. Specifically,",
+      "start": 28812,
+      "end": 28999
+    },
+    {
+      "type": "latex_inline",
+      "content": "contains the normal modes of",
+      "start": 29022,
+      "end": 29056
+    },
+    {
+      "type": "latex_inline",
+      "content": ", so they should have a substantial amount of shared information. We then incorporate the training process of the mutual information estimator into the stable feature module to advocate maximizing the",
+      "start": 29066,
+      "end": 29298
+    },
+    {
+      "type": "latex_inline",
+      "content": ", denoted as",
+      "start": 29340,
+      "end": 29357
+    },
+    {
+      "type": "latex_inline",
+      "content": ". The final loss of the stable feature module is then defined as shown in Equation 13.\n\n<span id=\"page-5-0\"></span>",
+      "start": 29404,
+      "end": 29523
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{L}_{\\text{sta}} = \\|\\mathbf{Y} - \\hat{\\mathbf{Y}}_{\\text{sta}}\\|_{\\mathcal{F}}^2 - I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})",
+      "start": 29523,
+      "end": 29664
+    },
+    {
+      "type": "latex_inline",
+      "content": "(13)\n\nHere,",
+      "start": 29664,
+      "end": 29681
+    },
+    {
+      "type": "latex_inline",
+      "content": "is the mutual information estimator parameterized by",
+      "start": 29698,
+      "end": 29756
+    },
+    {
+      "type": "latex_inline",
+      "content": ". We can choose a specific estimator among many existing ones. We choose InfoNCE as defined in Equation 14 as the default estimator due to its excellent performance as reported in recent studies [7], ",
+      "start": 29762,
+      "end": 30076
+    },
+    {
+      "type": "latex_inline",
+      "content": "I_{\\text{InfoNCE}} = \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}[f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})] - \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}_{\\text{sta}})}[\\mathbb{E}_{\\mathb",
+      "start": 30076,
+      "end": 30349
+    },
+    {
+      "type": "latex_inline",
+      "content": "(14)\n\nHere,",
+      "start": 30349,
+      "end": 30365
+    },
+    {
+      "type": "latex_inline",
+      "content": "is separable critic function defined as shown in Equation 15.\n\n<span id=\"page-5-2\"></span>",
+      "start": 30412,
+      "end": 30507
+    },
+    {
+      "type": "latex_inline",
+      "content": "f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}}) = \\phi_{\\theta}(\\mathbf{Y})^{\\top} \\phi_{\\theta}(\\mathbf{Y}_{\\text{sta}}),",
+      "start": 30507,
+      "end": 30631
+    },
+    {
+      "type": "latex_inline",
+      "content": "(15)\n\nwhere",
+      "start": 30631,
+      "end": 30648
+    },
+    {
+      "type": "latex_inline",
+      "content": "is a non-linear transformation function such as a feed-forward neural network.\n\nBy proposing the loss function in Equation 13, we aim to achieve three targets. First, the MI measures the statistical d",
+      "start": 30668,
+      "end": 31511
+    },
+    {
+      "type": "latex_inline",
+      "content": "encodes stable features of the time series, and short-term anomalies are less likely to distort\n\nthis distribution. Second, this can be seen as introducing the maximization of MI into representation l",
+      "start": 31534,
+      "end": 31895
+    },
+    {
+      "type": "latex_inline",
+      "content": "into the training process. This function is considered as a contrastive loss to provide self-supervisory information to the loss.\n\n#### C. Regularization\n\nWe observe that both the stable and auxiliary",
+      "start": 31912,
+      "end": 33410
+    },
+    {
+      "type": "latex_inline",
+      "content": "to represent the parameters of the student model and the teacher model, respectively. When computing the consistency regularization, we directly obtain the projected representation from the output rep",
+      "start": 33429,
+      "end": 33694
+    },
+    {
+      "type": "latex_inline",
+      "content": ". The consistency regularization for the student model and the teacher model is computed as shown in Equation 16.\n\n<span id=\"page-5-3\"></span>",
+      "start": 33706,
+      "end": 33852
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{L}_{\\text{reg}} = \\|\\mathbf{Y}'_{u} \\cdot \\mathbf{W}_{p} - \\mathbf{Y}'_{y} \\cdot \\mathbf{W}_{p}\\|_{\\mathcal{F}}^{2}",
+      "start": 33852,
+      "end": 33978
+    },
+    {
+      "type": "latex_inline",
+      "content": "(16)\n\nHere,",
+      "start": 33978,
+      "end": 33995
+    },
+    {
+      "type": "latex_inline",
+      "content": "represents the output representation of the student model, and",
+      "start": 34015,
+      "end": 34083
+    },
+    {
+      "type": "latex_inline",
+      "content": "represents the output representation of the teacher model. This way, EDAD is enabled to utilize highly shared weights to partition the features of the time series into two parts, thereby increasing th",
+      "start": 34101,
+      "end": 34544
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{L} = \\lambda_1 \\cdot \\mathcal{L}_{\\text{sta}} + \\lambda_2 \\cdot \\mathcal{L}_{\\text{aux}} + \\lambda_3 \\cdot \\mathcal{L}_{\\text{reg}}",
+      "start": 34544,
+      "end": 34686
+    },
+    {
+      "type": "latex_inline",
+      "content": "(17)\n\nHyperparameters",
+      "start": 34686,
+      "end": 34713
+    },
+    {
+      "type": "latex_inline",
+      "content": "control the trade-off between the objective function terms. We investigate the sensitivity to",
+      "start": 34756,
+      "end": 34855
+    },
+    {
+      "type": "latex_inline",
+      "content": "in the experimental study.\n\n<span id=\"page-6-1\"></span>![](_page_6_Figure_0.jpeg)\n\nFigure 4: Regularization.\n\n## E. Anomaly Scores\n\nWe have shaped EDAD to enforce it on learning the stable features by",
+      "start": 34898,
+      "end": 35353
+    },
+    {
+      "type": "latex_inline",
+      "content": "and the auxiliary features",
+      "start": 35363,
+      "end": 35395
+    },
+    {
+      "type": "latex_inline",
+      "content": "can be used to identify anomalies, which are also related to individual observations and short-term patterns. This enables an \"asymmetric\" design of the loss function used for training and the definit",
+      "start": 35411,
+      "end": 35779
+    },
+    {
+      "type": "latex_inline",
+      "content": "and the corresponding auxiliary representation",
+      "start": 35789,
+      "end": 35841
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nDue to the choice of different mutual information estimators, the critic function",
+      "start": 35857,
+      "end": 35946
+    },
+    {
+      "type": "latex_inline",
+      "content": "(see Equation 13) may not necessarily be proportional to",
+      "start": 35963,
+      "end": 36025
+    },
+    {
+      "type": "latex_inline",
+      "content": "when tightening the lower bound [63], so it cannot be used alone to compute the anomaly scores. Therefore, we employ the entire estimator's forward pass. Let",
+      "start": 36137,
+      "end": 36300
+    },
+    {
+      "type": "latex_inline",
+      "content": "be the mutual information estimator parameterized by",
+      "start": 36310,
+      "end": 36368
+    },
+    {
+      "type": "latex_inline",
+      "content": ". Then, we can compute the anomaly score for each data point",
+      "start": 36374,
+      "end": 36439
+    },
+    {
+      "type": "latex_inline",
+      "content": "as follows.",
+      "start": 36451,
+      "end": 36468
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathcal{AS}(\\mathbf{s}_i) = -I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{aux}}) \\tag{18}",
+      "start": 36468,
+      "end": 36556
+    },
+    {
+      "type": "latex_inline",
+      "content": "A high score indicates that the input",
+      "start": 36556,
+      "end": 36599
+    },
+    {
+      "type": "latex_inline",
+      "content": "share less information. Since",
+      "start": 36634,
+      "end": 36669
+    },
+    {
+      "type": "latex_inline",
+      "content": "includes only short-term variations,",
+      "start": 36685,
+      "end": 36727
+    },
+    {
+      "type": "latex_inline",
+      "content": "is more likely to be anomalous.\n\n#### IV. EXPERIMENTS\n\n#### <span id=\"page-6-0\"></span>A. Experimental Settings\n\n1) Datasets: We conduct experiments on eight real-world datasets that span a wide range",
+      "start": 36739,
+      "end": 50196
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.133                 | 0.477                 |\n| IForest<br>DAGMM            | 0.627                 | 0.924          |                |                       | 0.542<br>0.647        | 0.334 0.354 ",
+      "start": 50215,
+      "end": 51903
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.714                 | 0.523                 | 0.526                 | 0.894        | 0.781                 |                        | 0.142                 | 0.579                      | 0.122    ",
+      "start": 51922,
+      "end": 52466
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.601                 |              | 0.603                 |                        | 0.103                 | 0.423                      | 0.118                 | 0.459                            ",
+      "start": 52485,
+      "end": 53005
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.822        |                       | 0.836<br>0.731         | 0.113                 | 0.416<br>0.375             |",
+      "start": 53024,
+      "end": 53146
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.425<br>0.414                                   | 0.702        | 0.726<br>0.058 | 0.714 0.086    | 0.126         | 0.323 0.312           | 0.235<br>0.113        | 0.356<br>0.351        |\n| OmniAnom",
+      "start": 53165,
+      "end": 57921
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.032                 | 0.621<br>0.622        |\n| SAND                        | 0.937                 | 0.817          |                |                       | 0.569                 | 0.193       ",
+      "start": 57940,
+      "end": 60278
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.474<br><b>0.503</b>      | 0.424<br><b>0.454</b> | 0.478<br>0.456                                   |              | 0.615          | 0.175<br>0.175 | 0.015         | 0.276<br>0.690        | 0.028",
+      "start": 60322,
+      "end": 66021
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.657                                            | 0.694        | 0.723          |                | 0.219         | 0.424                 | 0.227                 | 0.561                 |\n| TranAD  ",
+      "start": 66040,
+      "end": 67377
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.243                 | 0.633                 |              |                       | 0.750                  |                       | 0.284                      | 0.227                 | 0.657    ",
+      "start": 67396,
+      "end": 67730
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.545                 |\n| IMdiffusion<br>AnomalyTrans |",
+      "start": 67749,
+      "end": 67810
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 0.846          |                |                       | 0.638<br>0.302        | 0.245<br>0.219        | 0.631<br>0.615        |              | 0.924                 |                        | 0.21",
+      "start": 67829,
+      "end": 72172
+    },
+    {
+      "type": "latex_inline",
+      "content": "| 00                    | <del> </del>                                     |              |                |                |               | \u06f7 \u0627                   | -                     | - T       ",
+      "start": 72196,
+      "end": 74232
+    },
+    {
+      "type": "latex_inline",
+      "content": "0.           | 30 1 2                | 4 6 8 10                                         | )20          | 0.10 1         | 2 4 6          | 8 1020        | 0.44                  | 1 2 4 6              ",
+      "start": 74243,
+      "end": 76509
+    },
+    {
+      "type": "latex_inline",
+      "content": "|\n| 0.80                        | WW O                  | <u>9</u>       | .90            | - <del></del>         |                       | 0.85                  | A A A                 | 44          ",
+      "start": 76523,
+      "end": 83532
+    },
+    {
+      "type": "latex_inline",
+      "content": "and the estimators. The design of the critic function determines its ability to distinguish between joint and marginal distributions. In the next experiment, we consider three commonly used critic fun",
+      "start": 83549,
+      "end": 88177
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_1",
+      "start": 88696,
+      "end": 88707
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_2",
+      "start": 88711,
+      "end": 88722
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_3",
+      "start": 88730,
+      "end": 88741
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_1",
+      "start": 88793,
+      "end": 88804
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_2",
+      "start": 88808,
+      "end": 88819
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_3",
+      "start": 88827,
+      "end": 88838
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda",
+      "start": 88915,
+      "end": 88924
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_3",
+      "start": 89084,
+      "end": 89095
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_1",
+      "start": 89333,
+      "end": 89344
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\lambda_2",
+      "start": 89351,
+      "end": 89362
+    },
+    {
+      "type": "latex_inline",
+      "content": "B \\geq 50",
+      "start": 90127,
+      "end": 90138
+    }
+  ]
+}

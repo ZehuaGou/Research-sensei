@@ -1,0 +1,776 @@
+[
+  {
+    "formula_id": "formula_001",
+    "page": 2,
+    "bbox": [
+      79.5,
+      527.09765625,
+      298.23046875,
+      557.26171875
+    ],
+    "polygon": [
+      [
+        79.5,
+        528.0
+      ],
+      [
+        298.23046875,
+        527.09765625
+      ],
+      [
+        298.23046875,
+        555.71484375
+      ],
+      [
+        79.5,
+        557.26171875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "I(X,Y) = \\sum_{x \\in X} \\sum_{y \\in Y} \\mathbb{P}(x,y) \\log \\left( \\frac{\\mathbb{P}(x,y)}{\\mathbb{P}(x)\\mathbb{P}(y)} \\right)",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_2_equation_1",
+    "crop_path": "formula_001_p2.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "I(X,Y) = \\sum_{x \\in X} \\sum_{y \\in Y} \\mathbb{P}(x,y) \\log \\left( \\frac{\\mathbb{P}(x,y)}{\\mathbb{P}(x)\\mathbb{P}(y)} \\right)",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_002",
+    "page": 2,
+    "bbox": [
+      309.884765625,
+      294.29296875,
+      565.5,
+      346.5
+    ],
+    "polygon": [
+      [
+        309.884765625,
+        295.83984375
+      ],
+      [
+        565.5,
+        294.29296875
+      ],
+      [
+        565.5,
+        346.5
+      ],
+      [
+        309.884765625,
+        346.5
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "I_{\\text{UBA}}(X,Y) \\triangleq \\mathbb{E}_{p(x,y)}[\\log q(x|y)] + h(X)",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_2_equation_2",
+    "crop_path": "formula_002_p2.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "I_{\\text{UBA}}(X,Y) \\triangleq \\mathbb{E}_{p(x,y)}[\\log q(x|y)] + h(X)",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_003",
+    "page": 2,
+    "bbox": [
+      388.5,
+      393.6796875,
+      563.25,
+      418.4296875
+    ],
+    "polygon": [
+      [
+        388.5,
+        395.2265625
+      ],
+      [
+        563.25,
+        393.6796875
+      ],
+      [
+        563.25,
+        416.8828125
+      ],
+      [
+        388.5,
+        418.4296875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "q(x|y) = \\frac{p(x)}{Z(y)}e^{f(x,y)}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_2_equation_3",
+    "crop_path": "formula_003_p2.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "q(x|y) = \\frac{p(x)}{Z(y)}e^{f(x,y)}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_004",
+    "page": 3,
+    "bbox": [
+      90.75,
+      662.0625,
+      300.75,
+      689.90625
+    ],
+    "polygon": [
+      [
+        90.75,
+        662.25
+      ],
+      [
+        300.75,
+        662.0625
+      ],
+      [
+        300.75,
+        688.359375
+      ],
+      [
+        90.75,
+        689.90625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{H}_{t:t+B} = \\frac{\\mathbf{s}_{t:t+B} - \\mathbb{E}[\\mathbf{s}_{t:t+B}]}{\\sqrt{\\text{Var}[\\mathbf{s}_{t:t+B}] + \\epsilon}} \\cdot \\gamma_1 + \\beta_1",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_4",
+    "crop_path": "formula_004_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{H}_{t:t+B} = \\frac{\\mathbf{s}_{t:t+B} - \\mathbb{E}[\\mathbf{s}_{t:t+B}]}{\\sqrt{\\text{Var}[\\mathbf{s}_{t:t+B}] + \\epsilon}} \\cdot \\gamma_1 + \\beta_1",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_005",
+    "page": 3,
+    "bbox": [
+      398.0390625,
+      204.75,
+      563.25,
+      215.7890625
+    ],
+    "polygon": [
+      [
+        398.25,
+        204.75
+      ],
+      [
+        563.25,
+        204.75
+      ],
+      [
+        563.25,
+        215.25
+      ],
+      [
+        398.0390625,
+        215.7890625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{H}_{\\text{emb}} = \\mathbf{W}_{\\text{emb}} \\cdot \\mathbf{H} \\tag{5}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_5",
+    "crop_path": "formula_005_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{H}_{\\text{emb}} = \\mathbf{W}_{\\text{emb}} \\cdot \\mathbf{H} \\tag{5}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_006",
+    "page": 3,
+    "bbox": [
+      383.994140625,
+      267.609375,
+      563.25,
+      349.59375
+    ],
+    "polygon": [
+      [
+        384.75,
+        269.15625
+      ],
+      [
+        563.25,
+        267.609375
+      ],
+      [
+        563.25,
+        348.046875
+      ],
+      [
+        383.994140625,
+        349.59375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{Q} = \\mathbf{W}_{\\mathbf{Q}} \\cdot \\mathbf{H}_{\\text{emb}}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_6",
+    "crop_path": "formula_006_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{Q} = \\mathbf{W}_{\\mathbf{Q}} \\cdot \\mathbf{H}_{\\text{emb}}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_007",
+    "page": 3,
+    "bbox": [
+      372.75,
+      469.86328125,
+      563.25,
+      486.10546875
+    ],
+    "polygon": [
+      [
+        372.75,
+        471.41015625
+      ],
+      [
+        563.25,
+        469.86328125
+      ],
+      [
+        563.25,
+        484.55859375
+      ],
+      [
+        372.75,
+        486.10546875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{Y}_1 = \\mathbf{W}_{\\text{mult}} \\cdot [\\mathbf{Y}_1^1, \\dots, \\mathbf{Y}_1^M]^\\top \\tag{7}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_7",
+    "crop_path": "formula_007_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{Y}_1 = \\mathbf{W}_{\\text{mult}} \\cdot [\\mathbf{Y}_1^1, \\dots, \\mathbf{Y}_1^M]^\\top \\tag{7}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_008",
+    "page": 3,
+    "bbox": [
+      355.5,
+      557.25,
+      563.25,
+      588.19921875
+    ],
+    "polygon": [
+      [
+        356.25,
+        557.25
+      ],
+      [
+        563.25,
+        559.58203125
+      ],
+      [
+        563.25,
+        586.65234375
+      ],
+      [
+        355.5,
+        588.19921875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{Y}_{2} = \\mathbf{Y}_{1} + \\frac{\\mathbf{Y}_{1} - \\mathbb{E}[\\mathbf{Y}_{1}]}{\\sqrt{\\operatorname{Var}[\\mathbf{Y}_{1}] + \\epsilon}} \\cdot \\gamma_{2} + \\beta_{2}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_8",
+    "crop_path": "formula_008_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{Y}_{2} = \\mathbf{Y}_{1} + \\frac{\\mathbf{Y}_{1} - \\mathbb{E}[\\mathbf{Y}_{1}]}{\\sqrt{\\operatorname{Var}[\\mathbf{Y}_{1}] + \\epsilon}} \\cdot \\gamma_{2} + \\beta_{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_009",
+    "page": 3,
+    "bbox": [
+      375.0,
+      674.05078125,
+      563.25,
+      687.19921875
+    ],
+    "polygon": [
+      [
+        375.0,
+        675.0
+      ],
+      [
+        563.25,
+        674.05078125
+      ],
+      [
+        563.25,
+        687.0
+      ],
+      [
+        375.0,
+        687.19921875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{Y}_3 = \\mathbf{W}_2 \\cdot \\text{ReLU}(\\mathbf{W}_1 \\cdot \\mathbf{Y}_2) \\tag{9}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_9",
+    "crop_path": "formula_009_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{Y}_3 = \\mathbf{W}_2 \\cdot \\text{ReLU}(\\mathbf{W}_1 \\cdot \\mathbf{Y}_2) \\tag{9}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_010",
+    "page": 4,
+    "bbox": [
+      368.25,
+      516.26953125,
+      563.25,
+      561.90234375
+    ],
+    "polygon": [
+      [
+        368.25,
+        516.75
+      ],
+      [
+        563.25,
+        516.26953125
+      ],
+      [
+        563.25,
+        560.35546875
+      ],
+      [
+        368.25,
+        561.90234375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{aux}} &= \\text{concat}(\\mathbf{Y}_{\\text{sta}}^{I}, \\mathbf{Y}_{\\text{aux}}^{S}) \\cdot \\mathbf{W}_{p} \\end{aligned} \\tag{10}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_4_equation_10",
+    "crop_path": "formula_010_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{aux}} &= \\text{concat}(\\mathbf{Y}_{\\text{sta}}^{I}, \\mathbf{Y}_{\\text{aux}}^{S}) \\cdot \\mathbf{W}_{p} \\end{aligned} \\tag{10}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_011",
+    "page": 4,
+    "bbox": [
+      372.75,
+      602.12109375,
+      563.25,
+      616.81640625
+    ],
+    "polygon": [
+      [
+        372.75,
+        603.66796875
+      ],
+      [
+        563.25,
+        602.12109375
+      ],
+      [
+        563.25,
+        615.26953125
+      ],
+      [
+        372.75,
+        616.81640625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L}_{aux} = \\|\\text{shuffle}(\\mathbf{Y}) - \\hat{\\mathbf{Y}}_{aux}\\|_{\\mathcal{F}}^{2}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_4_equation_11",
+    "crop_path": "formula_011_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L}_{aux} = \\|\\text{shuffle}(\\mathbf{Y}) - \\hat{\\mathbf{Y}}_{aux}\\|_{\\mathcal{F}}^{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_012",
+    "page": 5,
+    "bbox": [
+      106.5,
+      94.359375,
+      301.5,
+      138.0
+    ],
+    "polygon": [
+      [
+        106.5,
+        94.359375
+      ],
+      [
+        300.75,
+        94.359375
+      ],
+      [
+        301.5,
+        136.5
+      ],
+      [
+        106.5,
+        138.0
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{sta}} &= \\text{concat}(\\mathbf{Y}_{\\text{sta}}^{S}, \\mathbf{Y}_{\\text{aux}}^{I}) \\cdot \\mathbf{W}_{p} \\end{aligned} \\tag{12}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_12",
+    "crop_path": "formula_012_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\begin{aligned} \\mathbf{Y}_{\\text{sta}}^{S} &= \\text{shuffle}(\\mathbf{Y}_{\\text{sta}}) \\\\ \\mathbf{Y}_{\\text{aux}}^{I} &= \\text{identity}(\\mathbf{Y}_{\\text{aux}}) \\\\ \\mathbf{\\hat{Y}}_{\\text{sta}} &= \\text{concat}(\\mathbf{Y}_{\\text{sta}}^{S}, \\mathbf{Y}_{\\text{aux}}^{I}) \\cdot \\mathbf{W}_{p} \\end{aligned} \\tag{12}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_013",
+    "page": 5,
+    "bbox": [
+      100.5,
+      335.25,
+      300.75,
+      348.43359375
+    ],
+    "polygon": [
+      [
+        100.5,
+        335.25
+      ],
+      [
+        300.75,
+        335.25
+      ],
+      [
+        300.75,
+        346.88671875
+      ],
+      [
+        100.5,
+        348.43359375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L}_{\\text{sta}} = \\|\\mathbf{Y} - \\hat{\\mathbf{Y}}_{\\text{sta}}\\|_{\\mathcal{F}}^2 - I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_13",
+    "crop_path": "formula_013_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L}_{\\text{sta}} = \\|\\mathbf{Y} - \\hat{\\mathbf{Y}}_{\\text{sta}}\\|_{\\mathcal{F}}^2 - I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_014",
+    "page": 5,
+    "bbox": [
+      46.5,
+      444.33984375,
+      304.5,
+      469.86328125
+    ],
+    "polygon": [
+      [
+        46.5,
+        445.5
+      ],
+      [
+        304.5,
+        444.33984375
+      ],
+      [
+        304.5,
+        468.31640625
+      ],
+      [
+        46.5,
+        469.86328125
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "I_{\\text{InfoNCE}} = \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}[f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})] - \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}_{\\text{sta}})}[\\mathbb{E}_{\\mathbb{P}(\\mathbf{Y})}[e^{f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}]]",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_14",
+    "crop_path": "formula_014_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "I_{\\text{InfoNCE}} = \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}[f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})] - \\mathbb{E}_{\\mathbb{P}(\\mathbf{Y}_{\\text{sta}})}[\\mathbb{E}_{\\mathbb{P}(\\mathbf{Y})}[e^{f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}})}]]",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_015",
+    "page": 5,
+    "bbox": [
+      106.5,
+      504.75,
+      300.75,
+      520.5234375
+    ],
+    "polygon": [
+      [
+        106.5,
+        504.75
+      ],
+      [
+        300.75,
+        504.75
+      ],
+      [
+        300.75,
+        518.9765625
+      ],
+      [
+        106.5,
+        520.5234375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}}) = \\phi_{\\theta}(\\mathbf{Y})^{\\top} \\phi_{\\theta}(\\mathbf{Y}_{\\text{sta}}),",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_15",
+    "crop_path": "formula_015_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "f_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{sta}}) = \\phi_{\\theta}(\\mathbf{Y})^{\\top} \\phi_{\\theta}(\\mathbf{Y}_{\\text{sta}}),",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_016",
+    "page": 5,
+    "bbox": [
+      367.5,
+      509.25,
+      563.25,
+      522.0
+    ],
+    "polygon": [
+      [
+        367.5,
+        509.25
+      ],
+      [
+        563.25,
+        509.25
+      ],
+      [
+        563.25,
+        522.0
+      ],
+      [
+        367.5,
+        522.0
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L}_{\\text{reg}} = \\|\\mathbf{Y}'_{u} \\cdot \\mathbf{W}_{p} - \\mathbf{Y}'_{y} \\cdot \\mathbf{W}_{p}\\|_{\\mathcal{F}}^{2}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_16",
+    "crop_path": "formula_016_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L}_{\\text{reg}} = \\|\\mathbf{Y}'_{u} \\cdot \\mathbf{W}_{p} - \\mathbf{Y}'_{y} \\cdot \\mathbf{W}_{p}\\|_{\\mathcal{F}}^{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_017",
+    "page": 5,
+    "bbox": [
+      362.25,
+      666.0,
+      563.25,
+      676.5
+    ],
+    "polygon": [
+      [
+        362.25,
+        666.0
+      ],
+      [
+        563.25,
+        666.0
+      ],
+      [
+        563.25,
+        676.5
+      ],
+      [
+        362.25,
+        676.5
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L} = \\lambda_1 \\cdot \\mathcal{L}_{\\text{sta}} + \\lambda_2 \\cdot \\mathcal{L}_{\\text{aux}} + \\lambda_3 \\cdot \\mathcal{L}_{\\text{reg}}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_17",
+    "crop_path": "formula_017_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L} = \\lambda_1 \\cdot \\mathcal{L}_{\\text{sta}} + \\lambda_2 \\cdot \\mathcal{L}_{\\text{aux}} + \\lambda_3 \\cdot \\mathcal{L}_{\\text{reg}}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_018",
+    "page": 6,
+    "bbox": [
+      122.25,
+      465.75,
+      300.75,
+      477.984375
+    ],
+    "polygon": [
+      [
+        122.25,
+        465.75
+      ],
+      [
+        300.75,
+        465.75
+      ],
+      [
+        300.75,
+        477.75
+      ],
+      [
+        122.25,
+        477.984375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{AS}(\\mathbf{s}_i) = -I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{aux}}) \\tag{18}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_18",
+    "crop_path": "formula_018_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{AS}(\\mathbf{s}_i) = -I_{\\theta}(\\mathbf{Y}, \\mathbf{Y}_{\\text{aux}}) \\tag{18}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  }
+]

@@ -1,0 +1,515 @@
+{
+  "block_formulas": [],
+  "markdown_formulas": [
+    {
+      "type": "latex_display",
+      "content": "p(\\mathbf{x}|z) = \\begin{cases} p^+(\\mathbf{x}) & \\text{if } z = 0\\\\ p^-(\\mathbf{x}) & \\text{if } z = 1, \\end{cases}",
+      "start": 6186,
+      "end": 6306
+    },
+    {
+      "type": "latex_display",
+      "content": "p(\\mathbf{x}_t|z_t=0) = p_{\\theta}^+(\\mathbf{x}_t) \\tag{2}",
+      "start": 11990,
+      "end": 12052
+    },
+    {
+      "type": "latex_display",
+      "content": "p(\\mathbf{x}_t|z_t=1) = p^-(\\mathbf{x}_t) \\tag{3}",
+      "start": 12054,
+      "end": 12107
+    },
+    {
+      "type": "latex_inline",
+      "content": "\\mathbf{x}",
+      "start": 5516,
+      "end": 5528
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(\\mathbf{x}) = \\alpha p^+(\\mathbf{x}) + (1-\\alpha)p^-(\\mathbf{x})",
+      "start": 5570,
+      "end": 5638
+    },
+    {
+      "type": "latex_inline",
+      "content": "p^+(\\mathbf{x})",
+      "start": 5648,
+      "end": 5665
+    },
+    {
+      "type": "latex_inline",
+      "content": "p^-(\\mathbf{x})",
+      "start": 5712,
+      "end": 5729
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(z=0)=\\alpha",
+      "start": 6074,
+      "end": 6089
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(z=1)=1-\\alpha",
+      "start": 6121,
+      "end": 6138
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(\\mathbf{x}|z) = \\begin{cases} p^+(\\mathbf{x}) & \\text{if } z = 0\\\\ p^-(\\mathbf{x}) & \\text{if } z = 1, \\end{cases}",
+      "start": 6187,
+      "end": 6305
+    },
+    {
+      "type": "latex_inline",
+      "content": "(1)\n\nso that",
+      "start": 6305,
+      "end": 6323
+    },
+    {
+      "type": "latex_inline",
+      "content": ". In this setup, anomaly detection can be performed by inferring the posterior distribution",
+      "start": 6418,
+      "end": 6514
+    },
+    {
+      "type": "latex_inline",
+      "content": "(and thresholding it if a hard choice is desired). Yet another way of representing the same model is generatively: first, draw",
+      "start": 6529,
+      "end": 6661
+    },
+    {
+      "type": "latex_inline",
+      "content": ", and then set",
+      "start": 6766,
+      "end": 6785
+    },
+    {
+      "type": "latex_inline",
+      "content": ", i.e. the observation",
+      "start": 6859,
+      "end": 6886
+    },
+    {
+      "type": "latex_inline",
+      "content": "is equal to",
+      "start": 6896,
+      "end": 6913
+    },
+    {
+      "type": "latex_inline",
+      "content": "if it is nominal (z=1) and equal to",
+      "start": 6925,
+      "end": 6966
+    },
+    {
+      "type": "latex_inline",
+      "content": "otherwise. Introducing the additional latent variables",
+      "start": 6978,
+      "end": 7038
+    },
+    {
+      "type": "latex_inline",
+      "content": "is unnecessary in the IID setting, but becomes useful in the time series setting described next.\n\nIn time series setting, where the observations are time series",
+      "start": 7071,
+      "end": 7237
+    },
+    {
+      "type": "latex_inline",
+      "content": "that exhibit temporal dependencies, and anomalies are time points or regions within these time series, we have one anomaly indicator variable",
+      "start": 7289,
+      "end": 7436
+    },
+    {
+      "type": "latex_inline",
+      "content": "corresponding to each time point",
+      "start": 7439,
+      "end": 7477
+    },
+    {
+      "type": "latex_inline",
+      "content": ". Like before, the nominal data is drawn from a parametrized probabilistic model",
+      "start": 7489,
+      "end": 7574
+    },
+    {
+      "type": "latex_inline",
+      "content": ", and the anomalies are generated from a fixed model",
+      "start": 7604,
+      "end": 7661
+    },
+    {
+      "type": "latex_inline",
+      "content": ". For time series data, the mixture data model then amounts to drawing",
+      "start": 7682,
+      "end": 7757
+    },
+    {
+      "type": "latex_inline",
+      "content": ", and setting",
+      "start": 7866,
+      "end": 7884
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\n#### 3. Method\n\nForecasting or reconstruction models are designed to learn a model of",
+      "start": 7970,
+      "end": 8063
+    },
+    {
+      "type": "latex_inline",
+      "content": "but are typically trained directly on the observed time series",
+      "start": 8073,
+      "end": 8141
+    },
+    {
+      "type": "latex_inline",
+      "content": ". We propose to learn the model\n\nof",
+      "start": 8157,
+      "end": 8197
+    },
+    {
+      "type": "latex_inline",
+      "content": "only from",
+      "start": 8207,
+      "end": 8222
+    },
+    {
+      "type": "latex_inline",
+      "content": "by inferring",
+      "start": 8240,
+      "end": 8258
+    },
+    {
+      "type": "latex_inline",
+      "content": "on the training set. This way we can train the model only on the observed points that are normal, the ones that are equal to",
+      "start": 8283,
+      "end": 8413
+    },
+    {
+      "type": "latex_inline",
+      "content": ". Depending on the model, the anomalous points can be treated as missing or the normal point can be inferred.\n\n#### 3.1. Models\n\nEach of the three latent time series is modeled with a probabilistic mo",
+      "start": 8431,
+      "end": 8661
+    },
+    {
+      "type": "latex_inline",
+      "content": "of the nominal data",
+      "start": 8673,
+      "end": 8698
+    },
+    {
+      "type": "latex_inline",
+      "content": ", a fixed model",
+      "start": 8716,
+      "end": 8736
+    },
+    {
+      "type": "latex_inline",
+      "content": "to model the anomalous data",
+      "start": 8739,
+      "end": 8772
+    },
+    {
+      "type": "latex_inline",
+      "content": ", and a model",
+      "start": 8790,
+      "end": 8808
+    },
+    {
+      "type": "latex_inline",
+      "content": "of the indicator time series",
+      "start": 8811,
+      "end": 8845
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nNominal Data Model Many existing deep anomaly detection methods aim to model the nominal data (e.g. (Shipmon et al., 2017; Zhao et al., 2020; Su et al., 2019; Xu et al., 2018; Park et al., 2018; Zh",
+      "start": 8852,
+      "end": 9135
+    },
+    {
+      "type": "latex_inline",
+      "content": ", the latent nominal time series. Our method is agnostic to the type of model used, so that it can be combined with any probabilistic time series model, be it a deep or shallow probabilistic forecasti",
+      "start": 9147,
+      "end": 9466
+    },
+    {
+      "type": "latex_inline",
+      "content": ", which is parametrised by a set of parameters",
+      "start": 9478,
+      "end": 9529
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nIn our experiments we demonstrate the general setup by modeling",
+      "start": 9535,
+      "end": 9606
+    },
+    {
+      "type": "latex_inline",
+      "content": "with a simple deep probabilistic forecasting model. We decompose",
+      "start": 9629,
+      "end": 9699
+    },
+    {
+      "type": "latex_inline",
+      "content": "into the telescoping product",
+      "start": 9720,
+      "end": 9754
+    },
+    {
+      "type": "latex_inline",
+      "content": "and, making an l-th order Markov assumption, approximate it with a network",
+      "start": 9825,
+      "end": 9905
+    },
+    {
+      "type": "latex_inline",
+      "content": "taking as input the last l time points.\n\n**Anomalous Data Model** A simple model can be used to model",
+      "start": 10025,
+      "end": 10132
+    },
+    {
+      "type": "latex_inline",
+      "content": ", it does not need to take into account the time component as there are typically few anomalous points. It can be modeled with a mixture of Gaussian distributions for example, with the risk of over-fi",
+      "start": 10135,
+      "end": 10400
+    },
+    {
+      "type": "latex_inline",
+      "content": "with a uniform distribution over the domain of the training data, not assuming any prior on the kind of anomalies that we may expect.\n\nAnomaly Indicator Model We model the latent anomaly indicator wit",
+      "start": 10403,
+      "end": 10661
+    },
+    {
+      "type": "latex_inline",
+      "content": "corresponds to the point being normal and state",
+      "start": 10666,
+      "end": 10719
+    },
+    {
+      "type": "latex_inline",
+      "content": "corresponds to the point being anomalous. Any kind of time series model parameterizing a Bernoulli distribution can be used to model the latent anomaly indicators, we pick an HMM as it encodes basic t",
+      "start": 10724,
+      "end": 11174
+    },
+    {
+      "type": "latex_inline",
+      "content": ". The expected percentage\n\nof anomalous points in the dataset can be used to initialise the transition probability",
+      "start": 11192,
+      "end": 11311
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\n### 3.2. Training\n\nOur training procedure follows Monte Carlo EM (Wei & Tanner, 1990). In the E-step we infer",
+      "start": 11335,
+      "end": 11452
+    },
+    {
+      "type": "latex_inline",
+      "content": ". In the M-step we sample from",
+      "start": 11464,
+      "end": 11499
+    },
+    {
+      "type": "latex_inline",
+      "content": ", using these samples to update",
+      "start": 11511,
+      "end": 11547
+    },
+    {
+      "type": "latex_inline",
+      "content": "and the transition matrix of the HMM. Algorithm 1 sketches this procedure.\n\n# Algorithm 1 Monte Carlo EM for Latent Anomaly Indicator\n\n```\nInput: Observed time series \\mathbf{x}_{1:T}, model to be tra",
+      "start": 11559,
+      "end": 11880
+    },
+    {
+      "type": "latex_inline",
+      "content": "by using the standard forward-backward algorithm for HMMs, using the following distributions:",
+      "start": 11892,
+      "end": 11991
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(\\mathbf{x}_t|z_t=0) = p_{\\theta}^+(\\mathbf{x}_t) \\tag{2}",
+      "start": 11991,
+      "end": 12051
+    },
+    {
+      "type": "latex_inline",
+      "content": "p(\\mathbf{x}_t|z_t=1) = p^-(\\mathbf{x}_t) \\tag{3}",
+      "start": 12055,
+      "end": 12106
+    },
+    {
+      "type": "latex_inline",
+      "content": "is given by the HMM transition matrix.\n\n### 3.2.2. M-STEP\n\nWe want to train",
+      "start": 12129,
+      "end": 12210
+    },
+    {
+      "type": "latex_inline",
+      "content": "only from",
+      "start": 12220,
+      "end": 12235
+    },
+    {
+      "type": "latex_inline",
+      "content": ". As most models may not allow for an analytical update using",
+      "start": 12253,
+      "end": 12319
+    },
+    {
+      "type": "latex_inline",
+      "content": ", we propose to a Monte Carlo approximation of the expectation under",
+      "start": 12351,
+      "end": 12424
+    },
+    {
+      "type": "latex_inline",
+      "content": ". We draw multiple samples from",
+      "start": 12436,
+      "end": 12472
+    },
+    {
+      "type": "latex_inline",
+      "content": "giving us possible normal points on which",
+      "start": 12484,
+      "end": 12531
+    },
+    {
+      "type": "latex_inline",
+      "content": "can be trained. Each path sampled gives us a set of observed points that can be considered as coming from the normal data distribution",
+      "start": 12541,
+      "end": 12681
+    },
+    {
+      "type": "latex_inline",
+      "content": ". We maximise the probability of these points under",
+      "start": 12684,
+      "end": 12740
+    },
+    {
+      "type": "latex_inline",
+      "content": ", treating the points coming from",
+      "start": 12750,
+      "end": 12788
+    },
+    {
+      "type": "latex_inline",
+      "content": "points as missing.\n\nDepending on the choice of model for",
+      "start": 12791,
+      "end": 12853
+    },
+    {
+      "type": "latex_inline",
+      "content": ", one may not be able to simply ignore anomalous points and they would have to be imputed. For deep forecasting or reconstruction models for example the model has to be given an input for each time po",
+      "start": 12865,
+      "end": 13171
+    },
+    {
+      "type": "latex_inline",
+      "content": "at the last M-step. This way, we use",
+      "start": 13183,
+      "end": 13225
+    },
+    {
+      "type": "latex_inline",
+      "content": "to infer the time points of",
+      "start": 13237,
+      "end": 13270
+    },
+    {
+      "type": "latex_inline",
+      "content": "that were not observed. With this method we can recover the full",
+      "start": 13288,
+      "end": 13358
+    },
+    {
+      "type": "latex_inline",
+      "content": "time series and train",
+      "start": 13376,
+      "end": 13403
+    },
+    {
+      "type": "latex_inline",
+      "content": "on it.\n\nDepending on the choice of model for",
+      "start": 13415,
+      "end": 13465
+    },
+    {
+      "type": "latex_inline",
+      "content": ", one can update it using the points that are sampled as coming from",
+      "start": 13468,
+      "end": 13541
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nWe can update the transition matrix of the HMM with the classical M-step. The average number of transitions from one state to the next in the samples from",
+      "start": 13559,
+      "end": 13721
+    },
+    {
+      "type": "latex_inline",
+      "content": "become the new transition probabilities.\n\n#### 3.3. Inference\n\nAt inference time, we propose to use the HMM to perform filtering on z and infer if incoming points are more likely to be drawn from",
+      "start": 13733,
+      "end": 13934
+    },
+    {
+      "type": "latex_inline",
+      "content": ". If an incoming point",
+      "start": 13948,
+      "end": 13975
+    },
+    {
+      "type": "latex_inline",
+      "content": "is more likely to be coming from",
+      "start": 13987,
+      "end": 14025
+    },
+    {
+      "type": "latex_inline",
+      "content": "it can be treated as missing or replaced with a sample from",
+      "start": 14028,
+      "end": 14093
+    },
+    {
+      "type": "latex_inline",
+      "content": "or by its mode. This way we ensure that the trained model is only used on points coming from",
+      "start": 14107,
+      "end": 14205
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\n### 4. Experiments\n\nWe make our code available with an illustration notebook. <sup>1</sup>\n\n**Model** We evaluate our approach with a simple forecasting model on both anomaly detection and forecast",
+      "start": 14223,
+      "end": 16182
+    },
+    {
+      "type": "latex_inline",
+      "content": ".\n\nFigure 1. We fit a MLP on this simple synthetic time series with anomalies. (a) shows the fit of the model trained in a conventional way, (b) shows the fit of the model trained as we propose to, (c",
+      "start": 16192,
+      "end": 16416
+    },
+    {
+      "type": "latex_inline",
+      "content": "distribution at the end of the training.\n\neach time series for testing. We scale each time series using the median and inter-quartile range on the train set.\n\n### 4.1. Visualization on synthetic data\n",
+      "start": 16426,
+      "end": 16739
+    },
+    {
+      "type": "latex_inline",
+      "content": ". We generate a synthetic time series and inject outliers in it. We observe that our approach allows to train the model",
+      "start": 16751,
+      "end": 16875
+    },
+    {
+      "type": "latex_inline",
+      "content": "while ignoring the outliers in the data, whereas the outliers heavily influence the model trained conventionally. We observe from figure 1c that the model is able to infer accurately which of the trai",
+      "start": 16887,
+      "end": 18426
+    }
+  ]
+}

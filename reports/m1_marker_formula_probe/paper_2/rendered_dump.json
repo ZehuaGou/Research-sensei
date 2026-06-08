@@ -1,0 +1,1076 @@
+{
+  "markdown": "# Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT\n\nZekai Chen, *Student Member, IEEE,* Dingshuo Chen, Xiao Zhang, *Member, IEEE*, Zixuan Yuan, and Xiuzhen Cheng, *Fellow, IEEE*\n\n*Abstract*\u2014Many real-world IoT systems, which include a variety of internet-connected sensory devices, produce substantial amounts of multivariate time series data. Meanwhile, vital IoT infrastructures like smart power grids and water distribution networks are frequently targeted by cyber-attacks, making anomaly detection an important study topic. Modeling such relatedness is, nevertheless, unavoidable for any efficient and effective anomaly detection system, given the intricate topological and nonlinear connections that are originally unknown among sensors. Furthermore, detecting anomalies in multivariate time series is difficult due to their temporal dependency and stochasticity. This paper presented GTA, a new framework for multivariate time series anomaly detection that involves automatically learning a graph structure, graph convolution, and modeling temporal dependency using a Transformer-based architecture. The connection learning policy, which is based on the Gumbel-softmax sampling approach to learn bi-directed links among sensors directly, is at the heart of learning graph structure. To describe the anomaly information flow between network nodes, we introduced a new graph convolution called Influence Propagation convolution. In addition, to tackle the quadratic complexity barrier, we suggested a multibranch attention mechanism to replace the original multi-head self-attention method. Extensive experiments on four publicly available anomaly detection benchmarks further demonstrate the superiority of our approach over alternative state-of-the-arts. Codes are available at https://github.com/ZEKAICHEN/GTA.\n\n*Index Terms*\u2014Multivariate time series, anomaly detection, graph learning, self-attention\n\n#### I. INTRODUCTION\n\n<span id=\"page-0-0\"></span>Due to the fast rising number of Internet-connected sensory devices, the Internet of Things (IoT) infrastructure has created vast sensory data. IoT data is often characterized by its speed in terms of geographical and temporal dependency [\\[1\\]](#page-10-0), [\\[2\\]](#page-10-1), and it is frequently subjected to correspondingly rising abnormalities and cyberattacks [\\[3\\]](#page-10-2), [\\[4\\]](#page-10-3). Many critical infrastructures constructed on top of Cyber-Physical Systems (CPS) [\\[5\\]](#page-10-4), such as smart power grids, water treatment and distribution networks, transportation, and autonomous cars, are especially in need of security monitoring [\\[6\\]](#page-10-5), [\\[7\\]](#page-10-6), [\\[4\\]](#page-10-3). As a result, an efficient and accurate anomaly detection system has great research value because it can help with continuous monitoring of fundamental controls or indicators and promptly provide notifications for any probable anomalous occurrence.\n\nIn this work, we focus on anomaly detection for multivariate time series [\\[8\\]](#page-10-7) as a copious amount of IoT sensors in many real-life scenarios consecutively generate substantial volumes of time series data. For instance, in a Secure Water Distribution (WADI) system [\\[9\\]](#page-10-8), multiple sensing measurements such as flowing meter, transmitting level, valve status, water pressure level, etc., are recorded simultaneously at each timestamp to form a multivariate time series. In this case, the central water treatment testbed is also known as an *entity*. It is commonly accepted to detect anomalies from the entity-level instead of the sensor-level since the overall status detection is generally worth more concern and less expensive. Predominantly, data from these sensors are highly correlated in a complex topological and nonlinear fashion: for example, opening a valve would result in pressure and flow rate changes, leading to further chain reactions of other sensors within the same entity following an internal mechanism. Nevertheless, *the dependencies among sensors are initially hidden and somehow costly to access in most real-life scenarios, leading to an intuitive question of how to model such complicated relationships between sensors without knowing prior information?*\n\n1\n\nRecently, deep learning-based techniques have demonstrated some promising improvements in anomaly detection due to the superiority in sequence modeling over high-dimensional datasets. Generally, the existing approaches can roughly fall into two lines: reconstruction-based models (R-model) [\\[10\\]](#page-10-9), [\\[11\\]](#page-10-10), [\\[12\\]](#page-10-11), [\\[6\\]](#page-10-5), [\\[13\\]](#page-10-12) and forecasting-based models (F-model) [\\[14\\]](#page-10-13), [\\[15\\]](#page-10-14), [\\[8\\]](#page-10-7), [\\[16\\]](#page-10-15), [\\[17\\]](#page-10-16), [\\[4\\]](#page-10-3). For example, Auto-Encoders (AE) [\\[10\\]](#page-10-9) is a popular approach for anomaly detection, which uses reconstruction error as an outlier score. More recently, Generative Adversarial Networks (GANs) [\\[18\\]](#page-10-17), [\\[19\\]](#page-10-18) based on reconstruction [\\[20\\]](#page-10-19), [\\[6\\]](#page-10-5) and RNN-based forecasting approaches [\\[8\\]](#page-10-7), [\\[17\\]](#page-10-16) have also reported promising performance for multivariate anomaly detection. However, *these methods do not explicitly learn the topological structure among sensors, thus leaving room for improvements in modeling highdimensional sensor data with considerable potential interrelationships appropriately*.\n\nGraph Convolutional Networks (GCNs) [\\[21\\]](#page-10-20), [\\[22\\]](#page-10-21), [\\[23\\]](#page-10-22), [\\[24\\]](#page-10-23) have recently revealed discriminative power in learning graph representations due to their permutation-invariance, local connectivity, and compositionality [\\[21\\]](#page-10-20), [\\[25\\]](#page-10-24). Graph neural networks allow each graph node to acknowledge its neighborhood context by propagating information through structures. Recent works [\\[17\\]](#page-10-16), [\\[26\\]](#page-10-25), [\\[4\\]](#page-10-3) then combined temporal modeling methods with GCNs to model the topological relationships between sensors. Specifically, most existing graph-\n\nZ. Chen is with the Department of Computer Science, George Washington University, Washington, DC, 20052 USA (email: zech chan@gwu.edu)\n\nZ. Yuan is with the School of Business, Rutgers University, New Jersey, 08901 USA (email: zy101@rutgers.edu)\n\nX. Zhang (corresponding author), X. Cheng and D. Chen are with School of Computer Science and Technology, Shandong University, China (emails: xiaozhang@sdu.edu.cn, xzcheng@sdu.edu.cn)\n\nbased approaches [\\[25\\]](#page-10-24), [\\[4\\]](#page-10-3) aim to learn the graph structure by measuring the cosine similarity (or other distance metrics) between sensor embeddings and defining top-K closest nodes as the source node's *connections*, followed by a graph attention convolution to capture the information propagation process. However, we argue that (1) *dot products among sensor embeddings lead inevitably to quadratic time and space complexity regarding the number of sensors*; (2) *the tightness of spatial distance can not entirely indicate that there exists a strong connection in a topological structure*.\n\nTo address the problems above, we propose an innovative framework named *Graph Learning with Transformer for Anomaly detection* (GTA) in this paper. We devise from the perspective of learning a global bi-directed graph structure involving all sensors within the entity through a *connection learning policy* based on the Gumbel-Softmax Sampling trick to overcome the quadratic complexity challenge and the limitations of top-K *nearest* strategy. The policy logits can automatically discover the hidden associations during the training process by determining whether any specific node's information should flow to the other targets to achieve the best forecasting accuracy while restricting each node's neighborhoods' scope as much as possible. The discovered hidden associations are then fed into the graph convolution layers for information propagation modeling. We then integrate these graph convolution layers with different level dilated convolution layers to construct a hierarchical context encoding block specifically for temporal data. *While recurrent mechanisms can be naturally applied to temporal dependency modeling, it is hard to parallelize in many mobile environments (e.g., IoT), which require high computation efficiency.* Hence we adopt the *Transformer* [\\[27\\]](#page-10-26) based architecture for the sequence modeling and forecasting due to the parallel efficiency and capability of capturing long-distance context information. We also propose a novel multi-branch attention strategy to reduce the quadratic complexity of original self multi-head attention.\n\nThe main contributions of our work are summarized as follows:\n\n- We propose a novel and differentiable *connection learning policy* to automatically learn the graph structure of dependency relationships between sensors. Meanwhile, each node's neighborhood field is restricted by integrating a new loss term for further inference efficiency.\n- We introduce a novel graph convolution named Information Propagation (IP) convolution to model the anomaly influence flowing process. A multi-scale dilated convolution is then combined with the graph convolution to form an effective hierarchical temporal context encoding block.\n- We propose a novel multi-branch attention mechanism to tackle the original multi-head attention mechanism's quadratic complexity challenge.\n- We conduct extensive experiments on a wide range of multivariate time series anomaly detection benchmarks to demonstrate the superiority of our proposed approach over state-of-the-arts.\n\n#### II. RELATED WORK\n\nThe existing literature for addressing time series anomaly detection usually can be divided into two major categories. The first category usually modeled each time series variable independently, while the second category took into consideration the correlations among multivariate time series to improve the performance.\n\n## *A. Anomaly Detection in Univariate Time Series*\n\nThe anomaly detection in univariate time series has drawn many researchers' attentions in recent years. Traditionally, the anomaly detection frameworks included two main phases: estimation phase and detection phase [\\[28\\]](#page-10-27). In estimation phase, the variable values at one timestamp or time interval can be predicted or estimated by specific algorithm. Then the estimated values were compared with real values based on dynamically adjusted thresholds to detect anomalies in detection phase. For example, Zhang et. al [\\[29\\]](#page-10-28) applied ARIMA to capture the linear dependencies between the future values and the past values, thus modeling the time series behavior for anomaly detection. Lu et.al [\\[30\\]](#page-10-29) utilized wavelet analysis to construct the estimation model. With the development of deep learning, various neural network architectures have also been applied to anomaly detection. DeepAnt [\\[31\\]](#page-10-30) was an unsupervised approach using convolutional neural network (CNN) to forecast future time series values and adopted Euclidean distance to measure the discrepancy for anomaly detection. The LSTM neural network was also widely used in modeling time series behaviors [\\[32\\]](#page-10-31), [\\[33\\]](#page-10-32), [\\[6\\]](#page-10-5). The LSTMbased encoder-decoder [\\[32\\]](#page-10-31) reconstructed the variable values and measured the reconstruction errors for detection.\n\n## *B. Anomaly Detection in Multivariate Time Series*\n\nIn real-world scenarios, the time series data acquisition sources could be multiple [\\[34\\]](#page-10-33). Therefore, many work began to pay attention to exploiting the correlations among multiple variables to improve the accuracy of anomaly detection. Jones et.al [\\[35\\]](#page-10-34) extracted statistical and smoothed trajectory (SST) features of time series and utilized a set of non-linear functions to model related variables to detect anomalies. Using the LSTM network as the base models to to capture the temporal correlations of time series data, MAD-GAN [\\[6\\]](#page-10-5) proposed an unsupervised anomaly detection method combining generative adversarial networks (GAN) by considering complex dependencies amongst different time series variables. Sakurada et al. [\\[36\\]](#page-10-35) conducted dimentionality reduction based on autoencoders for anomaly detection. The ODCA framework [\\[37\\]](#page-10-36) included three parts: data preprocessing, outlier analysis, and outlier rank, which used cross correlation to translate high-dimentional data sets to one-dimentional crosscorrelation function. OmniAnomaly [\\[13\\]](#page-10-12) was a stochastic model to avoid potential misguiding by uncertain instances, which used stochastic variable connection and normalizing flow to get reconstruction probabilities and adopted streaming POT with drift (DSPOT) algorithm [\\[38\\]](#page-10-37) for automatic threshold selection. Senin et al. [\\[39\\]](#page-10-38) proposed two algorithms\n\n<span id=\"page-2-0\"></span>![](_page_2_Figure_1.jpeg)\n\nFig. 1: The visualization of our proposed GTA's architecture with l levels dilated convolution and graph convolution, 3 encoder layers, and 1 decoder layer. Generally, the input multivariate time series inputs are split into train sequences and label sequences, of which train sequences are fed into encoder while label sequences are fed to the decoder.\n\nthat conducted symbolic time series discretization and used grammar reduction to compress the input sequence and compactly encode them with grammar rules. Those rarely used substrings in the grammar rules were regarded as anomalies. Autoregressive with exogenous inputs (ARX) and artificial neural network (ANN) [40] extracted time-series features and detected anomalous data points by conducting hypothesis testing on the extrema of residuals.\n\nTo cover the shortage that the convolution and pooling operators of CNNs are defined for regular grids, recent GNN [41] generalizes CNNs to graphs that are able to encode irregular and non-Euclidean structures. GNN adopted the localized spectral filters and used a graph coarsening algorithm to cluster similar vertices for speeding up. In this way, GNN efficiently extracted the local stationary property and captured the correlation between nodes. In real-world IoT environment, the graph structure modeling the correlations between sensors is often not predefined in advance. Graph deviation network (GDN) [4] learned the pairwise relationship by cosine similarity to elaborate adjacent matrix which can be modeled as a graph. Then it predicted the future values by graph attentionbased forecasting and computed the absolute error value to evaluate graph deviation score. MTAD-GAN [17] concatenated feature-oriented and time-oriented graph attention layer to learn graph structure and used both forecasting-based model and reconstruction-based model to calculate integrated loss. Then automatic threshold algorithm was adopted to perform anomaly detection.\n\n#### III. PROBLEM STATEMENT\n\nIn this work, we focus on the task of multivariate time series anomaly detection. Let  $\\mathcal{X}^{(t)} \\in \\mathbb{R}^M$  denote the original multivariate time series data at any timestamp t, where M is\n\nthe total number of sensors or any data measuring node within the same entity. M is also reported as the number of features or variables in some literature [6], [13], [4]. Considering the high unbalance between normal data and anomalies, we only construct the sequence modeling process on normal data (without anomalies) and make prediction on testing data (with anomalies) for anomaly detection. Specifically, we let  $\\mathcal{X}$  and  $\\mathcal{X}$  represent the entire normal data and data with anomalies, respectively. For sequence modeling on normal data, we inherit a forecasting-based strategy to predict the time series value  $\\mathbf{x}^{(t)} \\in \\mathbb{R}^{M}$  at next time step t (aka. single-step time series forecasting) based on the historical data  $\\mathbf{x} = \\{\\mathbf{x}^{(t-n)}, \\cdots, \\mathbf{x}^{(t-1)}\\}\\$ with a specific window size n. Therefore, given a sequence of historical n time steps of multivariate contiguous observations  $\\hat{\\mathbf{x}} \\in \\mathbb{R}^{M \\times n}$ , the goal of anomaly detection is to predict the output vector  $\\hat{\\mathbf{y}} \\in \\mathbb{R}^n$ , where  $\\hat{\\mathbf{y}}^{(t)} \\in \\{0,1\\}$  denotes binary labels indicating whether there is an anomaly at time tick t. Precisely, our proposed approach returns an anomaly score for each testing timestamp, and then the anomaly result can be obtained via selecting different thresholds.\n\nWe also provide some basic graph-related concepts for better understanding formulated as follows:\n\n**Definition III.1** (Graph). A directed graph is formulated as  $\\mathcal{G} = (\\mathcal{V}, \\mathcal{E})$  where  $\\mathcal{V} = \\{1, \\cdots, M\\}$  is the set of nodes, and  $\\mathcal{E} \\subseteq \\mathcal{V} \\times \\mathcal{V}$  is the set of edges, where  $\\mathbf{e}_{i,j}$  represents the uni-directed edge flowing from node i to node j.\n\n**Definition III.2** (Node Neighborhood). Let  $i \\in \\mathcal{V}$  denote a node and  $\\mathbf{e}_{i,j} \\in \\mathcal{E}$  denote the edge pointing from node i to node j. The neighborhood of any node i is defined as  $\\mathcal{N}(i) = \\{j \\in \\mathcal{V} | \\mathbf{e}_{i,j} \\in \\mathcal{E} \\}$ .\n\n<span id=\"page-3-0\"></span>![](_page_3_Picture_1.jpeg)\n\nFig. 2: Suppose we have 3 sensors  $(N_1, N_2, N_3)$  of which the dependencies are yet hidden. Our connection learning policy's main idea is to use the Gumbel-Softmax Sampling strategy to sample a random categorical vector for determining whether any directed connection between two nodes can be established. For  $N_1$  and  $N_2$ , if the value of  $\\mathcal{P}_{1,2}$  is relatively high, it represents  $N_1$  is highly possibly pointed to  $N_2$ , vice versa.\n\n#### IV. METHODOLOGY\n\nIn most real-life scenarios of IoT, there are usually complex topological relationships between sensors where the entire entity can be seen as a graph structure. Each sensor is also viewed as a specific node in the graph. Previous methods [25], [4] focused on applying various distance metrics to measure the relations between nodes mostly by selecting the top-K closest ones as their neighbor dependencies. Different from existing approaches, we devise a directed graph structure learning policy (see Fig. 1) to automatically learn the adjacency matrix among nodes such that the network can achieve the maximum benefits. The core of the learning policy is named Gumbel-Softmax Sampling strategy [42], [43] inspired by the policy learning network in many reinforcement learning methods [44], [45]. These discovered hidden associations are then fed into the graph convolution layers for information propagation modeling. We then integrate these graph convolution layers with different level dilated convolution layers together to construct a hierarchical context encoding block specifically for temporal data. The outputs of the context encoding block are then applied positional encoding as the inputs of Transformer [27] for single-step time series forecasting. We also propose a global attention strategy to overcome the quadratic computation complexity challenge of the multihead attention mechanism. Fig. 1 further illustrates the entire architecture in detail.\n\n#### A. Gumbel-Softmax Sampling\n\nThe sampling process of discrete data from a categorical distribution is originally non-differentiable, where typical backpropagation in deep neural networks cannot be conducted. [42], [43] proposed a differentiable substitution of discrete random variables in stochastic computations by introducing Gumbel-Softmax distribution, a continuous distribution over the simplex that can approximate samples from a categorical distribution. In our graph learning policy with a total number of M candidate nodes, we let  $\\mathbf{z}^{i,j}$  be a binary connection control variable for any pair of nodes i and j with uni-directed probabilities from node i to node j as  $\\{\\pi_0^{i,j}, \\pi_1^{i,j}\\}$ , where  $\\pi_0^{i,j} + \\pi_1^{i,j} = 1$  and  $\\pi_1^{i,j}$  represents the probability that there exists an information flow from node i to node j in the graph\n\n(see Fig. 2). Similarly, by Gumbel-Max trick, we can sample any pair of nodes' connection strategy  $z^{i,j} \\in \\{0,1\\}^2$  with:\n\n$$z^{i,j} = \\underset{c \\in \\{0,1\\}}{\\arg \\max} (\\log \\pi_c^{i,j} + g_c^{i,j})$$\n (1)\n\nwhere  $g_0, g_1$  are i.i.d samples drawn from a standard Gumbel distribution which can be easily sampled using inverse transform sampling by drawing  $u \\sim \\text{Uniform}(0,1)$  and computing  $g = -\\log(-\\log u)$ . We further substitute this  $\\arg \\max$  operation, since it is not differentiable, with a Softmax reparameterization trick, also known as Gumbel-Softmax trick, as:\n\n$$z_c^{i,j} = \\frac{\\exp((\\log \\pi_c^{i,j} + g_c^{i,j})/\\tau)}{\\sum_{v \\in \\{0,1\\}} \\exp((\\log \\pi_v^{i,j} + g_v^{i,j})/\\tau)}$$\n(2)\n\nwhere  $c \\in \\{0,1\\}$  and  $\\tau$  is the temperature parameter to control Gumbel-Softmax distribution's smoothness, as the temperature  $\\tau$  approaches 0, the Gumbel-Softmax distribution becomes identical to the one-hot categorical distribution. As the randomness of g is independent of  $\\pi$ , we can now directly optimize our gating control policy using standard gradient descent algorithms.\n\nCompared to the previous graph structure learning approaches, our proposed method significantly reduces the computation complexity from  $\\mathcal{O}(M^2)$  to  $\\mathcal{O}(1)$  since it requires no dot products among high-dimensional node embeddings. Additionally, the graph structure learning policy is able to automatically learn the global topological connections among all nodes, thereby avoiding the limitation of selecting only the top-K *nearest* nodes as neighbors.\n\n### B. Influence Propagation via Graph Convolution\n\nOn top of the learned topological structure, the graph convolution block aims to further model the influence propagation process and update each specific node's representation by incorporating its neighbors' information. Considering the characteristics of tasks such as anomaly detection, usually, the occurrence of abnormalities is due to a series of chain influences caused by one or several nodes being attacked. Therefore, it is intuitive for us to model the relationships between upstream and downstream nodes by capturing both temporal and spatial differences. Thus, we define our Influence Propagation (IP) convolution process concerning each specific node and its neighborhoods by applying a node-wise symmetric aggregating operation  $\\square$  (e.g., add, mean, or max) on the differences between nodes associated with all the edges emanating from each node. The updated output of IPConv at the *i*-th node is given by:\n\n$$\\mathbf{x}_{i}' = \\sum_{j \\in \\mathcal{N}(i)} h_{\\mathbf{\\Theta}}(\\mathbf{x}_{i}||\\mathbf{x}_{j} - \\mathbf{x}_{j}||\\mathbf{x}_{j} + \\mathbf{x}_{i})$$\n(3)\n\nwhere  $\\square$  is chosen as summation in our method,  $h_{\\Theta}$  denotes a neural network, i.e. MLPs (Multi-layer Perceptrons),  $\\mathbf{x}_i \\in \\mathbb{R}^T$  represents the time series embedding of node i and || denotes the concatenation operation. We denote  $\\mathbf{x}_j - \\mathbf{x}_i$  as the differences between nodes to *explicitly model the influence propagation delay* from node j to i, captured by the value difference at each timestamp of the time series embedding. We\n\n<span id=\"page-4-0\"></span>![](_page_4_Picture_1.jpeg)\n\nFig. 3: Visualization of hierarchical dilated convolution combined with graph convolution.\n\nalso incorporate the term  $\\mathbf{x}_i + \\mathbf{x}_j$  with the differences to work as a *scale benchmark* such that the model can learn the truly generalized impact to the other nodes brought by anomalies instead of extreme values. Intuitively, for any specific node i, if one of its neighbor nodes j being attacked, node i shall be severely affected sooner or later due to the restricted topological relationship.\n\nTraining Strategy and Regularization. Graph convolution based on the learned dependencies among sensors only aggregates the information from nodes' neighbors without taking efficiency into account. Under the extreme circumstance that all nodes are mutually connected, aggregating neighborhood information adds considerable noise to each node. However, it is preferred to form a compact sub-graph structure for every single node, in which redundant connections are omitted as much as possible without deteriorating the forecasting accuracy. To this end, we propose a sparsity regularization  $\\mathcal{L}_s$  to enhance the compactness of each node by minimizing the log-likelihood of the probability of a connection being established as\n\n$$\\mathcal{L}_s = \\sum_{1 \\le i, j \\le M, i \\ne j} \\log \\pi_1^{i,j} \\tag{4}$$\n\nFurthermore, to encourage better learning convergence, the *connection learning policy* is initialized with all nodes connected. We *warm up* the network weights by training with this *complete graph structure* for a few epochs to provide a good starting point for the policy learning.\n\n#### C. Hierarchical Dilated Convolution\n\nThe dilated convolution [46] is widely used in sequence modeling due to its powerful capability in extracting high-level temporal context features by capturing sequential patterns of time series data through standard 1D convolution filters. Setting different dilation size levels can discover temporal patterns with various ranges and handle very long sequences. However, choosing the right kernel size is often a challenging problem for convolutional operations. Some previous approaches adopted the widely employed inception learning strategy [47] in computer vision which concatenates the outputs of convolutional filters with different kernel sizes followed by a weighted matrix. Unlike them, we propose a hierarchical dilated convolution learning strategy combined with the graph convolution\n\nabove to fully explore the temporal context modeling process with different sequence lengths and receptive fields by setting multi-scale dilation sizes. Specifically, as Fig. 3 illustrates, the bottom layer represents the multivariate time series input (for some time t, onto which repeated dilated convolutions, with increasing dilation rates, are applied; the filter width is again set to equal two in the observed model). The first level block applies dilated convolutions with the dilation rate equal to one, meaning that the layer applies the filter onto two adjacent elements,  $\\mathbf{x}^{(t)}$  and  $\\mathbf{x}^{(t+1)}$ , of the input series. The outputs of the first-level dilated convolutions are fed into the graph convolution module proposed above. Then the second-level layer applies dilated convolutions, with the rate now set to equal two, which means that the filter is applied onto elements  $\\mathbf{x}^{(t)}$  and  $\\mathbf{x}^{(t+2)}$  (notice here that the number of parameters remains the same, but the filter width has been \"widened\"). By setting multi-scale dilation sizes with a hierarchical learning style, abundant temporal representations concerning different temporal positions and sequence lengths can be effectively learned.\n\nThe hierarchical dilated convolution and the graph convolution together form the temporal context embedding progression where dilated convolution captures the long-term temporal dependencies while graph convolution describes the topological connection relationships between sensors (or nodes). As a result, the final outputs have been well represented to be the inputs of the next forecasting procedure using Transformer architecture.\n\n### D. More Efficient Multi-branch Transformer\n\nTransformer [27] has been widely used in sequence modeling due to the superior capability of multi-head attention mechanism in long-distance dependencies capturing. However, one main efficiency bottleneck in self-attention is that the pairwise token interaction dot-production incurs a complexity of  $\\mathcal{O}(n^2)$  with respect to sequence length. To tackle this challenge, in this section, we first briefly review the background of some recent development of multi-head attention mechanism and then propose a more efficient Transformer architecture based on the innovative multi-branch attention mechanism which is more computationally efficient.\n\n**Self-attention in Transformers.** The vanilla multi-head self-attention mechanism was originally proposed by [27]. For a sequence of token representations  $\\mathbf{X} \\in \\mathcal{R}^{n \\times d}$  (with sequence length n and dimensionality d), the self-attention function firstly projects them into queries  $\\mathbf{Q} \\in \\mathcal{R}^{n \\times d_k}$ , keys  $\\mathbf{K} \\in \\mathcal{R}^{n \\times d_k}$  and values  $\\mathbf{V} \\in \\mathcal{R}^{n \\times d_v}$ , h times with different, learned linear projections to  $d_k$ ,  $d_k$  and  $d_v$  dimensions, respectively. Then a particular scaled dot-product attention was computed to obtain the weights on the values as:\n\nAttention(Q, K, V) = Softmax(\n$$\\frac{QK^T}{\\sqrt{d_k}}$$\n)V (5)\n\nMulti-head attention allows the model to jointly attend to information from different representation subspaces at different\n\n<span id=\"page-5-0\"></span>![](_page_5_Figure_1.jpeg)\n\n![](_page_5_Figure_2.jpeg)\n\n![](_page_5_Figure_3.jpeg)\n\nformer.\n\nglobal-fixed attention.\n\nVanilla multi-branch Trans- (b) Multi-branch Transformer with (c) Our proposed multi-branch attention mechanism.\n\nFig. 4: Different variants of efficient multi-branch attention mechanism. Right: Replacing vanilla multi-head attention with a combination of both global-fixed attention and vanilla multi-head attention and neighborhood convolution by splitting embeddings into multiple channels.\n\npositions. With a concatenated computing way, the final output of multi-head attention is as following:\n\n$$MultiHead(\\mathbf{Q}, \\mathbf{K}, \\mathbf{V}) = Concat(head_1, \\cdots, head_h)W^O$$\n(6)\n\nin which, h is the number of total heads. Each head is defined as:\n\n$$head_i = Attention(\\mathbf{Q}W_i^Q, \\mathbf{K}W_i^K, \\mathbf{V}W_i^V)$$\n (7)\n\nwhere the projections are parameter matrices  $W_i^Q \\in \\mathcal{R}^{d \\times d_k}$ ,  $W_i^K \\in \\mathcal{R}^{d \\times d_k}$ ,  $W_i^V \\in \\mathcal{R}^{d \\times d_v}$  and  $W^O \\in \\mathcal{R}^{hd_v \\times d}$ .\n\nGlobal-learned Attention. Recent research [48], [49] claim that the self-attention in Transformers can be substantially simplified with trivial attentive patterns at training time: only preserving adjacent and previous tokens is necessary. The adjacent positional information such as \"current token\", \"previous token\" and \"next token\" are the key features learned across all layers by encoder self-attention. Instead of costly learning the trivial pattern using massive corpus with considerable computational resources, the conventional pairwise token interaction attention could be replaced by a more computation-efficient global attention pattern. In practice, manually pre-define all global-fixed patterns is easy to implement but can barely cover all possible situations. To generalize the global-fixed attention pattern proposed in [50], we apply a parameter matrix  $\\mathbf{S} \\in \\mathcal{R}^{m \\times m}$  (m > n) as a learnable global compatibility function across all training samples following the Synthesizer [51]. Hence, each head adds  $m^2$  parameters while reducing two projection matrices  $W^Q$  and  $W^K$ . The attention now has been as following:\n\n$$Attention(S, V) = Softmax(S)V$$\n (8)\n\nwhere S is a learnable matrix which can be randomly initial-\n\nMulti-branch Architecture for Transformers. [52] has demonstrated the effectiveness of multi-branch attention in capturing global and local context patterns, especially under mobile computational constraints. As Fig. 4 illustrates, this double-branch architecture splits the original input sequences into two pieces along the embedding channel, followed by two attention branches: one convolution branch for extracting information in a restricted neighborhood and one multi-head attention branch for capturing long-distance dependencies. As a substitute for vanilla self-attention, we apply a task-specific alignment matrix that learns globally across all training samples where attention weights are no longer conditioned on any input token in our architecture. By simply replacing the dotproduction with global-learned alignment as Fig. 4 shows, the input sequences will only be projected into value matrices. A weighted sum up of *values* is then calculated using this globallearned attention. In order to explore a better trade-off between computation efficiency and model performance, we propose to combine the pairwise token interactions and global-learned attention in terms of a branch-wise mixing strategy.\n\nBranch-wise Mixing. For branch-wise mixing, the input sequences are split into multiple branches along the embedding dimension as Fig. 4 clearly describes. Different from the original two-branch architecture, we build one more branch for global-learned attention. Thus,\n\nAttention = Concat(\n$$\\mathbf{A}^{(1)}, \\mathbf{A}^{(2)}$$\n)  \n\n$$\\mathbf{A}^{(1)} = \\text{MultiHead}(\\mathbf{X}^{(1)})$$\n\n$$\\mathbf{A}^{(2)} = \\text{Global}(\\mathbf{X}^{(2)})$$\n(9)\n\nwhere \n$$\\mathbf{X}^{(1)} \\in \\mathcal{R}^{n \\times d_1}$$\n,  $\\mathbf{X}^{(2)} \\in \\mathcal{R}^{n \\times d_2}$  and  $d = d_1 + d_2$ .\n\nIn our models, we only change the branch that captures the global contexts while remaining the local pattern extractor using either lightConv or dynamicConv [53].\n\nComputation Analysis. Table I lists the different model variants explored within our proposed framework. The column  $|\\theta|$  refers to the total number of parameters in one selfattention module excluding the feed-forward layer. Obviously, compared to the original scaled dot-production, the amount of computation of global-learned attention is directly reduced by half in terms of Mult-Adds. Our proposed multi-branch mixing strategy increases the amount of calculation in varying degrees due to the mix with scaled dot-production. However, this is a trade-off between computation complexity and model size. More precisely, when  $m \\leq \\sqrt{2/hd}$ , the global attention module is more computationally efficient than the other variants.\n\n#### E. Anomaly Scoring\n\nInspired by [54], the original multivariate time series inputs are split into two parts: training sequences for the encoder and label sequences for the decoder. The decoder receives long sequence inputs, pads the target elements into zero, measures the weighted attention composition of the feature map, and\n\nTABLE I: Memory and computation analysis on different attention types.\n\n| Attention Type                                             | $ \\theta $                                      | # Mult-Adds                                                                                                                                | Global/Inter            |\n|------------------------------------------------------------|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|\n| Scaled Dot-Product<br>Global-Learned<br>Branch-Wise Mixing | $4d^2 \\\\ m^2h + 2d^2 \\\\ 4d_1^2 + m^2h + 2d_2^2$ | $ \\begin{array}{c} \\mathcal{O}(4nd^2 + 2n^2d) \\\\ \\mathcal{O}(2nd^2 + n^2d) \\\\ \\mathcal{O}(4nd_1^2 + n^2d_1 + 2nd_2^2 + n^2d) \\end{array} $ | Inter<br>Global<br>Both |\n\n<span id=\"page-6-0\"></span>instantly predicts output elements in a generative style. Let the single-step prediction denote as  $\\hat{\\mathcal{Y}} \\in \\mathbb{R}^{M \\times n}$ . We apply the Mean Square Error (MSE) between the predicted outputs  $\\hat{\\mathbf{Y}}$  and the observation  $\\mathcal{Y}$ , as the loss function to minimize:\n\n$$\\mathcal{L}_{mse} = \\frac{1}{M} \\sum_{t=1}^{n} ||\\mathcal{Y}^{(t)} - \\hat{\\mathcal{Y}}^{(t)}||_{2}^{2}$$\n (10)\n\nSimilar to the loss objective, the anomalous score compares the expected value at time t to the observed value, computing an anomaly score via the deviation level as:\n\n$$\\hat{\\mathbf{y}}^{(t)} = \\sum_{i=1}^{M} ||\\mathcal{Y}_i^{(t)} - \\hat{\\mathcal{Y}}_i^{(t)}||_2^2$$\n (11)\n\nFinally, we label a timestamp t as an anomaly if  $\\hat{\\mathbf{y}}^{(t)}$  exceeds a fixed threshold. Since different approaches could be employed to set the threshold such as extreme value theory [38], the same anomaly detection model could result in different prediction performance with different anomaly thresholds. Thus, we apply a grid search on all possible anomaly thresholds to search for the best F1-score (with notation \\*\\*) and Recall (with notation \\*) in theory and report them.\n\n#### V. EXPERIMENTS\n\n#### A. Datasets\n\nWe evaluate our method over a wide range of real-world anomaly detection datasets. SWaT [55] The Secure Water Treatment dataset is collected from a water treatment testbed for cyber-attack investigation initially launched in May 2015. The SWaT dataset collection process lasted for 11 days, with the system operated 24 hours per day such that the network traffic and all the values obtained from all 51 sensors and actuators are recorded. Due to the system working flow characteristics, there is a natural topological structure relationship between all sensing nodes. After this, a total of 41 attacks derived through an attack model considering the intent space of a CPS were launched during the last 4 days of the 2016 SWaT data collection process. As such, the overall sequential data is labeled according to normal and abnormal behaviors at each timestamp. WADI [9] Water Distribution dataset is collected from a water distribution testbed as an extension of the SWaT testbed. It consists of a total of 16 days of continuous operations with 14 days under regular operation and 2 days with attack scenarios. The entire testbed contains 123 sensors and actuators. Moreover, SMAP (Soil Moisture Active Passive satellite) and MSL (Mars Science Laboratory rover) are two public datasets published by NASA [56]. Each dataset has a training and a testing subset, and anomalies in both testing subsets have been labeled [8].\n\nTable II and III summarises the statistics of the four datasets. In order to fair comparison with other methods, the original data samples for **SWaT** and **WADI** are downsampled to one measurement every 10 seconds by taking the median values following [4].\n\n<span id=\"page-6-1\"></span>TABLE II: Statistical summary of datasets SWaT and WADI.\n\n| Datasets                                | SWaT                       | WADI          |  |\n|-----------------------------------------|----------------------------|---------------|--|\n| Feature Desc.                           | All sensors and actuators. |               |  |\n| # Features                              | 51                         | 112           |  |\n| # Attacks                               | 41                         | 15            |  |\n| Attack durations (mins)                 | $2 \\sim 25$                | $1.5 \\sim 30$ |  |\n| Training size (normal data)             | 49619                      | 120899        |  |\n| <b>Testing size (data with attacks)</b> | 44931                      | 17219         |  |\n| Anomaly rate (%)                        | 12.14                      | 5.75          |  |\n|                                         |                            |               |  |\n\n<span id=\"page-6-2\"></span>TABLE III: Statistical summary of datasets SMAP and MSL.\n\n| Datasets                                  | SMAP                                | MSL   |\n|-------------------------------------------|-------------------------------------|-------|\n| Feature Desc.                             | Radiation, temperature, power, etc. |       |\n| # Features                                | 25                                  | 25    |\n| Training size (normal data)               | 135183                              | 58317 |\n| <b>Testing size (data with anomalies)</b> | 427617                              | 73729 |\n| Anomaly rate (%)                          | 13.13                               | 10.72 |\n\n#### B. Experimental Setup\n\n1) Data preprocessing: We perform a data standardization before training to improve the robustness of our model. Data preprocessing is applied on both training and testing set:\n\n$$\\tilde{x} = \\frac{x - \\min X_{train}}{\\max X_{train} - \\min X_{train}} \\tag{12}$$\n\nwhere  $\\max(X_{train})$  and  $\\min(X_{train})$  are the maximum value and the minimum value of the training set respectively.\n\n2) Evaluation metrics: We adopt the standard evaluation metrics in anomaly detection tasks, namely Precision, Recall and F1 score, to evaluate the performance of our approach, in which:\n\n$$Precision = \\frac{TP}{TP + FP}$$\n (13)\n\n$$Recall = \\frac{TP}{TP + FN}$$\n (14)\n\n$$F1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}}$$\n (15)\n\nwhere TP represents the truly detected anomalies (aka. true positives), FP stands for the falsely detected anomalies (aka. false positives), TN represents the correctly classified normal samples (aka. true negatives), and FN is the misclassified normal samples (aka. false negatives). Given the fact that\n\nTABLE IV: Experimental results on SWaT and WADI.\n\n<span id=\"page-7-0\"></span>\n\n| Datasets | Methods                       | Precision(%) | Recall(%)    | F1-score |\n|----------|-------------------------------|--------------|--------------|----------|\n| PCA      |                               | 24.92        | 21.63        | 0.23     |\n|          | KNN                           | 7.83         | 7.83         | 0.08     |\n|          | FB                            | 10.17        | 10.17        | 0.10     |\n|          | AE                            | 72.63        | 52.63        | 0.61     |\n|          | DAGMM                         | 27.46        | 69.52        | 0.39     |\n|          | LSTM-VAE                      | 96.24        | 59.91        | 0.74     |\n| SWaT     | MAD-GAN                       | 98.97        | 63.74        | 0.77     |\n|          | GDN                           | 99.35        | <u>68.12</u> | 0.81     |\n|          | GTA* (ours)                   | 74.91        | 96.41        | 0.84     |\n|          | GTA**                         | 94.83        | 88.10        | 0.91     |\n|          | $\\Delta_{\\uparrow}$ (best F1) | -4.55%       | +29.33%      | +12.35%  |\n|          | PCA                           | 39.53        | 5.63         | 0.10     |\n|          | KNN                           | 7.76         | 7.75         | 0.08     |\n|          | FB                            | 8.60         | 8.60         | 0.09     |\n|          | AE                            | 34.35        | 34.35        | 0.34     |\n|          | DAGMM                         | 54.44        | 26.99        | 0.36     |\n|          | LSTM-VAE                      | 87.79        | 14.45        | 0.25     |\n| WADI     | MAD-GAN                       | 41.44        | 33.92        | 0.37     |\n|          | GDN                           | 97.50        | <u>40.19</u> | 0.57     |\n|          | GTA* (ours)                   | 74.56        | 90.50        | 0.82     |\n|          | GTA**                         | 83.91        | 83.61        | 0.84     |\n|          | $\\Delta_{\\uparrow}$ (best F1) | -13.94%      | +108.04%     | +47.37%  |\n\nBest performance in bold. Second-best with underlines.\n\n $\\Delta_{\\uparrow}$  represents the percentage increase between our best F1-score performance and the second-best method (GDN).\n\nTABLE V: Experimental results on SMAP and MSL.\n\n<span id=\"page-7-1\"></span>\n\n| Method   |              | SMAP         |           |          | MSL          |           |                     |\n|----------|--------------|--------------|-----------|----------|--------------|-----------|---------------------|\n|          |              | Precision(%) | Recall(%) | F1-score | Precision(%) | Recall(%) | F1-score            |\n|          | KitNet       | 77.25        | 83.27     | 0.8014   | 63.12        | 79.36     | 0.7031              |\n| R-Models | GAN-Li       | 67.10        | 87.06     | 0.7579   | 71.02        | 87.06     | 0.7823              |\n|          | LSTM-VAE     | 85.51        | 63.66     | 0.7298   | 52.57        | 95.46     | 0.6780              |\n|          | MAD-GAN      | 80.49        | 82.14     | 0.8131   | 85.17        | 89.91     | 0.8747              |\n|          | OmniAnomaly  | 74.16        | 97.76     | 0.8434   | 88.67        | 91.17     | 0.8989              |\n|          | LSTM-NDT     | 89.65        | 88.46     | 0.8905   | 59.44        | 53.74     | 0.5640              |\n| F-Models | DAGMM        | 58.45        | 90.58     | 0.7105   | 54.12        | 99.34     | 0.7007              |\n|          | MTAD-GAT     | 89.06        | 91.23     | 0.9013   | 87.54        | 94.40     | 0.9084              |\n|          | GTA** (ours) | 89.11        | 91.76     | 0.9041   | 91.04        | 91.17     | $\\overline{0.9111}$ |\n\nBest performance in bold. Second-best with underlines.\n\nin many real-world anomaly detection scenarios, it is more vital for the system to detect all the real attacks or anomalies by tolerating a few false alarms. As such, we generally give more concern to Recall and the overall F1 score instead of Precision. Considering different anomaly score thresholds may result in different metric scores, we hence report both our best Recall and F1 results (with notations \\* and \\*\\* respectively) on all datasets for a thorough comparison.\n\nAlso, we adopt the point-adjust way to calculate the performance metrics following [13]. In practice, anomalous observations usually occur consecutively to form contiguous anomaly segments. An alert for anomalies can be triggered within any subset of an actual anomaly window. Thus, for any observation\n\nin the ground truth anomaly segment, if it is detected as an anomaly or attack, we would consider this whole anomaly window is correctly detected and every observation point in this segment has been classified as anomalies. The observations outside the ground truth anomaly segment are treated as usual. In all, we first train our model on the training set to learn the general sequence pattern and make the forecasting on the test set for anomaly detection.\n\n3) Baselines: We compare our GTA with a wide range of state-of-the-arts in multivariate time series anomaly detection, including: (1) reconstruction-based models: PCA, AE [10], KitNet [57], DAGMM [12], GAN-Li [20], OmniAnomaly [13], LSTM-VAE [11], MAD-GAN [6], and (2) forecasting-\n\n<sup>\\*</sup> represents the results chosen by best Recall.\n\n<sup>\\*\\*</sup> represents the results chosen by best F1-score.\n\n<sup>\\*\\*</sup> represents the results chosen by best F1-score.\n\nbased models: KNN [\\[14\\]](#page-10-13), FB [\\[15\\]](#page-10-14), MTAD-GAT [\\[17\\]](#page-10-16) and GDN [\\[4\\]](#page-10-3).\n\n*4) Training Settings:* We implement our method and all its variants using Pytorch[1](#page-8-0) version 1.7.0 with CUDA 10.1 and Pytorch Geometric Library [\\[58\\]](#page-11-16) version 1.6.3. We conduct all experiments on four NVIDIA Tesla P100 GPUs. For time series forecasting, we set the historical window size to 60 frames with a label series length as 30 to predict the value at next timestamp. The number of dilated convolution levels for temporal context modeling is set to 3. Also, the general model input embedding dimension is set to 128. For the conventional multi-head attention mechanism, the number of heads is set to 8. In total, we have 3 encoder layers and 2 decoder layers and the dimensional of fully connected network is set to 128 which is equal to the model dimension. Additionally, we apply the dropout strategy to prevent overfitting with dropout rate consistently equals to 0.05. The models are trained using the Adam optimizer with learning rate initialized as 1e \u22124 and \u03b21, \u03b2<sup>2</sup> as 0.9, 0.99, respectively. A learning rate adjusting strategy is also applied. We train our models for up to 50 epochs and early stopping strategy is applied with patience of 10. We run each experiment for 5 trials and report the mean value.\n\n### *C. Experimental Results*\n\nIn Table [IV,](#page-7-0) we show the anomaly detection accuracy in terms of precision, recall, and F1-score, of our proposed GTA method and other state-of-the-arts on datasets SWaT and WADI. Each of these baselines provides a specific threshold selection method, and the reported F1-score is calculated correspondingly. Our proposed GTA significantly outperforms all the other approaches on both datasets by achieving the best F1-score as 0.91 for SWaT and 0.84 for WADI. Astonishingly, compared to the second-best model GDN, GTA can achieve an overall 12.35% increase and an impressive 47.47% improvement in terms of the best F1-score on these two datasets, respectively. Moreover, we have the following observations: (1) Compared to the conventional unsupervised approaches such as PCA, KNN, FB, deep learning-based techniques (AE, LSTM-VAE, MAD-GAN, etc.) generally have a better detection performance on both datasets. By adopting the recurrent mechanism (RNN, GRU, LSTM) in modeling long sequences and capturing the temporal context dependencies, the deep learning-based methods demonstrate superiority over the conventional methods. (2) DAGMM [\\[12\\]](#page-10-11) aims to handle multivariate data *without* temporal information, indicating the input data contains only one observation instead of a historical time series window. Hence this approach is not suitable for temporal dependency modeling, which is crucial for multivariate time series anomaly detection. (3) Most existing methods are based on recurrent neural networks to capture temporal dependency, including both reconstruction-based models (LSTM-VAE, OmniAnomaly, MAD-GAN) and forecastingbased models (LSTM-NDT, MTAD-GAT). Of which, LSTM-NDT [\\[8\\]](#page-10-7) is a deterministic model without leveraging stochastic\n\n<span id=\"page-8-1\"></span>TABLE VI: Anomaly detection accuracy in terms of precision(%), recall(%), and F1-score of GTA and its variants.\n\n| Method                          | SWaT                    |                         |                      | WADI                    |                         |                      |\n|---------------------------------|-------------------------|-------------------------|----------------------|-------------------------|-------------------------|----------------------|\n|                                 | Prec(%)                 | Rec(%)                  | F1-score             | Prec(%)                 | Rec(%)                  | F1-score             |\n| GTA                             | 94.83                   | 88.10                   | 0.91                 | 83.91                   | 83.61                   | 0.84                 |\n| w/o Graph<br>w/o LP<br>w/o Attn | 88.64<br>89.36<br>78.75 | 65.73<br>72.12<br>65.34 | 0.75<br>0.80<br>0.71 | 71.25<br>79.56<br>74.75 | 68.23<br>77.10<br>70.90 | 0.70<br>0.78<br>0.73 |\n\ninformation for modeling the inherent stochasticity of time series. LSTM-VAE [\\[11\\]](#page-10-10) combines LSTM with VAE for sequence modeling; however, it ignores the temporal dependencies among latent variables. OmniAnomaly [\\[13\\]](#page-10-12) was then proposed to solve this problem. Additionally, MAD-GAN [\\[6\\]](#page-10-5) aims to adopt a general adversarial training fashion to reconstruct the original time series, which also uses recurrent neural networks. Nevertheless, the recurrent learning mechanism's core properties restrict the modeling process to be sequential. Past information has to be retained through the past hidden states, limiting the long-term sequence modeling capability of the model. Transformer adopts a non-sequential learning fashion, and the powerful self-attention mechanism makes the context distance between any token of a time series shrink to one, which is of high importance to sequence modeling as more historical data can provide more pattern information. (4) Though GDN [\\[4\\]](#page-10-3) is also a graph learning-based anomaly detection approach, it adopts the top-K *nearest* connection strategy to model the topological graph structure among sensors, which have certain limitations as we discussed in Section [I.](#page-0-0) MTAD-GAT [\\[17\\]](#page-10-16) directly utilizes the initial graph structure information by assuming all sensors are mutually connected, making it a complete graph that is not suitable for many reallife situations.\n\nFrom Table [V,](#page-7-1) we can see that the overall improvements in terms of best F1-score on datasets SMAP and MSL are not as impressive as Table [IV](#page-7-0) shows. We argue the main difference of results between the NASA anomaly datasets and the Cyber-attack datasets lies in the features' dependencies. SMAP provides measurements of the land surface soil moisture by measuring various separated attributes such as radiation, temperature, computational activities, etc. Though these attributes are not entirely independent of each other, the internal relationships between them are much weaker than those within SWaT or WADI where any slight change that appears on one sensor can propagate to the whole network. Therefore, our proposed graph structure learning strategy might be more effective on datasets with a strong topological structure.\n\n## *D. Ablation Studies*\n\nTo study each component of our approach's effectiveness, we gradually exclude the elements to observe how the model performance degrades on datasets SWaT and WADI. First, we study the significance of modeling the dependencies among sensors using graph learning. We directly apply the original time series as the inputs for the Transformer and make the\n\n<span id=\"page-8-0\"></span><sup>1</sup>https://pytorch.org/\n\n<span id=\"page-9-0\"></span>![](_page_9_Figure_1.jpeg)\n\n![](_page_9_Figure_2.jpeg)\n\n- (a) Partial graph structure learned by the learning policy. (b) The attacked sensor with three other malicious sensors.\n\nFig. 5: A case study of showing an attack in WADI.\n\nforecasting without graph learned phase. Second, we study the significance of our proposed *structure learning policy* (LP) by substituting it with a static complete graph where every node is bi-directionally linked to each other. Finally, to study the necessity of the Transformer-based architecture for sequence modeling, we substitute the Transformer with a GRU-based recurrent neural network for forecasting. The results are summarized in Table [VI](#page-8-1) and provide the following observations: (1) Our proposed learning policy helps the graph convolution operation by capturing only proper information flow with noises filtered out. (2) There is a considerable gap between GTA and the variant without graph learning which again demonstrates the importance of topological structure modeling in handling multivariate time series anomaly detection. (3) Transformer-based architecture exhibits superiority in sequence modeling, where the self-attention mechanism plays a critical role. Moreover, these results again confirm that every component of our method is indispensable and make this framework powerful in multivariate time series anomaly detection.\n\n#### *E. Graph Learning and Case Study*\n\nBy introducing a case study of an actual attack from the Cyber-attack dataset WADI, we evaluate what a graph structure would the graph learning policy learn and how this helps us localize and comprehend an anomaly in this section. An assault with a period of 25.16 minutes was logged in the WADI data collecting log, which fraudulently turned on the motorized valve 1 MV 001 STATUS and caused an overflow on the primary tank. It's difficult for the operation engineers to find out the status of this valve manually because it's still within normal range. As a result, it's not easy to spot this oddity.\n\nThe water distribution treatment, for example, consists of three-state processes from the water supply, distribution network, and return water system, which are denoted as P1, P2, and P3, respectively. Every sensor and actuator, in every condition, is inextricably linked. The raw water inlet valve that regulates the SUTD entering, for example, is represented by 1 MV 001 STATUS. Because 1 FIT 001 PV is a downstream flow indicator transmitter of the water distribution, the value of 1 FIT 001 PV rises rapidly if the 1 MV 001 valve is turned on abruptly. As its outcome of the first stage propagates the influence from the raw water transfer pump to the second stage, 2 FIT 001 PV is also vulnerable to the same malicious attack. In addition, as LEAK DIFF PRESSURE becomes irregular during this procedure, the leaking water pressure grows without a doubt. Our graph learning policy learned a partial graph in Fig. [5a,](#page-9-0) which almost properly depicts the topological interactions among sensors. The LEAD DIFF PRESSURE is almost related to every other displayed node as malicious information passes from upstream sensors to downstream ones. More importantly, Fig. [5b](#page-9-0) shows our model's predicted sensor curves (blue lines) against the ground truth (red lines) of sensor 1 FIT 001 PV, 2 FIT 001 PV, and 2 PIT 001 PV within the attack duration. The predictions of these sensors are consistently higher than the ground truth, where the anomaly score increases correspondingly. It is mainly because the input time series has been embedded with the graph structure information through the influence propagation convolution operation. Sensors that are not directly attacked will still be severely affected if sensors that are highly related to them are attacked. Therefore, our model can capture this dependency and result in an *abnormal* prediction, which is vital for the following anomaly detection.\n\n## VI. CONCLUSION\n\nIn this work, we proposed GTA, a Transformer-based framework for anomaly detection that uses the introduced connection learning policy to automatically learn sensor dependencies. To simulate the information flow among the sensors in the graph, we devised an unique Influence Propagation (IP) graph convolution. The inference speed of our proposed multi-branch attention technique is greatly improved without sacrificing model performance. Extensive experiments on four real-world datasets demonstrated that our strategy outperformed other state-of-the-art approaches in terms of prediction accuracy. We also provided a case study to demonstrate how our approach identifies the anomaly by utilizing our proposed techniques. We aim to explore more about combining this approach with the online learning strategy to land it on the mobile IoT scenarios for future work.\n\n## REFERENCES\n\n- <span id=\"page-10-0\"></span>[1] M. S. Mahdavinejad, M. Rezvan, M. Barekatain, P. Adibi, P. M. Barnaghi, and A. P. Sheth, \"Machine learning for internet of things data analysis: A survey,\" *CoRR*, vol. abs/1802.06305, 2018.\n- <span id=\"page-10-1\"></span>[2] Z. Cai and Z. He, \"Trading private range counting over big iot data,\" in *39th IEEE International Conference on Distributed Computing Systems, ICDCS 2019, Dallas, TX, USA, July 7-10, 2019*. IEEE, 2019, pp. 144\u2013 153. [Online]. Available:<https://doi.org/10.1109/ICDCS.2019.00023>\n- <span id=\"page-10-2\"></span>[3] M. Mohammadi, A. I. Al-Fuqaha, S. Sorour, and M. Guizani, \"Deep learning for iot big data and streaming analytics: A survey,\" *IEEE Commun. Surv. Tutorials*, vol. 20, no. 4, pp. 2923\u20132960, 2018.\n- <span id=\"page-10-3\"></span>[4] A. Deng and B. Hooi, \"Graph neural network-based anomaly detection in multivariate time series,\" in *Proceedings of the 35th AAAI Conference on Artificial Intelligence*, 2021.\n- <span id=\"page-10-4\"></span>[5] Z. Cai and X. Zheng, \"A private and efficient mechanism for data uploading in smart cyber-physical systems,\" *IEEE Trans. Netw. Sci. Eng.*, vol. 7, no. 2, pp. 766\u2013775, 2020. [Online]. Available: <https://doi.org/10.1109/TNSE.2018.2830307>\n- <span id=\"page-10-5\"></span>[6] D. Li, D. Chen, B. Jin, L. Shi, J. Goh, and S. Ng, \"MAD-GAN: multivariate anomaly detection for time series data with generative adversarial networks,\" in *28th International Conference on Artificial Neural Networks*, ser. Lecture Notes in Computer Science, vol. 11730. Springer, 2019, pp. 703\u2013716.\n- <span id=\"page-10-6\"></span>[7] X. Zheng and Z. Cai, \"Privacy-preserved data sharing towards multiple parties in industrial iots,\" *IEEE J. Sel. Areas Commun.*, vol. 38, no. 5, pp. 968\u2013979, 2020. [Online]. Available: [https:](https://doi.org/10.1109/JSAC.2020.2980802) [//doi.org/10.1109/JSAC.2020.2980802](https://doi.org/10.1109/JSAC.2020.2980802)\n- <span id=\"page-10-7\"></span>[8] K. Hundman, V. Constantinou, C. Laporte, I. Colwell, and T. Soderstr \u00a8 om, \"Detecting spacecraft anomalies using lstms and non- \u00a8 parametric dynamic thresholding,\" in *Proceedings of the 24th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining*. ACM, 2018, pp. 387\u2013395.\n- <span id=\"page-10-8\"></span>[9] C. M. Ahmed, V. R. Palleti, and A. P. Mathur, \"WADI: a water distribution testbed for research in the design of secure cyber physical systems,\" in *Proceedings of the 3rd International Workshop on Cyber-Physical Systems for Smart Water Networks*. ACM, 2017, pp. 25\u201328.\n- <span id=\"page-10-9\"></span>[10] C. C. Aggarwal, *Outlier Analysis*. Springer, 2013.\n- <span id=\"page-10-10\"></span>[11] D. Park, Y. Hoshi, and C. C. Kemp, \"A multimodal anomaly detector for robot-assisted feeding using an lstm-based variational autoencoder,\" *CoRR*, vol. abs/1711.00614, 2017.\n- <span id=\"page-10-11\"></span>[12] B. Zong, Q. Song, M. R. Min, W. Cheng, C. Lumezanu, D. Cho, and H. Chen, \"Deep autoencoding gaussian mixture model for unsupervised anomaly detection,\" in *6th International Conference on Learning Representations*. OpenReview.net, 2018.\n- <span id=\"page-10-12\"></span>[13] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, \"Robust anomaly detection for multivariate time series through stochastic recurrent neural network,\" in *Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining*. ACM, 2019, pp. 2828\u20132837.\n- <span id=\"page-10-13\"></span>[14] F. Angiulli and C. Pizzuti, \"Fast outlier detection in high dimensional spaces,\" in *Principles of Data Mining and Knowledge Discovery, 6th European Conference*, ser. Lecture Notes in Computer Science, vol. 2431. Springer, 2002, pp. 15\u201326.\n- <span id=\"page-10-14\"></span>[15] A. Lazarevic and V. Kumar, \"Feature bagging for outlier detection,\" in *Proceedings of the 11th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining*. ACM, 2005, pp. 157\u2013166.\n- <span id=\"page-10-15\"></span>[16] Y. Liang, Z. Cai, J. Yu, Q. Han, and Y. Li, \"Deep learning based inference of private information using embedded sensors in smart devices,\" *IEEE Netw.*, vol. 32, no. 4, pp. 8\u201314, 2018. [Online]. Available:<https://doi.org/10.1109/MNET.2018.1700349>\n- <span id=\"page-10-16\"></span>[17] H. Zhao, Y. Wang, J. Duan, C. Huang, D. Cao, Y. Tong, B. Xu, J. Bai, J. Tong, and Q. Zhang, \"Multivariate time-series anomaly detection via graph attention network,\" in *20th IEEE International Conference on Data Mining*. IEEE, 2020, pp. 841\u2013850.\n- <span id=\"page-10-17\"></span>[18] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. C. Courville, and Y. Bengio, \"Generative adversarial networks,\" *CoRR*, vol. abs/1406.2661, 2014.\n- <span id=\"page-10-18\"></span>[19] Z. Cai, Z. Xiong, H. Xu, P. Wang, W. Li, and Y. Pan, \"Generative adversarial networks: A survey towards private and secure applications,\" *CoRR*, vol. abs/2106.03785, 2021. [Online]. Available: <https://arxiv.org/abs/2106.03785>\n- <span id=\"page-10-19\"></span>[20] D. Li, D. Chen, J. Goh, and S. Ng, \"Anomaly detection with generative adversarial networks for multivariate time series,\" *CoRR*, vol. abs/1809.04758, 2018.\n\n- <span id=\"page-10-20\"></span>[21] J. Zhou, G. Cui, Z. Zhang, C. Yang, Z. Liu, and M. Sun, \"Graph neural networks: A review of methods and applications,\" *CoRR*, vol. abs/1812.08434, 2018.\n- <span id=\"page-10-21\"></span>[22] P. Velickovic, G. Cucurull, A. Casanova, A. Romero, P. Lio, and ` Y. Bengio, \"Graph attention networks,\" in *6th International Conference on Learning Representations*. OpenReview.net, 2018.\n- <span id=\"page-10-22\"></span>[23] F. Wu, A. H. S. Jr., T. Zhang, C. Fifty, T. Yu, and K. Q. Weinberger, \"Simplifying graph convolutional networks,\" in *Proceedings of the 36th International Conference on Machine Learning*, ser. Proceedings of Machine Learning Research, vol. 97. PMLR, 2019, pp. 6861\u20136871.\n- <span id=\"page-10-23\"></span>[24] Y. Wang, Y. Sun, Z. Liu, S. E. Sarma, M. M. Bronstein, and J. M. Solomon, \"Dynamic graph CNN for learning on point clouds,\" *ACM Trans. Graph.*, vol. 38, no. 5, pp. 146:1\u2013146:12, 2019.\n- <span id=\"page-10-24\"></span>[25] Z. Wu, S. Pan, G. Long, J. Jiang, X. Chang, and C. Zhang, \"Connecting the dots: Multivariate time series forecasting with graph neural networks,\" in *Proceedings of the 26th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining*. ACM, 2020, pp. 753\u2013763.\n- <span id=\"page-10-25\"></span>[26] D. Cao, Y. Wang, J. Duan, C. Zhang, X. Zhu, C. Huang, Y. Tong, B. Xu, J. Bai, J. Tong, and Q. Zhang, \"Spectral temporal graph neural network for multivariate time-series forecasting,\" in *NeurIPS*, 2020.\n- <span id=\"page-10-26\"></span>[27] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, L. Kaiser, and I. Polosukhin, \"Attention is all you need,\" in *NeurIPS*, 2017, pp. 5998\u20136008.\n- <span id=\"page-10-27\"></span>[28] A. Blazquez-Garc \u00b4 \u00b4\u0131a, A. Conde, U. Mori, and J. A. Lozano, \"A review on outlier/anomaly detection in time series data,\" *CoRR*, vol. abs/2002.04236, 2020.\n- <span id=\"page-10-28\"></span>[29] Y. Zhang, Z. Ge, A. G. Greenberg, and M. Roughan, \"Network anomography,\" in *Proceedings of the 5th Internet Measurement Conference, IMC 2005, Berkeley, California, USA, October 19-21, 2005*. USENIX Association, 2005, pp. 317\u2013330.\n- <span id=\"page-10-29\"></span>[30] W. Lu and A. A. Ghorbani, \"Network anomaly detection based on wavelet analysis,\" *EURASIP J. Adv. Signal Process.*, vol. 2009, 2009.\n- <span id=\"page-10-30\"></span>[31] M. Munir, S. A. Siddiqui, A. Dengel, and S. Ahmed, \"Deepant: A deep learning approach for unsupervised anomaly detection in time series,\" *IEEE Access*, vol. 7, pp. 1991\u20132005, 2019.\n- <span id=\"page-10-31\"></span>[32] P. Malhotra, A. Ramakrishnan, G. Anand, L. Vig, P. Agarwal, and G. Shroff, \"Lstm-based encoder-decoder for multi-sensor anomaly detection,\" *CoRR*, vol. abs/1607.00148, 2016.\n- <span id=\"page-10-32\"></span>[33] P. Filonov, A. Lavrentyev, and A. Vorontsov, \"Multivariate industrial time series with cyber-attack simulation: Fault detection using an lstmbased predictive data model,\" *CoRR*, vol. abs/1612.06676, 2016.\n- <span id=\"page-10-33\"></span>[34] A. A. Cook, G. Misirli, and Z. Fan, \"Anomaly detection for iot timeseries data: A survey,\" *IEEE Internet Things J.*, vol. 7, no. 7, pp. 6481\u2013 6494, 2020.\n- <span id=\"page-10-34\"></span>[35] M. Jones, D. Nikovski, M. Imamura, and T. Hirata, \"Exemplar learning for extremely efficient anomaly detection in real-valued time series,\" *Data Min. Knowl. Discov.*, vol. 30, no. 6, pp. 1427\u20131454, 2016.\n- <span id=\"page-10-35\"></span>[36] M. Sakurada and T. Yairi, \"Anomaly detection using autoencoders with nonlinear dimensionality reduction,\" in *Proceedings of the MLSDA 2014 2nd Workshop on Machine Learning for Sensory Data Analysis, Gold Coast, Australia, QLD, Australia, December 2, 2014*, A. Rahman, J. D. Deng, and J. Li, Eds. ACM, 2014, p. 4.\n- <span id=\"page-10-36\"></span>[37] H. Lu, Y. Liu, Z. Fei, and C. Guan, \"An outlier detection algorithm based on cross-correlation analysis for time series dataset,\" *IEEE Access*, vol. 6, pp. 53 593\u201353 610, 2018.\n- <span id=\"page-10-37\"></span>[38] A. Siffer, P. Fouque, A. Termier, and C. Largouet, \"Anomaly detection \u00a8 in streams with extreme value theory,\" in *Proceedings of the 23rd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining*. ACM, 2017, pp. 1067\u20131075.\n- <span id=\"page-10-38\"></span>[39] P. Senin, J. Lin, X. Wang, T. Oates, S. Gandhi, A. P. Boedihardjo, C. Chen, and S. Frankenstein, \"Time series anomaly discovery with grammar-based compression,\" in *Proceedings of the 18th International Conference on Extending Database Technology, EDBT 2015, Brussels, Belgium, March 23-27, 2015*, G. Alonso, F. Geerts, L. Popa, P. Barcelo,\u00b4 J. Teubner, M. Ugarte, J. V. den Bussche, and J. Paredaens, Eds. OpenProceedings.org, 2015, pp. 481\u2013492.\n- <span id=\"page-10-39\"></span>[40] H. N. Akouemo and R. J. Povinelli, \"Data improving in time series using arx and ann models,\" *IEEE Transactions on Power Systems*, vol. 32, no. 5, pp. 3352\u20133359, 2017.\n- <span id=\"page-10-40\"></span>[41] M. Defferrard, X. Bresson, and P. Vandergheynst, \"Convolutional neural networks on graphs with fast localized spectral filtering,\" in *Advances in Neural Information Processing Systems 29: Annual Conference on Neural Information Processing Systems 2016, December 5-10, 2016, Barcelona, Spain*, D. D. Lee, M. Sugiyama, U. von Luxburg, I. Guyon, and R. Garnett, Eds., 2016, pp. 3837\u20133845.\n\n- <span id=\"page-11-0\"></span>[42] C. J. Maddison, D. Tarlow, and T. Minka, \"A\\* sampling,\" in *NeurIPS* , 2014, pp. 3086\u20133094.\n- <span id=\"page-11-1\"></span>[43] E. Jang, S. Gu, and B. Poole, \"Categorical reparameterization with gumbel-softmax,\" in *5th International Conference on Learning Representations*. OpenReview.net, 2017.\n- <span id=\"page-11-2\"></span>[44] C. Rosenbaum, T. Klinger, and M. Riemer, \"Routing networks: Adaptive selection of non-linear functions for multi-task learning,\" in *6th International Conference on Learning Representations*. OpenReview.net, 2018.\n- <span id=\"page-11-3\"></span>[45] Y. Guo, H. Shi, A. Kumar, K. Grauman, T. Rosing, and R. S. Feris, \"Spottune: Transfer learning through adaptive fine-tuning,\" in *IEEE Conference on Computer Vision and Pattern Recognition*. Computer Vision Foundation / IEEE, 2019, pp. 4805\u20134814.\n- <span id=\"page-11-4\"></span>[46] F. Yu and V. Koltun, \"Multi-scale context aggregation by dilated convolutions,\" in *4th International Conference on Learning Representations*, Y. Bengio and Y. LeCun, Eds., 2016.\n- <span id=\"page-11-5\"></span>[47] C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. E. Reed, D. Anguelov, D. Erhan, V. Vanhoucke, and A. Rabinovich, \"Going deeper with convolutions,\" in *IEEE Conference on Computer Vision and Pattern Recognition*. IEEE Computer Society, 2015, pp. 1\u20139.\n- <span id=\"page-11-6\"></span>[48] A. Raganato and J. Tiedemann, \"An analysis of encoder representations in transformer-based machine translation,\" in *EMNLP*. Association for Computational Linguistics, 2018, pp. 287\u2013297.\n- <span id=\"page-11-7\"></span>[49] E. Voita, R. Sennrich, and I. Titov, \"The bottom-up evolution of representations in the transformer: A study with machine translation and language modeling objectives,\" in *EMNLP-IJCNLP*. Association for Computational Linguistics, 2019, pp. 4395\u20134405.\n- <span id=\"page-11-8\"></span>[50] A. Raganato, Y. Scherrer, and J. Tiedemann, \"Fixed encoder selfattention patterns in transformer-based machine translation,\" in *EMNLP*, T. Cohn, Y. He, and Y. Liu, Eds. Association for Computational Linguistics, 2020, pp. 556\u2013568.\n- <span id=\"page-11-9\"></span>[51] Y. Tay, D. Bahri, D. Metzler, D. Juan, Z. Zhao, and C. Zheng, \"Synthesizer: Rethinking self-attention in transformer models,\" *CoRR* , vol. abs/2005.00743, 2020.\n- <span id=\"page-11-10\"></span>[52] Z. Wu, Z. Liu, J. Lin, Y. Lin, and S. Han, \"Lite transformer with long-short range attention,\" in *8th International Conference on Learning Representations*. OpenReview.net, 2020.\n- <span id=\"page-11-11\"></span>[53] F. Wu, A. Fan, A. Baevski, Y. N. Dauphin, and M. Auli, \"Pay less attention with lightweight and dynamic convolutions,\" in *7th International Conference on Learning Representations*. OpenReview.net, 2019.\n- <span id=\"page-11-12\"></span>[54] H. Zhou, S. Zhang, J. Peng, S. Zhang, J. Li, H. Xiong, and W. Zhang, \"Informer: Beyond efficient transformer for long sequence time-series forecasting,\" *CoRR*, vol. abs/2012.07436, 2020.\n- <span id=\"page-11-13\"></span>[55] A. P. Mathur and N. O. Tippenhauer, \"Swat: a water treatment testbed for research and training on ICS security,\" in *2016 International Workshop on Cyber-physical Systems for Smart Water Networks*. IEEE Computer Society, 2016, pp. 31\u201336.\n- <span id=\"page-11-14\"></span>[56] P. O'Neill, D. Entekhabi, E. G. Njoku, and K. H. Kellogg, \"The NASA soil moisture active passive (SMAP) mission: Overview,\" in *IEEE International Geoscience & Remote Sensing Symposium*. IEEE, 2010, pp. 3236\u20133239.\n- <span id=\"page-11-15\"></span>[57] Y. Mirsky, T. Doitshman, Y. Elovici, and A. Shabtai, \"Kitsune: An ensemble of autoencoders for online network intrusion detection,\" in *25th Annual Network and Distributed System Security Symposium*. The Internet Society, 2018.\n- <span id=\"page-11-16\"></span>[58] M. Fey and J. E. Lenssen, \"Fast graph representation learning with pytorch geometric,\" *CoRR*, vol. abs/1903.02428, 2019.",
+  "images": {
+    "_page_2_Figure_1.jpeg": "<PIL.Image.Image image mode=RGB size=1060x668 at 0x2172D08DA30>",
+    "_page_3_Picture_1.jpeg": "<PIL.Image.Image image mode=RGB size=272x233 at 0x2172D08DF40>",
+    "_page_4_Picture_1.jpeg": "<PIL.Image.Image image mode=RGB size=437x368 at 0x2172D08E0F0>",
+    "_page_5_Figure_1.jpeg": "<PIL.Image.Image image mode=RGB size=292x155 at 0x2172D08E060>",
+    "_page_5_Figure_2.jpeg": "<PIL.Image.Image image mode=RGB size=291x154 at 0x2172D08E3C0>",
+    "_page_5_Figure_3.jpeg": "<PIL.Image.Image image mode=RGB size=286x225 at 0x2172D08E600>",
+    "_page_9_Figure_1.jpeg": "<PIL.Image.Image image mode=RGB size=632x411 at 0x2172D08E570>",
+    "_page_9_Figure_2.jpeg": "<PIL.Image.Image image mode=RGB size=729x392 at 0x2172D08DE20>"
+  },
+  "metadata": {
+    "table_of_contents": [
+      {
+        "title": "Learning Graph Structures with Transformer for\nMultivariate Time Series Anomaly Detection in IoT",
+        "heading_level": null,
+        "page_id": 0,
+        "polygon": [
+          [
+            49.0078125,
+            57.62109375
+          ],
+          [
+            561.1961059570312,
+            57.62109375
+          ],
+          [
+            561.1961059570312,
+            110.4320068359375
+          ],
+          [
+            47.8125,
+            110.4320068359375
+          ]
+        ]
+      },
+      {
+        "title": "I. INTRODUCTION",
+        "heading_level": null,
+        "page_id": 0,
+        "polygon": [
+          [
+            134.47265625,
+            492.29296875
+          ],
+          [
+            213.37179565429688,
+            492.29296875
+          ],
+          [
+            213.37179565429688,
+            502.7582702636719
+          ],
+          [
+            134.47265625,
+            502.7582702636719
+          ]
+        ]
+      },
+      {
+        "title": "II. RELATED WORK",
+        "heading_level": null,
+        "page_id": 1,
+        "polygon": [
+          [
+            394.453125,
+            56.4609375
+          ],
+          [
+            480.4651794433594,
+            56.4609375
+          ],
+          [
+            480.4651794433594,
+            66.84600830078125
+          ],
+          [
+            394.453125,
+            66.84600830078125
+          ]
+        ]
+      },
+      {
+        "title": "A. Anomaly Detection in Univariate Time Series",
+        "heading_level": null,
+        "page_id": 1,
+        "polygon": [
+          [
+            309.287109375,
+            162.61956787109375
+          ],
+          [
+            511.7679748535156,
+            161.26171875
+          ],
+          [
+            511.7679748535156,
+            172.58221435546875
+          ],
+          [
+            309.287109375,
+            172.58221435546875
+          ]
+        ]
+      },
+      {
+        "title": "B. Anomaly Detection in Multivariate Time Series",
+        "heading_level": null,
+        "page_id": 1,
+        "polygon": [
+          [
+            309.884765625,
+            459.2275695800781
+          ],
+          [
+            518.4130249023438,
+            457.875
+          ],
+          [
+            518.4130249023438,
+            469.1901550292969
+          ],
+          [
+            309.884765625,
+            469.1901550292969
+          ]
+        ]
+      },
+      {
+        "title": "III. PROBLEM STATEMENT",
+        "heading_level": null,
+        "page_id": 2,
+        "polygon": [
+          [
+            115.5,
+            698.80078125
+          ],
+          [
+            232.5,
+            698.80078125
+          ],
+          [
+            232.5,
+            708.0
+          ],
+          [
+            115.34765625,
+            708.0
+          ]
+        ]
+      },
+      {
+        "title": "IV. METHODOLOGY",
+        "heading_level": null,
+        "page_id": 3,
+        "polygon": [
+          [
+            129.75,
+            243.0
+          ],
+          [
+            218.25,
+            243.0
+          ],
+          [
+            218.25,
+            252.75
+          ],
+          [
+            129.75,
+            252.75
+          ]
+        ]
+      },
+      {
+        "title": "A. Gumbel-Softmax Sampling",
+        "heading_level": null,
+        "page_id": 3,
+        "polygon": [
+          [
+            46.5,
+            578.25
+          ],
+          [
+            171.0,
+            577.37109375
+          ],
+          [
+            171.0,
+            588.0
+          ],
+          [
+            46.5,
+            588.0
+          ]
+        ]
+      },
+      {
+        "title": "B. Influence Propagation via Graph Convolution",
+        "heading_level": null,
+        "page_id": 3,
+        "polygon": [
+          [
+            309.5859375,
+            423.75
+          ],
+          [
+            513.0,
+            423.0703125
+          ],
+          [
+            513.0,
+            433.5
+          ],
+          [
+            309.5859375,
+            433.8984375
+          ]
+        ]
+      },
+      {
+        "title": "C. Hierarchical Dilated Convolution",
+        "heading_level": null,
+        "page_id": 4,
+        "polygon": [
+          [
+            48.0,
+            578.91796875
+          ],
+          [
+            200.25,
+            578.91796875
+          ],
+          [
+            200.25,
+            588.0
+          ],
+          [
+            48.0,
+            588.0
+          ]
+        ]
+      },
+      {
+        "title": "D. More Efficient Multi-branch Transformer",
+        "heading_level": null,
+        "page_id": 4,
+        "polygon": [
+          [
+            310.482421875,
+            419.9765625
+          ],
+          [
+            493.5,
+            418.4296875
+          ],
+          [
+            493.5,
+            429.0
+          ],
+          [
+            310.482421875,
+            429.2578125
+          ]
+        ]
+      },
+      {
+        "title": "E. Anomaly Scoring",
+        "heading_level": null,
+        "page_id": 5,
+        "polygon": [
+          [
+            310.482421875,
+            673.5
+          ],
+          [
+            395.25,
+            672.75
+          ],
+          [
+            395.25,
+            682.9453125
+          ],
+          [
+            310.482421875,
+            683.25
+          ]
+        ]
+      },
+      {
+        "title": "V. EXPERIMENTS",
+        "heading_level": null,
+        "page_id": 6,
+        "polygon": [
+          [
+            135.75,
+            409.5
+          ],
+          [
+            212.25,
+            409.5
+          ],
+          [
+            212.25,
+            418.04296875
+          ],
+          [
+            135.75,
+            418.04296875
+          ]
+        ]
+      },
+      {
+        "title": "A. Datasets",
+        "heading_level": null,
+        "page_id": 6,
+        "polygon": [
+          [
+            47.25,
+            423.0703125
+          ],
+          [
+            98.25,
+            423.0703125
+          ],
+          [
+            98.25,
+            432.75
+          ],
+          [
+            46.318359375,
+            432.75
+          ]
+        ]
+      },
+      {
+        "title": "B. Experimental Setup",
+        "heading_level": null,
+        "page_id": 6,
+        "polygon": [
+          [
+            310.5,
+            455.5546875
+          ],
+          [
+            405.75,
+            455.5546875
+          ],
+          [
+            405.75,
+            465.75
+          ],
+          [
+            310.5,
+            465.75
+          ]
+        ]
+      },
+      {
+        "title": "C. Experimental Results",
+        "heading_level": null,
+        "page_id": 8,
+        "polygon": [
+          [
+            47.8125,
+            351.140625
+          ],
+          [
+            149.02825927734375,
+            351.140625
+          ],
+          [
+            149.02825927734375,
+            362.0583190917969
+          ],
+          [
+            47.8125,
+            362.0583190917969
+          ]
+        ]
+      },
+      {
+        "title": "D. Ablation Studies",
+        "heading_level": null,
+        "page_id": 8,
+        "polygon": [
+          [
+            309.5859375,
+            660.90234375
+          ],
+          [
+            393.2330017089844,
+            660.90234375
+          ],
+          [
+            393.2330017089844,
+            672.3210601806641
+          ],
+          [
+            309.5859375,
+            672.3210601806641
+          ]
+        ]
+      },
+      {
+        "title": "E. Graph Learning and Case Study",
+        "heading_level": null,
+        "page_id": 9,
+        "polygon": [
+          [
+            47.8125,
+            493.7884521484375
+          ],
+          [
+            195.8724822998047,
+            493.06640625
+          ],
+          [
+            195.8724822998047,
+            503.75103759765625
+          ],
+          [
+            47.8125,
+            503.75103759765625
+          ]
+        ]
+      },
+      {
+        "title": "VI. CONCLUSION",
+        "heading_level": null,
+        "page_id": 9,
+        "polygon": [
+          [
+            397.44140625,
+            544.88671875
+          ],
+          [
+            475.8114929199219,
+            544.88671875
+          ],
+          [
+            475.8114929199219,
+            557.4119567871094
+          ],
+          [
+            397.44140625,
+            557.4119567871094
+          ]
+        ]
+      },
+      {
+        "title": "REFERENCES",
+        "heading_level": null,
+        "page_id": 10,
+        "polygon": [
+          [
+            145.529296875,
+            56.8824462890625
+          ],
+          [
+            202.39849853515625,
+            55.6875
+          ],
+          [
+            202.39849853515625,
+            66.84503173828125
+          ],
+          [
+            144.333984375,
+            66.84503173828125
+          ]
+        ]
+      }
+    ],
+    "page_stats": [
+      {
+        "page_id": 0,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            282
+          ],
+          [
+            "Line",
+            103
+          ],
+          [
+            "Text",
+            8
+          ],
+          [
+            "Footnote",
+            3
+          ],
+          [
+            "SectionHeader",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 1,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            293
+          ],
+          [
+            "Line",
+            111
+          ],
+          [
+            "Text",
+            6
+          ],
+          [
+            "ListItem",
+            4
+          ],
+          [
+            "SectionHeader",
+            3
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "ListGroup",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 2,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "Line",
+            106
+          ],
+          [
+            "Span",
+            100
+          ],
+          [
+            "Text",
+            7
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Figure",
+            1
+          ],
+          [
+            "Caption",
+            1
+          ],
+          [
+            "SectionHeader",
+            1
+          ],
+          [
+            "FigureGroup",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 3,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "Span",
+            134
+          ],
+          [
+            "Line",
+            111
+          ],
+          [
+            "Text",
+            8
+          ],
+          [
+            "SectionHeader",
+            3
+          ],
+          [
+            "Equation",
+            3
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Picture",
+            1
+          ],
+          [
+            "Caption",
+            1
+          ],
+          [
+            "PictureGroup",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 4,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "Line",
+            111
+          ],
+          [
+            "Span",
+            81
+          ],
+          [
+            "Text",
+            9
+          ],
+          [
+            "Equation",
+            2
+          ],
+          [
+            "SectionHeader",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Picture",
+            1
+          ],
+          [
+            "Caption",
+            1
+          ],
+          [
+            "PictureGroup",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 5,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "Span",
+            100
+          ],
+          [
+            "Line",
+            86
+          ],
+          [
+            "Text",
+            11
+          ],
+          [
+            "Equation",
+            5
+          ],
+          [
+            "Caption",
+            4
+          ],
+          [
+            "Figure",
+            3
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "SectionHeader",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 6,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "Line",
+            93
+          ],
+          [
+            "Span",
+            62
+          ],
+          [
+            "TableCell",
+            54
+          ],
+          [
+            "Text",
+            10
+          ],
+          [
+            "Equation",
+            6
+          ],
+          [
+            "Caption",
+            3
+          ],
+          [
+            "Table",
+            3
+          ],
+          [
+            "SectionHeader",
+            3
+          ],
+          [
+            "Reference",
+            3
+          ],
+          [
+            "TableGroup",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 7,
+        "text_extraction_method": "surya",
+        "block_counts": [
+          [
+            "TableCell",
+            192
+          ],
+          [
+            "Line",
+            47
+          ],
+          [
+            "Span",
+            13
+          ],
+          [
+            "Text",
+            7
+          ],
+          [
+            "Footnote",
+            3
+          ],
+          [
+            "Caption",
+            2
+          ],
+          [
+            "Table",
+            2
+          ],
+          [
+            "TableGroup",
+            2
+          ],
+          [
+            "Reference",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 8,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            304
+          ],
+          [
+            "Line",
+            112
+          ],
+          [
+            "TableCell",
+            24
+          ],
+          [
+            "Text",
+            6
+          ],
+          [
+            "SectionHeader",
+            2
+          ],
+          [
+            "Reference",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Footnote",
+            1
+          ],
+          [
+            "Caption",
+            1
+          ],
+          [
+            "Table",
+            1
+          ],
+          [
+            "TableGroup",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 9,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            239
+          ],
+          [
+            "Line",
+            84
+          ],
+          [
+            "Text",
+            5
+          ],
+          [
+            "Figure",
+            2
+          ],
+          [
+            "ListItem",
+            2
+          ],
+          [
+            "SectionHeader",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "Caption",
+            1
+          ],
+          [
+            "ListGroup",
+            1
+          ],
+          [
+            "Reference",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 10,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            507
+          ],
+          [
+            "Line",
+            151
+          ],
+          [
+            "ListItem",
+            41
+          ],
+          [
+            "Reference",
+            41
+          ],
+          [
+            "ListGroup",
+            2
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "SectionHeader",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      },
+      {
+        "page_id": 11,
+        "text_extraction_method": "pdftext",
+        "block_counts": [
+          [
+            "Span",
+            195
+          ],
+          [
+            "Line",
+            60
+          ],
+          [
+            "ListItem",
+            17
+          ],
+          [
+            "Reference",
+            17
+          ],
+          [
+            "PageHeader",
+            1
+          ],
+          [
+            "ListGroup",
+            1
+          ]
+        ],
+        "block_metadata": {
+          "llm_request_count": 0,
+          "llm_error_count": 0,
+          "llm_tokens_used": 0,
+          "previous_text": "",
+          "previous_type": "",
+          "previous_order": 0
+        }
+      }
+    ],
+    "debug_data_path": "debug_data\\source"
+  }
+}

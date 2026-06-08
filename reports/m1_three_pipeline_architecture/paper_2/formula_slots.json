@@ -1,0 +1,690 @@
+[
+  {
+    "formula_id": "formula_001",
+    "page": 3,
+    "bbox": [
+      371.25,
+      81.75,
+      563.25,
+      105.0
+    ],
+    "polygon": [
+      [
+        371.25,
+        81.75
+      ],
+      [
+        563.25,
+        81.75
+      ],
+      [
+        563.25,
+        105.0
+      ],
+      [
+        371.25,
+        105.0
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "z^{i,j} = \\underset{c \\in \\{0,1\\}}{\\arg \\max} (\\log \\pi_c^{i,j} + g_c^{i,j})",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_1",
+    "crop_path": "formula_001_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "z^{i,j} = \\underset{c \\in \\{0,1\\}}{\\arg \\max} (\\log \\pi_c^{i,j} + g_c^{i,j})",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_002",
+    "page": 3,
+    "bbox": [
+      353.25,
+      186.75,
+      563.25,
+      223.13671875
+    ],
+    "polygon": [
+      [
+        353.25,
+        186.75
+      ],
+      [
+        563.25,
+        186.75
+      ],
+      [
+        563.25,
+        221.58984375
+      ],
+      [
+        353.25,
+        223.13671875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "z_c^{i,j} = \\frac{\\exp((\\log \\pi_c^{i,j} + g_c^{i,j})/\\tau)}{\\sum_{v \\in \\{0,1\\}} \\exp((\\log \\pi_v^{i,j} + g_v^{i,j})/\\tau)}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_2",
+    "crop_path": "formula_002_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "z_c^{i,j} = \\frac{\\exp((\\log \\pi_c^{i,j} + g_c^{i,j})/\\tau)}{\\sum_{v \\in \\{0,1\\}} \\exp((\\log \\pi_v^{i,j} + g_v^{i,j})/\\tau)}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_003",
+    "page": 3,
+    "bbox": [
+      356.203125,
+      632.25,
+      563.25,
+      659.35546875
+    ],
+    "polygon": [
+      [
+        356.25,
+        634.5
+      ],
+      [
+        563.25,
+        632.25
+      ],
+      [
+        563.25,
+        657.80859375
+      ],
+      [
+        356.203125,
+        659.35546875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{x}_{i}' = \\sum_{j \\in \\mathcal{N}(i)} h_{\\mathbf{\\Theta}}(\\mathbf{x}_{i}||\\mathbf{x}_{j} - \\mathbf{x}_{j}||\\mathbf{x}_{j} + \\mathbf{x}_{i})",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_3_equation_3",
+    "crop_path": "formula_003_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{x}_{i}' = \\sum_{j \\in \\mathcal{N}(i)} h_{\\mathbf{\\Theta}}(\\mathbf{x}_{i}||\\mathbf{x}_{j} - \\mathbf{x}_{j}||\\mathbf{x}_{j} + \\mathbf{x}_{i})",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_004",
+    "page": 4,
+    "bbox": [
+      117.0,
+      474.75,
+      300.0,
+      501.57421875
+    ],
+    "polygon": [
+      [
+        117.0,
+        474.75
+      ],
+      [
+        300.0,
+        475.5
+      ],
+      [
+        300.0,
+        501.0
+      ],
+      [
+        117.0,
+        501.57421875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L}_s = \\sum_{1 \\le i, j \\le M, i \\ne j} \\log \\pi_1^{i,j} \\tag{4}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_4_equation_4",
+    "crop_path": "formula_004_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L}_s = \\sum_{1 \\le i, j \\le M, i \\ne j} \\log \\pi_1^{i,j} \\tag{4}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_005",
+    "page": 4,
+    "bbox": [
+      345.75,
+      686.8125,
+      563.25,
+      714.65625
+    ],
+    "polygon": [
+      [
+        345.75,
+        687.75
+      ],
+      [
+        563.25,
+        686.8125
+      ],
+      [
+        563.25,
+        713.109375
+      ],
+      [
+        345.75,
+        714.65625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\frac{QK^T}{\\sqrt{d_k}}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_4_equation_5",
+    "crop_path": "formula_005_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\frac{QK^T}{\\sqrt{d_k}}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_006",
+    "page": 5,
+    "bbox": [
+      55.58203125,
+      252.52734375,
+      298.23046875,
+      279.59765625
+    ],
+    "polygon": [
+      [
+        56.77734375,
+        254.07421875
+      ],
+      [
+        298.23046875,
+        252.52734375
+      ],
+      [
+        297.03515625,
+        278.05078125
+      ],
+      [
+        55.58203125,
+        279.59765625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "MultiHead(\\mathbf{Q}, \\mathbf{K}, \\mathbf{V}) = Concat(head_1, \\cdots, head_h)W^O",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_6",
+    "crop_path": "formula_006_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "MultiHead(\\mathbf{Q}, \\mathbf{K}, \\mathbf{V}) = Concat(head_1, \\cdots, head_h)W^O",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_007",
+    "page": 5,
+    "bbox": [
+      84.0,
+      301.5,
+      298.529296875,
+      317.49609375
+    ],
+    "polygon": [
+      [
+        84.0,
+        301.5
+      ],
+      [
+        298.529296875,
+        301.5
+      ],
+      [
+        297.333984375,
+        315.94921875
+      ],
+      [
+        84.0,
+        317.49609375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "head_i = Attention(\\mathbf{Q}W_i^Q, \\mathbf{K}W_i^K, \\mathbf{V}W_i^V)",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_7",
+    "crop_path": "formula_007_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "head_i = Attention(\\mathbf{Q}W_i^Q, \\mathbf{K}W_i^K, \\mathbf{V}W_i^V)",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_008",
+    "page": 5,
+    "bbox": [
+      102.19921875,
+      584.71875,
+      299.42578125,
+      595.546875
+    ],
+    "polygon": [
+      [
+        102.75,
+        585.75
+      ],
+      [
+        299.42578125,
+        584.71875
+      ],
+      [
+        298.23046875,
+        594.75
+      ],
+      [
+        102.19921875,
+        595.546875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "Attention(S, V) = Softmax(S)V",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_8",
+    "crop_path": "formula_008_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "Attention(S, V) = Softmax(S)V",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_009",
+    "page": 5,
+    "bbox": [
+      367.5,
+      408.375,
+      563.25,
+      453.234375
+    ],
+    "polygon": [
+      [
+        367.5,
+        409.5
+      ],
+      [
+        563.25,
+        408.375
+      ],
+      [
+        563.25,
+        451.6875
+      ],
+      [
+        367.5,
+        453.234375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{A}^{(1)}, \\mathbf{A}^{(2)}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_9",
+    "crop_path": "formula_009_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{A}^{(1)}, \\mathbf{A}^{(2)}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_010",
+    "page": 5,
+    "bbox": [
+      309.5859375,
+      461.7421875,
+      538.5,
+      473.25
+    ],
+    "polygon": [
+      [
+        309.5859375,
+        462.0
+      ],
+      [
+        538.5,
+        461.7421875
+      ],
+      [
+        538.5,
+        473.25
+      ],
+      [
+        309.5859375,
+        473.25
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathbf{X}^{(1)} \\in \\mathcal{R}^{n \\times d_1}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_5_equation_10",
+    "crop_path": "formula_010_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathbf{X}^{(1)} \\in \\mathcal{R}^{n \\times d_1}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_011",
+    "page": 6,
+    "bbox": [
+      106.5,
+      191.8125,
+      300.75,
+      219.65625
+    ],
+    "polygon": [
+      [
+        106.5,
+        191.8125
+      ],
+      [
+        300.75,
+        191.8125
+      ],
+      [
+        300.75,
+        219.65625
+      ],
+      [
+        106.5,
+        219.65625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\mathcal{L}_{mse} = \\frac{1}{M} \\sum_{t=1}^{n} ||\\mathcal{Y}^{(t)} - \\hat{\\mathcal{Y}}^{(t)}||_{2}^{2}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_11",
+    "crop_path": "formula_011_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\mathcal{L}_{mse} = \\frac{1}{M} \\sum_{t=1}^{n} ||\\mathcal{Y}^{(t)} - \\hat{\\mathcal{Y}}^{(t)}||_{2}^{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_012",
+    "page": 6,
+    "bbox": [
+      117.0,
+      263.7421875,
+      300.75,
+      296.2265625
+    ],
+    "polygon": [
+      [
+        117.0,
+        265.2890625
+      ],
+      [
+        300.75,
+        263.7421875
+      ],
+      [
+        300.75,
+        294.6796875
+      ],
+      [
+        117.0,
+        296.2265625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\hat{\\mathbf{y}}^{(t)} = \\sum_{i=1}^{M} ||\\mathcal{Y}_i^{(t)} - \\hat{\\mathcal{Y}}_i^{(t)}||_2^2",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_12",
+    "crop_path": "formula_012_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\hat{\\mathbf{y}}^{(t)} = \\sum_{i=1}^{M} ||\\mathcal{Y}_i^{(t)} - \\hat{\\mathcal{Y}}_i^{(t)}||_2^2",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_013",
+    "page": 6,
+    "bbox": [
+      371.14453125,
+      509.25,
+      563.25,
+      533.28515625
+    ],
+    "polygon": [
+      [
+        371.14453125,
+        509.25
+      ],
+      [
+        563.25,
+        509.25
+      ],
+      [
+        563.25,
+        533.25
+      ],
+      [
+        371.14453125,
+        533.28515625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\tilde{x} = \\frac{x - \\min X_{train}}{\\max X_{train} - \\min X_{train}} \\tag{12}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_13",
+    "crop_path": "formula_013_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\tilde{x} = \\frac{x - \\min X_{train}}{\\max X_{train} - \\min X_{train}} \\tag{12}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_014",
+    "page": 6,
+    "bbox": [
+      385.5,
+      604.5,
+      563.25,
+      629.578125
+    ],
+    "polygon": [
+      [
+        385.5,
+        604.5
+      ],
+      [
+        563.25,
+        604.5
+      ],
+      [
+        563.25,
+        628.03125
+      ],
+      [
+        385.5,
+        629.578125
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "Precision = \\frac{TP}{TP + FP}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_14",
+    "crop_path": "formula_014_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "Precision = \\frac{TP}{TP + FP}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_015",
+    "page": 6,
+    "bbox": [
+      390.75,
+      632.25,
+      563.25,
+      657.03515625
+    ],
+    "polygon": [
+      [
+        390.75,
+        632.25
+      ],
+      [
+        563.25,
+        632.25
+      ],
+      [
+        563.25,
+        657.0
+      ],
+      [
+        390.75,
+        657.03515625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "Recall = \\frac{TP}{TP + FN}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_15",
+    "crop_path": "formula_015_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "Recall = \\frac{TP}{TP + FN}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_016",
+    "page": 6,
+    "bbox": [
+      373.5,
+      659.25,
+      563.25,
+      685.65234375
+    ],
+    "polygon": [
+      [
+        373.5,
+        659.25
+      ],
+      [
+        563.25,
+        659.25
+      ],
+      [
+        563.25,
+        684.10546875
+      ],
+      [
+        373.5,
+        685.65234375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "F1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}}",
+    "nearby_text_before": "",
+    "nearby_text_after": "",
+    "section": "",
+    "slot_marker": "marker_6_equation_16",
+    "crop_path": "formula_016_p6.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "F1 = 2 \\times \\frac{\\text{Precision} \\times \\text{Recall}}{\\text{Precision} + \\text{Recall}}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  }
+]
