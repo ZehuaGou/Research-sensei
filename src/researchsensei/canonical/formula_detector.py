@@ -65,6 +65,7 @@ class MarkerDocumentFormulaDetector:
         """Use Marker's build_document() to get Equation blocks with bbox."""
         from marker.converters.pdf import PdfConverter
         from marker.models import create_model_dict
+        from marker.schema import BlockTypes
 
         models = create_model_dict()
         converter = PdfConverter(artifact_dict=models)
@@ -75,22 +76,26 @@ class MarkerDocumentFormulaDetector:
         slots: list[FormulaSlot] = []
         formula_counter = 0
 
-        for page in doc.children:
+        # Use doc.pages (list of PageGroup), not doc.children
+        for page in doc.pages:
             page_id = getattr(page, "page_id", 0)
+            # Get blocks from page — use current_children or contained_blocks
+            page_blocks = page.current_children if page.children else []
+
             # Get nearby text for context
             text_blocks = []
-            for block in page.children:
-                block_type = type(block).__name__
-                if block_type == "Text":
+            for block in page_blocks:
+                if block.block_type == BlockTypes.Text:
                     text_blocks.append(getattr(block, "text", ""))
 
             nearby_before = text_blocks[-1] if text_blocks else ""
             nearby_after = ""
 
-            for block in page.children:
-                block_type = type(block).__name__
-                if block_type not in ("Equation", "TextInlineMath"):
+            for block in page_blocks:
+                if block.block_type not in (BlockTypes.Equation, BlockTypes.TextInlineMath):
                     continue
+
+                block_type = block.block_type.name if hasattr(block.block_type, 'name') else str(block.block_type)
 
                 # Get bbox from polygon
                 polygon_obj = getattr(block, "polygon", None)

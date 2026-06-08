@@ -1597,7 +1597,7 @@ class MaterialNormalizer:
 
 def _resolve_formula_slots(
     slots: list[FormulaSlot],
-    text_formula_blocks: list[FormulaBlock],
+    text_formula_blocks: list[FormulaBlock] | list[dict],
 ) -> list[FormulaSlot]:
     """Resolve final_latex and final_origin for each FormulaSlot.
 
@@ -1605,10 +1605,29 @@ def _resolve_formula_slots(
 
     Also cross-references with text-based FormulaBlock entries from body pipeline
     to fill in LaTeX when Marker block doesn't have it.
+    text_formula_blocks can be FormulaBlock objects or dicts from select_best_parser.
     """
+    # Normalize text_formula_blocks to FormulaBlock-like objects
+    normalized: list[FormulaBlock] = []
+    for fb in text_formula_blocks:
+        if isinstance(fb, dict):
+            normalized.append(FormulaBlock(
+                formula_id=fb.get("formula_id", ""),
+                latex=fb.get("latex", ""),
+                raw_formula_text=fb.get("raw_formula_text", ""),
+                is_latex=fb.get("is_latex", True),
+                confidence=fb.get("confidence", 0.7),
+                origin=FormulaOrigin(fb["origin"]) if fb.get("origin") in [e.value for e in FormulaOrigin] else FormulaOrigin.UNKNOWN,
+                section=fb.get("section", ""),
+                page=fb.get("page"),
+                bbox=fb.get("bbox", []),
+            ))
+        else:
+            normalized.append(fb)
+
     # Build a lookup from text-based formula blocks by page and approximate position
     text_by_page: dict[int, list[FormulaBlock]] = {}
-    for fb in text_formula_blocks:
+    for fb in normalized:
         page = fb.page or 0
         text_by_page.setdefault(page, []).append(fb)
 
