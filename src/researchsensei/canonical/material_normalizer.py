@@ -1,6 +1,10 @@
 """M1.4 Material Normalizer — converts raw sources to canonical_paper.md.
 
-M1 must produce a normalized canonical_paper.md for M2 consumption.
+Three-pipeline architecture:
+1. Body pipeline: MarkItDown (default) → PyMuPDF (text fallback) → optional Marker
+2. Formula pipeline: MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
+3. FormulaMerger: body sections + formula slots → canonical_paper.md
+
 Source priority: latex_source > structured_html > marker_pdf > mineru_pdf > pymupdf > low_confidence_text > metadata_only.
 metadata_only cannot enter M2.
 """
@@ -18,6 +22,7 @@ from researchsensei.schemas.canonical import (
     CanonicalPaperFrontMatter,
     CanonicalizationResult,
     FormulaBlock,
+    FormulaSlot,
 )
 from researchsensei.schemas.common import WarningItem
 from researchsensei.schemas.direction import CandidatePaper, ResolvedPaperSource
@@ -68,6 +73,11 @@ _STANDARD_SECTIONS = [
 class MaterialNormalizer:
     """M1 material normalizer: produces canonical_paper.md from raw sources.
 
+    Three-pipeline architecture:
+    1. Body pipeline: MarkItDown (default) → PyMuPDF (text fallback) → optional Marker
+    2. Formula pipeline: MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
+    3. FormulaMerger: body sections + formula slots → canonical_paper.md
+
     Source priority:
     1. latex_source (arXiv source, LaTeX package)
     2. structured_html (HTML/XML, DeepXiv)
@@ -84,6 +94,8 @@ class MaterialNormalizer:
         marker_enabled: bool = False,
         marker_trigger_mode: str = "never",
         marker_timeout_seconds: float = 90.0,
+        formula_detection_enabled: bool = True,
+        formula_crop_enabled: bool = True,
     ) -> None:
         self.formula_region_detector = formula_region_detector
         self.formula_ocr_adapter = formula_ocr_adapter
@@ -93,6 +105,8 @@ class MaterialNormalizer:
         self._marker_enabled = marker_enabled
         self._marker_trigger_mode = marker_trigger_mode
         self._marker_timeout_seconds = marker_timeout_seconds
+        self.formula_detection_enabled = formula_detection_enabled
+        self.formula_crop_enabled = formula_crop_enabled
 
     def normalize(
         self,
@@ -132,6 +146,34 @@ class MaterialNormalizer:
 
         sections, quality_status, quality_reasons = self._repair_and_assess_sections(sections)
 
+        # === FORMULA PIPELINE: detect, crop, resolve ===
+        formula_slots: list[FormulaSlot] = []
+        formula_slot_count = 0
+        formula_crop_count = 0
+        parser_latex_count = 0
+        ocr_latex_count = 0
+        raw_formula_text_count = 0
+        unresolved_formula_count = 0
+
+        if self.formula_detection_enabled and source_priority == SourcePriority.PDF:
+            pdf_path_for_formula = source.local_path if source else None
+            if pdf_path_for_formula and Path(pdf_path_for_formula).exists():
+                formula_slots = self._run_formula_pipeline(
+                    Path(pdf_path_for_formula), formula_blocks, output_dir
+                )
+                # Count by origin
+                for fs in formula_slots:
+                    if fs.final_origin == FormulaOrigin.PARSER_LATEX:
+                        parser_latex_count += 1
+                    elif fs.final_origin == FormulaOrigin.OCR_LATEX:
+                        ocr_latex_count += 1
+                    elif fs.final_origin == FormulaOrigin.RAW_FORMULA_TEXT:
+                        raw_formula_text_count += 1
+                    elif fs.final_origin == FormulaOrigin.UNRESOLVED:
+                        unresolved_formula_count += 1
+                formula_slot_count = len(formula_slots)
+                formula_crop_count = sum(1 for fs in formula_slots if fs.crop_path)
+
         # Determine degradation and M2 gate.
         missing_sections = [s for s in _STANDARD_SECTIONS if not sections.get(s, "").strip()]
         degraded = len(missing_sections) > 3 or quality_status == CanonicalQualityStatus.DEGRADED
@@ -166,6 +208,20 @@ class MaterialNormalizer:
             parser_selection_reason=getattr(self, '_parser_selection_reason', ''),
             # Store detailed scores as JSON
             parser_quality_details_json=json.dumps(getattr(self, '_parser_quality_details', {})),
+            # Body parser selection (three-pipeline)
+            body_selected_parser=parser_used,
+            body_parser_quality_score=getattr(self, '_selected_parser_score', 0.0),
+            body_parser_selection_reason=getattr(self, '_parser_selection_reason', ''),
+            # Formula pipeline metadata
+            formula_detector="marker_document" if formula_slots else "",
+            formula_selected_parser="marker" if formula_slots else "",
+            formula_slot_count=formula_slot_count,
+            formula_crop_count=formula_crop_count,
+            parser_latex_count=parser_latex_count,
+            ocr_latex_count=ocr_latex_count,
+            raw_formula_text_count=raw_formula_text_count,
+            unresolved_formula_count=unresolved_formula_count,
+            canonical_quality_status_formula=_formula_quality_status(formula_slots),
         )
 
         canonical = CanonicalPaper(
@@ -219,8 +275,8 @@ class MaterialNormalizer:
                 formula_blocks=formula_blocks,
             )
 
-        # Generate markdown AFTER all formula updates
-        raw_md = self._render_markdown(canonical)
+        # Generate markdown AFTER all formula updates (new formula slot format)
+        raw_md = self._render_markdown_with_slots(canonical, formula_slots)
         canonical.raw_markdown = raw_md
 
         # Write to file AFTER formula detection and OCR
@@ -230,6 +286,12 @@ class MaterialNormalizer:
             md_path = output_dir / "canonical_paper.md"
             md_path.write_text(raw_md, encoding="utf-8")
             canonical_path = str(md_path)
+
+            # Write formula_slots.json
+            if formula_slots:
+                slots_path = output_dir / "formula_slots.json"
+                slots_data = [fs.model_dump() for fs in formula_slots]
+                slots_path.write_text(json.dumps(slots_data, indent=2, ensure_ascii=False), encoding="utf-8")
 
         # Build adapter info
         adapter_info = self._build_adapter_info()
@@ -553,6 +615,201 @@ class MaterialNormalizer:
 
         reason = payload.get("blocking_reason", "unknown Marker failure")
         return None, f"marker_status=failed ({reason})"
+
+    def _run_formula_pipeline(
+        self,
+        pdf_path: Path,
+        text_formula_blocks: list[FormulaBlock],
+        output_dir: Path | None,
+    ) -> list[FormulaSlot]:
+        """Run the formula pipeline: detect → crop → resolve.
+
+        1. MarkerDocumentFormulaDetector finds Equation blocks with bbox
+        2. FormulaCropper crops formula images
+        3. Resolve final_latex and final_origin via priority merge
+        """
+        from researchsensei.canonical.formula_detector import MarkerDocumentFormulaDetector
+        from researchsensei.canonical.formula_cropper import FormulaCropper
+
+        slots: list[FormulaSlot] = []
+
+        # Step 1: Detect formula positions via Marker build_document()
+        detector = MarkerDocumentFormulaDetector()
+        if detector.is_available():
+            try:
+                slots = detector.detect(pdf_path)
+            except Exception as exc:
+                logger.warning("MarkerDocumentFormulaDetector failed: %s", exc)
+
+        # Step 2: Crop formula images
+        if slots and self.formula_crop_enabled and output_dir:
+            crop_dir = output_dir / "formula_crops"
+            cropper = FormulaCropper()
+            if cropper.is_available():
+                try:
+                    slots = cropper.crop(pdf_path, slots, crop_dir)
+                except Exception as exc:
+                    logger.warning("FormulaCropper failed: %s", exc)
+
+        # Step 3: Resolve final_latex and final_origin via priority merge
+        slots = _resolve_formula_slots(slots, text_formula_blocks)
+
+        return slots
+
+    def _render_markdown_with_slots(
+        self, paper: CanonicalPaper, formula_slots: list[FormulaSlot]
+    ) -> str:
+        """Render canonical_paper.md with new formula slot format.
+
+        Formula blocks use HTML comment metadata + LaTeX code block:
+        <!-- formula_id: formula_001 | origin: parser_latex | ... -->
+        ```latex
+        \\mathcal{L} = ...
+        ```
+
+        Unresolved formulas use:
+        {{FORMULA:formula_002 unresolved}}
+        """
+        lines: list[str] = []
+
+        # YAML front matter
+        fm = paper.front_matter
+        lines.append("---")
+        lines.append(f"paper_id: {fm.paper_id}")
+        lines.append(f'title: "{fm.title}"')
+        if fm.authors:
+            lines.append("authors:")
+            for author in fm.authors:
+                lines.append(f'  - "{author}"')
+        if fm.year:
+            lines.append(f"year: {fm.year}")
+        if fm.venue:
+            lines.append(f'venue: "{fm.venue}"')
+        lines.append(f"source_type: {fm.source_type}")
+        lines.append(f"source_confidence: {fm.source_confidence}")
+        lines.append(f"canonicalization_status: {fm.canonicalization_status.value}")
+        lines.append(f"canonical_quality_status: {fm.canonical_quality_status.value}")
+        lines.append(f"parser_used: {fm.parser_used}")
+        lines.append(f"m2_ready: {'true' if fm.m2_ready else 'false'}")
+        if fm.degradation_reason:
+            lines.append(f'degradation_reason: "{fm.degradation_reason}"')
+        # Parser quality selection fields
+        if fm.parser_candidates:
+            lines.append(f"parser_candidates: {fm.parser_candidates}")
+        if fm.selected_parser:
+            lines.append(f"selected_parser: {fm.selected_parser}")
+        if fm.parser_quality_score > 0:
+            lines.append(f"parser_quality_score: {fm.parser_quality_score:.1f}")
+        if fm.parser_selection_reason:
+            lines.append(f'parser_selection_reason: "{fm.parser_selection_reason}"')
+        # Body parser selection
+        if fm.body_selected_parser:
+            lines.append(f"body_selected_parser: {fm.body_selected_parser}")
+        if fm.body_parser_quality_score > 0:
+            lines.append(f"body_parser_quality_score: {fm.body_parser_quality_score:.1f}")
+        if fm.body_parser_selection_reason:
+            lines.append(f'body_parser_selection_reason: "{fm.body_parser_selection_reason}"')
+        # Formula pipeline metadata
+        if fm.formula_detector:
+            lines.append(f"formula_detector: {fm.formula_detector}")
+        if fm.formula_slot_count > 0:
+            lines.append(f"formula_slot_count: {fm.formula_slot_count}")
+        if fm.formula_crop_count > 0:
+            lines.append(f"formula_crop_count: {fm.formula_crop_count}")
+        if fm.parser_latex_count > 0:
+            lines.append(f"parser_latex_count: {fm.parser_latex_count}")
+        if fm.ocr_latex_count > 0:
+            lines.append(f"ocr_latex_count: {fm.ocr_latex_count}")
+        if fm.raw_formula_text_count > 0:
+            lines.append(f"raw_formula_text_count: {fm.raw_formula_text_count}")
+        if fm.unresolved_formula_count > 0:
+            lines.append(f"unresolved_formula_count: {fm.unresolved_formula_count}")
+        if fm.canonical_quality_status_formula:
+            lines.append(f"canonical_quality_status_formula: {fm.canonical_quality_status_formula}")
+        # Detailed parser quality scores
+        if fm.parser_quality_details_json:
+            try:
+                details = json.loads(fm.parser_quality_details_json)
+                if details:
+                    lines.append("parser_quality_details:")
+                    for parser_name, scores in details.items():
+                        lines.append(f"  {parser_name}:")
+                        for key, value in scores.items():
+                            lines.append(f"    {key}: {value}")
+            except json.JSONDecodeError:
+                pass
+        lines.append("---")
+        lines.append("")
+
+        # Title
+        lines.append(f"# {fm.title}")
+        lines.append("")
+
+        # Sections in standard order
+        for section_name in _STANDARD_SECTIONS:
+            content = paper.sections.get(section_name, "").strip()
+            if content:
+                lines.append(f"## {section_name}")
+                lines.append("")
+                lines.append(content)
+                lines.append("")
+            else:
+                lines.append(f"## {section_name}")
+                lines.append("")
+                lines.append(f"<!-- Section not available: {section_name} -->")
+                lines.append("")
+
+        # Any non-standard sections
+        for section_name, content in paper.sections.items():
+            if section_name not in _STANDARD_SECTIONS and section_name != "Title" and content.strip():
+                lines.append(f"## {section_name}")
+                lines.append("")
+                lines.append(content)
+                lines.append("")
+
+        # Formula blocks (new format with slots)
+        if formula_slots:
+            lines.append("## Formula Blocks")
+            lines.append("")
+            for fs in formula_slots:
+                bbox_str = str(fs.bbox) if fs.bbox else "[]"
+                origin_val = fs.final_origin.value if fs.final_origin else "unresolved"
+                ocr_val = fs.ocr_status.value if hasattr(fs.ocr_status, 'value') else str(fs.ocr_status)
+                unresolved_reason = f" | unresolved_reason: {fs.unresolved_reason}" if fs.unresolved_reason else ""
+                lines.append(
+                    f"<!-- formula_id: {fs.formula_id} | origin: {origin_val} | "
+                    f"section: {fs.section} | page: {fs.page} | bbox: {bbox_str} | "
+                    f"ocr_status: {ocr_val}{unresolved_reason} -->"
+                )
+                if fs.final_latex:
+                    lines.append("```latex")
+                    lines.append(fs.final_latex)
+                    lines.append("```")
+                elif fs.final_origin == FormulaOrigin.UNRESOLVED:
+                    lines.append(f"{{{{FORMULA:{fs.formula_id} unresolved}}}}")
+                else:
+                    lines.append(f"<!-- No formula content for {fs.formula_id} -->")
+                lines.append("")
+        elif paper.formula_blocks:
+            # Fallback to legacy formula block format
+            lines.append("## Formula Blocks")
+            lines.append("")
+            for fb in paper.formula_blocks:
+                bbox_str = str(fb.bbox) if fb.bbox else "[]"
+                lines.append(f"<!-- formula_id: {fb.formula_id} | origin: {fb.origin.value} | section: {fb.section} | page: {fb.page or 'N/A'} | bbox: {bbox_str} | ocr_status: {fb.ocr_status.value} | is_latex: {fb.is_latex} | confidence: {fb.confidence} -->")
+                if fb.origin == FormulaOrigin.RAW_FORMULA_TEXT:
+                    lines.append("```text")
+                    lines.append(fb.raw_formula_text)
+                    lines.append("```")
+                elif fb.is_latex and fb.latex:
+                    lines.append("```latex")
+                    lines.append(fb.latex)
+                    lines.append("```")
+                else:
+                    lines.append(f"<!-- No formula content -->")
+                lines.append("")
+
+        return "\n".join(lines)
 
     def _extract_from_text(
         self, paper: CandidatePaper, source: ResolvedPaperSource | None
@@ -1336,3 +1593,152 @@ class MaterialNormalizer:
             adapter_info=self._build_adapter_info(),
             warnings=["METADATA_ONLY cannot enter M2 deep reading."],
         )
+
+
+def _resolve_formula_slots(
+    slots: list[FormulaSlot],
+    text_formula_blocks: list[FormulaBlock],
+) -> list[FormulaSlot]:
+    """Resolve final_latex and final_origin for each FormulaSlot.
+
+    Priority: source_latex > parser_latex (Marker/MinerU) > ocr_latex > raw_formula_text > unresolved
+
+    Also cross-references with text-based FormulaBlock entries from body pipeline
+    to fill in LaTeX when Marker block doesn't have it.
+    """
+    # Build a lookup from text-based formula blocks by page and approximate position
+    text_by_page: dict[int, list[FormulaBlock]] = {}
+    for fb in text_formula_blocks:
+        page = fb.page or 0
+        text_by_page.setdefault(page, []).append(fb)
+
+    for slot in slots:
+        # Priority 1: source_latex (from LaTeX source — not expected from Marker)
+        # Priority 2: parser_latex from Marker block
+        if slot.marker_latex and slot.marker_latex.strip():
+            slot.final_latex = slot.marker_latex.strip()
+            slot.final_origin = FormulaOrigin.PARSER_LATEX
+            continue
+
+        # Priority 3: Cross-reference with text-based formula blocks
+        page_formulas = text_by_page.get(slot.page, [])
+        matched_fb = _find_matching_text_formula(slot, page_formulas)
+        if matched_fb and matched_fb.latex and matched_fb.latex.strip():
+            slot.final_latex = matched_fb.latex.strip()
+            slot.final_origin = matched_fb.origin
+            if matched_fb.origin == FormulaOrigin.PARSER_LATEX:
+                slot.marker_latex = matched_fb.latex.strip()
+            continue
+
+        # Priority 4: raw_formula_text from marker_text
+        if slot.marker_text and _looks_like_formula(slot.marker_text):
+            slot.final_latex = slot.marker_text.strip()
+            slot.final_origin = FormulaOrigin.RAW_FORMULA_TEXT
+            continue
+
+        # Priority 5: unresolved
+        slot.final_origin = FormulaOrigin.UNRESOLVED
+        slot.unresolved_reason = "no_latex_from_any_source"
+
+    return slots
+
+
+def _find_matching_text_formula(
+    slot: FormulaSlot, page_formulas: list[FormulaBlock]
+) -> FormulaBlock | None:
+    """Find the text-based formula block that best matches a FormulaSlot.
+
+    Uses bbox overlap heuristic: if the text formula has a bbox that overlaps
+    with the slot's bbox, it's a match.
+    """
+    if not page_formulas or not slot.bbox:
+        return None
+
+    slot_area = _bbox_area(slot.bbox)
+    best_match = None
+    best_overlap = 0.0
+
+    for fb in page_formulas:
+        if not fb.bbox:
+            # No bbox — can't match by position, but if only one formula on page, match it
+            if len(page_formulas) == 1:
+                return fb
+            continue
+
+        overlap = _bbox_overlap_ratio(slot.bbox, fb.bbox)
+        if overlap > best_overlap:
+            best_overlap = overlap
+            best_match = fb
+
+    # Require at least 30% overlap for a confident match
+    if best_overlap >= 0.3:
+        return best_match
+
+    # Fallback: if only one formula on page and slot has no match, use it
+    if len(page_formulas) == 1 and best_overlap < 0.3:
+        return page_formulas[0]
+
+    return None
+
+
+def _bbox_area(bbox: list[float]) -> float:
+    """Calculate area of a bbox."""
+    if len(bbox) != 4:
+        return 0.0
+    return max(0, bbox[2] - bbox[0]) * max(0, bbox[3] - bbox[1])
+
+
+def _bbox_overlap_ratio(bbox_a: list[float], bbox_b: list[float]) -> float:
+    """Calculate overlap ratio between two bboxes (intersection / min area)."""
+    if len(bbox_a) != 4 or len(bbox_b) != 4:
+        return 0.0
+
+    x1 = max(bbox_a[0], bbox_b[0])
+    y1 = max(bbox_a[1], bbox_b[1])
+    x2 = min(bbox_a[2], bbox_b[2])
+    y2 = min(bbox_a[3], bbox_b[3])
+
+    if x1 >= x2 or y1 >= y2:
+        return 0.0
+
+    intersection = (x2 - x1) * (y2 - y1)
+    area_a = _bbox_area(bbox_a)
+    area_b = _bbox_area(bbox_b)
+    min_area = min(area_a, area_b)
+
+    if min_area <= 0:
+        return 0.0
+
+    return intersection / min_area
+
+
+def _looks_like_formula(text: str) -> bool:
+    """Check if text looks like a formula (contains math-like patterns)."""
+    import re
+    patterns = [
+        r'\\(?:frac|sum|int|partial|alpha|beta|gamma|delta|mathcal|mathbb|mathrm|sqrt)',
+        r'[=∑√σλτπ∈⊙]',
+        r'\$[^$]+\$',
+        r'R\^?\{',
+        r'\\\[|\\\]',
+    ]
+    return any(re.search(p, text) for p in patterns)
+
+
+def _formula_quality_status(slots: list[FormulaSlot]) -> str:
+    """Determine formula quality status from resolved slots."""
+    if not slots:
+        return "no_formulas"
+
+    total = len(slots)
+    unresolved = sum(1 for s in slots if s.final_origin == FormulaOrigin.UNRESOLVED)
+    resolved = total - unresolved
+
+    if unresolved == 0:
+        return "all_resolved"
+    elif resolved > unresolved:
+        return "mostly_resolved"
+    elif resolved > 0:
+        return "partially_resolved"
+    else:
+        return "all_unresolved"

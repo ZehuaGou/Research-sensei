@@ -83,37 +83,78 @@ Source priority:
 
 **M1 Material Normalization Contract**:
 
+Three-pipeline architecture:
+1. **Body pipeline** — extracts text body from PDF: MarkItDown (default, MIT) → PyMuPDF (text fallback) → optional Marker (text path)
+2. **Formula pipeline** — detects and extracts formulas with positions: MarkerDocumentFormulaDetector (`build_document()` → Equation blocks with bbox) → FormulaSlot → FormulaCropper (PyMuPDF crop)
+3. **FormulaMerger** — merges body sections + formula slots → `canonical_paper.md`
+
 Input:
 - verified candidate metadata
 - best available source artifact
-- parser/layout output from LaTeX source, structured HTML/XML/DeepXiv, PDF parser, MinerU, Marker, or low-confidence text fallback
+- PDF file path
 
 Output:
 - `canonical_paper.md`
-- canonical front matter: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
+- `formula_slots.json` — all detected formula slots with positions, crop paths, OCR status
+- `formula_crops/` — cropped formula images
+- `formula_overlays/` — optional overlay visualizations
+- canonical front matter (see below)
 - canonical sections: Title, Abstract, Introduction, Related Work, Method, Experiments, Conclusion, References when available
-- formula blocks with `formula_id`, `origin`, `section`, `page`, `bbox`, `ocr_status`
+
+FormulaSlot fields (17):
+- `formula_id`: unique ID (e.g. `formula_001`)
+- `page`: 0-indexed page number
+- `bbox`: `[min_x, min_y, max_x, max_y]` in PDF points
+- `polygon`: 4-corner coordinates (clockwise from top-left)
+- `block_type`: `Equation` or `TextInlineMath`
+- `detection_source`: `marker_document`
+- `detection_confidence`: float 0-1
+- `marker_text`: raw text from Marker block
+- `marker_latex`: LaTeX extracted from Marker block (if available)
+- `nearby_text_before`: text before formula in reading order
+- `nearby_text_after`: text after formula in reading order
+- `section`: inferred section name
+- `slot_marker`: Marker block ID
+- `crop_path`: path to cropped formula image (relative to paper output dir)
+- `ocr_latex`: OCR result (only when triggered)
+- `ocr_status`: `not_required`, `cropped`, `ocr_pending`, `ocr_success`, `ocr_failed`, `skipped_by_policy`
+- `final_latex`: resolved LaTeX (after priority merge)
+- `final_origin`: `source_latex` | `parser_latex` | `ocr_latex` | `raw_formula_text` | `unresolved`
+- `unresolved_reason`: reason if unresolved
+
+Formula origin priority: `source_latex` > `parser_latex` (Marker/MinerU) > `ocr_latex` > `raw_formula_text` > `unresolved`
+
+Front matter (extended):
+- existing: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
+- new body parser fields: `body_selected_parser`, `body_parser_quality_score`, `body_parser_selection_reason`
+- new formula fields: `formula_detector`, `formula_selected_parser`, `formula_slot_count`, `formula_crop_count`, `parser_latex_count`, `ocr_latex_count`, `raw_formula_text_count`, `unresolved_formula_count`, `canonical_quality_status`
 
 Status fields:
 - `canonicalization_status`: `SUCCESS`, `DEGRADED`, `BLOCKED`
 - `m2_ready`: boolean
 - `degradation_reason`: list or structured warning reason
-- `formula_ocr_status`: `not_required`, `queued`, `success`, `failed`, `skipped_by_policy`
-- `formula_origin`: `source_latex`, `parser_latex`, `ocr_latex`, `reconstructed`, `unknown`
+- `formula_origin`: `source_latex`, `parser_latex`, `ocr_latex`, `raw_formula_text`, `unresolved`
 
-FormulaRegionDetector:
-- input: PDF parser / layout parser / MinerU / Marker blocks, page images, page metadata
-- output: formula bbox, page, section, detector confidence
-- failure: no bbox, bbox/page mismatch, low confidence, no section alignment
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+MarkerDocumentFormulaDetector:
+- input: PDF file path
+- uses `converter.build_document()` to access internal Document with Equation blocks
+- output: list of FormulaSlot with page, bbox, polygon, block_type, marker_text, marker_latex
+- failure: Marker timeout, no Equation blocks found, bbox out of bounds
+- current status: IMPLEMENTED
 
-FormulaOCRAdapter:
-- input: formula region image, bbox, page, context, OCR config
-- output: OCR LaTeX, OCR confidence, `formula_origin=ocr_latex`, warnings
-- candidates: pix2tex / LaTeX-OCR through adapter
-- failure: timeout, GPU/resource error, low confidence, malformed LaTeX, context mismatch
-- run policy: `formula_ocr_enabled=true`, `default_formula_ocr_mode=on_demand`, `max_formula_ocr_per_paper=3`, `max_formula_ocr_batch=10`
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+FormulaCropper:
+- input: PDF path, FormulaSlot with bbox
+- uses PyMuPDF (`fitz.Rect(bbox)` → `page.get_pixmap(clip=rect, dpi=200)`)
+- output: cropped formula image saved to `formula_crops/`
+- padding: configurable (default 4pt)
+- failure: bbox invalid, crop too small, page out of range
+- current status: IMPLEMENTED
+
+OCR strategy (NOT automatic):
+- Only triggered when Marker block has bbox but no reliable LaTeX
+- OCR result is labeled `ocr_latex`, never `source_latex`
+- pix2tex adapter (currently BLOCKED due to model download)
+- current status: BLOCKED (pix2tex model unavailable)
 
 **Failure contract (source-aware)**:
 - If LaTeX source exists but download fails, record `latex_source_error` and continue to structured_html/pdf only as degraded path.
@@ -998,22 +1039,26 @@ This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 ### M1 / M2 Canonical Formula Chain
 
 **Schema / artifact contract**:
-- `canonical_paper.md`
-- formula block metadata: `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, `formula_context_before`, `formula_context_after`, `formula_ocr_status`, `formula_explanation_status`
+- `canonical_paper.md` with formula blocks
+- `formula_slots.json` — all FormulaSlot entries with positions, crop paths, OCR status
+- formula block metadata in markdown: `formula_id`, `origin`, `section`, `page`, `bbox`, `ocr_status`, `final_origin`
+- formula block format: HTML comment metadata + LaTeX code block, or `{{FORMULA:id unresolved}}` for unresolved
 
 **Live validation contract**:
 - one real paper
-- one real formula region
-- FormulaRegionDetector output when parser/layout source provides bbox
-- FormulaOCRAdapter output when policy triggers
+- MarkerDocumentFormulaDetector produces FormulaSlot entries with bbox
+- FormulaCropper produces cropped images
+- Body pipeline selects best parser independently (MarkItDown/PyMuPDF/Marker)
+- FormulaMerger produces canonical_paper.md with formula slots merged into body
 - M2 reads formula block and preserves origin
 
 **Failure contract**:
 - missing formula origin → formula explanation degraded or blocked
-- OCR failure → `formula_ocr_status=failed`, not silent success
-- `unknown` origin → detailed derivation blocked
+- OCR failure → `ocr_status=failed`, not silent success
+- `unresolved` origin → detailed derivation blocked
+- Marker timeout → body pipeline continues without formula detection
 
-**Current status**: DOC_DESIGNED / NOT_IMPLEMENTED
+**Current status**: IMPLEMENTED (MarkerDocumentFormulaDetector + FormulaCropper + three-pipeline MaterialNormalizer)
 
 ### M2 Survey Deep Reading
 

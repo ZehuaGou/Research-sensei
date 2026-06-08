@@ -103,13 +103,20 @@ class FormulaOrigin(str, Enum):
     SOURCE_LATEX = "source_latex"
     PARSER_LATEX = "parser_latex"
     OCR_LATEX = "ocr_latex"
-    RECONSTRUCTED = "reconstructed"
     RAW_FORMULA_TEXT = "raw_formula_text"
+    UNRESOLVED = "unresolved"
     UNKNOWN = "unknown"
 
 
 class FormulaOcrStatus(str, Enum):
     """Status of formula OCR attempt."""
+    NOT_REQUIRED = "not_required"
+    CROPPED = "cropped"
+    OCR_PENDING = "ocr_pending"
+    OCR_SUCCESS = "ocr_success"
+    OCR_FAILED = "ocr_failed"
+    SKIPPED_BY_POLICY = "skipped_by_policy"
+    # Legacy aliases
     SUCCESS = "success"
     FAILED = "failed"
     UNAVAILABLE = "unavailable"

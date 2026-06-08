@@ -28,11 +28,13 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
-| M1 | canonical_paper.md pipeline | implemented | unit tested | IMPLEMENTED | MaterialNormalizer 已实现，canonical_paper.md 生成已实现，front matter 和 formula block 支持已实现 |
-| M1 | MarkItDownAdapter (default PDF parser) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，0.6-2.9s/paper，内容覆盖 2-4x PyMuPDF，公式检测好，已接入 pipeline 作为默认 PDF parser |
-| M1 | MarkerPdfAdapter (optional heavy) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，~16min/paper，section 结构最好，作为 optional heavy adapter |
+| M1 | canonical_paper.md pipeline (three-pipeline) | implemented | unit tested | IMPLEMENTED | 三阶段架构：Body pipeline (MarkItDown/PyMuPDF/Marker text) + Formula pipeline (MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper) + FormulaMerger → canonical_paper.md |
+| M1 | MarkItDownAdapter (default PDF parser) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，0.6-2.9s/paper，内容覆盖 2-4x PyMuPDF，公式检测好，已接入 Body pipeline 作为默认 PDF parser |
+| M1 | MarkerPdfAdapter (optional heavy) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，~16min/paper，section 结构最好，作为 optional heavy adapter，同时用于 Formula pipeline (build_document → Equation blocks) |
 | M1 | MinerUPdfAdapter (optional heavy) | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | magic-pdf 已安装 (AGPL-3.0)，do_parse API 可用，但 live eval 中未被触发 |
-| M1 | FormulaRegionDetector | implemented | unit tested | DEGRADED_IMPLEMENTED | 基于 PyMuPDF 的文本公式检测已实现，layout-based 检测未实现 |
+| M1 | MarkerDocumentFormulaDetector | implemented | unit tested | IMPLEMENTED | 使用 Marker build_document() 获取 Equation blocks with bbox，输出 FormulaSlot 列表 |
+| M1 | FormulaCropper | implemented | unit tested | IMPLEMENTED | PyMuPDF crop with padding，bbox in PDF points，输出 cropped formula images |
+| M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MarkerDocumentFormulaDetector 取代，保留用于 backward compatibility |
 | M1 | FormulaOCRAdapter / pix2tex | blocked | — | BLOCKED | pix2tex 已安装但模型权重下载太慢 (97.4MB at ~5KB/s)，无法完成 OCR 测试 |
 | M1 | DeepXiv | — | — | BLOCKED | pip 包不存在，无确认的公开 API |
 | M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
@@ -115,9 +117,11 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
-- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、MaterialNormalizer、canonical_paper.md 生成、FormulaRegionDetector（degraded）、A_READ canonical gate。
-- 当前未实现能力包含：FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、MinerU/Marker/DeepXiv adapter、M2 canonical input reader、formula_origin 全链路。
+- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate。
+- 当前未实现能力包含：FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、MinerU/DeepXiv adapter、M2 canonical input reader、formula_origin 全链路。
 - FormulaOCRAdapter 接口已实现，但 OCR 模型未集成，返回 UNAVAILABLE 状态。
+- MarkerDocumentFormulaDetector 使用 Marker build_document() 获取 Equation blocks with bbox，已实现并测试。
+- FormulaCropper 使用 PyMuPDF crop formula regions，已实现并测试。
 - M1 direction exploration and seed paper expansion are NOT complete.
 
 ## External Reference Boundary

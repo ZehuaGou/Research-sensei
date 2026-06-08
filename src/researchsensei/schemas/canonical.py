@@ -16,6 +16,34 @@ from researchsensei.schemas.enums import (
 )
 
 
+class FormulaSlot(SenseiModel):
+    """A detected formula with position, crop path, and resolution status.
+
+    Produced by MarkerDocumentFormulaDetector, enriched by FormulaCropper,
+    and merged into canonical_paper.md by FormulaMerger.
+    """
+
+    formula_id: str = ""  # e.g. "formula_001"
+    page: int = 0  # 0-indexed page number
+    bbox: list[float] = Field(default_factory=list)  # [min_x, min_y, max_x, max_y] in PDF points
+    polygon: list[list[float]] = Field(default_factory=list)  # 4-corner coords (clockwise from top-left)
+    block_type: str = ""  # "Equation" or "TextInlineMath"
+    detection_source: str = "marker_document"  # "marker_document"
+    detection_confidence: float = 0.0  # 0-1
+    marker_text: str = ""  # raw text from Marker block
+    marker_latex: str = ""  # LaTeX extracted from Marker block (if available)
+    nearby_text_before: str = ""  # text before formula in reading order
+    nearby_text_after: str = ""  # text after formula in reading order
+    section: str = ""  # inferred section name
+    slot_marker: str = ""  # Marker block ID
+    crop_path: str = ""  # path to cropped formula image (relative to paper output dir)
+    ocr_latex: str = ""  # OCR result (only when triggered)
+    ocr_status: FormulaOcrStatus = FormulaOcrStatus.NOT_REQUIRED
+    final_latex: str = ""  # resolved LaTeX (after priority merge)
+    final_origin: FormulaOrigin = FormulaOrigin.UNRESOLVED
+    unresolved_reason: str = ""  # reason if unresolved
+
+
 class FormulaBlock(SenseiModel):
     """A formula block in canonical_paper.md."""
 
@@ -80,6 +108,20 @@ class CanonicalPaperFrontMatter(SenseiModel):
     parser_selection_reason: str = ""  # Why this parser was selected
     # Detailed parser quality scores (stored as JSON string for serialization)
     parser_quality_details_json: str = ""  # JSON string of detailed scores
+    # Body parser selection (three-pipeline architecture)
+    body_selected_parser: str = ""  # Body pipeline selected parser
+    body_parser_quality_score: float = 0.0  # Body parser quality score (0-100)
+    body_parser_selection_reason: str = ""  # Why this body parser was selected
+    # Formula pipeline metadata
+    formula_detector: str = ""  # e.g. "marker_document"
+    formula_selected_parser: str = ""  # Parser used for formula detection
+    formula_slot_count: int = 0  # Total FormulaSlot entries detected
+    formula_crop_count: int = 0  # Number of successfully cropped formulas
+    parser_latex_count: int = 0  # Formulas with parser_latex origin
+    ocr_latex_count: int = 0  # Formulas with ocr_latex origin
+    raw_formula_text_count: int = 0  # Formulas with raw_formula_text origin
+    unresolved_formula_count: int = 0  # Formulas with unresolved origin
+    canonical_quality_status_formula: str = ""  # Formula quality status
 
 
 class CanonicalPaper(SenseiModel):

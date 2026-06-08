@@ -417,6 +417,26 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 
 M1 Material Normalization converts the best available source into `canonical_paper.md`. This is the M1→M2 core contract.
 
+**Architecture update (2026-06-08)**: M1 PDF canonicalization is no longer "pick one parser and extract text + formulas". It is now a three-pipeline architecture:
+
+```
+PDF
+  -> Body pipeline
+       MarkItDown / PyMuPDF / optional Marker body output
+       parser quality scoring
+       body_selected_parser
+       sections
+  -> Formula pipeline
+       Marker build_document()
+       Equation/TextInlineMath blocks
+       FormulaSlot(page, bbox, marker_latex/text)
+       FormulaCropper(PyMuPDF crop)
+       FormulaOCRAdapter if needed
+  -> FormulaMerger
+       sections + FormulaSlot + final_latex/unresolved
+       canonical_paper.md
+```
+
 ### Inputs
 
 - verified candidate metadata
@@ -431,7 +451,46 @@ M1 Material Normalization converts the best available source into `canonical_pap
 - normalization warnings
 - `canonicalization_status`
 - `m2_ready`
-- formula block metadata
+- formula slot metadata
+
+### FormulaSlot
+
+FormulaSlot is the core data structure for the formula pipeline. It represents a detected formula region with position, source, and resolution status.
+
+```python
+class FormulaSlot(SenseiModel):
+    formula_id: str                    # unique ID, e.g. "eq_001"
+    page: int                          # 0-indexed page number
+    bbox: list[float]                  # [x1, y1, x2, y2] in PDF points
+    polygon: list[list[float]] | None  # 4-corner coords if available
+    block_type: str                    # "Equation" | "TextInlineMath" | "Math" | "Formula"
+    detection_source: str              # "marker_document" | "mineru" | "pymupdf"
+    detection_confidence: float        # 0-1
+    marker_text: str                   # raw text from Marker block (if any)
+    marker_latex: str                  # LaTeX from Marker block (if any)
+    nearby_text_before: str            # text context before the formula
+    nearby_text_after: str             # text context after the formula
+    section: str                       # matched section name
+    slot_marker: str                   # "marker_equation" | "marker_inlinemath" | "regex" | etc.
+    crop_path: str | None              # path to cropped formula image
+    ocr_latex: str                     # OCR result (if OCR was run)
+    ocr_status: str                    # "not_required" | "success" | "failed" | "skipped_by_policy"
+    final_latex: str                   # final resolved LaTeX
+    final_origin: str                  # "source_latex" | "parser_latex" | "ocr_latex" | "raw_formula_text" | "unresolved"
+    unresolved_reason: str             # why it couldn't be resolved (if unresolved)
+```
+
+### Formula origin priority
+
+```
+source_latex > parser_latex (Marker/MinerU) > ocr_latex > raw_formula_text > unresolved
+```
+
+- `source_latex`: From original LaTeX source (highest confidence)
+- `parser_latex`: From Marker `build_document()` Equation block or MinerU (reliable when block has LaTeX)
+- `ocr_latex`: From FormulaOCRAdapter on cropped image
+- `raw_formula_text`: Extracted from text but no reliable LaTeX
+- `unresolved`: Formula detected but could not be resolved
 
 ### canonical_paper.md front matter
 
@@ -445,9 +504,26 @@ venue:
 source_type:
 source_confidence:
 canonicalization_status:
-parser_used:
+parser_used:                    # legacy, kept for compatibility
 m2_ready:
 degradation_reason:
+
+# Body pipeline
+body_selected_parser:           # "markitdown" | "pymupdf" | "marker"
+body_parser_quality_score:      # 0-100
+body_parser_selection_reason:   # why this parser was selected
+
+# Formula pipeline
+formula_detector:               # "marker_document" | "regex" | "none"
+formula_selected_parser:        # which parser produced the final formula LaTeX
+formula_slot_count:             # total FormulaSlot count
+formula_crop_count:             # how many were cropped
+parser_latex_count:             # formulas with parser-provided LaTeX
+ocr_latex_count:                # formulas resolved via OCR
+raw_formula_text_count:         # formulas with raw text only
+unresolved_formula_count:       # formulas that couldn't be resolved
+
+canonical_quality_status:       # "PASS" | "DEGRADED" | "BLOCKED"
 ---
 ```
 
@@ -466,26 +542,47 @@ The body should preserve these sections when available:
 
 Missing sections remain missing with warnings. Empty generated placeholders are not allowed.
 
-### Formula block format
+### Formula block format in canonical_paper.md
+
+Formulas with resolved LaTeX:
 
 ````markdown
-<!-- formula_id: eq1 | origin: ocr_latex | section: Method | page: 4 | bbox: [x1,y1,x2,y2] | ocr_status: success -->
+<!-- formula_id: eq_001 | page: 3 | bbox: [x1,y1,x2,y2] | source: marker_document | origin: parser_latex | confidence: 0.8 -->
 ```latex
 \mathcal{L} = ...
 ```
 ````
 
-### Formula origin
+Unresolved formulas:
 
-| origin | Meaning | M2 consequence |
-|---|---|---|
-| `source_latex` | From original LaTeX source | High-confidence formula explanation allowed with evidence |
-| `parser_latex` | From structured parser / MathML / PDF parser | Explanation allowed with parser warning |
-| `ocr_latex` | From FormulaOCRAdapter | Explanation allowed with OCR warning and confidence cap |
-| `reconstructed` | Reconstructed by model/rules from context | Speculative explanation only |
-| `unknown` | Formula detected but LaTeX unavailable | Detailed derivation blocked |
+```markdown
+<!-- formula_id: eq_001 | page: 3 | bbox: [...] | source: marker_document | origin: unresolved | reason: OCR failed or disabled -->
+{{FORMULA:eq_001 unresolved}}
+```
 
-### FormulaRegionDetector
+### Marker new role
+
+Marker is no longer just a Markdown parser. Its primary value in M1 is as a **formula position detector**:
+
+**MarkerDocumentFormulaDetector**:
+- Uses `converter.build_document(pdf_path)` to get the internal `Document`
+- Iterates `Page.children` to find `Equation` / `TextInlineMath` / `Math` / `Formula` blocks
+- Extracts `page_id` and `block.polygon.bbox`
+- Extracts `marker_latex` / `marker_text` when available
+
+**Key finding**: `MarkdownOutput` and `JSONRenderer` both discard Equation block positions. The internal `Document` object is the only source of formula position data. The `MarkdownOutput` flattens equations to `$...$` text; `JSONRenderer` inlines them into parent Text blocks.
+
+### OCR strategy
+
+OCR is not run by default on all formulas:
+
+1. **Marker block has reliable LaTeX** → `final_origin = parser_latex` → no OCR needed
+2. **Marker block has bbox but no reliable LaTeX** → crop → OCR:
+   - OCR succeeds → `final_origin = ocr_latex`
+   - OCR fails → `final_origin = unresolved`
+3. **OCR result must never be labeled as `source_latex`** — OCR is a fallback, not a source-quality signal
+
+### FormulaRegionDetector (legacy, superseded by MarkerDocumentFormulaDetector)
 
 Input:
 - parser/layout blocks
@@ -514,7 +611,7 @@ Gate rules:
 - detector failure sets formula extraction status degraded
 - formula explanation is blocked unless a reliable LaTeX source exists from another path
 
-Current status: DOC_DESIGNED / NOT_IMPLEMENTED.
+Current status: Superseded by MarkerDocumentFormulaDetector for PDF sources.
 
 ### FormulaOCRAdapter
 
@@ -535,11 +632,10 @@ Output:
 Candidate implementations:
 - pix2tex / LaTeX-OCR
 
-Trigger conditions:
+Trigger conditions (OCR is NOT automatic):
+- Marker block has bbox but no reliable LaTeX
 - user requests formula explanation
 - M2 marks formula as core top-K
-- parser detected a formula region but did not provide reliable LaTeX
-- `parser_latex` conflicts with surrounding context and requires OCR verification
 - deep reading mode requests formula-level explanation
 
 Run policy:
@@ -564,7 +660,7 @@ Gate rules:
 - OCR result never becomes `source_latex`
 - OCR result cannot silently upgrade to high-confidence explanation
 
-Current status: DOC_DESIGNED / NOT_IMPLEMENTED.
+Current status: IMPLEMENTED (pix2tex adapter exists, model weight download slow).
 
 ### m2_ready gate
 

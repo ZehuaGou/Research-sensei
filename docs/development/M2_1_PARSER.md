@@ -27,11 +27,14 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 
 | 职责 | 归属 | 状态 |
 |---|---|---|
-| PDF / LaTeX / HTML / DeepXiv material normalization | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
-| MinerU / Marker / DeepXiv / LaTeX source adapter | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
-| FormulaRegionDetector | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
-| FormulaOCRAdapter | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
-| `canonical_paper.md` generation | M1 | DOC_DESIGNED / NOT_IMPLEMENTED |
+| PDF / LaTeX / HTML / DeepXiv material normalization (three-pipeline) | M1 | IMPLEMENTED |
+| Body pipeline: MarkItDown / PyMuPDF / Marker text | M1 | IMPLEMENTED |
+| Formula pipeline: MarkerDocumentFormulaDetector + FormulaCropper | M1 | IMPLEMENTED |
+| FormulaMerger: body sections + formula slots → canonical_paper.md | M1 | IMPLEMENTED |
+| MarkerDocumentFormulaDetector (build_document → Equation blocks) | M1 | IMPLEMENTED |
+| FormulaCropper (PyMuPDF crop with padding) | M1 | IMPLEMENTED |
+| FormulaOCRAdapter (pix2tex) | M1 | BLOCKED (model unavailable) |
+| `canonical_paper.md` generation | M1 | IMPLEMENTED |
 | 读取 `canonical_paper.md` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 校验 canonical front matter | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 解析 Markdown section / paragraph / formula blocks | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
@@ -61,7 +64,7 @@ M2.1 must read `canonical_paper.md`. It no longer chooses raw-source parsers as 
 3. **CanonicalBlockBuilder** — converts sections, paragraphs, tables, figures, and formulas into `DocumentBlock`.
 4. **FormulaBlockReader** — preserves `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, context, OCR status, and explanation status.
 
-LaTeXSourceParser, StructuredHTMLParser, MinerUAdapter, MarkerAdapter, DoclingAdapter, GROBIDReferenceAdapter, PyMuPDFLowConfidenceAdapter, FormulaRegionDetector, and FormulaOCRAdapter are M1 material normalization components. M2.1 validates their canonical output.
+LaTeXSourceParser, StructuredHTMLParser, MinerUAdapter, MarkerAdapter, DoclingAdapter, GROBIDReferenceAdapter, PyMuPDFLowConfidenceAdapter, MarkerDocumentFormulaDetector, FormulaCropper, and FormulaOCRAdapter are M1 material normalization components. M2.1 validates their canonical output.
 
 ## 5. 外部项目调研（详细）
 
