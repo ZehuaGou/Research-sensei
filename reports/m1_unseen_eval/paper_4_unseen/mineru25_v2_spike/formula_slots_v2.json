@@ -1,0 +1,200 @@
+[
+  {
+    "formula_id": "formula_001",
+    "page": 4,
+    "bbox": [
+      0.336,
+      0.424,
+      0.826,
+      0.463
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 4",
+    "block_source": "mineru25pro",
+    "mineru_latex": "v _ {i, t} ^ {s} = P (m _ {i} \\rightarrow q _ {t} ^ {s}) = \\frac {e x p (\\langle m _ {i} , q _ {t} ^ {s} \\rangle / \\tau)}{\\sum_ {p = 1} ^ {L} e x p (\\langle m _ {i} , q _ {p} ^ {s} \\rangle / \\tau)}, \\tag {1}\n\\",
+    "final_latex": "v _ {i, t} ^ {s} = P (m _ {i} \\rightarrow q _ {t} ^ {s}) = \\frac {e x p (\\langle m _ {i} , q _ {t} ^ {s} \\rangle / \\tau)}{\\sum_ {p = 1} ^ {L} e x p (\\langle m _ {i} , q _ {p} ^ {s} \\rangle / \\tau)}, \\tag {1}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_002",
+    "page": 4,
+    "bbox": [
+      0.38,
+      0.572,
+      0.826,
+      0.613
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 4",
+    "block_source": "mineru25pro",
+    "mineru_latex": "\\psi = \\sigma \\left(U _ {\\psi} m _ {i} + W _ {\\psi} \\sum_ {t = 1} ^ {L} v _ {i, t} ^ {s} q _ {t} ^ {s}\\right), \\tag {2}\n\\",
+    "final_latex": "\\psi = \\sigma \\left(U _ {\\psi} m _ {i} + W _ {\\psi} \\sum_ {t = 1} ^ {L} v _ {i, t} ^ {s} q _ {t} ^ {s}\\right), \\tag {2}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_003",
+    "page": 4,
+    "bbox": [
+      0.373,
+      0.616,
+      0.826,
+      0.657
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 4",
+    "block_source": "mineru25pro",
+    "mineru_latex": "m _ {i} \\leftarrow (1 - \\psi) \\circ m _ {i} + \\psi \\circ \\sum_ {t = 1} ^ {L} v _ {i, t} ^ {s} q _ {t} ^ {s}, \\tag {3}\n\\",
+    "final_latex": "m _ {i} \\leftarrow (1 - \\psi) \\circ m _ {i} + \\psi \\circ \\sum_ {t = 1} ^ {L} v _ {i, t} ^ {s} q _ {t} ^ {s}, \\tag {3}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_004",
+    "page": 4,
+    "bbox": [
+      0.336,
+      0.781,
+      0.826,
+      0.82
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 4",
+    "block_source": "mineru25pro",
+    "mineru_latex": "w _ {t, i} ^ {s} = P (q _ {t} ^ {s} \\rightarrow m _ {i}) = \\frac {e x p (\\langle m _ {i} , q _ {t} ^ {s} \\rangle / \\tau)}{\\sum_ {j = 1} ^ {M} e x p (\\langle m _ {j} , q _ {t} ^ {s} \\rangle / \\tau)}, \\tag {4}\n\\",
+    "final_latex": "w _ {t, i} ^ {s} = P (q _ {t} ^ {s} \\rightarrow m _ {i}) = \\frac {e x p (\\langle m _ {i} , q _ {t} ^ {s} \\rangle / \\tau)}{\\sum_ {j = 1} ^ {M} e x p (\\langle m _ {j} , q _ {t} ^ {s} \\rangle / \\tau)}, \\tag {4}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_005",
+    "page": 4,
+    "bbox": [
+      0.432,
+      0.872,
+      0.826,
+      0.916
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 4",
+    "block_source": "mineru25pro",
+    "mineru_latex": "\\tilde {q} _ {t} ^ {s} = \\sum_ {i ^ {\\prime} = 1} ^ {M} w _ {t, i ^ {\\prime}} ^ {s} m _ {i ^ {\\prime}}. \\tag {5}\n\\",
+    "final_latex": "\\tilde {q} _ {t} ^ {s} = \\sum_ {i ^ {\\prime} = 1} ^ {M} w _ {t, i ^ {\\prime}} ^ {s} m _ {i ^ {\\prime}}. \\tag {5}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_006",
+    "page": 5,
+    "bbox": [
+      0.4,
+      0.264,
+      0.826,
+      0.305
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 5",
+    "block_source": "mineru25pro",
+    "mineru_latex": "L _ {r e c} = \\frac {1}{N} \\sum_ {s = 1} ^ {N} \\left\\| X ^ {s} - \\hat {X} ^ {s} \\right\\| _ {2} ^ {2}. \\tag {6}\n\\",
+    "final_latex": "L _ {r e c} = \\frac {1}{N} \\sum_ {s = 1} ^ {N} \\left\\| X ^ {s} - \\hat {X} ^ {s} \\right\\| _ {2} ^ {2}. \\tag {6}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_007",
+    "page": 5,
+    "bbox": [
+      0.364,
+      0.388,
+      0.826,
+      0.429
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 5",
+    "block_source": "mineru25pro",
+    "mineru_latex": "L _ {e n t r} = \\frac {1}{N} \\sum_ {s = 1} ^ {N} \\sum_ {t = 1} ^ {L} \\sum_ {i = 1} ^ {M} - w _ {t, i} ^ {s} \\log (w _ {t, i} ^ {s}). \\tag {7}\n\\",
+    "final_latex": "L _ {e n t r} = \\frac {1}{N} \\sum_ {s = 1} ^ {N} \\sum_ {t = 1} ^ {L} \\sum_ {i = 1} ^ {M} - w _ {t, i} ^ {s} \\log (w _ {t, i} ^ {s}). \\tag {7}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_008",
+    "page": 5,
+    "bbox": [
+      0.429,
+      0.473,
+      0.826,
+      0.489
+    ],
+    "section": "Method",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 5",
+    "block_source": "mineru25pro",
+    "mineru_latex": "L = L _ {r e c} + \\lambda L _ {e n t r}, \\tag {8}\n\\",
+    "final_latex": "L = L _ {r e c} + \\lambda L _ {e n t r}, \\tag {8}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_009",
+    "page": 6,
+    "bbox": [
+      0.392,
+      0.267,
+      0.826,
+      0.288
+    ],
+    "section": "Experiments",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 6",
+    "block_source": "mineru25pro",
+    "mineru_latex": "L S D (q _ {t} ^ {s}, m) = \\| q _ {t} ^ {s} - m _ {t} ^ {s, p o s} \\| _ {2} ^ {2} \\tag {9}\n\\",
+    "final_latex": "L S D (q _ {t} ^ {s}, m) = \\| q _ {t} ^ {s} - m _ {t} ^ {s, p o s} \\| _ {2} ^ {2} \\tag {9}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_010",
+    "page": 6,
+    "bbox": [
+      0.382,
+      0.303,
+      0.826,
+      0.333
+    ],
+    "section": "Experiments",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 6",
+    "block_source": "mineru25pro",
+    "mineru_latex": "I S D (X _ {t,:} ^ {s}, \\hat {X} _ {t,:} ^ {s}) = \\left\\| X _ {t,:} ^ {s} - \\hat {X} _ {t,:} ^ {s} \\right\\| _ {2} ^ {2} \\tag {10}\n\\",
+    "final_latex": "I S D (X _ {t,:} ^ {s}, \\hat {X} _ {t,:} ^ {s}) = \\left\\| X _ {t,:} ^ {s} - \\hat {X} _ {t,:} ^ {s} \\right\\| _ {2} ^ {2} \\tag {10}\n\\",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_011",
+    "page": 6,
+    "bbox": [
+      0.257,
+      0.385,
+      0.826,
+      0.404
+    ],
+    "section": "Experiments",
+    "section_confidence": "medium",
+    "section_reason": "page_timeline: page 6",
+    "block_source": "mineru25pro",
+    "mineru_latex": "A (X ^ {s}) = \\text { softmax } \\left([ L S D (q _ {t} ^ {s}, m)",
+    "final_latex": "A (X ^ {s}) = \\text { softmax } \\left([ L S D (q _ {t} ^ {s}, m)",
+    "final_origin": "mineru_latex",
+    "risk_flags": []
+  }
+]
