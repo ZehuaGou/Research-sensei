@@ -31,6 +31,23 @@ def _block(
     )
 
 
+def _reviewed_slots(blocks) -> list[dict]:
+    slots = []
+    for index, block in enumerate((b for b in blocks if b.block_type == "formula"), start=1):
+        slots.append({
+            "formula_id": f"formula_{index:03d}",
+            "block_id": block.block_id,
+            "page": block.page,
+            "bbox": block.bbox,
+            "crop_required": True,
+            "overlay_required": True,
+            "crop_path": f"formula_crops/{block.block_id}.png",
+            "overlay_path": f"formula_overlays/{block.block_id}.png",
+            "source_mismatch": False,
+        })
+    return slots
+
+
 def test_document_block_normalizes_type_bbox_and_identity() -> None:
     from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
 
@@ -146,6 +163,37 @@ def test_quality_gate_blocks_section_contradiction() -> None:
     assert result.section_contradiction_count == 1
 
 
+def test_quality_gate_requires_crop_overlay_when_formula_slots_missing() -> None:
+    from researchsensei.canonical.quality_gate import M1QualityGate
+
+    blocks = [_block("b001", page=3, block_type="formula", latex="x=y", section="Method")]
+
+    result = M1QualityGate().evaluate(blocks, formula_slots=[])
+
+    assert result.status == CanonicalQualityStatus.FAIL
+    assert result.missing_crop_count == 1
+    assert result.missing_overlay_count == 1
+    assert "MISSING_FORMULA_CROP" in result.blocking_reasons
+    assert "MISSING_FORMULA_OVERLAY" in result.blocking_reasons
+
+
+def test_quality_gate_marks_dense_raw_only_formulas_degraded_not_formula_ready() -> None:
+    from researchsensei.canonical.quality_gate import M1QualityGate
+
+    blocks = [
+        _block(f"b{i:03d}", page=3, block_type="formula", text=f"raw formula line {i}: x{i}=y{i}", latex="", section="Method")
+        for i in range(1, 6)
+    ]
+
+    result = M1QualityGate().evaluate(blocks, formula_slots=_reviewed_slots(blocks))
+
+    assert result.status == CanonicalQualityStatus.DEGRADED
+    assert result.m2_ready_for_formula_understanding is False
+    assert result.raw_only_formula_dense is True
+    assert result.high_risk_count >= 1
+    assert "RAW_ONLY_FORMULA_DENSE_NO_LATEX" in result.warning_reasons
+
+
 def test_ollama_client_uses_native_chat_json_schema(monkeypatch) -> None:
     from researchsensei.canonical.ollama_refiner import OllamaStructuredClient
 
@@ -239,7 +287,7 @@ def test_canonical_builder_v2_preserves_formula_identity_and_gate_status(tmp_pat
         _block("b003", page=3, block_type="title", text="3 Method", section="Method"),
         _block("b004", page=3, block_type="formula", latex="x_t=f(h_t)", section="Method"),
     ]
-    gate = M1QualityGate().evaluate(blocks, formula_slots=[])
+    gate = M1QualityGate().evaluate(blocks, formula_slots=_reviewed_slots(blocks))
 
     result = CanonicalBuilderV2().build(
         paper_id="p-test",
@@ -258,12 +306,40 @@ def test_canonical_builder_v2_preserves_formula_identity_and_gate_status(tmp_pat
     assert result.formula_blocks[0].origin == FormulaOrigin.MINERU_LATEX
 
 
+def test_canonical_builder_blocks_m2_formula_understanding_for_raw_only_dense_formulas(tmp_path) -> None:
+    from researchsensei.canonical.canonical_builder_v2 import CanonicalBuilderV2
+    from researchsensei.canonical.quality_gate import M1QualityGate
+
+    blocks = [
+        _block(f"b{i:03d}", page=4, block_type="formula", text=f"raw-only formula {i}: score_t=max e_t", section="Method")
+        for i in range(1, 6)
+    ]
+    quality = M1QualityGate().evaluate(blocks, formula_slots=_reviewed_slots(blocks))
+
+    result = CanonicalBuilderV2().build(
+        paper_id="p-raw-only",
+        title="Raw Formula Paper",
+        blocks=blocks,
+        quality=quality,
+        output_dir=tmp_path,
+    )
+
+    markdown = Path(result.canonical_paper_path).read_text(encoding="utf-8")
+    assert result.canonical_quality_status == CanonicalQualityStatus.DEGRADED
+    assert result.m2_ready is False
+    assert result.m2_ready_for_formula_understanding is False
+    assert "m2_ready: false" in markdown
+    assert "m2_ready_for_formula_understanding: false" in markdown
+    assert "```text" in markdown
+    assert "```latex" not in markdown
+
+
 def test_visual_audit_report_contains_public_metrics(tmp_path) -> None:
     from researchsensei.canonical.quality_gate import M1QualityGate
     from researchsensei.canonical.visual_audit import M1VisualAuditReportGenerator
 
     blocks = [_block("b001", page=3, block_type="formula", latex="x=y", section="Method")]
-    quality = M1QualityGate().evaluate(blocks, formula_slots=[])
+    quality = M1QualityGate().evaluate(blocks, formula_slots=_reviewed_slots(blocks))
 
     report = M1VisualAuditReportGenerator().write(
         output_dir=tmp_path,
@@ -279,6 +355,7 @@ def test_visual_audit_report_contains_public_metrics(tmp_path) -> None:
     assert "formula_count" in html
     assert "ollama_json_invalid" in public
     assert "high_risk_count" in public
+    assert "m2_ready_for_formula_understanding" in public
 
 
 def test_m1_v2_pipeline_orchestrates_refine_gate_build_and_reports(tmp_path) -> None:
@@ -296,6 +373,7 @@ def test_m1_v2_pipeline_orchestrates_refine_gate_build_and_reports(tmp_path) -> 
         title="Pipeline Paper",
         blocks=blocks,
         output_dir=tmp_path,
+        formula_slots=_reviewed_slots(blocks),
     )
 
     assert result.canonicalization.m2_ready is True
@@ -304,6 +382,63 @@ def test_m1_v2_pipeline_orchestrates_refine_gate_build_and_reports(tmp_path) -> 
     assert Path(result.report.html_path).exists()
     assert result.metrics["primary_parser"] == "mineru25pro"
     assert result.metrics["ollama_enabled"] is False
+
+
+def test_m1_v2_pipeline_default_formula_slots_require_crop_overlay(tmp_path) -> None:
+    from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="Abstract"),
+        _block("b002", page=1, text="We study robust anomaly detection."),
+        _block("b003", page=3, block_type="title", text="3 Method"),
+        _block("b004", page=3, block_type="formula", latex="x_t=f(h_t)"),
+    ]
+
+    result = M1V2CanonicalPipeline().run_from_blocks(
+        paper_id="p-missing-review",
+        title="Missing Review Pipeline Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+    )
+
+    assert result.quality.status == CanonicalQualityStatus.FAIL
+    assert result.quality.missing_crop_count == 1
+    assert result.quality.missing_overlay_count == 1
+    assert result.canonicalization.m2_ready is False
+
+
+def test_m1_v2_pipeline_run_pdf_unpacks_mineru_payload_and_records_stats(tmp_path) -> None:
+    from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="Abstract"),
+        _block("b002", page=1, text="Readable abstract text.", section="Abstract"),
+    ]
+
+    class FakeMinerUAdapter:
+        def parse_pdf(self, pdf_path, *, output_dir=None):
+            return blocks, {
+                "stats": {
+                    "parser": "mineru25pro",
+                    "pages": 2,
+                    "total_blocks": len(blocks),
+                    "elapsed_seconds": 0.25,
+                },
+                "pages": [{"page": 1, "blocks": []}, {"page": 2, "blocks": []}],
+            }
+
+    result = M1V2CanonicalPipeline(mineru_adapter=FakeMinerUAdapter()).run_pdf(
+        paper_id="p-run-pdf",
+        title="Run PDF Paper",
+        pdf_path=tmp_path / "source.pdf",
+        output_dir=tmp_path,
+    )
+
+    assert [block.block_id for block in result.blocks] == ["b001", "b002"]
+    assert result.metrics["mineru_raw_payload_parser"] == "mineru25pro"
+    assert result.metrics["mineru_raw_payload_pages"] == 2
+    assert result.metrics["mineru_raw_payload_total_blocks"] == len(blocks)
+    assert result.report.metrics["mineru_raw_payload_total_blocks"] == len(blocks)
 
 
 def test_m1_v2_pipeline_keeps_failed_gate_out_of_m2(tmp_path) -> None:

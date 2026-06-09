@@ -8,7 +8,7 @@
 - parser_selection_reason: Fallback/debug route selected because cached MinerU output is unavailable and report must not claim primary success.
 - parser_quality_score: 0.000
 - canonical_quality_status: DEGRADED
-- degradation_reason: none
+- degradation_reason: MISSING_FORMULA_CROP; MISSING_FORMULA_OVERLAY; MISSING_FORMULA_LATEX; RAW_ONLY_FORMULA_DENSE_NO_LATEX; FORMULA_VISUAL_REVIEW_PENDING
 - canonical_paper_path: canonical_paper.md
 
 ## Parser Quality Table

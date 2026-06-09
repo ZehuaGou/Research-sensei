@@ -5,6 +5,8 @@
 - selected_parser: pymupdf
 - selected_reason: Fallback/debug route selected because cached MinerU output is unavailable and report must not claim primary success.
 - canonical_quality_status: DEGRADED
+- m2_ready: False
+- m2_ready_for_formula_understanding: False
 - canonical_paper: canonical_paper.md
 - visual_audit: visual_audit.html
 - dense_pages: formula_dense_pages.md generated from PyMuPDF page-level text scan; selected pages: [3, 14, 6, 2]

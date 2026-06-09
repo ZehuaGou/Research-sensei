@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Any
 
 from pydantic import Field
 
@@ -56,8 +57,9 @@ class M1V2CanonicalPipeline:
         formula_slots: list[dict] | None = None,
     ) -> M1V2PipelineResult:
         start = time.perf_counter()
-        blocks = self.mineru_adapter.parse_pdf(pdf_path)
+        blocks, raw_payload = self.mineru_adapter.parse_pdf(pdf_path, output_dir=output_dir)
         parse_seconds = time.perf_counter() - start
+        raw_payload_metrics = self._raw_payload_metrics(raw_payload)
         return self.run_from_blocks(
             paper_id=paper_id,
             title=title,
@@ -70,6 +72,7 @@ class M1V2CanonicalPipeline:
                 "primary_parser": "mineru25pro",
                 "parser_runtime_seconds": round(parse_seconds, 3),
                 "mineru_available": True,
+                **raw_payload_metrics,
             },
         )
 
@@ -157,10 +160,31 @@ class M1V2CanonicalPipeline:
                 "block_id": block.block_id,
                 "page": block.page,
                 "bbox": block.bbox,
-                "crop_required": False,
-                "overlay_required": False,
+                "crop_required": True,
+                "overlay_required": True,
                 "crop_path": "",
                 "overlay_path": "",
                 "source_mismatch": False,
+                "review_disabled": False,
             })
         return slots
+
+    def _raw_payload_metrics(self, raw_payload: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(raw_payload, dict):
+            return {"mineru_raw_payload_present": False}
+
+        pages = raw_payload.get("pages")
+        stats = raw_payload.get("stats") if isinstance(raw_payload.get("stats"), dict) else {}
+        metrics: dict[str, Any] = {
+            "mineru_raw_payload_present": True,
+            "mineru_raw_payload_stats": stats,
+        }
+        if isinstance(pages, list):
+            metrics["mineru_raw_payload_pages"] = len(pages)
+            metrics["mineru_raw_payload_total_blocks"] = sum(
+                len(page.get("blocks", [])) for page in pages if isinstance(page, dict)
+            )
+        for key, value in stats.items():
+            if isinstance(value, (str, int, float, bool)):
+                metrics[f"mineru_raw_payload_{key}"] = value
+        return metrics

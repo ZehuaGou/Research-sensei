@@ -103,6 +103,8 @@ PAPERS = [
     ),
 ]
 
+VISUAL_REVIEW_BLOCKING_REASONS = {"MISSING_FORMULA_CROP", "MISSING_FORMULA_OVERLAY"}
+
 
 SECTION_ALIASES = {
     "abstract": "Abstract",
@@ -430,16 +432,20 @@ def formula_slots_for_gate(spec: PaperSpec, out_dir: Path, blocks: list[Canonica
         original = by_id.get(formula_id, {})
         crop_exists = any((out_dir / "formula_crops").glob(f"{formula_id}_*.png"))
         overlay_exists = any((out_dir / "formula_overlays").glob("overlay_page*.png"))
+        crop_path = next((out_dir / "formula_crops").glob(f"{formula_id}_*.png"), None)
+        overlay_path = next((out_dir / "formula_overlays").glob("overlay_page*.png"), None)
+        review_disabled = original.get("review_disabled") is True or str(original.get("review_disabled", "")).lower() == "true"
         slots.append({
             "formula_id": formula_id,
             "block_id": block.block_id,
             "page": block.page,
             "bbox": block.bbox,
-            "crop_required": bool(original),
-            "overlay_required": bool(original),
-            "crop_path": str(next((out_dir / "formula_crops").glob(f"{formula_id}_*.png"), "")) if crop_exists else "",
-            "overlay_path": str(next((out_dir / "formula_overlays").glob("overlay_page*.png"), "")) if overlay_exists else "",
+            "crop_required": not review_disabled,
+            "overlay_required": not review_disabled,
+            "crop_path": str(crop_path) if crop_exists and crop_path else "",
+            "overlay_path": str(overlay_path) if overlay_exists and overlay_path else "",
             "source_mismatch": False,
+            "review_disabled": review_disabled,
         })
     return slots
 
@@ -525,6 +531,13 @@ def metrics_for(spec: PaperSpec, out_dir: Path, blocks: list[CanonicalDocumentBl
         "section_contradiction_count": quality.section_contradiction_count,
         "all_formulas_in_Abstract_suspicious": quality.all_formulas_in_abstract_suspicious,
         "polluted_section_count": quality.polluted_section_count,
+        "missing_crop_count": quality.missing_crop_count,
+        "missing_overlay_count": quality.missing_overlay_count,
+        "raw_only_formula_dense": quality.raw_only_formula_dense,
+        "m2_ready_for_formula_understanding": quality.m2_ready_for_formula_understanding,
+        "formula_understanding_reasons": "; ".join(quality.formula_understanding_reasons) or "none",
+        "blocking_reasons": "; ".join(quality.blocking_reasons) or "none",
+        "warning_reasons": "; ".join(quality.warning_reasons) or "none",
         "high_risk_count": quality.high_risk_count,
         "medium_risk_count": quality.medium_risk_count,
         "low_risk_count": max(quality.low_risk_count, 0),
@@ -631,6 +644,10 @@ def write_formula_review(out_dir: Path, title: str, metrics: dict, blocks: list[
         f"| unknown | 0 |",
         f"| canonical FormulaBlock total | {metrics['formula_count']} |",
         "",
+        f"- m2_ready_for_formula_understanding: {metrics['m2_ready_for_formula_understanding']}",
+        f"- formula_understanding_reasons: {metrics['formula_understanding_reasons']}",
+        f"- raw_only_formula_dense: {metrics['raw_only_formula_dense']}",
+        "",
         "## Formula Samples (from canonical paper)",
         "",
         "| id | origin | is_latex | confidence | source_parser | content |",
@@ -692,6 +709,11 @@ def write_compare_report(out_dir: Path, spec: PaperSpec, metrics: dict, quality)
         f"- bbox_count: {metrics['bbox_count']}",
         f"- crop_exists: {metrics['crop_exists']}",
         f"- overlay_exists: {metrics['overlay_exists']}",
+        f"- missing_crop_count: {metrics['missing_crop_count']}",
+        f"- missing_overlay_count: {metrics['missing_overlay_count']}",
+        f"- raw_only_formula_dense: {metrics['raw_only_formula_dense']}",
+        f"- m2_ready_for_formula_understanding: {metrics['m2_ready_for_formula_understanding']}",
+        f"- formula_understanding_reasons: {metrics['formula_understanding_reasons']}",
         f"- section_contradiction_count: {metrics['section_contradiction_count']}",
         f"- all_formulas_in_Abstract_suspicious: {metrics['all_formulas_in_Abstract_suspicious']}",
         f"- polluted_section_count: {metrics['polluted_section_count']}",
@@ -735,7 +757,7 @@ def write_compare_report(out_dir: Path, spec: PaperSpec, metrics: dict, quality)
         f"- parser_selection_reason: {route_reason(spec)}",
         f"- parser_quality_score: {selected_score}",
         f"- canonical_quality_status: {quality.status.value}",
-        f"- degradation_reason: {'; '.join(quality.blocking_reasons) or 'none'}",
+        f"- degradation_reason: {'; '.join(quality.blocking_reasons + quality.warning_reasons) or 'none'}",
         "- canonical_paper_path: canonical_paper.md",
         "",
         "## Parser Quality Table",
@@ -765,12 +787,25 @@ def _fmt_metric(value: object) -> str:
 
 def route_reason(spec: PaperSpec) -> str:
     if spec.parser_name == "mineru25pro":
-        return "MinerU2.5-Pro cached output preserves formula sections without all-Abstract failure."
+        return "MinerU route verified on paper_4 only; multi-paper MinerU acceptance remains pending."
     if spec.parser_name == "marker_document":
         return "Marker fallback selected because it produced real parser_latex FormulaBlocks for this review case."
     if "Marker formula audit" in spec.route:
         return "PyMuPDF body text plus Marker formula slots selected from stable three-pipeline review artifacts."
     return "Fallback/debug route selected because cached MinerU output is unavailable and report must not claim primary success."
+
+
+def downgrade_visual_review_only_fail_to_degraded(quality) -> None:
+    if quality.status != CanonicalQualityStatus.FAIL:
+        return
+    non_visual_blockers = [reason for reason in quality.blocking_reasons if reason not in VISUAL_REVIEW_BLOCKING_REASONS]
+    if non_visual_blockers:
+        return
+    quality.status = CanonicalQualityStatus.DEGRADED
+    if "FORMULA_VISUAL_REVIEW_PENDING" not in quality.warning_reasons:
+        quality.warning_reasons.append("FORMULA_VISUAL_REVIEW_PENDING")
+    quality.high_risk_count = max(quality.high_risk_count, len(quality.blocking_reasons), 1)
+    quality.medium_risk_count = len(quality.warning_reasons)
 
 
 def build_paper(spec: PaperSpec) -> dict:
@@ -789,15 +824,7 @@ def build_paper(spec: PaperSpec) -> dict:
 
     gate_slots = formula_slots_for_gate(spec, out_dir, blocks)
     quality = M1QualityGate().evaluate(blocks, gate_slots)
-
-    # If cached review artifacts lack crop/overlay paths for raw-text formulas, keep the
-    # canonical paper DEGRADED rather than FAIL. Missing source/crop is still visible in metrics.
-    if spec.parser_name != "mineru25pro" and quality.status == CanonicalQualityStatus.FAIL:
-        filtered = [reason for reason in quality.blocking_reasons if reason not in {"MISSING_FORMULA_CROP", "MISSING_FORMULA_OVERLAY"}]
-        if not filtered:
-            quality.blocking_reasons = []
-            quality.status = CanonicalQualityStatus.DEGRADED
-            quality.high_risk_count = 0
+    downgrade_visual_review_only_fail_to_degraded(quality)
 
     aux_texts = []
     for name in ["markitdown.md", "pymupdf.txt", "marker.md"]:
@@ -836,20 +863,28 @@ def build_paper(spec: PaperSpec) -> dict:
         f"- selected_parser: {spec.parser_name}\n"
         f"- selected_reason: {route_reason(spec)}\n"
         f"- canonical_quality_status: {quality.status.value}\n"
+        f"- m2_ready: {result.m2_ready}\n"
+        f"- m2_ready_for_formula_understanding: {result.m2_ready_for_formula_understanding}\n"
         f"- canonical_paper: {Path(result.canonical_paper_path).name}\n"
         f"- visual_audit: {Path(report.html_path).name}\n"
         f"- dense_pages: formula_dense_pages.md generated from PyMuPDF page-level text scan; selected pages: {[p['page'] for p in dense_pages]}\n"
         f"- unseen_reason: {spec.unseen_reason or 'review paper'}\n",
         encoding="utf-8",
     )
-    return {"spec": spec, "metrics": metrics, "quality": quality.status.value, "m2_ready": result.m2_ready}
+    return {
+        "spec": spec,
+        "metrics": metrics,
+        "quality": quality.status.value,
+        "m2_ready": result.m2_ready,
+        "m2_ready_for_formula_understanding": result.m2_ready_for_formula_understanding,
+    }
 
 
 def write_top_level(rows: list[dict]) -> None:
     lines = [
         "# M1 v2 Acceptance Report",
         "",
-        "Default route decision: MinerU2.5-Pro + RuleBasedStructureRefiner is the primary M1 route when MinerU cached/live output is available. Marker remains fallback/audit baseline. Ollama remains optional and disabled by default because the cached paper_4_unseen evaluation recorded JSON valid=0 / invalid=17, so it did not improve section/context quality reliably.",
+        "Default route decision: MinerU2.5-Pro + RuleBasedStructureRefiner is the primary M1 route, but the MinerU route is verified on paper_4 only. Multi-paper MinerU acceptance remains pending. Fallback reports are allowed for parser review and debugging, but they cannot prove that the primary route is stable. Marker remains fallback/audit baseline. Ollama remains optional and disabled by default because the cached paper_4_unseen evaluation recorded JSON valid=0 / invalid=17, so it did not improve section/context quality reliably.",
         "",
         "Current local Ollama smoke (qwen2.5:0.5b, 12 paper_4 blocks, timeout 20s): available=True, JSON valid=0, invalid=1, timeout=1, changed_by_count=0. This confirms Ollama remains optional/off by default.",
         "",
@@ -859,8 +894,8 @@ def write_top_level(rows: list[dict]) -> None:
         "",
         "## Papers",
         "",
-        "| paper | parser | status | m2_ready | formulas | latex | raw_text | high_risk | coverage |",
-        "| ----- | ------ | ------ | -------- | -------: | ----: | -------: | --------: | -------- |",
+        "| paper | parser | status | m2_ready | formula_m2_ready | formulas | latex | raw_text | high_risk | coverage |",
+        "| ----- | ------ | ------ | -------- | ---------------- | -------: | ----: | -------: | --------: | -------- |",
     ]
     for row in rows:
         spec = row["spec"]
@@ -868,6 +903,7 @@ def write_top_level(rows: list[dict]) -> None:
         coverage_text = "; ".join(f"{k}={v}" for k, v in metrics["core_formula_coverage"].items())
         lines.append(
             f"| {spec.key} | {spec.parser_name} | {row['quality']} | {row['m2_ready']} | "
+            f"{row['m2_ready_for_formula_understanding']} | "
             f"{metrics['formula_count']} | {metrics['latex_count']} | {metrics['raw_formula_text_count']} | "
             f"{metrics['high_risk_count']} | {coverage_text} |"
         )
@@ -875,7 +911,7 @@ def write_top_level(rows: list[dict]) -> None:
         "",
         "## Route Comparison",
         "",
-        "- A MinerU2.5-Pro + RuleBasedStructureRefiner: selected as default when available; paper_4_unseen had 11 formulas distributed Method=8 / Experiments=3 / Abstract=0 in the cached spike.",
+        "- A MinerU2.5-Pro + RuleBasedStructureRefiner: verified on paper_4_unseen only; multi-paper MinerU acceptance is pending.",
         "- B MinerU2.5-Pro + RuleBasedStructureRefiner + Ollama structured refiner: not selected by default; Ollama native /api/chat JSON schema path is implemented, but cached live eval was JSON valid=0 / invalid=17.",
         "- C Marker fallback/audit baseline: retained for parser_latex fallback and visual audit comparison; not primary after all-formulas-in-Abstract blind failure.",
         "- D PyMuPDF/MarkItDown fallback/debug: allowed for review/debug artifacts, raw_formula_text must stay raw_formula_text and is never written as LaTeX.",

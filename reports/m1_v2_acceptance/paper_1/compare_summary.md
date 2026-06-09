@@ -8,7 +8,7 @@
 - parser_selection_reason: Marker fallback selected because it produced real parser_latex FormulaBlocks for this review case.
 - parser_quality_score: 100.000
 - canonical_quality_status: DEGRADED
-- degradation_reason: none
+- degradation_reason: MISSING_FORMULA_CROP; MISSING_FORMULA_OVERLAY; MISSING_FORMULA_LATEX; FORMULA_VISUAL_REVIEW_PENDING
 - canonical_paper_path: canonical_paper.md
 
 ## Parser Quality Table

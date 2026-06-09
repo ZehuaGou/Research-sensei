@@ -8,21 +8,28 @@ canonical_quality_status: DEGRADED
 primary_parser: marker_document
 fallback_used: false
 m2_ready: true
+m2_ready_for_formula_understanding: true
 formula_slot_count: 54
 mineru_latex_count: 0
 raw_formula_text_count: 13
+raw_only_formula_dense: false
 section_contradiction_count: 0
 all_formulas_in_Abstract_suspicious: false
 source_pdf_path: "source.pdf"
 all_formulas_in_Abstract_suspicious: false
 bbox_count: 54
+blocking_reasons: "MISSING_FORMULA_CROP; MISSING_FORMULA_OVERLAY"
 canonical_match: true
 crop_exists: 0
 formula_count: 54
-high_risk_count: 0
+formula_understanding_reasons: "none"
+high_risk_count: 2
 latex_count: 41
 low_risk_count: 0
-medium_risk_count: 1
+m2_ready_for_formula_understanding: true
+medium_risk_count: 2
+missing_crop_count: 54
+missing_overlay_count: 54
 ollama_changed_by_count: 0
 ollama_json_invalid: 0
 ollama_json_valid: 0
@@ -33,10 +40,12 @@ peak_vram_estimate: "not measured"
 polluted_section_count: 0
 primary_parser: "marker_document"
 raw_formula_text_count: 13
+raw_only_formula_dense: false
 route: "C Marker fallback/audit baseline"
 runtime_device: "CPU/cached artifacts"
-runtime_seconds: 0.205
+runtime_seconds: 0.213
 section_contradiction_count: 0
+warning_reasons: "MISSING_FORMULA_LATEX; FORMULA_VISUAL_REVIEW_PENDING"
 ---
 
 # Monte Carlo EM for Deep Time Series Anomaly Detection

@@ -5,7 +5,7 @@
 - paper_id: paper_4_unseen
 - source_pdf_path: source.pdf
 - selected_parser: mineru25pro
-- parser_selection_reason: MinerU2.5-Pro cached output preserves formula sections without all-Abstract failure.
+- parser_selection_reason: MinerU route verified on paper_4 only; multi-paper MinerU acceptance remains pending.
 - parser_quality_score: 88.000
 - canonical_quality_status: PASS
 - degradation_reason: none

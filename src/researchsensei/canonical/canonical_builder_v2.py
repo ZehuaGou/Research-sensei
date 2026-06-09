@@ -66,17 +66,19 @@ class CanonicalBuilderV2:
         (output_dir / "formula_slots.md").write_text(self._render_formula_slots(formula_slots), encoding="utf-8")
 
         status = self._canonical_status(quality.status)
+        m2_ready = self._m2_ready(quality)
         return CanonicalizationResult(
             paper_id=paper_id,
             title=title,
             source_type="pdf",
             source_priority=SourcePriority.PDF,
             preferred_m2_input="pdf",
-            has_valid_deep_reading_source=quality.status != CanonicalQualityStatus.FAIL,
+            has_valid_deep_reading_source=m2_ready,
             canonical_paper_path=str(canonical_path),
             canonicalization_status=status,
             canonical_quality_status=quality.status,
-            m2_ready=quality.status != CanonicalQualityStatus.FAIL,
+            m2_ready=m2_ready,
+            m2_ready_for_formula_understanding=quality.m2_ready_for_formula_understanding,
             degradation_reason="; ".join(quality.blocking_reasons + quality.warning_reasons),
             formula_blocks=formula_blocks,
             warnings=quality.warning_reasons,
@@ -158,13 +160,17 @@ class CanonicalBuilderV2:
             f"canonical_quality_status: {quality.status.value}",
             f"primary_parser: {parser_name}",
             "fallback_used: false",
-            f"m2_ready: {'true' if quality.status != CanonicalQualityStatus.FAIL else 'false'}",
+            f"m2_ready: {'true' if self._m2_ready(quality) else 'false'}",
+            f"m2_ready_for_formula_understanding: {'true' if quality.m2_ready_for_formula_understanding else 'false'}",
             f"formula_slot_count: {len(formula_blocks)}",
             f"mineru_latex_count: {sum(1 for fb in formula_blocks if fb.origin == FormulaOrigin.MINERU_LATEX)}",
             f"raw_formula_text_count: {sum(1 for fb in formula_blocks if fb.origin == FormulaOrigin.RAW_FORMULA_TEXT)}",
+            f"raw_only_formula_dense: {'true' if quality.raw_only_formula_dense else 'false'}",
             f"section_contradiction_count: {quality.section_contradiction_count}",
             f"all_formulas_in_Abstract_suspicious: {'true' if quality.all_formulas_in_abstract_suspicious else 'false'}",
         ]
+        if quality.formula_understanding_reasons:
+            lines.append(f'formula_understanding_reason: "{", ".join(quality.formula_understanding_reasons)}"')
         if source_pdf_path:
             lines.append(f'source_pdf_path: "{source_pdf_path}"')
         for key, value in sorted(metrics.items()):
@@ -215,6 +221,12 @@ class CanonicalBuilderV2:
         if quality == CanonicalQualityStatus.DEGRADED:
             return CanonicalizationStatus.DEGRADED
         return CanonicalizationStatus.SUCCESS
+
+    def _m2_ready(self, quality: M1QualityGateResult) -> bool:
+        return (
+            quality.status != CanonicalQualityStatus.FAIL
+            and quality.m2_ready_for_formula_understanding
+        )
 
     def _render_formula_slots(self, slots: list[dict]) -> str:
         lines = [

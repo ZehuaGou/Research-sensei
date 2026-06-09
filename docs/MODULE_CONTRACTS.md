@@ -139,13 +139,14 @@ FormulaSlot fields (22):
 Formula origin priority: `source_latex` > `mineru_latex` > `marker_latex` > `ocr_latex` > `raw_formula_text` > `unresolved`
 
 Front matter (extended):
-- existing: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
+- existing: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `m2_ready_for_formula_understanding`, `degradation_reason`
 - parser pipeline fields: `primary_parser` ("mineru25pro" | "marker_document"), `fallback_used`, `llama_refined`, `mineru_available`
 - formula fields: `formula_detector`, `formula_slot_count`, `formula_crop_count`, `mineru_latex_count`, `marker_latex_count`, `ocr_latex_count`, `raw_formula_text_count`, `unresolved_formula_count`, `canonical_quality_status`, `structure_audit_status`, `section_contradiction_count`
 
 Status fields:
 - `canonicalization_status`: `SUCCESS`, `DEGRADED`, `BLOCKED`
 - `m2_ready`: boolean
+- `m2_ready_for_formula_understanding`: boolean; false when formulas are raw-text-only at dense scale (`formula_count >= 5` and `latex_count == 0`)
 - `degradation_reason`: list or structured warning reason
 - `formula_origin`: `source_latex`, `parser_latex`, `ocr_latex`, `raw_formula_text`, `unresolved`
 

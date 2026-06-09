@@ -5,6 +5,8 @@
 - selected_parser: marker_document
 - selected_reason: Marker fallback selected because it produced real parser_latex FormulaBlocks for this review case.
 - canonical_quality_status: DEGRADED
+- m2_ready: True
+- m2_ready_for_formula_understanding: True
 - canonical_paper: canonical_paper.md
 - visual_audit: visual_audit.html
 - dense_pages: formula_dense_pages.md generated from PyMuPDF page-level text scan; selected pages: [2, 3, 6, 1]

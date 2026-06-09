@@ -72,19 +72,21 @@ Focused query: "时间序列异常检测 transformer 方法"
 - Classification paper "Improving position encoding of transformers for multivariate time series classification" was excluded from A_READ by LLM relevance judge
 - LLM: mimo-v2.5-pro, 3265 tokens (3 calls: query planning + relevance judge)
 
-## M1 v2 Canonical Acceptance Report (2026-06-09)
+## M1 v2 Canonical Acceptance Report (2026-06-10)
 
 Report path: `reports/m1_v2_acceptance/`
 Bundle path: `reports/m1_v2_acceptance_bundle.zip`
 
-Default route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner when MinerU output is available. Marker remains fallback/audit baseline. PyMuPDF/MarkItDown remain fallback/debug only. Ollama is optional/off by default.
+Default route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner when MinerU output is available, but the MinerU route is verified on paper_4_unseen only and multi-paper MinerU acceptance remains pending. Marker remains fallback/audit baseline. PyMuPDF/MarkItDown reports are fallback/debug evidence only and cannot prove the primary route is stable. Ollama is optional/off by default.
 
 Acceptance set:
-- paper_1 Monte Carlo EM: marker fallback, DEGRADED, m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=0.
-- paper_2 GTA: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=26, latex=0, raw_formula_text=26, high_risk=0.
-- paper_3 EDAD: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=18, latex=0, raw_formula_text=18, high_risk=0.
+- paper_1 Monte Carlo EM: marker fallback, DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
+- paper_2 GTA: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=false, formula_m2_ready=false, formulas=26, latex=0, raw_formula_text=26, high_risk=3.
+- paper_3 EDAD: MarkItDown/PyMuPDF fallback/debug, PASS, m2_ready=true, formula_m2_ready=true, formulas=9, latex=9, raw_formula_text=0, high_risk=0.
 - paper_4_unseen MEMTO: MinerU2.5-Pro cached output, PASS, m2_ready=true, formulas=11, latex=11, raw_formula_text=0, high_risk=0; formulas distribute Method=8 / Experiments=3 / Abstract=0 in the spike report.
-- paper_5_unseen TranAD: live_eval auto-downloaded unseen PDF, PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=129, latex=0, raw_formula_text=129, high_risk=0.
+- paper_5_unseen TranAD: live_eval auto-downloaded unseen PDF, PyMuPDF fallback/debug, DEGRADED, m2_ready=false, formula_m2_ready=false, formulas=129, latex=0, raw_formula_text=129, high_risk=3.
+
+Dense formula sets with `formula_count >= 5` and `latex_count == 0` are raw-text-only evidence: they stay `raw_formula_text`, set `m2_ready_for_formula_understanding=false`, and cannot be reported as formula-understanding-ready.
 
 Ollama evaluation: cached paper_4_unseen eval JSON valid=0 / invalid=17. Current local smoke with qwen2.5:0.5b on 12 paper_4 blocks: available=true, JSON valid=0, invalid=1, timeout=1, changed_by_count=0. Decision: do not enable Ollama by default.
 

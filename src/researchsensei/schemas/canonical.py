@@ -103,6 +103,7 @@ class CanonicalPaperFrontMatter(SenseiModel):
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     parser_used: str = ""
     m2_ready: bool = False
+    m2_ready_for_formula_understanding: bool = True
     degradation_reason: str = ""
     # Parser quality selection fields
     parser_candidates: list[str] = Field(default_factory=list)  # List of parser names evaluated
@@ -160,6 +161,7 @@ class CanonicalizationResult(SenseiModel):
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     m2_ready: bool = False
+    m2_ready_for_formula_understanding: bool = True
     degradation_reason: str = ""
     formula_blocks: list[FormulaBlock] = Field(default_factory=list)
     formula_region_results: list[FormulaRegionResult] = Field(default_factory=list)

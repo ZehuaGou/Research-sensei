@@ -8,21 +8,28 @@ canonical_quality_status: PASS
 primary_parser: mineru25pro
 fallback_used: false
 m2_ready: true
+m2_ready_for_formula_understanding: true
 formula_slot_count: 11
 mineru_latex_count: 11
 raw_formula_text_count: 0
+raw_only_formula_dense: false
 section_contradiction_count: 0
 all_formulas_in_Abstract_suspicious: false
 source_pdf_path: "source.pdf"
 all_formulas_in_Abstract_suspicious: false
 bbox_count: 11
+blocking_reasons: "none"
 canonical_match: true
 crop_exists: 11
 formula_count: 11
+formula_understanding_reasons: "none"
 high_risk_count: 0
 latex_count: 11
 low_risk_count: 0
+m2_ready_for_formula_understanding: true
 medium_risk_count: 0
+missing_crop_count: 0
+missing_overlay_count: 0
 ollama_changed_by_count: 0
 ollama_json_invalid: 17
 ollama_json_valid: 0
@@ -33,10 +40,12 @@ peak_vram_estimate: "not measured"
 polluted_section_count: 0
 primary_parser: "mineru25pro"
 raw_formula_text_count: 0
+raw_only_formula_dense: false
 route: "A MinerU2.5-Pro + RuleBasedStructureRefiner"
 runtime_device: "CPU/cached artifacts"
 runtime_seconds: 0.182
 section_contradiction_count: 0
+warning_reasons: "none"
 ---
 
 # MEMTO: Memory-guided Transformer for Multivariate Time Series Anomaly Detection

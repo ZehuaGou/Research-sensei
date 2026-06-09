@@ -12,7 +12,13 @@ class M1QualityGateResult(SenseiModel):
     status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     blocking_reasons: list[str] = Field(default_factory=list)
     warning_reasons: list[str] = Field(default_factory=list)
+    formula_understanding_reasons: list[str] = Field(default_factory=list)
+    m2_ready_for_formula_understanding: bool = True
     all_formulas_in_abstract_suspicious: bool = False
+    raw_only_formula_dense: bool = False
+    formula_count: int = 0
+    latex_count: int = 0
+    raw_formula_text_count: int = 0
     section_contradiction_count: int = 0
     polluted_section_count: int = 0
     source_mismatch_count: int = 0
@@ -20,6 +26,7 @@ class M1QualityGateResult(SenseiModel):
     missing_bbox_count: int = 0
     missing_crop_count: int = 0
     missing_overlay_count: int = 0
+    review_disabled_count: int = 0
     high_risk_count: int = 0
     medium_risk_count: int = 0
     low_risk_count: int = 0
@@ -31,6 +38,9 @@ class M1QualityGate:
     def evaluate(self, blocks: list[CanonicalDocumentBlock], formula_slots: list[dict]) -> M1QualityGateResult:
         formulas = [block for block in blocks if block.block_type == "formula"]
         result = M1QualityGateResult(status=CanonicalQualityStatus.PASS)
+        result.formula_count = len(formulas)
+        result.latex_count = sum(1 for block in formulas if block.latex.strip())
+        result.raw_formula_text_count = sum(1 for block in formulas if block.text.strip() and not block.latex.strip())
 
         if len(formulas) >= 5 and all(block.section == "Abstract" for block in formulas):
             result.all_formulas_in_abstract_suspicious = True
@@ -56,13 +66,27 @@ class M1QualityGate:
         if result.missing_bbox_count:
             result.blocking_reasons.append("MISSING_FORMULA_BBOX")
 
-        for slot in formula_slots:
+        if len(formulas) >= 5 and result.latex_count == 0:
+            result.raw_only_formula_dense = True
+            result.m2_ready_for_formula_understanding = False
+            reason = "RAW_ONLY_FORMULA_DENSE_NO_LATEX"
+            result.warning_reasons.append(reason)
+            result.formula_understanding_reasons.append(reason)
+
+        slots_by_block_id = {str(slot.get("block_id", "")): slot for slot in formula_slots if slot.get("block_id")}
+        slots_by_formula_id = {str(slot.get("formula_id", "")): slot for slot in formula_slots if slot.get("formula_id")}
+        for index, block in enumerate(formulas, start=1):
+            formula_id = f"formula_{index:03d}"
+            slot = slots_by_block_id.get(block.block_id) or slots_by_formula_id.get(formula_id) or {}
+            if slot.get("review_disabled") is True:
+                result.review_disabled_count += 1
+                continue
             if slot.get("crop_required", True) and not slot.get("crop_path"):
                 result.missing_crop_count += 1
             if slot.get("overlay_required", True) and not slot.get("overlay_path"):
                 result.missing_overlay_count += 1
-            if slot.get("source_mismatch"):
-                result.source_mismatch_count += 1
+
+        result.source_mismatch_count = sum(1 for slot in formula_slots if slot.get("source_mismatch"))
 
         if result.source_mismatch_count:
             result.blocking_reasons.append("SOURCE_MISMATCH")
@@ -71,9 +95,9 @@ class M1QualityGate:
         if result.missing_overlay_count:
             result.blocking_reasons.append("MISSING_FORMULA_OVERLAY")
 
-        result.high_risk_count = len(result.blocking_reasons)
+        result.high_risk_count = len(result.blocking_reasons) + (1 if result.raw_only_formula_dense else 0)
         result.medium_risk_count = len(result.warning_reasons)
-        result.low_risk_count = sum(len(block.risk_flags) for block in blocks) - result.high_risk_count
+        result.low_risk_count = max(0, sum(len(block.risk_flags) for block in blocks) - result.high_risk_count)
 
         if result.blocking_reasons:
             result.status = CanonicalQualityStatus.FAIL

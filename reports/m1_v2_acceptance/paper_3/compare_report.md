@@ -11,10 +11,15 @@
 - bbox_count: 9
 - crop_exists: 9
 - overlay_exists: 5
+- missing_crop_count: 0
+- missing_overlay_count: 0
+- raw_only_formula_dense: False
+- m2_ready_for_formula_understanding: True
+- formula_understanding_reasons: none
 - section_contradiction_count: 0
 - all_formulas_in_Abstract_suspicious: False
 - polluted_section_count: 0
-- runtime_seconds: 0.414
+- runtime_seconds: 0.433
 - runtime_device: CPU/cached artifacts
 - ollama_json_valid: 0
 - ollama_json_invalid: 0

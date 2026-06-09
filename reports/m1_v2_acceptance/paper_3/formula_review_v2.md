@@ -11,6 +11,10 @@
 | unknown | 0 |
 | canonical FormulaBlock total | 9 |
 
+- m2_ready_for_formula_understanding: True
+- formula_understanding_reasons: none
+- raw_only_formula_dense: False
+
 ## Formula Samples (from canonical paper)
 
 | id | origin | is_latex | confidence | source_parser | content |
