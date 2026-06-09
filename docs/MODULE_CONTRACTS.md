@@ -83,7 +83,7 @@ Source priority:
 
 **M1 Material Normalization Contract**:
 
-Canonical pipeline v2 (MinerU2.5-Pro primary + Llama refiner + Marker fallback):
+Canonical pipeline v2 (MinerU2.5-Pro primary + optional Ollama/Llama refiner + Marker fallback):
 1. **MinerU2.5-Pro adapter** (PRIMARY) — `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`, outputs page/block JSON with bbox/latex/reading_order
 2. **StructureRefiner** — RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional, local)
 3. **CanonicalBuilder** — `canonical_paper.md`, `formula_slots.json`, visual audit
@@ -93,7 +93,7 @@ v1 fallback (Marker three-pipeline, retained as audit baseline):
 2. **Formula pipeline** — MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
 3. **FormulaMerger** — sections + FormulaSlot → `canonical_paper.md`
 
-**IMPORTANT**: The current code's `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). This is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The v2 adapter must use the new MinerU2.5-Pro model.
+**IMPORTANT**: MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The current code's legacy `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). magic_pdf/do_parse is not an equivalent implementation. The v2 adapter must use the new MinerU2.5-Pro model.
 
 Input:
 - verified candidate metadata
@@ -157,36 +157,40 @@ MarkerDocumentFormulaDetector:
 - current status: IMPLEMENTED
 - new role: fallback formula detector and audit baseline (not primary parser in v2)
 
-MinerU25ProAdapter (DOC_DESIGNED / NOT_IMPLEMENTED):
+MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`
 - input: PDF path or page image
 - output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
 - NOT the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
 - failure: model unavailable, GPU OOM, parse error
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+- current status: IMPLEMENTED / UNIT_TESTED; real multi-paper acceptance report pending
 
-DocumentBlock (DOC_DESIGNED / NOT_IMPLEMENTED):
+DocumentBlock (IMPLEMENTED / UNIT_TESTED):
 - fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
 - consumed by M2.1 as evidence-ready input
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+- current status: IMPLEMENTED / UNIT_TESTED
 
-LlamaSectionRefiner (DOC_DESIGNED / NOT_IMPLEMENTED):
+OllamaSectionRefiner / LlamaSectionRefiner (IMPLEMENTED / UNIT_TESTED, OPTIONAL):
 - input: blocks from MinerU / Marker / PyMuPDF
 - output: strict JSON with refined section, section_confidence, section_reason, reading_order_warning, formula_context_reason, risk_flags
-- forbidden: modify formula_latex, bbox, page, source_pdf identity, paper metadata
+- forbidden: modify formula_latex, bbox, page, source identity, paper metadata
 - if Llama output invalid JSON: fallback to RuleBasedStructureRefiner, record risk
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+- current status: IMPLEMENTED / UNIT_TESTED. Ollama is an optional structured refiner. Ollama must not modify latex, bbox, page, or source identity.
 
-StructureRefiner (DOC_DESIGNED / NOT_IMPLEMENTED):
+StructureRefiner (IMPLEMENTED / UNIT_TESTED):
 - two layers: RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional)
 - priority: MinerU sections → rule-based sanity → optional Llama → audit gate
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+- current status: IMPLEMENTED / UNIT_TESTED
 
 M1 Quality Gate:
+- M1 gate blocks all-formulas-in-Abstract
+- M1 gate blocks section contradiction
+- M1 gate blocks source mismatch
+- M1 gate blocks missing latex/crop/overlay
 - checks: source/title, formula bbox/crop/overlay, latex/canonical match, section_contradiction, all_formulas_same_section_suspicious, abstract_formula_overload, fallback_used, llama_refined
 - hard rule: 5+ formulas all in Abstract for method paper → HIGH risk / BLOCKED
 - hard rule: Llama modifies formula_latex/page/bbox → BLOCKED (越权)
-- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+- current status: IMPLEMENTED / UNIT_TESTED; real multi-paper acceptance report pending
 
 FormulaCropper:
 - input: PDF path, FormulaSlot with bbox

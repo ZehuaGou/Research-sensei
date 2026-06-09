@@ -297,7 +297,11 @@ class MarkerPdfAdapter:
 
 
 class MinerUPdfAdapter:
-    """Adapter for MinerU (magic-pdf) PDF parsing.
+    """Legacy adapter for MinerU (magic-pdf) PDF parsing.
+
+    This is the old magic-pdf/do_parse path. It is not equivalent to
+    MinerU2.5-Pro via mineru-vl-utils and must not be treated as the M1 v2
+    primary parser. Use MinerU25ProAdapter for the formal v2 path.
 
     MinerU provides PDF parsing with formula-to-LaTeX and table-to-HTML conversion.
     License: AGPL-3.0.

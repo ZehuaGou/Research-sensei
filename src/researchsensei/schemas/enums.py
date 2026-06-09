@@ -101,6 +101,8 @@ class CanonicalQualityStatus(str, Enum):
 class FormulaOrigin(str, Enum):
     """Origin of formula content in canonical_paper.md."""
     SOURCE_LATEX = "source_latex"
+    MINERU_LATEX = "mineru_latex"
+    MARKER_LATEX = "marker_latex"
     PARSER_LATEX = "parser_latex"
     OCR_LATEX = "ocr_latex"
     RAW_FORMULA_TEXT = "raw_formula_text"

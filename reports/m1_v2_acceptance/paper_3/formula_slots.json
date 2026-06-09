@@ -1,0 +1,182 @@
+[
+  {
+    "formula_id": "formula_001",
+    "block_id": "formula_001",
+    "page": 3,
+    "bbox": [
+      184.5,
+      306.0,
+      504.75,
+      351.140625
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "exact_match: method",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\begin{split} \\mathcal{Z}^{l} &= \\text{Layer-Norm} \\Big( \\text{Anomaly-Attention}(\\mathcal{X}^{l-1}) + \\mathcal{X}^{l-1} \\Big) \\\\ \\mathcal{X}^{l} &= \\text{Layer-Norm} \\Big( \\text{Feed-Forward}(\\mathcal{Z}^{l}) + \\mathcal{Z}^{l} \\Big), \\end{split} \\tag{1}",
+    "final_latex": "\\begin{split} \\mathcal{Z}^{l} &= \\text{Layer-Norm} \\Big( \\text{Anomaly-Attention}(\\mathcal{X}^{l-1}) + \\mathcal{X}^{l-1} \\Big) \\\\ \\mathcal{X}^{l} &= \\text{Layer-Norm} \\Big( \\text{Feed-Forward}(\\mathcal{Z}^{l}) + \\mathcal{Z}^{l} \\Big), \\end{split} \\tag{1}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_002",
+    "block_id": "formula_002",
+    "page": 3,
+    "bbox": [
+      145.5,
+      531.75,
+      504.75,
+      628.5
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "nearby_text_heading: 3 METHOD",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{Q}, \\mathcal{K}, \\mathcal{V}, \\sigma = \\mathcal{X}^{l-1}W_{\\mathcal{Q}}^{l}, \\mathcal{X}^{l-1}W_{\\mathcal{K}}^{l}, \\mathcal{X}^{l-1}W_{\\mathcal{V}}^{l}, \\mathcal{X}^{l-1}W_{\\sigma}^{l}",
+    "final_latex": "\\mathcal{Q}, \\mathcal{K}, \\mathcal{V}, \\sigma = \\mathcal{X}^{l-1}W_{\\mathcal{Q}}^{l}, \\mathcal{X}^{l-1}W_{\\mathcal{K}}^{l}, \\mathcal{X}^{l-1}W_{\\mathcal{V}}^{l}, \\mathcal{X}^{l-1}W_{\\sigma}^{l}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_003",
+    "block_id": "formula_003",
+    "page": 4,
+    "bbox": [
+      159.0,
+      357.71484375,
+      504.75,
+      387.87890625
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "exact_match: method",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[\\frac{1}{L} \\sum_{l=1}^{L} \\left( KL(\\mathcal{P}_{i,:}^{l} || \\mathcal{S}_{i,:}^{l}) + KL(\\mathcal{S}_{i,:}^{l} || \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
+    "final_latex": "AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[\\frac{1}{L} \\sum_{l=1}^{L} \\left( KL(\\mathcal{P}_{i,:}^{l} || \\mathcal{S}_{i,:}^{l}) + KL(\\mathcal{S}_{i,:}^{l} || \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_004",
+    "block_id": "formula_004",
+    "page": 4,
+    "bbox": [
+      176.25,
+      553.39453125,
+      503.82421875,
+      568.08984375
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "exact_match: method",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{L}_{\\text{Total}}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
+    "final_latex": "\\mathcal{L}_{\\text{Total}}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_005",
+    "block_id": "formula_005",
+    "page": 4,
+    "bbox": [
+      213.0,
+      703.0546875,
+      504.75,
+      732.4453125
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "exact_match: method",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{L}_{Total}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}_{detach}, -\\lambda; \\mathcal{X})",
+    "final_latex": "\\mathcal{L}_{Total}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}_{detach}, -\\lambda; \\mathcal{X})",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_006",
+    "block_id": "formula_006",
+    "page": 5,
+    "bbox": [
+      137.25,
+      186.75,
+      503.2265625,
+      211.53515625
+    ],
+    "section": "Method",
+    "section_confidence": "high",
+    "section_reason": "exact_match: method",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{X}",
+    "final_latex": "\\mathcal{X}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_007",
+    "block_id": "formula_007",
+    "page": 14,
+    "bbox": [
+      110.56640625,
+      645.43359375,
+      503.25,
+      709.62890625
+    ],
+    "section": "Conclusion",
+    "section_confidence": "high",
+    "section_reason": "exact_match: conclusion and future work",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim}=1) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim}=1) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim}=-1\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim}=-1\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim}=0) \\end{aligned} \\qquad \\qquad \\triangleright \\mathcal{P}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{N \\times N} \\end{aligned}",
+    "final_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim}=1) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim}=1) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim}=-1\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim}=-1\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim}=0) \\end{aligned} \\qquad \\qquad \\triangleright \\mathcal{P}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{N \\times N} \\end{aligned}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_008",
+    "block_id": "formula_008",
+    "page": 15,
+    "bbox": [
+      110.56640625,
+      405.75,
+      504.0,
+      457.1015625
+    ],
+    "section": "Conclusion",
+    "section_confidence": "high",
+    "section_reason": "exact_match: conclusion and future work",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{C}_{AD} = \\text{Softmax}(-\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}), \\text{dim=0})",
+    "final_latex": "\\mathcal{C}_{AD} = \\text{Softmax}(-\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}), \\text{dim=0})",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_009",
+    "block_id": "formula_009",
+    "page": 15,
+    "bbox": [
+      104.58984375,
+      565.76953125,
+      549.0,
+      667.08984375
+    ],
+    "section": "Conclusion",
+    "section_confidence": "high",
+    "section_reason": "exact_match: conclusion and future work",
+    "block_source": "marker_document",
+    "mineru_latex": "",
+    "marker_latex": "\\mathcal{X}",
+    "final_latex": "\\mathcal{X}",
+    "final_origin": "marker_latex",
+    "risk_flags": []
+  }
+]

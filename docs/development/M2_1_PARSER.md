@@ -34,6 +34,9 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | MarkerDocumentFormulaDetector (build_document → Equation blocks) | M1 | IMPLEMENTED |
 | FormulaCropper (PyMuPDF crop with padding) | M1 | IMPLEMENTED |
 | FormulaOCRAdapter (pix2tex) | M1 | FALLBACK_ONLY (interface exists, model not integrated; used for unresolved formula crops only) |
+| MinerU25ProAdapter (MinerU2.5-Pro via mineru-vl-utils) | M1 | IMPLEMENTED / UNIT_TESTED |
+| RuleBasedStructureRefiner + optional OllamaSectionRefiner | M1 | IMPLEMENTED / UNIT_TESTED |
+| M1 Quality Gate v2 | M1 | IMPLEMENTED / UNIT_TESTED |
 | `canonical_paper.md` generation | M1 | IMPLEMENTED |
 | 读取 `canonical_paper.md` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 校验 canonical front matter | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
@@ -64,7 +67,11 @@ M2.1 must read `canonical_paper.md`. It no longer chooses raw-source parsers as 
 3. **CanonicalBlockBuilder** — converts sections, paragraphs, tables, figures, and formulas into `DocumentBlock`.
 4. **FormulaBlockReader** — preserves `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, context, OCR status, and explanation status.
 
-MinerU25ProAdapter, MarkerDocumentFormulaDetector (fallback), FormulaCropper, LlamaSectionRefiner, StructureRefiner, and FormulaOCRAdapter (fallback for unresolved crops) are M1 material normalization components. M2.1 validates their canonical output.
+MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. magic_pdf/do_parse is not an equivalent implementation. Marker is fallback/audit baseline.
+
+MinerU25ProAdapter, MarkerDocumentFormulaDetector (fallback), FormulaCropper, OllamaSectionRefiner, StructureRefiner, and FormulaOCRAdapter (fallback for unresolved crops) are M1 material normalization components. M2.1 validates their canonical output.
+
+Ollama is an optional structured refiner. Ollama must not modify latex, bbox, page, or source identity. M1 gate blocks all-formulas-in-Abstract, section contradiction, source mismatch, and missing latex/crop/overlay before M2.1 may accept `canonical_paper.md`.
 
 ## 5. 外部项目调研（详细）
 

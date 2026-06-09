@@ -19,7 +19,11 @@ logger = logging.getLogger(__name__)
 
 
 class FormulaRegionDetector:
-    """Detects formula regions in PDF documents.
+    """Detects formula regions in PDF documents as a deprecated fallback.
+
+    This v1 helper is superseded by MinerU25ProAdapter as the primary M1 v2
+    parser and MarkerDocumentFormulaDetector as fallback/audit baseline. It
+    remains only for low-confidence fallback/debug use.
 
     Supports multiple backends with graceful degradation.
     """

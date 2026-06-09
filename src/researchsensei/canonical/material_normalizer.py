@@ -71,7 +71,12 @@ _STANDARD_SECTIONS = [
 
 
 class MaterialNormalizer:
-    """M1 material normalizer: produces canonical_paper.md from raw sources.
+    """Legacy M1 material normalizer: produces canonical_paper.md from raw sources.
+
+    This v1 three-pipeline remains the fallback/debug path. The formal M1 v2
+    primary route is M1V2CanonicalPipeline with MinerU25ProAdapter,
+    RuleBasedStructureRefiner, optional OllamaSectionRefiner, M1QualityGate,
+    CanonicalBuilderV2, and visual audit reports.
 
     Three-pipeline architecture:
     1. Body pipeline: MarkItDown (default) → PyMuPDF (text fallback) → optional Marker

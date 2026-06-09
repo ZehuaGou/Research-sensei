@@ -50,6 +50,7 @@ class DirectionRunner:
         material_normalizer: MaterialNormalizer | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = 20,
+        max_canonicalize_candidates: int | None = None,
     ) -> None:
         self.workspace = workspace
         self.query_planner = query_planner or QueryPlanner()
@@ -64,6 +65,7 @@ class DirectionRunner:
         self.material_normalizer = material_normalizer or MaterialNormalizer()
         self.sources = sources or ["arxiv", "openalex", "semantic_scholar", "crossref"]
         self.max_results_per_source = max_results_per_source
+        self.max_canonicalize_candidates = max_canonicalize_candidates
 
     async def run(self, user_query: str, direction_id: str | None = None) -> DirectionBundle:
         actual_id = direction_id or _slugify(user_query)
@@ -114,18 +116,11 @@ class DirectionRunner:
         resolved_candidates = self._apply_source_resolution(llm_judged_candidates, source_resolution)
 
         # Step 7.5: Material normalization — generate canonical_paper.md for each candidate
-        canonical_dir = Path(run_dir) / "canonical_papers"
-        by_source = {item.paper_id: item for item in source_resolution.items}
-        canonicalization_results: list[CanonicalizationResult] = []
-        for candidate in resolved_candidates:
-            source_item = by_source.get(candidate.paper_id)
-            try:
-                canon_result = self.material_normalizer.normalize(
-                    candidate, source_item, output_dir=canonical_dir / (candidate.paper_id or "unknown")
-                )
-                canonicalization_results.append(canon_result)
-            except Exception as exc:
-                logger.warning("MaterialNormalizer failed for %s: %s", candidate.paper_id, exc)
+        canonicalization_results = self._canonicalize_resolved_candidates(
+            resolved_candidates,
+            source_resolution,
+            Path(run_dir) / "canonical_papers",
+        )
 
         # Update candidates with canonical fields
         by_canon = {cr.paper_id: cr for cr in canonicalization_results}
@@ -168,29 +163,27 @@ class DirectionRunner:
         self.workspace.write_json(run_dir / "filtered_candidates.json", filtered_candidates)
         self.workspace.write_json(run_dir / "reading_plan.json", reading_plan)
 
-        # Write canonicalization results
-        if canonicalization_results:
-            from researchsensei.schemas.canonical import CanonicalizationResult as CR
-            canon_summary = {
-                "total": len(canonicalization_results),
-                "canonical_paper_generated_count": sum(1 for cr in canonicalization_results if cr.canonical_paper_path),
-                "m2_ready_count": sum(1 for cr in canonicalization_results if cr.m2_ready),
-                "metadata_only_blocked_count": sum(1 for cr in canonicalization_results if cr.source_priority == SourcePriority.METADATA_ONLY),
-                "source_type_distribution": {},
-                "canonicalization_status_distribution": {},
-                "canonical_quality_status_distribution": {},
-                "adapter_status": {},
-            }
-            for cr in canonicalization_results:
-                st = cr.source_type
-                canon_summary["source_type_distribution"][st] = canon_summary["source_type_distribution"].get(st, 0) + 1
-                cs = cr.canonicalization_status.value
-                canon_summary["canonicalization_status_distribution"][cs] = canon_summary["canonicalization_status_distribution"].get(cs, 0) + 1
-                qs = cr.canonical_quality_status.value
-                canon_summary["canonical_quality_status_distribution"][qs] = canon_summary["canonical_quality_status_distribution"].get(qs, 0) + 1
-                for ai in cr.adapter_info:
-                    canon_summary["adapter_status"][ai.name] = ai.status.value
-            self.workspace.write_json(run_dir / "canonicalization_summary.json", canon_summary)
+        # Always write a fresh summary so live eval never reads stale canonicalization data.
+        canon_summary = {
+            "total": len(canonicalization_results),
+            "canonical_paper_generated_count": sum(1 for cr in canonicalization_results if cr.canonical_paper_path),
+            "m2_ready_count": sum(1 for cr in canonicalization_results if cr.m2_ready),
+            "metadata_only_blocked_count": sum(1 for cr in canonicalization_results if cr.source_priority == SourcePriority.METADATA_ONLY),
+            "source_type_distribution": {},
+            "canonicalization_status_distribution": {},
+            "canonical_quality_status_distribution": {},
+            "adapter_status": {},
+        }
+        for cr in canonicalization_results:
+            st = cr.source_type
+            canon_summary["source_type_distribution"][st] = canon_summary["source_type_distribution"].get(st, 0) + 1
+            cs = cr.canonicalization_status.value
+            canon_summary["canonicalization_status_distribution"][cs] = canon_summary["canonicalization_status_distribution"].get(cs, 0) + 1
+            qs = cr.canonical_quality_status.value
+            canon_summary["canonical_quality_status_distribution"][qs] = canon_summary["canonical_quality_status_distribution"].get(qs, 0) + 1
+            for ai in cr.adapter_info:
+                canon_summary["adapter_status"][ai.name] = ai.status.value
+        self.workspace.write_json(run_dir / "canonicalization_summary.json", canon_summary)
 
         return DirectionBundle(
             query_plan=query_plan,
@@ -207,6 +200,33 @@ class DirectionRunner:
             verification_summary=verification_summary,
             relevance_summary=relevance_metadata,
         )
+
+    def _canonicalize_resolved_candidates(
+        self,
+        resolved_candidates: list[CandidatePaper],
+        source_resolution: SourceResolutionResult,
+        canonical_dir: Path,
+    ) -> list[CanonicalizationResult]:
+        by_source = {item.paper_id: item for item in source_resolution.items}
+        candidates_with_source = [
+            candidate for candidate in resolved_candidates
+            if candidate.paper_id in by_source and by_source[candidate.paper_id].has_valid_deep_reading_source
+        ]
+        limit = self.max_canonicalize_candidates
+        if limit is not None:
+            candidates_with_source = candidates_with_source[:max(limit, 0)]
+
+        canonicalization_results: list[CanonicalizationResult] = []
+        for candidate in candidates_with_source:
+            source_item = by_source.get(candidate.paper_id)
+            try:
+                canon_result = self.material_normalizer.normalize(
+                    candidate, source_item, output_dir=canonical_dir / (candidate.paper_id or "unknown")
+                )
+                canonicalization_results.append(canon_result)
+            except Exception as exc:
+                logger.warning("MaterialNormalizer failed for %s: %s", candidate.paper_id, exc)
+        return canonicalization_results
 
     @staticmethod
     def _should_download(candidate: CandidatePaper) -> bool:
@@ -344,6 +364,10 @@ class DirectionRunner:
                         "pdf_available": pdf_available,
                         "pdf_downloaded": pdf_downloaded,
                         "can_enter_m2": can_enter_m2,
+                        "source_priority": resolved.source_priority,
+                        "preferred_m2_input": resolved.preferred_m2_input,
+                        "has_valid_deep_reading_source": resolved.has_valid_deep_reading_source,
+                        "metadata_only": not resolved.has_valid_deep_reading_source,
                         "source_confidence": source_confidence,
                         "metadata_confidence": metadata_confidence,
                         "raw_source_metadata": {

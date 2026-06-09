@@ -1,0 +1,52 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy M1 audit</title>
+<style>body{font-family:Arial,sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;vertical-align:top}code{white-space:pre-wrap}</style>
+</head><body>
+<h1>M1 Visual Audit: Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy</h1>
+<p>paper_id: paper_3</p>
+<h2>Metrics</h2>
+<pre>{
+  &quot;formula_count&quot;: 9,
+  &quot;latex_count&quot;: 9,
+  &quot;bbox_count&quot;: 9,
+  &quot;section_distribution&quot;: {
+    &quot;Abstract&quot;: 2,
+    &quot;Introduction&quot;: 2,
+    &quot;Related Work&quot;: 2,
+    &quot;Method&quot;: 11,
+    &quot;Experiments&quot;: 12,
+    &quot;Conclusion&quot;: 6,
+    &quot;References&quot;: 3
+  },
+  &quot;section_contradiction_count&quot;: 0,
+  &quot;all_formulas_in_Abstract_suspicious&quot;: false,
+  &quot;polluted_section_count&quot;: 0,
+  &quot;high_risk_count&quot;: 0,
+  &quot;medium_risk_count&quot;: 0,
+  &quot;low_risk_count&quot;: 0,
+  &quot;canonical_quality_status&quot;: &quot;PASS&quot;,
+  &quot;route&quot;: &quot;C Marker formula audit + PyMuPDF body fallback&quot;,
+  &quot;primary_parser&quot;: &quot;pymupdf&quot;,
+  &quot;raw_formula_text_count&quot;: 0,
+  &quot;crop_exists&quot;: 9,
+  &quot;overlay_exists&quot;: 5,
+  &quot;canonical_match&quot;: true,
+  &quot;runtime_seconds&quot;: 0.414,
+  &quot;runtime_device&quot;: &quot;CPU/cached artifacts&quot;,
+  &quot;peak_vram_estimate&quot;: &quot;not measured&quot;,
+  &quot;ollama_json_valid&quot;: 0,
+  &quot;ollama_json_invalid&quot;: 0,
+  &quot;ollama_retry&quot;: 0,
+  &quot;ollama_timeout&quot;: 0,
+  &quot;ollama_changed_by_count&quot;: 0,
+  &quot;core_formula_coverage&quot;: {
+    &quot;Prior-Association&quot;: &quot;FOUND_TEXT&quot;,
+    &quot;Series-Association&quot;: &quot;FOUND_TEXT&quot;,
+    &quot;AssDis(P,S;X)&quot;: &quot;FOUND_LATEX&quot;,
+    &quot;AnomalyScore&quot;: &quot;FOUND_TEXT&quot;
+  }
+}</pre>
+<h2>Formula Blocks</h2>
+<table><thead><tr><th>block</th><th>page</th><th>section</th><th>bbox</th><th>latex/text</th><th>risk</th></tr></thead>
+<tbody><tr><td>formula_001</td><td>3</td><td>Method</td><td>[184.5, 306.0, 504.75, 351.140625]</td><td><code>\begin{split} \mathcal{Z}^{l} &amp;= \text{Layer-Norm} \Big( \text{Anomaly-Attention}(\mathcal{X}^{l-1}) + \mathcal{X}^{l-1} \Big) \\ \mathcal{X}^{l} &amp;= \text{Layer-Norm} \Big( \text{Feed-Forward}(\mathcal{Z}^{l}) + \mathcal{Z}^{l} \Big), \end{split} \tag{1}</code></td><td>none</td></tr><tr><td>formula_002</td><td>3</td><td>Method</td><td>[145.5, 531.75, 504.75, 628.5]</td><td><code>\mathcal{Q}, \mathcal{K}, \mathcal{V}, \sigma = \mathcal{X}^{l-1}W_{\mathcal{Q}}^{l}, \mathcal{X}^{l-1}W_{\mathcal{K}}^{l}, \mathcal{X}^{l-1}W_{\mathcal{V}}^{l}, \mathcal{X}^{l-1}W_{\sigma}^{l}</code></td><td>none</td></tr><tr><td>formula_003</td><td>4</td><td>Method</td><td>[159.0, 357.71484375, 504.75, 387.87890625]</td><td><code>AssDis(\mathcal{P}, \mathcal{S}; \mathcal{X}) = \left[\frac{1}{L} \sum_{l=1}^{L} \left( KL(\mathcal{P}_{i,:}^{l} || \mathcal{S}_{i,:}^{l}) + KL(\mathcal{S}_{i,:}^{l} || \mathcal{P}_{i,:}^{l}) \right) \right]_{i=1,\dots,N}</code></td><td>none</td></tr><tr><td>formula_004</td><td>4</td><td>Method</td><td>[176.25, 553.39453125, 503.82421875, 568.08984375]</td><td><code>\mathcal{L}_{\text{Total}}(\widehat{\mathcal{X}}, \mathcal{P}, \mathcal{S}, \lambda; \mathcal{X}) = \|\mathcal{X} - \widehat{\mathcal{X}}\|_{F}^{2} - \lambda \times \|\text{AssDis}(\mathcal{P}, \mathcal{S}; \mathcal{X})\|_{1}</code></td><td>none</td></tr><tr><td>formula_005</td><td>4</td><td>Method</td><td>[213.0, 703.0546875, 504.75, 732.4453125]</td><td><code>\mathcal{L}_{Total}(\widehat{\mathcal{X}}, \mathcal{P}, \mathcal{S}_{detach}, -\lambda; \mathcal{X})</code></td><td>none</td></tr><tr><td>formula_006</td><td>5</td><td>Method</td><td>[137.25, 186.75, 503.2265625, 211.53515625]</td><td><code>\mathcal{X}</code></td><td>none</td></tr><tr><td>formula_007</td><td>14</td><td>Conclusion</td><td>[110.56640625, 645.43359375, 503.25, 709.62890625]</td><td><code>\begin{aligned} &amp;1: \ \mathcal{P}&#x27; = \texttt{Mean}(\mathcal{P}, \texttt{dim}=1) \\ &amp;2: \ \mathcal{S}&#x27; = \texttt{Mean}(\mathcal{S}, \texttt{dim}=1) \\ &amp;3: \ \mathcal{R}&#x27; = \texttt{KL}\Big((\mathcal{P}&#x27;, \mathcal{S}&#x27;), \texttt{dim}=-1\Big) + \texttt{KL}\Big((\mathcal{S}&#x27;, \mathcal{P}&#x27;), \texttt{dim}=-1\Big) \\ &amp;4: \ \mathcal{R} = \texttt{Mean}(\mathcal{R}&#x27;, \texttt{dim}=0) \end{aligned} \qquad \qquad \triangleright \mathcal{P}&#x27; \in \mathbb{R}^{L \times N \times N} \\ &amp;\triangleright \mathcal{R}&#x27; \in \mathbb{R}^{L \times N \times N} \\ &amp;\triangleright \mathcal{R}&#x27; \in \mathbb{R}^{L \times N \times N} \\ &amp;\triangleright \mathcal{R}&#x27; \in \mathbb{R}^{N \times N} \end{aligned}</code></td><td>none</td></tr><tr><td>formula_008</td><td>15</td><td>Conclusion</td><td>[110.56640625, 405.75, 504.0, 457.1015625]</td><td><code>\mathcal{C}_{AD} = \text{Softmax}(-\text{AssDis}(\mathcal{P}, \mathcal{S}; \mathcal{X}), \text{dim=0})</code></td><td>none</td></tr><tr><td>formula_009</td><td>15</td><td>Conclusion</td><td>[104.58984375, 565.76953125, 549.0, 667.08984375]</td><td><code>\mathcal{X}</code></td><td>none</td></tr></tbody></table>
+</body></html>

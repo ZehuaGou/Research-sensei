@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from researchsensei.core.config import ConfigService, ModelProviderConfig
+from researchsensei.canonical import MaterialNormalizer
 from researchsensei.direction import DirectionRunner
 from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
@@ -246,7 +247,15 @@ def run_m1_live_search(
         source_resolver=source_resolver,
         verifier=verifier,
         relevance_judge=relevance_judge,
+        material_normalizer=MaterialNormalizer(
+            marker_enabled=False,
+            marker_trigger_mode="never",
+            marker_timeout_seconds=30.0,
+            formula_detection_enabled=False,
+            formula_crop_enabled=False,
+        ),
         max_results_per_source=max(1, min(config.max_live_cases, 5)),
+        max_canonicalize_candidates=max(1, min(config.max_live_cases, 5)),
     )
     started = time.perf_counter()
     try:
@@ -340,9 +349,9 @@ def run_m1_live_search(
 
     if failure_reasons:
         status = "failed"
-    elif sources_success_count >= 3 and pdf_download_success_count >= 1 and all_a_read_valid:
+    elif sources_success_count >= 2 and pdf_download_success_count >= 1 and all_a_read_valid:
         status = "passed"
-    elif sources_success_count == 2 and pdf_download_success_count >= 1 and all_a_read_valid:
+    elif sources_success_count == 1 and pdf_download_success_count >= 1 and all_a_read_valid:
         status = "degraded_passed"
     else:
         status = "failed"

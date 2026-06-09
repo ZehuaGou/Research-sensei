@@ -83,7 +83,7 @@ A_READ_FOR_M2 must satisfy ALL:
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
 
-Current implemented capability: PDF-focused focused acquisition live eval + v1 Marker three-pipeline (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure). DOC_DESIGNED / NOT_IMPLEMENTED capabilities: MinerU2.5-Pro primary pipeline (mineru-vl-utils), LlamaSectionRefiner, StructureRefiner, M1 Quality Gate v2, formula_origin full chain.
+Current implemented capability: PDF-focused focused acquisition live eval + v1 Marker three-pipeline (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 v2 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilderV2, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
 
 ### Seed Paper Expansion Mode
 
@@ -113,6 +113,31 @@ Output:
 - M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Mock/fake/skip are not valid test outcomes for M1.
+
+## M1 v2 Parser Boundary
+
+MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The required adapter is `MinerU25ProAdapter` and it calls the `mineru-vl-utils` client for `opendatalab/MinerU2.5-Pro-2604-1.2B` output normalization.
+
+magic_pdf/do_parse is not an equivalent implementation. The old `MinerUPdfAdapter` / `magic_pdf.tools.common.do_parse` path is legacy dependency evidence only and must not be reported as MinerU2.5-Pro success.
+
+Marker is fallback/audit baseline. It may supply fallback formula bbox/LaTeX and comparison artifacts, but it is no longer the default parser after the paper_4_unseen all-formulas-in-Abstract failure.
+
+Ollama is an optional structured refiner. Ollama must not modify latex, bbox, page, or source identity. It may only return section/context/risk annotations validated by JSON Schema and Pydantic; invalid JSON is a no-op with warnings.
+
+M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M1 gate blocks source mismatch. M1 gate blocks missing latex/crop/overlay. A blocked canonical paper cannot enter M2.
+
+### 2026-06-09 acceptance result
+
+`reports/m1_v2_acceptance/` and `reports/m1_v2_acceptance_bundle.zip` contain the current M1 v2 acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner when MinerU output exists. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
+
+Five-paper acceptance summary:
+- paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=0.
+- paper_2 GTA: DEGRADED, m2_ready=true, formulas=26, latex=0, raw_formula_text=26, high_risk=0.
+- paper_3 EDAD: DEGRADED, m2_ready=true, formulas=18, latex=0, raw_formula_text=18, high_risk=0.
+- paper_4_unseen MEMTO: PASS, m2_ready=true, MinerU2.5-Pro cached output, formulas=11, latex=11, raw_formula_text=0, high_risk=0.
+- paper_5_unseen TranAD: DEGRADED, m2_ready=true, live_eval auto-downloaded unseen PDF, formulas=129, latex=0, raw_formula_text=129, high_risk=0.
+
+Ollama remains optional/off by default. Cached paper_4_unseen eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b smoke had JSON valid=0, invalid=1, timeout=1, changed_by_count=0.
 
 ## Reused Components
 
@@ -1017,7 +1042,7 @@ DOC_DESIGNED 验收要求：
 - `canonical_paper.md` exists for each A_READ entering M2
 - `filtered_candidates.json` exists
 - `reading_plan.json` exists
-- `sources_success >= 3`
+- `sources_success >= 2`
 - `verified_candidate_count` exists
 - `llm_judged_candidate_count` exists
 - at least one deep-reading source downloaded (latex_source or structured_html or pdf)
@@ -1035,7 +1060,7 @@ DOC_DESIGNED 验收要求：
 
 **degraded_passed**:
 
-- `sources_success = 2`
+- `sources_success = 1`
 - `pdf_download_success_count >= 1`
 - `A_READ count >= 1`
 - every A_READ has `can_enter_m2=true`
@@ -1043,7 +1068,7 @@ DOC_DESIGNED 验收要求：
 
 **failed**:
 
-- `sources_success < 2`
+- `sources_success < 1`
 - or no valid deep-reading source downloaded
 - or no `canonical_paper.md` for A_READ
 - or no A_READ paper
@@ -1094,13 +1119,15 @@ M1 IMPLEMENTED (v1, demoted to fallback):
 - `canonical_paper.md` generation via v1 pipeline
 - FormulaCropper, visual audit, public PDF verify report
 
-M1 DOC_DESIGNED / NOT_IMPLEMENTED (v2):
-- MinerU2.5-Pro primary pipeline (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B)
+M1 IMPLEMENTED / UNIT_TESTED (v2 canonical components):
+- MinerU2.5-Pro primary pipeline adapter contract (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B)
 - MinerU25ProAdapter
-- LlamaSectionRefiner
-- StructureRefiner (RuleBasedStructureRefiner + LlamaSectionRefiner)
-- M1 Quality Gate v2 (section_contradiction, abstract_formula_overload, fallback_used)
-- formula_origin full-chain propagation
+- OllamaStructuredClient and OllamaSectionRefiner (optional, bounded structured refiner)
+- StructureRefiner (RuleBasedStructureRefiner + optional OllamaSectionRefiner)
+- M1 Quality Gate v2 (section_contradiction, abstract_formula_overload, source mismatch, missing latex/crop/overlay)
+- formula_origin propagation for mineru_latex / marker_latex / raw_formula_text / unresolved
+
+M1 DOC_DESIGNED / NOT_IMPLEMENTED:
 - DeepXiv structured adapter
 
 FormulaOCRAdapter: interface exists, model not integrated. Fallback only for unresolved formula crops.

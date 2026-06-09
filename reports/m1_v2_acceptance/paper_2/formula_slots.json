@@ -1,0 +1,522 @@
+[
+  {
+    "formula_id": "formula_001",
+    "block_id": "fc_1",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_002",
+    "block_id": "fc_2",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_003",
+    "block_id": "fc_3",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_004",
+    "block_id": "fc_4",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_005",
+    "block_id": "fc_5",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_006",
+    "block_id": "fc_6",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_007",
+    "block_id": "fc_7",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_008",
+    "block_id": "fc_8",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_009",
+    "block_id": "fc_9",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_010",
+    "block_id": "fc_10",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_011",
+    "block_id": "fc_11",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_012",
+    "block_id": "fc_12",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_013",
+    "block_id": "fc_13",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_014",
+    "block_id": "fc_14",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_015",
+    "block_id": "fc_15",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_016",
+    "block_id": "fc_16",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_017",
+    "block_id": "fc_17",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_018",
+    "block_id": "fc_18",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_019",
+    "block_id": "fc_19",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_020",
+    "block_id": "fc_20",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_021",
+    "block_id": "fc_21",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_022",
+    "block_id": "fc_22",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_023",
+    "block_id": "fc_23",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_024",
+    "block_id": "fc_24",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_025",
+    "block_id": "fc_25",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  },
+  {
+    "formula_id": "formula_026",
+    "block_id": "fc_26",
+    "page": 1,
+    "bbox": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "section": "Unknown",
+    "section_confidence": "low",
+    "section_reason": "canonical_formula_block",
+    "block_source": "pymupdf",
+    "mineru_latex": "",
+    "marker_latex": "",
+    "final_latex": "",
+    "final_origin": "raw_formula_text",
+    "risk_flags": []
+  }
+]

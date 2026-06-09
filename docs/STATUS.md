@@ -32,10 +32,10 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | MarkItDownAdapter (default PDF parser) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，0.6-2.9s/paper，内容覆盖 2-4x PyMuPDF，公式检测好，已接入 Body pipeline 作为默认 PDF parser |
 | M1 | MarkerPdfAdapter (fallback) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，~16min/paper，section 结构最好，作为 fallback formula detector 和 audit baseline |
 | M1 | MinerUPdfAdapter (old, NOT v2) | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | magic-pdf 已安装 (AGPL-3.0)，do_parse API 可用。注意：这是旧 MinerU CLI (magic_pdf)，不是 MinerU2.5-Pro (mineru-vl-utils) |
-| M1 | MinerU25ProAdapter (v2 PRIMARY) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | MinerU2.5-Pro-2604-1.2B via mineru-vl-utils，新主线 primary parser，代码未实现 |
-| M1 | LlamaSectionRefiner | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | local Llama section/context refinement，代码未实现 |
-| M1 | StructureRefiner | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | RuleBasedStructureRefiner + LlamaSectionRefiner，代码未实现 |
-| M1 | M1 Quality Gate (v2) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | section_contradiction, abstract_formula_overload, fallback_used 等新 gate，文档已设计，代码未实现 |
+| M1 | MinerU25ProAdapter (v2 PRIMARY) | implemented | unit tested | IMPLEMENTED, ACCEPTANCE_PENDING | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser; paper_4_unseen cached MinerU spike succeeded, full multi-paper acceptance report pending |
+| M1 | LlamaSectionRefiner / OllamaSectionRefiner | implemented | unit tested | OPTIONAL_REFINER, ACCEPTANCE_PENDING | Ollama is an optional structured refiner; previous live eval JSON valid=0, so default route remains RuleBased unless acceptance proves improvement |
+| M1 | StructureRefiner | implemented | unit tested | IMPLEMENTED | RuleBasedStructureRefiner always runs; optional Ollama refiner is bounded to section/context/risk fields |
+| M1 | M1 Quality Gate (v2) | implemented | unit tested | IMPLEMENTED, ACCEPTANCE_PENDING | M1 gate blocks all-formulas-in-Abstract, section contradiction, source mismatch, and missing latex/crop/overlay |
 | M1 | MarkerDocumentFormulaDetector | implemented | unit tested | IMPLEMENTED | 使用 Marker build_document() 获取 Equation blocks with bbox，输出 FormulaSlot 列表 |
 | M1 | FormulaCropper | implemented | unit tested | IMPLEMENTED | PyMuPDF crop with padding，bbox in PDF points，输出 cropped formula images |
 | M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MinerU25ProAdapter (primary) 和 MarkerDocumentFormulaDetector (fallback) 取代 |
@@ -71,6 +71,24 @@ Focused query: "时间序列异常检测 transformer 方法"
   2. Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy (verified via s2_title_search, llm_relevance=HIGH)
 - Classification paper "Improving position encoding of transformers for multivariate time series classification" was excluded from A_READ by LLM relevance judge
 - LLM: mimo-v2.5-pro, 3265 tokens (3 calls: query planning + relevance judge)
+
+## M1 v2 Canonical Acceptance Report (2026-06-09)
+
+Report path: `reports/m1_v2_acceptance/`
+Bundle path: `reports/m1_v2_acceptance_bundle.zip`
+
+Default route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner when MinerU output is available. Marker remains fallback/audit baseline. PyMuPDF/MarkItDown remain fallback/debug only. Ollama is optional/off by default.
+
+Acceptance set:
+- paper_1 Monte Carlo EM: marker fallback, DEGRADED, m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=0.
+- paper_2 GTA: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=26, latex=0, raw_formula_text=26, high_risk=0.
+- paper_3 EDAD: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=18, latex=0, raw_formula_text=18, high_risk=0.
+- paper_4_unseen MEMTO: MinerU2.5-Pro cached output, PASS, m2_ready=true, formulas=11, latex=11, raw_formula_text=0, high_risk=0; formulas distribute Method=8 / Experiments=3 / Abstract=0 in the spike report.
+- paper_5_unseen TranAD: live_eval auto-downloaded unseen PDF, PyMuPDF fallback/debug, DEGRADED, m2_ready=true, formulas=129, latex=0, raw_formula_text=129, high_risk=0.
+
+Ollama evaluation: cached paper_4_unseen eval JSON valid=0 / invalid=17. Current local smoke with qwen2.5:0.5b on 12 paper_4 blocks: available=true, JSON valid=0, invalid=1, timeout=1, changed_by_count=0. Decision: do not enable Ollama by default.
+
+Formula dense pages in this report are computed by PyMuPDF page-level text scans and saved as `formula_dense_pages.md` plus `formula_page_*.png`.
 
 ## Current verified PDF-only A_READ Gate
 
@@ -121,9 +139,12 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
-- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)。
-- 当前未实现能力包含：MinerU2.5-Pro adapter (mineru-vl-utils)、LlamaSectionRefiner、StructureRefiner、M1 Quality Gate v2、M2 canonical input reader、formula_origin 全链路。
-- MinerU2.5-Pro (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B) 是新主线 primary parser，但代码未实现。当前代码中的 MinerUPdfAdapter 使用旧 magic_pdf CLI，不等价。
+- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)、M1 v2 canonical components（DocumentBlock、MinerU25ProAdapter、RuleBasedStructureRefiner、OllamaStructuredClient、OllamaSectionRefiner、CanonicalBuilderV2、M1QualityGate、visual audit report generator）。
+- 当前未实现能力包含：M2 canonical input reader；M1 v2 仍需完整 multi-paper acceptance report 后才能从 ACCEPTANCE_PENDING 升级为 REAL_E2E_VERIFIED。
+- MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser。当前代码中的 legacy MinerUPdfAdapter 使用旧 magic_pdf CLI；magic_pdf/do_parse is not an equivalent implementation。
+- Marker is fallback/audit baseline。
+- Ollama is an optional structured refiner。Ollama must not modify latex, bbox, page, or source identity。
+- M1 gate blocks all-formulas-in-Abstract。M1 gate blocks section contradiction。M1 gate blocks source mismatch。M1 gate blocks missing latex/crop/overlay。
 - paper_4_unseen blind eval (MEMTO, arXiv 2312.02530) 暴露 Marker section inference 泛化失败：11 个公式全部被错误归到 Abstract。已通过 nearby_text heading 检测修复，但 Marker 不再作为最终主线。
 - FormulaOCRAdapter 接口存在但模型未集成。在 v2 pipeline 中仅作为 unresolved formula crops 的 fallback，不是默认主线。
 - MarkerDocumentFormulaDetector 使用 Marker build_document() 获取 Equation blocks with bbox，已实现并测试。

@@ -46,12 +46,18 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 
 ### M1 Material Normalization / canonical_paper.md
 
+- MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser.
+- magic_pdf/do_parse is not an equivalent implementation.
+- Marker is fallback/audit baseline.
+- Ollama is an optional structured refiner.
+- Ollama must not modify latex, bbox, page, or source identity.
+- M1 gate blocks all-formulas-in-Abstract, section contradiction, source mismatch, and missing latex/crop/overlay.
 - real paper source
 - `canonical_paper.md` exists
 - front matter contains paper_id/title/source_type/source_confidence/canonicalization_status/parser_used/m2_ready/degradation_reason
 - body contains abstract or enough body text
 - formula blocks include formula_id and formula_origin when formulas are present
-- Status: DOC_DESIGNED / NOT_IMPLEMENTED
+- Status: IMPLEMENTED / UNIT_TESTED, REAL_MULTI_PAPER_ACCEPTANCE_PENDING
 
 ### M1 Formula Detection / OCR
 
@@ -60,7 +66,7 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 - real formula detection output (MinerU25ProAdapter or MarkerDocumentFormulaDetector): formula_id, bbox, page, confidence
 - real FormulaOCRAdapter output when policy triggers (fallback only for unresolved crops): formula_latex, formula_origin=ocr_latex, formula_ocr_status
 - `canonical_paper.md` writes OCR result with origin and warning
-- Status: DOC_DESIGNED / NOT_IMPLEMENTED
+- Status: IMPLEMENTED / UNIT_TESTED for MinerU25ProAdapter and MarkerDocumentFormulaDetector; OCR model integration remains FALLBACK_ONLY / NOT_DEFAULT
 
 ### M1 Seed Paper Expansion
 

@@ -15,6 +15,7 @@ from researchsensei.schemas import (
     PaperSourceStatus,
     PaperSourceType,
     ResolvedPaperSource,
+    SourcePriority,
     SourceResolutionResult,
     SourceStatus,
     WarningItem,
@@ -342,6 +343,14 @@ class PaperSourceResolver:
         pdf_title_match: str = "",
         pdf_metadata_warning: str = "",
     ) -> ResolvedPaperSource:
+        has_valid_pdf = bool(
+            status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+            and local_path
+            and sha256
+            and file_size > 0
+        )
+        source_priority = SourcePriority.PDF if has_valid_pdf else SourcePriority.METADATA_ONLY
+        preferred_m2_input = "pdf" if has_valid_pdf else "none"
         return ResolvedPaperSource(
             paper_id=paper.paper_id,
             title=paper.title,
@@ -365,6 +374,9 @@ class PaperSourceResolver:
             pdf_metadata_check=pdf_metadata_check,
             pdf_title_match=pdf_title_match,
             pdf_metadata_warning=pdf_metadata_warning,
+            source_priority=source_priority,
+            preferred_m2_input=preferred_m2_input,
+            has_valid_deep_reading_source=has_valid_pdf,
         )
 
     @staticmethod
