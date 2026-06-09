@@ -312,6 +312,23 @@ any directed connection between two nodes can be established.
 For N1 and N2, if the value of P1,2 is relatively high, it
 represents N1 is highly possibly pointed to N2, vice versa.
 
+### Formula Slots
+
+<!-- formula_id: formula_001 | origin: parser_latex | section: Related Work | page: 3 | bbox: [371.25, 81.75, 563.25, 105.0] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: problem statement -->
+```latex
+z^{i,j} = \underset{c \in \{0,1\}}{\arg \max} (\log \pi_c^{i,j} + g_c^{i,j})
+```
+
+<!-- formula_id: formula_002 | origin: parser_latex | section: Related Work | page: 3 | bbox: [353.25, 186.75, 563.25, 223.13671875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: problem statement -->
+```latex
+z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j} + g_c^{i,j})/\tau)}{\sum_{v \in \{0,1\}} \exp((\log \pi_v^{i,j} + g_v^{i,j})/\tau)}
+```
+
+<!-- formula_id: formula_003 | origin: parser_latex | section: Related Work | page: 3 | bbox: [356.203125, 632.25, 563.25, 659.35546875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: problem statement -->
+```latex
+\mathbf{x}_{i}' = \sum_{j \in \mathcal{N}(i)} h_{\mathbf{\Theta}}(\mathbf{x}_{i}||\mathbf{x}_{j} - \mathbf{x}_{j}||\mathbf{x}_{j} + \mathbf{x}_{i})
+```
+
 ## Method
 
 In most real-life scenarios of IoT, there are usually complex
@@ -1051,24 +1068,69 @@ a GRU-based recurrent neural network for forecasting. The
 
 ### Formula Slots
 
-<!-- formula_id: formula_003 | origin: parser_latex | section: Method | page: 3 | bbox: [356.203125, 632.25, 563.25, 659.35546875] | ocr_status: cropped -->
+<!-- formula_id: formula_004 | origin: parser_latex | section: Method | page: 4 | bbox: [117.0, 474.75, 300.0, 501.57421875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
 ```latex
-\mathbf{x}_{i}' = \sum_{j \in \mathcal{N}(i)} h_{\mathbf{\Theta}}(\mathbf{x}_{i}||\mathbf{x}_{j} - \mathbf{x}_{j}||\mathbf{x}_{j} + \mathbf{x}_{i})
+\mathcal{L}_s = \sum_{1 \le i, j \le M, i \ne j} \log \pi_1^{i,j} \tag{4}
 ```
 
-<!-- formula_id: formula_008 | origin: parser_latex | section: Method | page: 5 | bbox: [102.19921875, 584.71875, 299.42578125, 595.546875] | ocr_status: cropped -->
+<!-- formula_id: formula_005 | origin: parser_latex | section: Method | page: 4 | bbox: [345.75, 686.8125, 563.25, 714.65625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\frac{QK^T}{\sqrt{d_k}}
+```
+
+<!-- formula_id: formula_006 | origin: parser_latex | section: Method | page: 5 | bbox: [55.58203125, 252.52734375, 298.23046875, 279.59765625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+MultiHead(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = Concat(head_1, \cdots, head_h)W^O
+```
+
+<!-- formula_id: formula_007 | origin: parser_latex | section: Method | page: 5 | bbox: [84.0, 301.5, 298.529296875, 317.49609375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+head_i = Attention(\mathbf{Q}W_i^Q, \mathbf{K}W_i^K, \mathbf{V}W_i^V)
+```
+
+<!-- formula_id: formula_008 | origin: parser_latex | section: Method | page: 5 | bbox: [102.19921875, 584.71875, 299.42578125, 595.546875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
 ```latex
 Attention(S, V) = Softmax(S)V
 ```
 
-<!-- formula_id: formula_009 | origin: parser_latex | section: Method | page: 5 | bbox: [367.5, 408.375, 563.25, 453.234375] | ocr_status: cropped -->
+<!-- formula_id: formula_009 | origin: parser_latex | section: Method | page: 5 | bbox: [367.5, 408.375, 563.25, 453.234375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
 ```latex
 \mathbf{A}^{(1)}, \mathbf{A}^{(2)}
 ```
 
-<!-- formula_id: formula_010 | origin: parser_latex | section: Method | page: 5 | bbox: [309.5859375, 461.7421875, 538.5, 473.25] | ocr_status: cropped -->
+<!-- formula_id: formula_010 | origin: parser_latex | section: Method | page: 5 | bbox: [309.5859375, 461.7421875, 538.5, 473.25] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
 ```latex
 \mathbf{X}^{(1)} \in \mathcal{R}^{n \times d_1}
+```
+
+<!-- formula_id: formula_011 | origin: parser_latex | section: Method | page: 6 | bbox: [106.5, 191.8125, 300.75, 219.65625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{L}_{mse} = \frac{1}{M} \sum_{t=1}^{n} ||\mathcal{Y}^{(t)} - \hat{\mathcal{Y}}^{(t)}||_{2}^{2}
+```
+
+<!-- formula_id: formula_012 | origin: parser_latex | section: Method | page: 6 | bbox: [117.0, 263.7421875, 300.75, 296.2265625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\hat{\mathbf{y}}^{(t)} = \sum_{i=1}^{M} ||\mathcal{Y}_i^{(t)} - \hat{\mathcal{Y}}_i^{(t)}||_2^2
+```
+
+<!-- formula_id: formula_013 | origin: parser_latex | section: Method | page: 6 | bbox: [371.14453125, 509.25, 563.25, 533.28515625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\tilde{x} = \frac{x - \min X_{train}}{\max X_{train} - \min X_{train}} \tag{12}
+```
+
+<!-- formula_id: formula_014 | origin: parser_latex | section: Method | page: 6 | bbox: [385.5, 604.5, 563.25, 629.578125] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+Precision = \frac{TP}{TP + FP}
+```
+
+<!-- formula_id: formula_015 | origin: parser_latex | section: Method | page: 6 | bbox: [390.75, 632.25, 563.25, 657.03515625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+Recall = \frac{TP}{TP + FN}
+```
+
+<!-- formula_id: formula_016 | origin: parser_latex | section: Method | page: 6 | bbox: [373.5, 659.25, 563.25, 685.65234375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+F1 = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
 ```
 
 ## Experiments
@@ -1258,6 +1320,14 @@ We aim to explore more about combining this approach with
 the online learning strategy to land it on the mobile IoT
 scenarios for future work.
 11
+
+## Other
+
+1
+Learning Graph Structures with Transformer for
+Multivariate Time Series Anomaly Detection in IoT
+Zekai Chen, Student Member, IEEE, Dingshuo Chen, Xiao Zhang, Member, IEEE, Zixuan Yuan,
+and Xiuzhen Cheng, Fellow, IEEE
 
 ## References
 
@@ -1523,78 +1593,3 @@ ensemble of autoencoders for online network intrusion detection,” in
 Internet Society, 2018.
 [58] M. Fey and J. E. Lenssen, “Fast graph representation learning with
 pytorch geometric,” CoRR, vol. abs/1903.02428, 2019.
-
-## Other
-
-1
-Learning Graph Structures with Transformer for
-Multivariate Time Series Anomaly Detection in IoT
-Zekai Chen, Student Member, IEEE, Dingshuo Chen, Xiao Zhang, Member, IEEE, Zixuan Yuan,
-and Xiuzhen Cheng, Fellow, IEEE
-
-## Formula Slots
-
-<!-- formula_id: formula_001 | origin: parser_latex | section:  | page: 3 | bbox: [371.25, 81.75, 563.25, 105.0] | ocr_status: cropped -->
-```latex
-z^{i,j} = \underset{c \in \{0,1\}}{\arg \max} (\log \pi_c^{i,j} + g_c^{i,j})
-```
-
-<!-- formula_id: formula_002 | origin: parser_latex | section:  | page: 3 | bbox: [353.25, 186.75, 563.25, 223.13671875] | ocr_status: cropped -->
-```latex
-z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j} + g_c^{i,j})/\tau)}{\sum_{v \in \{0,1\}} \exp((\log \pi_v^{i,j} + g_v^{i,j})/\tau)}
-```
-
-<!-- formula_id: formula_004 | origin: parser_latex | section:  | page: 4 | bbox: [117.0, 474.75, 300.0, 501.57421875] | ocr_status: cropped -->
-```latex
-\mathcal{L}_s = \sum_{1 \le i, j \le M, i \ne j} \log \pi_1^{i,j} \tag{4}
-```
-
-<!-- formula_id: formula_005 | origin: parser_latex | section: j∈N (i)
-hΘ(xi||xj −xj||xj + xi)
-(3) | page: 4 | bbox: [345.75, 686.8125, 563.25, 714.65625] | ocr_status: cropped -->
-```latex
-\frac{QK^T}{\sqrt{d_k}}
-```
-
-<!-- formula_id: formula_006 | origin: parser_latex | section:  | page: 5 | bbox: [55.58203125, 252.52734375, 298.23046875, 279.59765625] | ocr_status: cropped -->
-```latex
-MultiHead(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = Concat(head_1, \cdots, head_h)W^O
-```
-
-<!-- formula_id: formula_007 | origin: parser_latex | section:  | page: 5 | bbox: [84.0, 301.5, 298.529296875, 317.49609375] | ocr_status: cropped -->
-```latex
-head_i = Attention(\mathbf{Q}W_i^Q, \mathbf{K}W_i^K, \mathbf{V}W_i^V)
-```
-
-<!-- formula_id: formula_011 | origin: parser_latex | section:  | page: 6 | bbox: [106.5, 191.8125, 300.75, 219.65625] | ocr_status: cropped -->
-```latex
-\mathcal{L}_{mse} = \frac{1}{M} \sum_{t=1}^{n} ||\mathcal{Y}^{(t)} - \hat{\mathcal{Y}}^{(t)}||_{2}^{2}
-```
-
-<!-- formula_id: formula_012 | origin: parser_latex | section:  | page: 6 | bbox: [117.0, 263.7421875, 300.75, 296.2265625] | ocr_status: cropped -->
-```latex
-\hat{\mathbf{y}}^{(t)} = \sum_{i=1}^{M} ||\mathcal{Y}_i^{(t)} - \hat{\mathcal{Y}}_i^{(t)}||_2^2
-```
-
-<!-- formula_id: formula_013 | origin: parser_latex | section: A(2) = Global(X(2)) | page: 6 | bbox: [371.14453125, 509.25, 563.25, 533.28515625] | ocr_status: cropped -->
-```latex
-\tilde{x} = \frac{x - \min X_{train}}{\max X_{train} - \min X_{train}} \tag{12}
-```
-
-<!-- formula_id: formula_014 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
-(8) | page: 6 | bbox: [385.5, 604.5, 563.25, 629.578125] | ocr_status: cropped -->
-```latex
-Precision = \frac{TP}{TP + FP}
-```
-
-<!-- formula_id: formula_015 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
-(8) | page: 6 | bbox: [390.75, 632.25, 563.25, 657.03515625] | ocr_status: cropped -->
-```latex
-Recall = \frac{TP}{TP + FN}
-```
-
-<!-- formula_id: formula_016 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
-(8) | page: 6 | bbox: [373.5, 659.25, 563.25, 685.65234375] | ocr_status: cropped -->
-```latex
-F1 = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
-```

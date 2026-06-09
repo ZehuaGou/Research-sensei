@@ -34,7 +34,10 @@ class FormulaSlot(SenseiModel):
     marker_latex: str = ""  # LaTeX extracted from Marker block (if available)
     nearby_text_before: str = ""  # text before formula in reading order
     nearby_text_after: str = ""  # text after formula in reading order
-    section: str = ""  # inferred section name
+    section: str = ""  # inferred section name (trusted only: Abstract, Introduction, etc.)
+    section_confidence: str = "low"  # "high" | "medium" | "low"
+    section_source: str = "unknown"  # "heading_above" | "page_context" | "unknown"
+    section_reason: str = ""  # human-readable explanation
     slot_marker: str = ""  # Marker block ID
     crop_path: str = ""  # path to cropped formula image (relative to paper output dir)
     ocr_latex: str = ""  # OCR result (only when triggered)

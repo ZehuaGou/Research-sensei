@@ -752,9 +752,9 @@ class MaterialNormalizer:
         if formula_slots:
             for fs in formula_slots:
                 sec = fs.section.strip() if fs.section else ""
-                if sec and sec in _STANDARD_SECTIONS:
+                if sec in _STANDARD_SECTIONS:
                     formulas_by_section[sec].append(fs)
-                elif sec:
+                elif sec and sec != "Unknown":
                     # Non-standard section — try to match
                     matched = False
                     for std in _STANDARD_SECTIONS:
@@ -765,6 +765,7 @@ class MaterialNormalizer:
                     if not matched:
                         unmatched_formulas.append(fs)
                 else:
+                    # Unknown or empty section
                     unmatched_formulas.append(fs)
 
         def _render_formula_slot(fs):
@@ -774,10 +775,14 @@ class MaterialNormalizer:
             origin_val = fs.final_origin.value if fs.final_origin else "unresolved"
             ocr_val = fs.ocr_status.value if hasattr(fs.ocr_status, 'value') else str(fs.ocr_status)
             unresolved_reason = f" | unresolved_reason: {fs.unresolved_reason}" if fs.unresolved_reason else ""
+            sec_conf = getattr(fs, 'section_confidence', 'low')
+            sec_source = getattr(fs, 'section_source', 'unknown')
+            sec_reason = getattr(fs, 'section_reason', '')
             result.append(
                 f"<!-- formula_id: {fs.formula_id} | origin: {origin_val} | "
                 f"section: {fs.section} | page: {fs.page} | bbox: {bbox_str} | "
-                f"ocr_status: {ocr_val}{unresolved_reason} -->"
+                f"ocr_status: {ocr_val} | section_confidence: {sec_conf} | "
+                f"section_source: {sec_source} | section_reason: {sec_reason}{unresolved_reason} -->"
             )
             if fs.final_latex:
                 result.append("```latex")
@@ -791,7 +796,9 @@ class MaterialNormalizer:
             return result
 
         # Sections in standard order — insert formulas into matching sections
-        for section_name in _STANDARD_SECTIONS:
+        # Stop at References (unmatched formulas go before References)
+        sections_to_render = [s for s in _STANDARD_SECTIONS if s != "References"]
+        for section_name in sections_to_render:
             content = paper.sections.get(section_name, "").strip()
             lines.append(f"## {section_name}")
             lines.append("")
@@ -808,28 +815,42 @@ class MaterialNormalizer:
                 for fs in formulas_by_section[section_name]:
                     lines.extend(_render_formula_slot(fs))
 
-        # Any non-standard sections
+        # Unmatched formulas — group by page, insert BEFORE References
+        if unmatched_formulas:
+            by_page: dict[int, list] = defaultdict(list)
+            for fs in unmatched_formulas:
+                by_page[fs.page].append(fs)
+            for page_num in sorted(by_page.keys()):
+                lines.append(f"## Page {page_num} Formulas")
+                lines.append("")
+                for fs in by_page[page_num]:
+                    lines.extend(_render_formula_slot(fs))
+
+        # Any non-standard sections (after References position)
         for section_name, content in paper.sections.items():
             if section_name not in _STANDARD_SECTIONS and section_name != "Title" and content.strip():
                 lines.append(f"## {section_name}")
                 lines.append("")
                 lines.append(content)
                 lines.append("")
-                # Insert formulas for this non-standard section
                 if section_name in formulas_by_section:
                     lines.append(f"### Formula Slots")
                     lines.append("")
                     for fs in formulas_by_section[section_name]:
                         lines.extend(_render_formula_slot(fs))
 
-        # Unmatched formulas (no section detected) → Appendix / Formula Slots
-        if unmatched_formulas:
-            lines.append("## Formula Slots")
+        # References always comes last
+        ref_content = paper.sections.get("References", "").strip()
+        lines.append("## References")
+        lines.append("")
+        if ref_content:
+            lines.append(ref_content)
             lines.append("")
-            for fs in unmatched_formulas:
-                lines.extend(_render_formula_slot(fs))
+        else:
+            lines.append("<!-- Section not available: References -->")
+            lines.append("")
 
-        elif paper.formula_blocks:
+        if paper.formula_blocks:
             # Fallback to legacy formula block format
             lines.append("## Formula Blocks")
             lines.append("")

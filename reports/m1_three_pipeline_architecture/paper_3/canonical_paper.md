@@ -346,6 +346,23 @@ Equation 2, we get a variety of different variational mu-
 tual information estimators, including MINE [7], NWJ [7],
 InfoNCE [66], and JSD [22].
 
+### Formula Slots
+
+<!-- formula_id: formula_001 | origin: parser_latex | section: Introduction | page: 2 | bbox: [79.5, 527.09765625, 298.23046875, 557.26171875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: introduction -->
+```latex
+I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \mathbb{P}(x,y) \log \left( \frac{\mathbb{P}(x,y)}{\mathbb{P}(x)\mathbb{P}(y)} \right)
+```
+
+<!-- formula_id: formula_002 | origin: parser_latex | section: Introduction | page: 2 | bbox: [309.884765625, 294.29296875, 565.5, 346.5] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: introduction -->
+```latex
+I_{\text{UBA}}(X,Y) \triangleq \mathbb{E}_{p(x,y)}[\log q(x|y)] + h(X)
+```
+
+<!-- formula_id: formula_003 | origin: parser_latex | section: Introduction | page: 2 | bbox: [388.5, 393.6796875, 563.25, 418.4296875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: introduction -->
+```latex
+q(x|y) = \frac{p(x)}{Z(y)}e^{f(x,y)}
+```
+
 ## Related Work
 
 Time Series Anomaly Detection. Many time series anomaly
@@ -2230,6 +2247,83 @@ To the best of our knowledge, our proposal is the first to
 use mutual information for unsupervised time series anomaly
 detection.
 
+### Formula Slots
+
+<!-- formula_id: formula_004 | origin: parser_latex | section: Method | page: 3 | bbox: [90.75, 662.0625, 300.75, 689.90625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t:t+B} - \mathbb{E}[\mathbf{s}_{t:t+B}]}{\sqrt{\text{Var}[\mathbf{s}_{t:t+B}] + \epsilon}} \cdot \gamma_1 + \beta_1
+```
+
+<!-- formula_id: formula_005 | origin: parser_latex | section: Method | page: 3 | bbox: [398.0390625, 204.75, 563.25, 215.7890625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{H}_{\text{emb}} = \mathbf{W}_{\text{emb}} \cdot \mathbf{H} \tag{5}
+```
+
+<!-- formula_id: formula_006 | origin: parser_latex | section: Method | page: 3 | bbox: [383.994140625, 267.609375, 563.25, 349.59375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cdot \mathbf{H}_{\text{emb}}
+```
+
+<!-- formula_id: formula_007 | origin: parser_latex | section: Method | page: 3 | bbox: [372.75, 469.86328125, 563.25, 486.10546875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} \cdot [\mathbf{Y}_1^1, \dots, \mathbf{Y}_1^M]^\top \tag{7}
+```
+
+<!-- formula_id: formula_008 | origin: parser_latex | section: Method | page: 3 | bbox: [355.5, 557.25, 563.25, 588.19921875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{\mathbf{Y}_{1} - \mathbb{E}[\mathbf{Y}_{1}]}{\sqrt{\operatorname{Var}[\mathbf{Y}_{1}] + \epsilon}} \cdot \gamma_{2} + \beta_{2}
+```
+
+<!-- formula_id: formula_009 | origin: parser_latex | section: Method | page: 3 | bbox: [375.0, 674.05078125, 563.25, 687.19921875] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \cdot \mathbf{Y}_2) \tag{9}
+```
+
+<!-- formula_id: formula_010 | origin: parser_latex | section: Method | page: 4 | bbox: [368.25, 516.26953125, 563.25, 561.90234375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\begin{aligned} \mathbf{Y}_{\text{sta}}^{I} &= \text{identity}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{aux}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{I}, \mathbf{Y}_{\text{aux}}^{S}) \cdot \mathbf{W}_{p} \end{aligned} \tag{10}
+```
+
+<!-- formula_id: formula_011 | origin: parser_latex | section: Method | page: 4 | bbox: [372.75, 602.12109375, 563.25, 616.81640625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{L}_{aux} = \|\text{shuffle}(\mathbf{Y}) - \hat{\mathbf{Y}}_{aux}\|_{\mathcal{F}}^{2}
+```
+
+<!-- formula_id: formula_012 | origin: parser_latex | section: Method | page: 5 | bbox: [106.5, 94.359375, 301.5, 138.0] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\begin{aligned} \mathbf{Y}_{\text{sta}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{I} &= \text{identity}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{sta}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{S}, \mathbf{Y}_{\text{aux}}^{I}) \cdot \mathbf{W}_{p} \end{aligned} \tag{12}
+```
+
+<!-- formula_id: formula_013 | origin: parser_latex | section: Method | page: 5 | bbox: [100.5, 335.25, 300.75, 348.43359375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{L}_{\text{sta}} = \|\mathbf{Y} - \hat{\mathbf{Y}}_{\text{sta}}\|_{\mathcal{F}}^2 - I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})
+```
+
+<!-- formula_id: formula_014 | origin: parser_latex | section: Method | page: 5 | bbox: [46.5, 444.33984375, 304.5, 469.86328125] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb{P}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}[f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})] - \mathbb{E}_{\mathbb{P}(\mathbf{Y}_{\text{sta}})}[\mathbb{E}_{\mathbb{P}(\mathbf{Y})}[e^{f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}]]
+```
+
+<!-- formula_id: formula_015 | origin: parser_latex | section: Method | page: 5 | bbox: [106.5, 504.75, 300.75, 520.5234375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}}) = \phi_{\theta}(\mathbf{Y})^{\top} \phi_{\theta}(\mathbf{Y}_{\text{sta}}),
+```
+
+<!-- formula_id: formula_016 | origin: parser_latex | section: Method | page: 5 | bbox: [367.5, 509.25, 563.25, 522.0] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{L}_{\text{reg}} = \|\mathbf{Y}'_{u} \cdot \mathbf{W}_{p} - \mathbf{Y}'_{y} \cdot \mathbf{W}_{p}\|_{\mathcal{F}}^{2}
+```
+
+<!-- formula_id: formula_017 | origin: parser_latex | section: Method | page: 5 | bbox: [362.25, 666.0, 563.25, 676.5] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{L} = \lambda_1 \cdot \mathcal{L}_{\text{sta}} + \lambda_2 \cdot \mathcal{L}_{\text{aux}} + \lambda_3 \cdot \mathcal{L}_{\text{reg}}
+```
+
+<!-- formula_id: formula_018 | origin: parser_latex | section: Method | page: 6 | bbox: [122.25, 465.75, 300.75, 477.984375] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: methodology -->
+```latex
+\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{aux}}) \tag{18}
+```
+
 ## Experiments
 
 A. Experimental Settings
@@ -2500,6 +2594,17 @@ information [17], continual learning settings [73], and concept
 drift settings [62], [69]. It is also of interest to study different
 approaches such as ensemble learning [26] and explainabil-
 ity [27] to further improve anomaly detection accuracy.
+
+## Other
+
+An Encode-then-Decompose Approach to
+Unsupervised Time Series Anomaly Detection on
+Contaminated Training Data–Extended Version
+Buang Zhang1, Tung Kieu2, Xiangfei Qiu1, Chenjuan Guo1, Jilin Hu1
+Aoying Zhou1, Christian S. Jensen2, Bin Yang1
+1School of Data Science & Engineering, East China Normal University, Shanghai, China
+2Department of Computer Science, Aalborg University, Aalborg, Denmark
+1{buazhang, xfqiu}@stu.ecnu.edu.cn, 1{cjguo, jlhu, ayzhou, byang}@dase.ecnu.edu.cn, 2{tungkvt,csj}@cs.aau.dk
 
 ## References
 
@@ -2811,132 +2916,3 @@ H. Chen, “Deep autoencoding gaussian mixture model for unsupervised
 anomaly detection,” in Proceedings of the International Conference on
 Learning Representations (ICLR), 2018.
 15
-
-## Other
-
-An Encode-then-Decompose Approach to
-Unsupervised Time Series Anomaly Detection on
-Contaminated Training Data–Extended Version
-Buang Zhang1, Tung Kieu2, Xiangfei Qiu1, Chenjuan Guo1, Jilin Hu1
-Aoying Zhou1, Christian S. Jensen2, Bin Yang1
-1School of Data Science & Engineering, East China Normal University, Shanghai, China
-2Department of Computer Science, Aalborg University, Aalborg, Denmark
-1{buazhang, xfqiu}@stu.ecnu.edu.cn, 1{cjguo, jlhu, ayzhou, byang}@dase.ecnu.edu.cn, 2{tungkvt,csj}@cs.aau.dk
-
-## Formula Slots
-
-<!-- formula_id: formula_001 | origin: parser_latex | section: Training Data Clean Time Series
-Contaminated Time Series | page: 2 | bbox: [79.5, 527.09765625, 298.23046875, 557.26171875] | ocr_status: cropped -->
-```latex
-I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \mathbb{P}(x,y) \log \left( \frac{\mathbb{P}(x,y)}{\mathbb{P}(x)\mathbb{P}(y)} \right)
-```
-
-<!-- formula_id: formula_002 | origin: parser_latex | section: Training Data Clean Time Series
-Contaminated Time Series | page: 2 | bbox: [309.884765625, 294.29296875, 565.5, 346.5] | ocr_status: cropped -->
-```latex
-I_{\text{UBA}}(X,Y) \triangleq \mathbb{E}_{p(x,y)}[\log q(x|y)] + h(X)
-```
-
-<!-- formula_id: formula_003 | origin: parser_latex | section: Training Data Clean Time Series
-Contaminated Time Series | page: 2 | bbox: [388.5, 393.6796875, 563.25, 418.4296875] | ocr_status: cropped -->
-```latex
-q(x|y) = \frac{p(x)}{Z(y)}e^{f(x,y)}
-```
-
-<!-- formula_id: formula_004 | origin: parser_latex | section: Given a time series T
-= ⟨s1, s2, . . . , sN⟩, we aim at
-computing an anomaly sco | page: 3 | bbox: [90.75, 662.0625, 300.75, 689.90625] | ocr_status: cropped -->
-```latex
-\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t:t+B} - \mathbb{E}[\mathbf{s}_{t:t+B}]}{\sqrt{\text{Var}[\mathbf{s}_{t:t+B}] + \epsilon}} \cdot \gamma_1 + \beta_1
-```
-
-<!-- formula_id: formula_005 | origin: parser_latex | section: A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
-time-ordered observatio | page: 3 | bbox: [398.0390625, 204.75, 563.25, 215.7890625] | ocr_status: cropped -->
-```latex
-\mathbf{H}_{\text{emb}} = \mathbf{W}_{\text{emb}} \cdot \mathbf{H} \tag{5}
-```
-
-<!-- formula_id: formula_006 | origin: parser_latex | section: A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
-time-ordered observatio | page: 3 | bbox: [383.994140625, 267.609375, 563.25, 349.59375] | ocr_status: cropped -->
-```latex
-\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cdot \mathbf{H}_{\text{emb}}
-```
-
-<!-- formula_id: formula_007 | origin: parser_latex | section: Given a time series T
-= ⟨s1, s2, . . . , sN⟩, we aim at
-computing an anomaly sco | page: 3 | bbox: [372.75, 469.86328125, 563.25, 486.10546875] | ocr_status: cropped -->
-```latex
-\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} \cdot [\mathbf{Y}_1^1, \dots, \mathbf{Y}_1^M]^\top \tag{7}
-```
-
-<!-- formula_id: formula_008 | origin: parser_latex | section: Given a time series T
-= ⟨s1, s2, . . . , sN⟩, we aim at
-computing an anomaly sco | page: 3 | bbox: [355.5, 557.25, 563.25, 588.19921875] | ocr_status: cropped -->
-```latex
-\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{\mathbf{Y}_{1} - \mathbb{E}[\mathbf{Y}_{1}]}{\sqrt{\operatorname{Var}[\mathbf{Y}_{1}] + \epsilon}} \cdot \gamma_{2} + \beta_{2}
-```
-
-<!-- formula_id: formula_009 | origin: parser_latex | section: Given a time series T
-= ⟨s1, s2, . . . , sN⟩, we aim at
-computing an anomaly sco | page: 3 | bbox: [375.0, 674.05078125, 563.25, 687.19921875] | ocr_status: cropped -->
-```latex
-\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \cdot \mathbf{Y}_2) \tag{9}
-```
-
-<!-- formula_id: formula_010 | origin: parser_latex | section: Y1 = Wmult · [Y1
-1, . . . , YM
-1 ]⊤
-(7) | page: 4 | bbox: [368.25, 516.26953125, 563.25, 561.90234375] | ocr_status: cropped -->
-```latex
-\begin{aligned} \mathbf{Y}_{\text{sta}}^{I} &= \text{identity}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{aux}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{I}, \mathbf{Y}_{\text{aux}}^{S}) \cdot \mathbf{W}_{p} \end{aligned} \tag{10}
-```
-
-<!-- formula_id: formula_011 | origin: parser_latex | section: Var[Y1] + ϵ
-· γ2 + β2
-(8) | page: 4 | bbox: [372.75, 602.12109375, 563.25, 616.81640625] | ocr_status: cropped -->
-```latex
-\mathcal{L}_{aux} = \|\text{shuffle}(\mathbf{Y}) - \hat{\mathbf{Y}}_{aux}\|_{\mathcal{F}}^{2}
-```
-
-<!-- formula_id: formula_012 | origin: parser_latex | section: Add & Norm | page: 5 | bbox: [106.5, 94.359375, 301.5, 138.0] | ocr_status: cropped -->
-```latex
-\begin{aligned} \mathbf{Y}_{\text{sta}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{I} &= \text{identity}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{sta}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{S}, \mathbf{Y}_{\text{aux}}^{I}) \cdot \mathbf{W}_{p} \end{aligned} \tag{12}
-```
-
-<!-- formula_id: formula_013 | origin: parser_latex | section: (b) EDAD Achitecture
-(a) Attention Module | page: 5 | bbox: [100.5, 335.25, 300.75, 348.43359375] | ocr_status: cropped -->
-```latex
-\mathcal{L}_{\text{sta}} = \|\mathbf{Y} - \hat{\mathbf{Y}}_{\text{sta}}\|_{\mathcal{F}}^2 - I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})
-```
-
-<!-- formula_id: formula_014 | origin: parser_latex | section: (b) EDAD Achitecture
-(a) Attention Module | page: 5 | bbox: [46.5, 444.33984375, 304.5, 469.86328125] | ocr_status: cropped -->
-```latex
-I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb{P}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}[f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})] - \mathbb{E}_{\mathbb{P}(\mathbf{Y}_{\text{sta}})}[\mathbb{E}_{\mathbb{P}(\mathbf{Y})}[e^{f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}]]
-```
-
-<!-- formula_id: formula_015 | origin: parser_latex | section: 2
-and Yaux ∈RB× d | page: 5 | bbox: [106.5, 504.75, 300.75, 520.5234375] | ocr_status: cropped -->
-```latex
-f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}}) = \phi_{\theta}(\mathbf{Y})^{\top} \phi_{\theta}(\mathbf{Y}_{\text{sta}}),
-```
-
-<!-- formula_id: formula_016 | origin: parser_latex | section: 2
-and Yaux ∈RB× d | page: 5 | bbox: [367.5, 509.25, 563.25, 522.0] | ocr_status: cropped -->
-```latex
-\mathcal{L}_{\text{reg}} = \|\mathbf{Y}'_{u} \cdot \mathbf{W}_{p} - \mathbf{Y}'_{y} \cdot \mathbf{W}_{p}\|_{\mathcal{F}}^{2}
-```
-
-<!-- formula_id: formula_017 | origin: parser_latex | section: Laux = ∥shuffle(Y) −ˆYaux∥2
-F
-(11) | page: 5 | bbox: [362.25, 666.0, 563.25, 676.5] | ocr_status: cropped -->
-```latex
-\mathcal{L} = \lambda_1 \cdot \mathcal{L}_{\text{sta}} + \lambda_2 \cdot \mathcal{L}_{\text{aux}} + \lambda_3 \cdot \mathcal{L}_{\text{reg}}
-```
-
-<!-- formula_id: formula_018 | origin: parser_latex | section: Lsta = ∥Y −ˆYsta∥2
-F −Iθ(Y, Ysta)
-(13) | page: 6 | bbox: [122.25, 465.75, 300.75, 477.984375] | ocr_status: cropped -->
-```latex
-\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{aux}}) \tag{18}
-```

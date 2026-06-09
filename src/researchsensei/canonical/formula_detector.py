@@ -151,7 +151,14 @@ class MarkerDocumentFormulaDetector:
         return slots
 
     def _enrich_with_pymupdf_context(self, pdf_path: Path, slots: list[FormulaSlot]) -> None:
-        """Enrich formula slots with nearby text and section using PyMuPDF."""
+        """Enrich formula slots with nearby text and section using PyMuPDF.
+
+        Strategy:
+        1. Scan ALL pages, extract first line of each text block as heading candidate
+        2. Normalize heading candidates — only trust known section names
+        3. Build page→section mapping via cross-page timeline
+        4. For each formula, assign section from timeline + collect nearby text
+        """
         try:
             import fitz
         except ImportError:
@@ -165,32 +172,94 @@ class MarkerDocumentFormulaDetector:
             return
 
         try:
+            # Step 1: Scan all pages for heading candidates
+            # Extract first line of each text block, check if it's a heading
+            page_headings: dict[int, list[tuple[float, str]]] = {}
+            for page_idx in range(len(doc)):
+                page = doc[page_idx]
+                blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+                headings_on_page = []
+                for block in blocks:
+                    if block.get("type") != 0:
+                        continue
+                    bb = block.get("bbox", (0, 0, 0, 0))
+                    # Extract first line text and its font info
+                    first_line_text = ""
+                    first_line_font_size = 0
+                    first_line_bold = False
+                    for line in block.get("lines", []):
+                        line_text = ""
+                        line_max_fs = 0
+                        line_bold = False
+                        for span in line.get("spans", []):
+                            line_text += span.get("text", "")
+                            fs = span.get("size", 0)
+                            if fs > line_max_fs:
+                                line_max_fs = fs
+                            flags = span.get("flags", 0)
+                            if flags & 2**4:
+                                line_bold = True
+                        line_text = line_text.strip()
+                        if line_text:
+                            first_line_text = line_text
+                            first_line_font_size = line_max_fs
+                            first_line_bold = line_bold
+                            break  # Only need first line
+
+                    if not first_line_text:
+                        continue
+
+                    # Check if first line looks like a heading
+                    is_heading = False
+                    if first_line_font_size >= 14:
+                        is_heading = True
+                    if first_line_bold and first_line_font_size >= 11:
+                        is_heading = True
+                    # IEEE-style: Roman numeral + uppercase, e.g. "V. EXPERIMENTS"
+                    import re
+                    if re.match(r'^[IVXLC]+\.\s+[A-Z]', first_line_text):
+                        is_heading = True
+                    # Numbered section: "1. Introduction", "2.1 Background"
+                    if re.match(r'^\d+(\.\d+)?\.\s+\w', first_line_text):
+                        is_heading = True
+
+                    if is_heading:
+                        headings_on_page.append((bb[1], first_line_text))
+
+                page_headings[page_idx] = headings_on_page
+
+            # Step 2: Build section timeline — walk pages in order, track last trusted section
+            section_timeline: dict[int, tuple[str, str, str]] = {}
+            last_section = ("Unknown", "low", "no_heading_found")
+            for page_idx in range(len(doc)):
+                for y_pos, heading_text in sorted(page_headings.get(page_idx, [])):
+                    sec_name, sec_conf, sec_reason = _normalize_section_name(heading_text)
+                    if sec_name != "Unknown":
+                        last_section = (sec_name, sec_conf, sec_reason)
+                section_timeline[page_idx] = last_section
+
+            # Step 3: Enrich each formula slot
             for slot in slots:
                 if not slot.bbox or len(slot.bbox) != 4:
                     continue
-                page_idx = slot.page - 1  # Marker pages are 1-based, PyMuPDF is 0-based
+                page_idx = slot.page - 1
                 if page_idx < 0 or page_idx >= len(doc):
                     continue
 
                 page = doc[page_idx]
                 fx1, fy1, fx2, fy2 = slot.bbox
 
-                # Extract all text blocks from the page
                 blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
 
                 text_before_parts = []
                 text_after_parts = []
-                section_heading = ""
-                heading_y = -1
 
                 for block in blocks:
-                    if block.get("type") != 0:  # text block
+                    if block.get("type") != 0:
                         continue
-                    # Get block bbox
                     bb = block.get("bbox", (0, 0, 0, 0))
                     bx1, by1, bx2, by2 = bb
 
-                    # Extract block text
                     block_text = ""
                     for line in block.get("lines", []):
                         for span in line.get("spans", []):
@@ -200,38 +269,21 @@ class MarkerDocumentFormulaDetector:
                     if not block_text:
                         continue
 
-                    # Check if this block is a heading (larger font or bold)
-                    is_heading = False
-                    max_font_size = 0
-                    for line in block.get("lines", []):
-                        for span in line.get("spans", []):
-                            fs = span.get("size", 0)
-                            if fs > max_font_size:
-                                max_font_size = fs
-                            flags = span.get("flags", 0)
-                            if flags & 2**4:  # bold bit
-                                is_heading = True
-                    if max_font_size >= 12:
-                        is_heading = True
-
-                    # Text above the formula
                     if by2 < fy1:
-                        if is_heading and by1 > heading_y:
-                            section_heading = block_text
-                            heading_y = by1
-                        else:
-                            text_before_parts.append(block_text)
-
-                    # Text below the formula
+                        text_before_parts.append(block_text)
                     elif by1 > fy2:
                         text_after_parts.append(block_text)
 
-                # Set nearby text (last 500 chars before, first 500 chars after)
                 slot.nearby_text_before = "\n".join(text_before_parts)[-500:] if text_before_parts else ""
                 slot.nearby_text_after = "\n".join(text_after_parts)[:500] if text_after_parts else ""
 
-                # Set section from nearest heading above
-                slot.section = _normalize_section_name(section_heading) if section_heading else ""
+                sec_name, sec_conf, sec_reason = section_timeline.get(
+                    page_idx, ("Unknown", "low", "no_heading_found")
+                )
+                slot.section = sec_name
+                slot.section_confidence = sec_conf
+                slot.section_source = "heading_above" if sec_name != "Unknown" else "unknown"
+                slot.section_reason = sec_reason
         finally:
             doc.close()
 
@@ -249,46 +301,104 @@ def _is_valid_bbox(bbox) -> bool:
     return False
 
 
-def _normalize_section_name(heading_text: str) -> str:
-    """Map a heading text to a standard section name."""
+_TRUSTED_SECTIONS = {
+    "abstract": "Abstract",
+    "introduction": "Introduction",
+    "related work": "Related Work",
+    "related works": "Related Work",
+    "background": "Related Work",
+    "preliminaries": "Related Work",
+    "problem statement": "Related Work",
+    "method": "Method",
+    "methods": "Method",
+    "methodology": "Method",
+    "approach": "Method",
+    "proposed method": "Method",
+    "proposed approach": "Method",
+    "model": "Method",
+    "model architecture": "Method",
+    "experiments": "Experiments",
+    "experimental results": "Experiments",
+    "evaluation": "Experiments",
+    "experiments and results": "Experiments",
+    "results": "Experiments",
+    "discussion": "Experiments",
+    "conclusion": "Conclusion",
+    "conclusions": "Conclusion",
+    "summary": "Conclusion",
+    "conclusion and future work": "Conclusion",
+    "references": "References",
+    "appendix": "Appendix",
+}
+
+_FORMULA_TEXT_PATTERNS = [
+    r'[=∑√σλτπ∈⊙]',
+    r'\\(?:frac|sum|int|partial|alpha|beta|gamma|delta|mathcal|mathbb|mathrm|sqrt|oplus|otimes)',
+    r'(?:Attention|Softmax|Gumbel|argmax|argmin|Sigmoid|ReLU|ELU|LeakyReLU)\s*\(',
+    r'[A-Z]\(\d+\)\s*=\s*\w',  # A(2) = Global(X(2))
+    r'[A-Z]\(\d\)\s*[=∈⊂⊂≥≤]',  # A(2) = ... or X(2) ∈ ...
+    r'(?:Global|Local|Encoder|Decoder|Attention)\s*\(',
+    r'\b[A-Z]\s*=\s*(?:Softmax|Linear|Conv|Norm)',
+    r'(?:Q|K|V)\s*=\s*(?:Softmax|Linear)',
+    r'\\\[|\\\]',
+    r'\$\$',
+    r'j\s*∈\s*N',  # j∈N
+    r'[a-z]\s*∈\s*[A-Z]',  # i ∈ N
+]
+
+
+def _looks_like_formula_text(text: str) -> bool:
+    """Check if text looks like a formula rather than a section heading."""
+    import re
+    for pattern in _FORMULA_TEXT_PATTERNS:
+        if re.search(pattern, text):
+            return True
+    return False
+
+
+def _normalize_section_name(heading_text: str) -> tuple[str, str, str]:
+    """Map a heading text to a standard section name.
+
+    Returns:
+        (section_name, confidence, reason) where:
+        - section_name: trusted section name or "Unknown"
+        - confidence: "high", "medium", or "low"
+        - reason: human-readable explanation
+    """
     import re
     text = heading_text.strip()
+    if not text:
+        return ("Unknown", "low", "empty_heading")
+
+    # Reject formula text early
+    if _looks_like_formula_text(text):
+        return ("Unknown", "low", f"formula_text_detected: {text[:50]}")
+
+    # Reject very long headings (likely not a section title)
+    if len(text) > 80:
+        return ("Unknown", "low", f"heading_too_long: {len(text)} chars")
+
+    # Reject headings with too many special characters
+    alpha_ratio = sum(c.isalpha() or c.isspace() for c in text) / max(len(text), 1)
+    if alpha_ratio < 0.5:
+        return ("Unknown", "low", f"low_alpha_ratio: {alpha_ratio:.2f}")
+
     # Remove leading numbers like "1.", "2.1", "I.", etc.
-    text = re.sub(r'^[\d\.]+\s*', '', text)
-    text = re.sub(r'^[IVXLC]+\.\s*', '', text, flags=re.IGNORECASE)
-    text = text.strip().lower()
+    cleaned = re.sub(r'^[\d\.]+\s*', '', text)
+    cleaned = re.sub(r'^[IVXLC]+\.\s*', '', cleaned, flags=re.IGNORECASE)
+    cleaned = cleaned.strip().lower()
 
-    section_map = {
-        "abstract": "Abstract",
-        "introduction": "Introduction",
-        "related work": "Related Work",
-        "related works": "Related Work",
-        "background": "Related Work",
-        "preliminaries": "Related Work",
-        "method": "Method",
-        "methods": "Method",
-        "methodology": "Method",
-        "approach": "Method",
-        "proposed method": "Method",
-        "proposed approach": "Method",
-        "model": "Method",
-        "experiments": "Experiments",
-        "experimental results": "Experiments",
-        "evaluation": "Experiments",
-        "experiments and results": "Experiments",
-        "results": "Experiments",
-        "conclusion": "Conclusion",
-        "conclusions": "Conclusion",
-        "summary": "Conclusion",
-        "references": "References",
-    }
+    # Exact match first
+    if cleaned in _TRUSTED_SECTIONS:
+        return (_TRUSTED_SECTIONS[cleaned], "high", f"exact_match: {cleaned}")
 
-    for key, standard in section_map.items():
-        if key in text:
-            return standard
+    # Substring match
+    for key, standard in _TRUSTED_SECTIONS.items():
+        if key in cleaned:
+            return (standard, "medium", f"substring_match: '{key}' in '{cleaned}'")
 
-    # Return original heading if no match (title-case)
-    return heading_text.strip()[:80]
+    # No trusted match — return Unknown
+    return ("Unknown", "low", f"no_trusted_match: {text[:50]}")
 
 
 def _extract_latex_from_block(text: str, html: str) -> str:

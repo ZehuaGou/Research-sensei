@@ -36,7 +36,9 @@
 | bbox count | 18 |
 | crop success count | 18 |
 | crop success rate | 18/18 |
-| section non-empty count | 18/18 |
+| section_known_count | 18 |
+| section_unknown_count | 0 |
+| polluted_section_count | **0** |
 | nearby_text_before non-empty | 18/18 |
 | nearby_text_after non-empty | 18/18 |
 
@@ -72,10 +74,11 @@
 | Question | Answer |
 |----------|--------|
 | canonical_paper.md exists | YES |
-| canonical_paper.md size | 96930 bytes |
+| canonical_paper.md size | 97925 bytes |
 | formula slot comments present | YES |
 | unresolved slots present | NO |
 | formula comments with empty section | 0 |
+| formulas after References | NO |
 
 ---
 

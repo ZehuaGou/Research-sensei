@@ -9,42 +9,14 @@ authors:
 year: 2022
 venue: "ICML 2022"
 source_type: pdf
-source_confidence: low
+source_confidence: 0.8
 canonicalization_status: success
 canonical_quality_status: PASS
 parser_used: pymupdf
 m2_ready: true
-parser_candidates: ['pymupdf', 'markitdown_pdf']
-selected_parser: pymupdf
-parser_quality_score: 78.9
-parser_selection_reason: "Good quality"
-body_selected_parser: pymupdf
-body_parser_quality_score: 78.9
-body_parser_selection_reason: "Good quality"
-formula_detector: marker_document
 formula_slot_count: 3
 formula_crop_count: 3
 parser_latex_count: 3
-canonical_quality_status_formula: all_resolved
-parser_quality_details:
-  pymupdf:
-    overall_score: 78.9
-    output_length: 22387
-    section_count: 0
-    long_concat_count: 0
-    spacing_quality: 1.0
-    cid_token_count: 0
-    formula_candidate_count: 0
-    garbled_line_ratio: 0.056
-  markitdown_pdf:
-    overall_score: 39.4
-    output_length: 46270
-    section_count: 0
-    long_concat_count: 210
-    spacing_quality: 0.928
-    cid_token_count: 3
-    formula_candidate_count: 0
-    garbled_line_ratio: 0.008
 ---
 
 # Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
@@ -77,13 +49,6 @@ train set affect the training of forecasting models,
 which are commonly used for time series anomaly
 detection, and show that our method improves the
 training of the model.
-
-### Formula Slots
-
-<!-- formula_id: formula_001 | origin: parser_latex | section: Abstract | page: 1 | bbox: [108.75, 339.5390625, 288.0703125, 370.4765625] | ocr_status: cropped -->
-```latex
-p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) & \text{if } z = 0\\ p^-(\mathbf{x}) & \text{if } z = 1, \end{cases}
-```
 
 ## Introduction
 
@@ -151,6 +116,13 @@ We demonstrate the effectiveness of our approach with a
 simple model for anomaly detection on the Yahoo anomaly
 detection dataset and on the electricity dataset for forecast-
 ing from a noisy training set.
+
+### Formula Slots
+
+<!-- formula_id: formula_001 | origin: parser_latex | section: Introduction | page: 1 | bbox: [108.75, 339.5390625, 288.0703125, 370.4765625] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: introduction -->
+```latex
+p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) & \text{if } z = 0\\ p^-(\mathbf{x}) & \text{if } z = 1, \end{cases}
+```
 
 ## Related Work
 
@@ -361,6 +333,18 @@ way we ensure that the trained model is only used on points
 coming from y+
 1:T .
 
+### Formula Slots
+
+<!-- formula_id: formula_002 | origin: parser_latex | section: Method | page: 2 | bbox: [123.0, 420.0, 290.25, 432.0] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: method -->
+```latex
+p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}
+```
+
+<!-- formula_id: formula_003 | origin: parser_latex | section: Method | page: 2 | bbox: [123.1171875, 436.5, 289.5, 447.8203125] | ocr_status: cropped | section_confidence: high | section_source: heading_above | section_reason: exact_match: method -->
+```latex
+p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}
+```
+
 ## Experiments
 
 We make our code available with an illustration notebook. 1
@@ -508,6 +492,11 @@ particles which would mimic the Monte Carlo approach of
 the training time.
 Monte Carlo EM for Deep Time Series Anomaly Detection
 
+## Other
+
+Monte Carlo EM for Deep Time Series Anomaly Detection
+Franc¸ois-Xavier Aubet 1 Daniel Z¨ugner 2 Jan Gasthaus 1
+
 ## References
 
 Benidis, K., Rangapuram, S. S., Flunkert, V., Wang,
@@ -589,20 +578,3 @@ Zhao, H., Wang, Y., Duan, J., Huang, C., Cao, D., Tong, Y.,
 Xu, B., Bai, J., Tong, J., and Zhang, Q. Multivariate time-
 series anomaly detection via graph attention network.
 arXiv preprint arXiv:2009.02040, 2020.
-
-## Other
-
-Monte Carlo EM for Deep Time Series Anomaly Detection
-Franc¸ois-Xavier Aubet 1 Daniel Z¨ugner 2 Jan Gasthaus 1
-
-## Formula Slots
-
-<!-- formula_id: formula_002 | origin: parser_latex | section: so that p(x) = � | page: 2 | bbox: [123.0, 420.0, 290.25, 432.0] | ocr_status: cropped -->
-```latex
-p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}
-```
-
-<!-- formula_id: formula_003 | origin: parser_latex | section: so that p(x) = � | page: 2 | bbox: [123.1171875, 436.5, 289.5, 447.8203125] | ocr_status: cropped -->
-```latex
-p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}
-```

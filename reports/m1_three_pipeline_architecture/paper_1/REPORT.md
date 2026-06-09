@@ -11,15 +11,14 @@
 | Question | Answer |
 |----------|--------|
 | body_selected_parser | `pymupdf` |
-| body parser score | `78.9` |
+| body parser score | `100.0` |
 | selection_reason | `Good quality` |
 
 ### Parser Scores
 
 | parser | overall_score | sections | formulas | spacing |
 |--------|--------------|----------|----------|---------|
-| pymupdf | 78.9 | 0 | 0 | 1.000 |
-| markitdown_pdf | 39.4 | 0 | 0 | 0.928 |
+| pymupdf | 100.0 | 8 | 3 | 1.000 |
 
 ---
 
@@ -37,7 +36,9 @@
 | bbox count | 3 |
 | crop success count | 3 |
 | crop success rate | 3/3 |
-| section non-empty count | 3/3 |
+| section_known_count | 3 |
+| section_unknown_count | 0 |
+| polluted_section_count | **0** |
 | nearby_text_before non-empty | 3/3 |
 | nearby_text_after non-empty | 3/3 |
 
@@ -66,10 +67,11 @@
 | Question | Answer |
 |----------|--------|
 | canonical_paper.md exists | YES |
-| canonical_paper.md size | 25335 bytes |
+| canonical_paper.md size | 24791 bytes |
 | formula slot comments present | YES |
 | unresolved slots present | NO |
 | formula comments with empty section | 0 |
+| formulas after References | NO |
 
 ---
 
@@ -88,7 +90,7 @@
 
 | Metric | Value |
 |--------|-------|
-| overlays generated | 3 |
+| overlays generated | 2 |
 | overlay_dir | formula_overlays/ |
 
 ---
