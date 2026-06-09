@@ -1,6 +1,6 @@
 # M1 Three-Pipeline Architecture — Eval Report (W3184127157)
 
-**Date**: 2026-06-08
+**Date**: 2026-06-09
 **PDF**: reports\m1_parser_review\paper_2\source.pdf
 **Title**: Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT
 
@@ -18,8 +18,7 @@
 
 | parser | overall_score | sections | formulas | spacing |
 |--------|--------------|----------|----------|---------|
-| pymupdf | 100.0 | 4 | 19 | 1.000 |
-| markitdown_pdf | 61.5 | 0 | 10 | 1.000 |
+| pymupdf | 100.0 | 8 | 16 | 1.000 |
 
 ---
 
@@ -37,6 +36,9 @@
 | bbox count | 16 |
 | crop success count | 16 |
 | crop success rate | 16/16 |
+| section non-empty count | 9/16 |
+| nearby_text_before non-empty | 16/16 |
+| nearby_text_after non-empty | 15/16 |
 
 ### Block Type Distribution
 
@@ -69,9 +71,11 @@
 
 | Question | Answer |
 |----------|--------|
-| canonical_paper.md exists | NO |
-| formula slot comments present | NO |
+| canonical_paper.md exists | YES |
+| canonical_paper.md size | 69692 bytes |
+| formula slot comments present | YES |
 | unresolved slots present | NO |
+| formula comments with empty section | 7 |
 
 ---
 
@@ -86,6 +90,15 @@
 
 ---
 
+## Formula Overlays
+
+| Metric | Value |
+|--------|-------|
+| overlays generated | 2 |
+| overlay_dir | formula_overlays/ |
+
+---
+
 ## OCR Status
 
 | Question | Answer |
@@ -97,6 +110,4 @@
 
 ## Remaining Work
 
-- formula_overlays/ not yet implemented (placeholder only)
 - OCR blocked (pix2tex model unavailable)
-- Section inference for FormulaSlots not yet implemented

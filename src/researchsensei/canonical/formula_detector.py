@@ -56,7 +56,10 @@ class MarkerDocumentFormulaDetector:
             return []
 
         try:
-            return self._detect_via_build_document(pdf_path)
+            slots = self._detect_via_build_document(pdf_path)
+            if slots:
+                self._enrich_with_pymupdf_context(pdf_path, slots)
+            return slots
         except Exception as exc:
             logger.warning("MarkerDocumentFormulaDetector failed: %s", exc)
             return []
@@ -147,6 +150,91 @@ class MarkerDocumentFormulaDetector:
         )
         return slots
 
+    def _enrich_with_pymupdf_context(self, pdf_path: Path, slots: list[FormulaSlot]) -> None:
+        """Enrich formula slots with nearby text and section using PyMuPDF."""
+        try:
+            import fitz
+        except ImportError:
+            logger.warning("PyMuPDF not available for context enrichment")
+            return
+
+        try:
+            doc = fitz.open(str(pdf_path))
+        except Exception as exc:
+            logger.warning("Failed to open PDF for context enrichment: %s", exc)
+            return
+
+        try:
+            for slot in slots:
+                if not slot.bbox or len(slot.bbox) != 4:
+                    continue
+                page_idx = slot.page - 1  # Marker pages are 1-based, PyMuPDF is 0-based
+                if page_idx < 0 or page_idx >= len(doc):
+                    continue
+
+                page = doc[page_idx]
+                fx1, fy1, fx2, fy2 = slot.bbox
+
+                # Extract all text blocks from the page
+                blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
+
+                text_before_parts = []
+                text_after_parts = []
+                section_heading = ""
+                heading_y = -1
+
+                for block in blocks:
+                    if block.get("type") != 0:  # text block
+                        continue
+                    # Get block bbox
+                    bb = block.get("bbox", (0, 0, 0, 0))
+                    bx1, by1, bx2, by2 = bb
+
+                    # Extract block text
+                    block_text = ""
+                    for line in block.get("lines", []):
+                        for span in line.get("spans", []):
+                            block_text += span.get("text", "")
+                        block_text += "\n"
+                    block_text = block_text.strip()
+                    if not block_text:
+                        continue
+
+                    # Check if this block is a heading (larger font or bold)
+                    is_heading = False
+                    max_font_size = 0
+                    for line in block.get("lines", []):
+                        for span in line.get("spans", []):
+                            fs = span.get("size", 0)
+                            if fs > max_font_size:
+                                max_font_size = fs
+                            flags = span.get("flags", 0)
+                            if flags & 2**4:  # bold bit
+                                is_heading = True
+                    if max_font_size >= 12:
+                        is_heading = True
+
+                    # Text above the formula
+                    if by2 < fy1:
+                        if is_heading and by1 > heading_y:
+                            section_heading = block_text
+                            heading_y = by1
+                        else:
+                            text_before_parts.append(block_text)
+
+                    # Text below the formula
+                    elif by1 > fy2:
+                        text_after_parts.append(block_text)
+
+                # Set nearby text (last 500 chars before, first 500 chars after)
+                slot.nearby_text_before = "\n".join(text_before_parts)[-500:] if text_before_parts else ""
+                slot.nearby_text_after = "\n".join(text_after_parts)[:500] if text_after_parts else ""
+
+                # Set section from nearest heading above
+                slot.section = _normalize_section_name(section_heading) if section_heading else ""
+        finally:
+            doc.close()
+
 
 def _is_valid_bbox(bbox) -> bool:
     """Check if bbox is valid: 4 numeric values, min < max for x and y."""
@@ -159,6 +247,48 @@ def _is_valid_bbox(bbox) -> bool:
         except (TypeError, ValueError):
             return False
     return False
+
+
+def _normalize_section_name(heading_text: str) -> str:
+    """Map a heading text to a standard section name."""
+    import re
+    text = heading_text.strip()
+    # Remove leading numbers like "1.", "2.1", "I.", etc.
+    text = re.sub(r'^[\d\.]+\s*', '', text)
+    text = re.sub(r'^[IVXLC]+\.\s*', '', text, flags=re.IGNORECASE)
+    text = text.strip().lower()
+
+    section_map = {
+        "abstract": "Abstract",
+        "introduction": "Introduction",
+        "related work": "Related Work",
+        "related works": "Related Work",
+        "background": "Related Work",
+        "preliminaries": "Related Work",
+        "method": "Method",
+        "methods": "Method",
+        "methodology": "Method",
+        "approach": "Method",
+        "proposed method": "Method",
+        "proposed approach": "Method",
+        "model": "Method",
+        "experiments": "Experiments",
+        "experimental results": "Experiments",
+        "evaluation": "Experiments",
+        "experiments and results": "Experiments",
+        "results": "Experiments",
+        "conclusion": "Conclusion",
+        "conclusions": "Conclusion",
+        "summary": "Conclusion",
+        "references": "References",
+    }
+
+    for key, standard in section_map.items():
+        if key in text:
+            return standard
+
+    # Return original heading if no match (title-case)
+    return heading_text.strip()[:80]
 
 
 def _extract_latex_from_block(text: str, html: str) -> str:

@@ -1,6 +1,6 @@
 # M1 Three-Pipeline Architecture — Eval Report (2112.14436)
 
-**Date**: 2026-06-08
+**Date**: 2026-06-09
 **PDF**: reports\m1_parser_review\paper_1\source.pdf
 **Title**: Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
 
@@ -37,6 +37,9 @@
 | bbox count | 3 |
 | crop success count | 3 |
 | crop success rate | 3/3 |
+| section non-empty count | 3/3 |
+| nearby_text_before non-empty | 3/3 |
+| nearby_text_after non-empty | 3/3 |
 
 ### Block Type Distribution
 
@@ -62,9 +65,11 @@
 
 | Question | Answer |
 |----------|--------|
-| canonical_paper.md exists | NO |
-| formula slot comments present | NO |
+| canonical_paper.md exists | YES |
+| canonical_paper.md size | 25335 bytes |
+| formula slot comments present | YES |
 | unresolved slots present | NO |
+| formula comments with empty section | 0 |
 
 ---
 
@@ -79,6 +84,15 @@
 
 ---
 
+## Formula Overlays
+
+| Metric | Value |
+|--------|-------|
+| overlays generated | 3 |
+| overlay_dir | formula_overlays/ |
+
+---
+
 ## OCR Status
 
 | Question | Answer |
@@ -90,6 +104,4 @@
 
 ## Remaining Work
 
-- formula_overlays/ not yet implemented (placeholder only)
 - OCR blocked (pix2tex model unavailable)
-- Section inference for FormulaSlots not yet implemented

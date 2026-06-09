@@ -745,19 +745,68 @@ class MaterialNormalizer:
         lines.append(f"# {fm.title}")
         lines.append("")
 
-        # Sections in standard order
+        # Group formula slots by section for insertion
+        from collections import defaultdict
+        formulas_by_section: dict[str, list] = defaultdict(list)
+        unmatched_formulas: list = []
+        if formula_slots:
+            for fs in formula_slots:
+                sec = fs.section.strip() if fs.section else ""
+                if sec and sec in _STANDARD_SECTIONS:
+                    formulas_by_section[sec].append(fs)
+                elif sec:
+                    # Non-standard section — try to match
+                    matched = False
+                    for std in _STANDARD_SECTIONS:
+                        if sec.lower() == std.lower():
+                            formulas_by_section[std].append(fs)
+                            matched = True
+                            break
+                    if not matched:
+                        unmatched_formulas.append(fs)
+                else:
+                    unmatched_formulas.append(fs)
+
+        def _render_formula_slot(fs):
+            """Render a single formula slot as markdown lines."""
+            result = []
+            bbox_str = str(fs.bbox) if fs.bbox else "[]"
+            origin_val = fs.final_origin.value if fs.final_origin else "unresolved"
+            ocr_val = fs.ocr_status.value if hasattr(fs.ocr_status, 'value') else str(fs.ocr_status)
+            unresolved_reason = f" | unresolved_reason: {fs.unresolved_reason}" if fs.unresolved_reason else ""
+            result.append(
+                f"<!-- formula_id: {fs.formula_id} | origin: {origin_val} | "
+                f"section: {fs.section} | page: {fs.page} | bbox: {bbox_str} | "
+                f"ocr_status: {ocr_val}{unresolved_reason} -->"
+            )
+            if fs.final_latex:
+                result.append("```latex")
+                result.append(fs.final_latex)
+                result.append("```")
+            elif fs.final_origin == FormulaOrigin.UNRESOLVED:
+                result.append(f"{{{{FORMULA:{fs.formula_id} unresolved}}}}")
+            else:
+                result.append(f"<!-- No formula content for {fs.formula_id} -->")
+            result.append("")
+            return result
+
+        # Sections in standard order — insert formulas into matching sections
         for section_name in _STANDARD_SECTIONS:
             content = paper.sections.get(section_name, "").strip()
+            lines.append(f"## {section_name}")
+            lines.append("")
             if content:
-                lines.append(f"## {section_name}")
-                lines.append("")
                 lines.append(content)
                 lines.append("")
             else:
-                lines.append(f"## {section_name}")
-                lines.append("")
                 lines.append(f"<!-- Section not available: {section_name} -->")
                 lines.append("")
+            # Append formulas that belong to this section
+            if section_name in formulas_by_section:
+                lines.append(f"### Formula Slots")
+                lines.append("")
+                for fs in formulas_by_section[section_name]:
+                    lines.extend(_render_formula_slot(fs))
 
         # Any non-standard sections
         for section_name, content in paper.sections.items():
@@ -766,30 +815,20 @@ class MaterialNormalizer:
                 lines.append("")
                 lines.append(content)
                 lines.append("")
+                # Insert formulas for this non-standard section
+                if section_name in formulas_by_section:
+                    lines.append(f"### Formula Slots")
+                    lines.append("")
+                    for fs in formulas_by_section[section_name]:
+                        lines.extend(_render_formula_slot(fs))
 
-        # Formula blocks (new format with slots)
-        if formula_slots:
-            lines.append("## Formula Blocks")
+        # Unmatched formulas (no section detected) → Appendix / Formula Slots
+        if unmatched_formulas:
+            lines.append("## Formula Slots")
             lines.append("")
-            for fs in formula_slots:
-                bbox_str = str(fs.bbox) if fs.bbox else "[]"
-                origin_val = fs.final_origin.value if fs.final_origin else "unresolved"
-                ocr_val = fs.ocr_status.value if hasattr(fs.ocr_status, 'value') else str(fs.ocr_status)
-                unresolved_reason = f" | unresolved_reason: {fs.unresolved_reason}" if fs.unresolved_reason else ""
-                lines.append(
-                    f"<!-- formula_id: {fs.formula_id} | origin: {origin_val} | "
-                    f"section: {fs.section} | page: {fs.page} | bbox: {bbox_str} | "
-                    f"ocr_status: {ocr_val}{unresolved_reason} -->"
-                )
-                if fs.final_latex:
-                    lines.append("```latex")
-                    lines.append(fs.final_latex)
-                    lines.append("```")
-                elif fs.final_origin == FormulaOrigin.UNRESOLVED:
-                    lines.append(f"{{{{FORMULA:{fs.formula_id} unresolved}}}}")
-                else:
-                    lines.append(f"<!-- No formula content for {fs.formula_id} -->")
-                lines.append("")
+            for fs in unmatched_formulas:
+                lines.extend(_render_formula_slot(fs))
+
         elif paper.formula_blocks:
             # Fallback to legacy formula block format
             lines.append("## Formula Blocks")

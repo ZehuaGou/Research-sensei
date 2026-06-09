@@ -78,6 +78,13 @@ which are commonly used for time series anomaly
 detection, and show that our method improves the
 training of the model.
 
+### Formula Slots
+
+<!-- formula_id: formula_001 | origin: parser_latex | section: Abstract | page: 1 | bbox: [108.75, 339.5390625, 288.0703125, 370.4765625] | ocr_status: cropped -->
+```latex
+p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) & \text{if } z = 0\\ p^-(\mathbf{x}) & \text{if } z = 1, \end{cases}
+```
+
 ## Introduction
 
 In many time series anomaly detection applications one only
@@ -588,19 +595,14 @@ arXiv preprint arXiv:2009.02040, 2020.
 Monte Carlo EM for Deep Time Series Anomaly Detection
 Franc¸ois-Xavier Aubet 1 Daniel Z¨ugner 2 Jan Gasthaus 1
 
-## Formula Blocks
+## Formula Slots
 
-<!-- formula_id: formula_001 | origin: parser_latex | section:  | page: 1 | bbox: [108.75, 339.5390625, 288.0703125, 370.4765625] | ocr_status: cropped -->
-```latex
-p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) & \text{if } z = 0\\ p^-(\mathbf{x}) & \text{if } z = 1, \end{cases}
-```
-
-<!-- formula_id: formula_002 | origin: parser_latex | section:  | page: 2 | bbox: [123.0, 420.0, 290.25, 432.0] | ocr_status: cropped -->
+<!-- formula_id: formula_002 | origin: parser_latex | section: so that p(x) = � | page: 2 | bbox: [123.0, 420.0, 290.25, 432.0] | ocr_status: cropped -->
 ```latex
 p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}
 ```
 
-<!-- formula_id: formula_003 | origin: parser_latex | section:  | page: 2 | bbox: [123.1171875, 436.5, 289.5, 447.8203125] | ocr_status: cropped -->
+<!-- formula_id: formula_003 | origin: parser_latex | section: so that p(x) = � | page: 2 | bbox: [123.1171875, 436.5, 289.5, 447.8203125] | ocr_status: cropped -->
 ```latex
 p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}
 ```

@@ -168,6 +168,81 @@ def _block_type_stats(slots: list) -> dict:
     return dict(counter)
 
 
+def generate_formula_overlays(pdf_path: Path, slots: list, overlays_dir: Path, max_overlays: int = 5):
+    """Generate overlay PNGs showing bbox rectangles on page images for first N formulas."""
+    try:
+        import fitz
+    except ImportError:
+        print("[overlay] PyMuPDF not available")
+        return 0
+
+    overlays_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        doc = fitz.open(str(pdf_path))
+    except Exception as exc:
+        print(f"[overlay] Failed to open PDF: {exc}")
+        return 0
+
+    count = 0
+    try:
+        # Group slots by page, take first max_overlays formulas
+        page_formulas: dict[int, list] = {}
+        for slot in slots:
+            if not slot.bbox or len(slot.bbox) != 4:
+                continue
+            page_formulas.setdefault(slot.page, []).append(slot)
+            if sum(len(v) for v in page_formulas.values()) >= max_overlays:
+                break
+
+        for page_num, page_slots in page_formulas.items():
+            page_idx = page_num - 1
+            if page_idx < 0 or page_idx >= len(doc):
+                continue
+
+            page = doc[page_idx]
+            # Render page as pixmap (2x resolution for clarity)
+            mat = fitz.Matrix(2, 2)
+            pix = page.get_pixmap(matrix=mat)
+
+            # Create overlay image
+            from PIL import Image, ImageDraw
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            draw = ImageDraw.Draw(img)
+
+            for slot in page_slots:
+                fx1, fy1, fx2, fy2 = slot.bbox
+                # Scale to pixmap coordinates (2x)
+                sx1, sy1, sx2, sy2 = fx1 * 2, fy1 * 2, fx2 * 2, fy2 * 2
+
+                # Draw red rectangle (3px thick)
+                for offset in range(3):
+                    draw.rectangle(
+                        [sx1 - offset, sy1 - offset, sx2 + offset, sy2 + offset],
+                        outline="red",
+                    )
+
+                # Draw formula_id label
+                label = slot.formula_id
+                draw.text((sx1, sy1 - 16), label, fill="red")
+
+                count += 1
+                if count >= max_overlays:
+                    break
+
+            # Save overlay
+            overlay_path = overlays_dir / f"overlay_page{page_num}.png"
+            img.save(str(overlay_path), "PNG")
+            print(f"[overlay] Saved {overlay_path} ({len(page_slots)} formulas)")
+
+            if count >= max_overlays:
+                break
+    finally:
+        doc.close()
+
+    return count
+
+
 def generate_artifacts(body_result: dict, formula_slots: list, pdf_path: Path, output_dir: Path, paper_info: dict):
     """Generate all required artifacts for a single paper."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -226,14 +301,16 @@ def generate_artifacts(body_result: dict, formula_slots: list, pdf_path: Path, o
     (output_dir / "formula_ocr_results.md").write_text("\n".join(ocr_lines), encoding="utf-8")
     print(f"[artifact] Wrote formula_ocr_results.md")
 
-    # Generate formula_overlays/ (placeholder)
+    # Generate formula_overlays/ — draw bbox on page images for first 5 formulas
     overlays_dir = output_dir / "formula_overlays"
-    overlays_dir.mkdir(exist_ok=True)
-    (overlays_dir / "README.md").write_text(
-        "Formula overlays not yet implemented. Use formula_crops/ for cropped images.\n",
-        encoding="utf-8",
-    )
-    print(f"[artifact] Created formula_overlays/ (placeholder)")
+    overlay_count = generate_formula_overlays(pdf_path, formula_slots, overlays_dir, max_overlays=5)
+    if overlay_count == 0:
+        overlays_dir.mkdir(exist_ok=True)
+        (overlays_dir / "README.md").write_text(
+            "No overlays generated (no valid bbox data or PyMuPDF unavailable).\n",
+            encoding="utf-8",
+        )
+    print(f"[artifact] Generated {overlay_count} formula overlays")
 
     # Block type stats
     bt_stats = _block_type_stats(formula_slots)
@@ -253,6 +330,12 @@ def generate_artifacts(body_result: dict, formula_slots: list, pdf_path: Path, o
         "crop_paths": [s.crop_path for s in formula_slots if s.crop_path][:10],
         "slots_with_bbox": sum(1 for s in formula_slots if s.bbox and len(s.bbox) == 4),
         "pages_with_formulas": sorted(set(s.page for s in formula_slots)),
+        "overlay_count": overlay_count,
+        "section_counts": {
+            "with_section": sum(1 for s in formula_slots if s.section),
+            "nearby_before": sum(1 for s in formula_slots if s.nearby_text_before),
+            "nearby_after": sum(1 for s in formula_slots if s.nearby_text_after),
+        },
     }
 
 
@@ -262,6 +345,7 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
     reason = body_result["selection_reason"]
     candidates = body_result["candidates"]
     bt_stats = stats["block_type_stats"]
+    sc = stats.get("section_counts", {})
 
     # Find selected parser score
     selected_score = 0.0
@@ -275,10 +359,14 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
     canonical_content = canonical_path.read_text(encoding="utf-8") if has_canonical else ""
     has_formula_comment = "<!-- formula_id:" in canonical_content
     has_unresolved = "{{FORMULA:" in canonical_content
+    # Count formula comments with empty section
+    import re
+    formula_comment_pattern = re.compile(r'<!-- formula_id:.*?section:\s*(\S*?)\s*\|')
+    empty_section_count = sum(1 for m in formula_comment_pattern.finditer(canonical_content) if not m.group(1))
 
     report = f"""# M1 Three-Pipeline Architecture — Eval Report ({paper_info['pid']})
 
-**Date**: 2026-06-08
+**Date**: 2026-06-09
 **PDF**: {paper_info['src'].relative_to(ROOT)}
 **Title**: {paper_info['title']}
 
@@ -317,6 +405,9 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
 | bbox count | {stats['slots_with_bbox']} |
 | crop success count | {stats['cropped']} |
 | crop success rate | {stats['cropped']}/{stats['total_slots']} |
+| section non-empty count | {sc.get('with_section', 0)}/{stats['total_slots']} |
+| nearby_text_before non-empty | {sc.get('nearby_before', 0)}/{stats['total_slots']} |
+| nearby_text_after non-empty | {sc.get('nearby_after', 0)}/{stats['total_slots']} |
 
 ### Block Type Distribution
 
@@ -352,8 +443,10 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
 | Question | Answer |
 |----------|--------|
 | canonical_paper.md exists | {'YES' if has_canonical else 'NO'} |
+| canonical_paper.md size | {canonical_path.stat().st_size if has_canonical else 0} bytes |
 | formula slot comments present | {'YES' if has_formula_comment else 'NO'} |
 | unresolved slots present | {'YES' if has_unresolved else 'NO'} |
+| formula comments with empty section | {empty_section_count} |
 
 ---
 
@@ -368,6 +461,15 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
 
 ---
 
+## Formula Overlays
+
+| Metric | Value |
+|--------|-------|
+| overlays generated | {stats.get('overlay_count', 0)} |
+| overlay_dir | formula_overlays/ |
+
+---
+
 ## OCR Status
 
 | Question | Answer |
@@ -379,9 +481,7 @@ def generate_report(body_result: dict, formula_slots: list, stats: dict, output_
 
 ## Remaining Work
 
-- formula_overlays/ not yet implemented (placeholder only)
 - OCR blocked (pix2tex model unavailable)
-- Section inference for FormulaSlots not yet implemented
 """
 
     (output_dir / "REPORT.md").write_text(report, encoding="utf-8")
@@ -478,11 +578,17 @@ def run_one_paper(paper_name: str, paper_info: dict):
     print("-" * 40)
     stats = generate_artifacts(body_result, formula_slots, pdf_path, out_dir, paper_info)
 
-    # Generate REPORT.md
-    generate_report(body_result, formula_slots, stats, out_dir, paper_info)
-
-    # Generate canonical_paper.md
+    # Step 6: Generate canonical_paper.md (must run BEFORE REPORT so canonical exists)
+    print("\n" + "-" * 40)
+    print("STEP 6: Generate Canonical Paper")
+    print("-" * 40)
     run_canonical_normalizer(pdf_path, paper_info, out_dir)
+
+    # Step 7: Generate REPORT.md (AFTER canonical so file-existence check is accurate)
+    print("\n" + "-" * 40)
+    print("STEP 7: Generate REPORT")
+    print("-" * 40)
+    generate_report(body_result, formula_slots, stats, out_dir, paper_info)
 
     print(f"\n{paper_name} DONE")
     print(f"  FormulaSlots: {stats['total_slots']}")
@@ -491,6 +597,9 @@ def run_one_paper(paper_name: str, paper_info: dict):
     print(f"  ocr_latex: {stats['by_origin'].get('ocr_latex', 0)}")
     print(f"  unresolved: {stats['by_origin'].get('unresolved', 0)}")
     print(f"  block_types: {stats['block_type_stats']}")
+    print(f"  overlays: {stats.get('overlay_count', 0)}")
+    print(f"  section non-empty: {stats.get('section_counts', {}).get('with_section', 0)}/{stats['total_slots']}")
+    print(f"  nearby_before non-empty: {stats.get('section_counts', {}).get('nearby_before', 0)}/{stats['total_slots']}")
 
     return stats
 

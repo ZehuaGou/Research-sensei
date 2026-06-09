@@ -9,43 +9,14 @@ authors:
 year: 2024
 venue: "IEEE IoT Journal 2024"
 source_type: pdf
-source_confidence: low
-canonicalization_status: degraded
-canonical_quality_status: DEGRADED
+source_confidence: 0.8
+canonicalization_status: success
+canonical_quality_status: PASS
 parser_used: pymupdf
 m2_ready: true
-degradation_reason: "Method repaired by moving trailing reference entries to References"
-parser_candidates: ['pymupdf', 'markitdown_pdf']
-selected_parser: pymupdf
-parser_quality_score: 100.0
-parser_selection_reason: "Good quality"
-body_selected_parser: pymupdf
-body_parser_quality_score: 100.0
-body_parser_selection_reason: "Good quality"
-formula_detector: marker_document
 formula_slot_count: 16
 formula_crop_count: 16
 parser_latex_count: 16
-canonical_quality_status_formula: all_resolved
-parser_quality_details:
-  pymupdf:
-    overall_score: 100.0
-    output_length: 62823
-    section_count: 4
-    long_concat_count: 0
-    spacing_quality: 1.0
-    cid_token_count: 0
-    formula_candidate_count: 19
-    garbled_line_ratio: 0.132
-  markitdown_pdf:
-    overall_score: 61.5
-    output_length: 53756
-    section_count: 0
-    long_concat_count: 100
-    spacing_quality: 1.0
-    cid_token_count: 1
-    formula_candidate_count: 10
-    garbled_line_ratio: 0.027
 ---
 
 # Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT
@@ -347,687 +318,6 @@ In most real-life scenarios of IoT, there are usually complex
 topological relationships between sensors where the entire
 entity can be seen as a graph structure. Each sensor is also
 viewed as a speciﬁc node in the graph. Previous methods [25],
-
-## Experiments
-
-A. Datasets
-We evaluate our method over a wide range of real-world
-anomaly detection datasets. SWaT [55] The Secure Water
-Treatment dataset is collected from a water treatment testbed
-for cyber-attack investigation initially launched in May 2015.
-The SWaT dataset collection process lasted for 11 days, with
-the system operated 24 hours per day such that the network
-trafﬁc and all the values obtained from all 51 sensors and
-actuators are recorded. Due to the system working ﬂow char-
-acteristics, there is a natural topological structure relationship
-between all sensing nodes. After this, a total of 41 attacks
-derived through an attack model considering the intent space
-of a CPS were launched during the last 4 days of the 2016
-SWaT data collection process. As such, the overall sequential
-data is labeled according to normal and abnormal behaviors
-at each timestamp. WADI [9] Water Distribution dataset is
-collected from a water distribution testbed as an extension
-of the SWaT testbed. It consists of a total of 16 days of
-continuous operations with 14 days under regular operation
-and 2 days with attack scenarios. The entire testbed contains
-123 sensors and actuators. Moreover, SMAP (Soil Moisture
-Active Passive satellite) and MSL (Mars Science Laboratory
-rover) are two public datasets published by NASA [56]. Each
-dataset has a training and a testing subset, and anomalies in
-both testing subsets have been labeled [8].
-Table II and III summarises the statistics of the four datasets.
-In order to fair comparison with other methods, the original
-data samples for SWaT and WADI are downsampled to one
-measurement every 10 seconds by taking the median values
-following [4].
-TABLE II: Statistical summary of datasets SWaT and WADI.
-Datasets
-SWaT
-WADI
-Feature Desc.
-All sensors and actuators.
-# Features
-51
-112
-# Attacks
-41
-15
-Attack durations (mins)
-2 ∼25
-1.5 ∼30
-Training size (normal data)
-49619
-120899
-Testing size (data with attacks)
-44931
-17219
-Anomaly rate (%)
-12.14
-5.75
-TABLE III: Statistical summary of datasets SMAP and MSL.
-Datasets
-SMAP
-MSL
-Feature Desc.
-Radiation, temperature,
-power, etc.
-# Features
-25
-25
-Training size (normal data)
-135183
-58317
-Testing size (data with anomalies)
-427617
-73729
-Anomaly rate (%)
-13.13
-10.72
-B. Experimental Setup
-1) Data preprocessing: We perform a data standardization
-before training to improve the robustness of our model. Data
-preprocessing is applied on both training and testing set:
-˜x =
-x −min Xtrain
-max Xtrain −min Xtrain
-(12)
-where max(Xtrain) and min(Xtrain) are the maximum value
-and the minimum value of the training set respectively.
-metrics: We adopt the standard evaluation
-metrics in anomaly detection tasks, namely Precision, Recall
-and F1 score, to evaluate the performance of our approach, in
-which:
-Precision =
-TP
-TP + FP
-(13)
-Recall =
-TP
-TP + FN
-(14)
-F1 = 2 × Precision × Recall
-Precision + Recall
-(15)
-where TP represents the truly detected anomalies (aka. true
-positives), FP stands for the falsely detected anomalies (aka.
-false positives), TN represents the correctly classiﬁed normal
-samples (aka. true negatives), and FN is the misclassiﬁed
-normal samples (aka. false negatives). Given the fact that
-8
-TABLE IV: Experimental results on SWaT and WADI.
-Datasets
-Methods
-Precision(%)
-Recall(%)
-F1-score
-PCA
-24.92
-21.63
-0.23
-KNN
-7.83
-7.83
-0.08
-FB
-10.17
-10.17
-0.10
-AE
-72.63
-52.63
-0.61
-DAGMM
-27.46
-69.52
-0.39
-LSTM-VAE
-96.24
-59.91
-0.74
-MAD-GAN
-98.97
-63.74
-0.77
-GDN
-99.35
-68.12
-0.81
-GTA∗(ours)
-74.91
-96.41
-0.84
-GTA∗∗
-94.83
-88.10
-0.91
-SWaT
-∆↑(best F1)
--4.55%
-+29.33%
-+12.35%
-PCA
-39.53
-5.63
-0.10
-KNN
-7.76
-7.75
-0.08
-FB
-8.60
-8.60
-0.09
-AE
-34.35
-34.35
-0.34
-DAGMM
-54.44
-26.99
-0.36
-LSTM-VAE
-87.79
-14.45
-0.25
-MAD-GAN
-41.44
-33.92
-0.37
-GDN
-97.50
-40.19
-0.57
-GTA∗(ours)
-74.56
-90.50
-0.82
-GTA∗∗
-83.91
-83.61
-0.84
-WADI
-∆↑(best F1)
--13.94%
-+108.04%
-+47.37%
-Best performance in bold. Second-best with underlines.
-∗represents the results chosen by best Recall.
-∗∗represents the results chosen by best F1-score.
-∆↑represents the percentage increase between our best F1-score
-performance and the second-best method (GDN).
-TABLE V: Experimental results on SMAP and MSL.
-SMAP
-MSL
-Method
-Precision(%)
-Recall(%)
-F1-score
-Precision(%)
-Recall(%)
-F1-score
-KitNet
-77.25
-83.27
-0.8014
-63.12
-79.36
-0.7031
-GAN-Li
-67.10
-87.06
-0.7579
-71.02
-87.06
-0.7823
-LSTM-VAE
-85.51
-63.66
-0.7298
-52.57
-95.46
-0.6780
-MAD-GAN
-80.49
-82.14
-0.8131
-85.17
-89.91
-0.8747
-R-Models
-OmniAnomaly
-74.16
-97.76
-0.8434
-88.67
-91.17
-0.8989
-LSTM-NDT
-89.65
-88.46
-0.8905
-59.44
-53.74
-0.5640
-DAGMM
-58.45
-90.58
-0.7105
-54.12
-99.34
-0.7007
-MTAD-GAT
-89.06
-91.23
-0.9013
-87.54
-94.40
-0.9084
-F-Models
-GTA∗∗(ours)
-89.11
-91.76
-0.9041
-91.04
-91.17
-0.9111
-Best performance in bold. Second-best with underlines.
-∗∗represents the results chosen by best F1-score.
-in many real-world anomaly detection scenarios, it is more
-vital for the system to detect all the real attacks or anomalies
-by tolerating a few false alarms. As such, we generally give
-more concern to Recall and the overall F1 score instead
-of Precision. Considering different anomaly score thresholds
-may result in different metric scores, we hence report both
-our best Recall and F1 results (with notations
-∗and
-∗∗
-respectively) on all datasets for a thorough comparison.
-Also, we adopt the point-adjust way to calculate the perfor-
-mance metrics following [13]. In practice, anomalous observa-
-tions usually occur consecutively to form contiguous anomaly
-segments. An alert for anomalies can be triggered within any
-subset of an actual anomaly window. Thus, for any observation
-in the ground truth anomaly segment, if it is detected as an
-anomaly or attack, we would consider this whole anomaly
-window is correctly detected and every observation point in
-this segment has been classiﬁed as anomalies. The observa-
-tions outside the ground truth anomaly segment are treated as
-usual. In all, we ﬁrst train our model on the training set to
-learn the general sequence pattern and make the forecasting
-on the test set for anomaly detection.
-3) Baselines: We compare our GTA with a wide range of
-state-of-the-arts in multivariate time series anomaly detection,
-including: (1) reconstruction-based models: PCA, AE [10],
-KitNet [57], DAGMM [12], GAN-Li [20], OmniAnomaly
-[13], LSTM-VAE [11], MAD-GAN [6], and (2) forecasting-
-9
-based models: KNN [14], FB [15], MTAD-GAT [17] and GDN
-[4].
-4) Training Settings: We implement our method and all its
-variants using Pytorch1 version 1.7.0 with CUDA 10.1 and
-Pytorch Geometric Library [58] version 1.6.3. We conduct
-all experiments on four NVIDIA Tesla P100 GPUs. For time
-series forecasting, we set the historical window size to 60
-frames with a label series length as 30 to predict the value at
-next timestamp. The number of dilated convolution levels for
-temporal context modeling is set to 3. Also, the general model
-input embedding dimension is set to 128. For the conventional
-multi-head attention mechanism, the number of heads is set
-to 8. In total, we have 3 encoder layers and 2 decoder layers
-and the dimensional of fully connected network is set to 128
-which is equal to the model dimension. Additionally, we apply
-the dropout strategy to prevent overﬁtting with dropout rate
-consistently equals to 0.05. The models are trained using the
-Adam optimizer with learning rate initialized as 1e−4 and
-β1, β2 as 0.9, 0.99, respectively. A learning rate adjusting
-strategy is also applied. We train our models for up to 50
-epochs and early stopping strategy is applied with patience of
-10. We run each experiment for 5 trials and report the mean
-value.
-In Table IV, we show the anomaly detection accuracy in
-terms of precision, recall, and F1-score, of our proposed GTA
-are summarized in Table VI and provide the following
-observations: (1) Our proposed learning policy helps the graph
-convolution operation by capturing only proper information
-ﬂow with noises ﬁltered out. (2) There is a considerable gap
-between GTA and the variant without graph learning which
-again demonstrates the importance of topological structure
-modeling in handling multivariate time series anomaly detec-
-tion. (3) Transformer-based architecture exhibits superiority
-in sequence modeling, where the self-attention mechanism
-plays a critical role. Moreover, these results again conﬁrm that
-every component of our method is indispensable and make
-this framework powerful in multivariate time series anomaly
-detection.
-E. Graph Learning and Case Study
-By introducing a case study of an actual attack from
-the Cyber-attack dataset WADI, we evaluate what a graph
-structure would the graph learning policy learn and how this
-helps us localize and comprehend an anomaly in this section.
-An assault with a period of 25.16 minutes was logged in the
-WADI data collecting log, which fraudulently turned on the
-motorized valve 1 MV 001 STATUS and caused an overﬂow
-on the primary tank. It’s difﬁcult for the operation engineers
-to ﬁnd out the status of this valve manually because it’s still
-within normal range. As a result, it’s not easy to spot this
-oddity.
-The water distribution treatment, for example, consists
-of three-state processes from the water supply, distribution
-network, and return water system, which are denoted as
-P1, P2, and P3, respectively. Every sensor and actuator, in
-every condition, is inextricably linked. The raw water inlet
-valve that regulates the SUTD entering, for example, is
-represented by 1 MV 001 STATUS. Because 1 FIT 001 PV
-is a downstream ﬂow indicator transmitter of the water dis-
-tribution, the value of 1 FIT 001 PV rises rapidly if the
-1 MV 001 valve is turned on abruptly. As its outcome of
-the ﬁrst stage propagates the inﬂuence from the raw water
-transfer pump to the second stage, 2 FIT 001 PV is also
-vulnerable to the same malicious attack. In addition, as
-LEAK DIFF PRESSURE becomes irregular during this pro-
-cedure, the leaking water pressure grows without a doubt. Our
-graph learning policy learned a partial graph in Fig. 5a, which
-almost properly depicts the topological interactions among
-sensors. The LEAD DIFF PRESSURE is almost related to
-every other displayed node as malicious information passes
-from upstream sensors to downstream ones. More importantly,
-Fig. 5b shows our model’s predicted sensor curves (blue lines)
-against the ground truth (red lines) of sensor 1 FIT 001 PV,
-2 FIT 001 PV, and 2 PIT 001 PV within the attack dura-
-tion. The predictions of these sensors are consistently higher
-than the ground truth, where the anomaly score increases
-correspondingly. It is mainly because the input time series has
-been embedded with the graph structure information through
-the inﬂuence propagation convolution operation. Sensors that
-are not directly attacked will still be severely affected if
-sensors that are highly related to them are attacked. Therefore,
-our model can capture this dependency and result in an
-abnormal prediction, which is vital for the following anomaly
-detection.
-
-## Conclusion
-
-In this work, we proposed GTA, a Transformer-based frame-
-work for anomaly detection that uses the introduced connec-
-tion learning policy to automatically learn sensor dependen-
-cies. To simulate the information ﬂow among the sensors in the
-graph, we devised an unique Inﬂuence Propagation (IP) graph
-convolution. The inference speed of our proposed multi-branch
-attention technique is greatly improved without sacriﬁcing
-model performance. Extensive experiments on four real-world
-datasets demonstrated that our strategy outperformed other
-state-of-the-art approaches in terms of prediction accuracy. We
-also provided a case study to demonstrate how our approach
-identiﬁes the anomaly by utilizing our proposed techniques.
-We aim to explore more about combining this approach with
-the online learning strategy to land it on the mobile IoT
-scenarios for future work.
-11
-
-## References
-
-[1] M. S. Mahdavinejad, M. Rezvan, M. Barekatain, P. Adibi, P. M.
-Barnaghi, and A. P. Sheth, “Machine learning for internet of things
-data analysis: A survey,” CoRR, vol. abs/1802.06305, 2018.
-[2] Z. Cai and Z. He, “Trading private range counting over big iot data,” in
-39th IEEE International Conference on Distributed Computing Systems,
-ICDCS 2019, Dallas, TX, USA, July 7-10, 2019.
-IEEE, 2019, pp. 144–
-153. [Online]. Available: https://doi.org/10.1109/ICDCS.2019.00023
-[3] M. Mohammadi, A. I. Al-Fuqaha, S. Sorour, and M. Guizani, “Deep
-learning for iot big data and streaming analytics: A survey,” IEEE
-Commun. Surv. Tutorials, vol. 20, no. 4, pp. 2923–2960, 2018.
-[4] A. Deng and B. Hooi, “Graph neural network-based anomaly detection
-in multivariate time series,” in Proceedings of the 35th AAAI Conference
-on Artiﬁcial Intelligence, 2021.
-[5] Z. Cai and X. Zheng, “A private and efﬁcient mechanism for
-data uploading in smart cyber-physical systems,” IEEE Trans. Netw.
-Sci. Eng., vol. 7, no. 2, pp. 766–775, 2020. [Online]. Available:
-https://doi.org/10.1109/TNSE.2018.2830307
-[6] D. Li, D. Chen, B. Jin, L. Shi, J. Goh, and S. Ng, “MAD-GAN:
-multivariate anomaly detection for time series data with generative
-adversarial networks,” in 28th International Conference on Artiﬁcial
-Neural Networks, ser. Lecture Notes in Computer Science, vol. 11730.
-Springer, 2019, pp. 703–716.
-[7] X. Zheng and Z. Cai, “Privacy-preserved data sharing towards
-multiple parties in industrial iots,” IEEE J. Sel. Areas Commun.,
-vol.
-38,
-no.
-5,
-pp.
-968–979,
-2020.
-[Online].
-Available:
-https:
-//doi.org/10.1109/JSAC.2020.2980802
-[8] K.
-Hundman,
-V.
-Constantinou,
-C.
-Laporte,
-I.
-Colwell,
-and
-T. S¨oderstr¨om, “Detecting spacecraft anomalies using lstms and non-
-parametric dynamic thresholding,” in Proceedings of the 24th ACM
-SIGKDD International Conference on Knowledge Discovery & Data
-Mining.
-ACM, 2018, pp. 387–395.
-[9] C. M. Ahmed, V. R. Palleti, and A. P. Mathur, “WADI: a water
-distribution testbed for research in the design of secure cyber physical
-systems,” in Proceedings of the 3rd International Workshop on Cyber-
-Physical Systems for Smart Water Networks.
-ACM, 2017, pp. 25–28.
-[10] C. C. Aggarwal, Outlier Analysis.
-Springer, 2013.
-[11] D. Park, Y. Hoshi, and C. C. Kemp, “A multimodal anomaly detector
-for robot-assisted feeding using an lstm-based variational autoencoder,”
-CoRR, vol. abs/1711.00614, 2017.
-[12] B. Zong, Q. Song, M. R. Min, W. Cheng, C. Lumezanu, D. Cho, and
-H. Chen, “Deep autoencoding gaussian mixture model for unsupervised
-anomaly detection,” in 6th International Conference on Learning Rep-
-resentations.
-OpenReview.net, 2018.
-[13] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, “Robust anomaly
-detection for multivariate time series through stochastic recurrent neural
-network,” in Proceedings of the 25th ACM SIGKDD International
-Conference on Knowledge Discovery & Data Mining.
-ACM, 2019,
-pp. 2828–2837.
-[14] F. Angiulli and C. Pizzuti, “Fast outlier detection in high dimensional
-spaces,” in Principles of Data Mining and Knowledge Discovery, 6th
-European Conference, ser. Lecture Notes in Computer Science, vol.
-2431.
-Springer, 2002, pp. 15–26.
-[15] A. Lazarevic and V. Kumar, “Feature bagging for outlier detection,”
-in Proceedings of the 11th ACM SIGKDD International Conference on
-Knowledge Discovery & Data Mining.
-ACM, 2005, pp. 157–166.
-[16] Y. Liang, Z. Cai, J. Yu, Q. Han, and Y. Li, “Deep learning based
-inference of private information using embedded sensors in smart
-devices,” IEEE Netw., vol. 32, no. 4, pp. 8–14, 2018. [Online].
-Available: https://doi.org/10.1109/MNET.2018.1700349
-[17] H. Zhao, Y. Wang, J. Duan, C. Huang, D. Cao, Y. Tong, B. Xu, J. Bai,
-J. Tong, and Q. Zhang, “Multivariate time-series anomaly detection via
-graph attention network,” in 20th IEEE International Conference on
-Data Mining.
-IEEE, 2020, pp. 841–850.
-[18] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley,
-S. Ozair, A. C. Courville, and Y. Bengio, “Generative adversarial
-networks,” CoRR, vol. abs/1406.2661, 2014.
-[19] Z.
-Cai,
-Z.
-Xiong,
-H.
-Xu,
-P.
-Wang,
-W.
-Li,
-and
-Y.
-Pan,
-“Generative adversarial networks: A survey towards private and secure
-applications,” CoRR, vol. abs/2106.03785, 2021. [Online]. Available:
-https://arxiv.org/abs/2106.03785
-[20] D. Li, D. Chen, J. Goh, and S. Ng, “Anomaly detection with gen-
-erative adversarial networks for multivariate time series,” CoRR, vol.
-abs/1809.04758, 2018.
-[21] J. Zhou, G. Cui, Z. Zhang, C. Yang, Z. Liu, and M. Sun, “Graph
-neural networks: A review of methods and applications,” CoRR, vol.
-abs/1812.08434, 2018.
-[22] P. Velickovic, G. Cucurull, A. Casanova, A. Romero, P. Li`o, and
-Y. Bengio, “Graph attention networks,” in 6th International Conference
-on Learning Representations.
-OpenReview.net, 2018.
-[23] F. Wu, A. H. S. Jr., T. Zhang, C. Fifty, T. Yu, and K. Q. Weinberger,
-“Simplifying graph convolutional networks,” in Proceedings of the 36th
-International Conference on Machine Learning, ser. Proceedings of
-Machine Learning Research, vol. 97.
-PMLR, 2019, pp. 6861–6871.
-[24] Y. Wang, Y. Sun, Z. Liu, S. E. Sarma, M. M. Bronstein, and J. M.
-Solomon, “Dynamic graph CNN for learning on point clouds,” ACM
-Trans. Graph., vol. 38, no. 5, pp. 146:1–146:12, 2019.
-[25] Z. Wu, S. Pan, G. Long, J. Jiang, X. Chang, and C. Zhang, “Con-
-necting the dots: Multivariate time series forecasting with graph neural
-networks,” in Proceedings of the 26th ACM SIGKDD International
-Conference on Knowledge Discovery & Data Mining.
-ACM, 2020,
-pp. 753–763.
-[26] D. Cao, Y. Wang, J. Duan, C. Zhang, X. Zhu, C. Huang, Y. Tong, B. Xu,
-J. Bai, J. Tong, and Q. Zhang, “Spectral temporal graph neural network
-for multivariate time-series forecasting,” in NeurIPS, 2020.
-[27] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez,
-L. Kaiser, and I. Polosukhin, “Attention is all you need,” in NeurIPS,
-2017, pp. 5998–6008.
-[28] A. Bl´azquez-Garc´ıa, A. Conde, U. Mori, and J. A. Lozano, “A re-
-view on outlier/anomaly detection in time series data,” CoRR, vol.
-abs/2002.04236, 2020.
-[29] Y. Zhang, Z. Ge, A. G. Greenberg, and M. Roughan, “Network anomog-
-raphy,” in Proceedings of the 5th Internet Measurement Conference,
-IMC 2005, Berkeley, California, USA, October 19-21, 2005.
-USENIX
-Association, 2005, pp. 317–330.
-[30] W. Lu and A. A. Ghorbani, “Network anomaly detection based on
-wavelet analysis,” EURASIP J. Adv. Signal Process., vol. 2009, 2009.
-[31] M. Munir, S. A. Siddiqui, A. Dengel, and S. Ahmed, “Deepant: A deep
-learning approach for unsupervised anomaly detection in time series,”
-IEEE Access, vol. 7, pp. 1991–2005, 2019.
-[32] P. Malhotra, A. Ramakrishnan, G. Anand, L. Vig, P. Agarwal, and
-G. Shroff, “Lstm-based encoder-decoder for multi-sensor anomaly de-
-tection,” CoRR, vol. abs/1607.00148, 2016.
-[33] P. Filonov, A. Lavrentyev, and A. Vorontsov, “Multivariate industrial
-time series with cyber-attack simulation: Fault detection using an lstm-
-based predictive data model,” CoRR, vol. abs/1612.06676, 2016.
-[34] A. A. Cook, G. Misirli, and Z. Fan, “Anomaly detection for iot time-
-series data: A survey,” IEEE Internet Things J., vol. 7, no. 7, pp. 6481–
-6494, 2020.
-[35] M. Jones, D. Nikovski, M. Imamura, and T. Hirata, “Exemplar learning
-for extremely efﬁcient anomaly detection in real-valued time series,”
-Data Min. Knowl. Discov., vol. 30, no. 6, pp. 1427–1454, 2016.
-[36] M. Sakurada and T. Yairi, “Anomaly detection using autoencoders with
-nonlinear dimensionality reduction,” in Proceedings of the MLSDA 2014
-2nd Workshop on Machine Learning for Sensory Data Analysis, Gold
-Coast, Australia, QLD, Australia, December 2, 2014, A. Rahman, J. D.
-Deng, and J. Li, Eds.
-ACM, 2014, p. 4.
-[37] H. Lu, Y. Liu, Z. Fei, and C. Guan, “An outlier detection algorithm
-based on cross-correlation analysis for time series dataset,” IEEE Access,
-vol. 6, pp. 53 593–53 610, 2018.
-[38] A. Siffer, P. Fouque, A. Termier, and C. Largou¨et, “Anomaly detection
-in streams with extreme value theory,” in Proceedings of the 23rd ACM
-SIGKDD International Conference on Knowledge Discovery and Data
-Mining.
-ACM, 2017, pp. 1067–1075.
-[39] P. Senin, J. Lin, X. Wang, T. Oates, S. Gandhi, A. P. Boedihardjo,
-C. Chen, and S. Frankenstein, “Time series anomaly discovery with
-grammar-based compression,” in Proceedings of the 18th International
-Conference on Extending Database Technology, EDBT 2015, Brussels,
-Belgium, March 23-27, 2015, G. Alonso, F. Geerts, L. Popa, P. Barcel´o,
-J. Teubner, M. Ugarte, J. V. den Bussche, and J. Paredaens, Eds.
-OpenProceedings.org, 2015, pp. 481–492.
-[40] H. N. Akouemo and R. J. Povinelli, “Data improving in time series using
-arx and ann models,” IEEE Transactions on Power Systems, vol. 32,
-no. 5, pp. 3352–3359, 2017.
-[41] M. Defferrard, X. Bresson, and P. Vandergheynst, “Convolutional neural
-networks on graphs with fast localized spectral ﬁltering,” in Advances
-in Neural Information Processing Systems 29: Annual Conference on
-Neural Information Processing Systems 2016, December 5-10, 2016,
-Barcelona, Spain, D. D. Lee, M. Sugiyama, U. von Luxburg, I. Guyon,
-and R. Garnett, Eds., 2016, pp. 3837–3845.
-12
-[42] C. J. Maddison, D. Tarlow, and T. Minka, “A* sampling,” in NeurIPS,
-2014, pp. 3086–3094.
-[43] E. Jang, S. Gu, and B. Poole, “Categorical reparameterization with
-gumbel-softmax,” in 5th International Conference on Learning Repre-
-sentations.
-OpenReview.net, 2017.
-[44] C. Rosenbaum, T. Klinger, and M. Riemer, “Routing networks: Adaptive
-selection of non-linear functions for multi-task learning,” in 6th Inter-
-national Conference on Learning Representations.
-OpenReview.net,
-2018.
-[45] Y. Guo, H. Shi, A. Kumar, K. Grauman, T. Rosing, and R. S. Feris,
-“Spottune: Transfer learning through adaptive ﬁne-tuning,” in IEEE
-Conference on Computer Vision and Pattern Recognition.
-Computer
-Vision Foundation / IEEE, 2019, pp. 4805–4814.
-[46] F. Yu and V. Koltun, “Multi-scale context aggregation by dilated convo-
-lutions,” in 4th International Conference on Learning Representations,
-Y. Bengio and Y. LeCun, Eds., 2016.
-[47] C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. E. Reed, D. Anguelov,
-D. Erhan, V. Vanhoucke, and A. Rabinovich, “Going deeper with
-convolutions,” in IEEE Conference on Computer Vision and Pattern
-Recognition.
-IEEE Computer Society, 2015, pp. 1–9.
-[48] A. Raganato and J. Tiedemann, “An analysis of encoder representations
-in transformer-based machine translation,” in EMNLP.
-Association for
-Computational Linguistics, 2018, pp. 287–297.
-[49] E. Voita, R. Sennrich, and I. Titov, “The bottom-up evolution of
-representations in the transformer: A study with machine translation
-and language modeling objectives,” in EMNLP-IJCNLP.
-Association
-for Computational Linguistics, 2019, pp. 4395–4405.
-[50] A. Raganato, Y. Scherrer, and J. Tiedemann, “Fixed encoder self-
-attention patterns in transformer-based machine translation,” in EMNLP,
-T. Cohn, Y. He, and Y. Liu, Eds.
-Association for Computational
-Linguistics, 2020, pp. 556–568.
-[51] Y. Tay, D. Bahri, D. Metzler, D. Juan, Z. Zhao, and C. Zheng,
-“Synthesizer: Rethinking self-attention in transformer models,” CoRR,
-vol. abs/2005.00743, 2020.
-[52] Z. Wu, Z. Liu, J. Lin, Y. Lin, and S. Han, “Lite transformer with
-long-short range attention,” in 8th International Conference on Learning
-Representations.
-OpenReview.net, 2020.
-[53] F. Wu, A. Fan, A. Baevski, Y. N. Dauphin, and M. Auli, “Pay less atten-
-tion with lightweight and dynamic convolutions,” in 7th International
-Conference on Learning Representations.
-OpenReview.net, 2019.
-[54] H. Zhou, S. Zhang, J. Peng, S. Zhang, J. Li, H. Xiong, and W. Zhang,
-“Informer: Beyond efﬁcient transformer for long sequence time-series
-forecasting,” CoRR, vol. abs/2012.07436, 2020.
-[55] A. P. Mathur and N. O. Tippenhauer, “Swat: a water treatment testbed for
-research and training on ICS security,” in 2016 International Workshop
-on Cyber-physical Systems for Smart Water Networks.
-IEEE Computer
-Society, 2016, pp. 31–36.
-[56] P. O’Neill, D. Entekhabi, E. G. Njoku, and K. H. Kellogg, “The
-NASA soil moisture active passive (SMAP) mission: Overview,” in IEEE
-International Geoscience & Remote Sensing Symposium.
-IEEE, 2010,
-pp. 3236–3239.
-[57] Y. Mirsky, T. Doitshman, Y. Elovici, and A. Shabtai, “Kitsune: An
-ensemble of autoencoders for online network intrusion detection,” in
-25th Annual Network and Distributed System Security Symposium. The
-Internet Society, 2018.
-[58] M. Fey and J. E. Lenssen, “Fast graph representation learning with
-pytorch geometric,” CoRR, vol. abs/1903.02428, 2019.
 [4] focused on applying various distance metrics to measure
 the relations between nodes mostly by selecting the top-K
 closest ones as their neighbor dependencies. Different from
@@ -1408,6 +698,232 @@ performance with different anomaly thresholds. Thus, we
 apply a grid search on all possible anomaly thresholds to
 search for the best F1-score (with notation ∗∗) and Recall
 (with notation ∗) in theory and report them.
+Precision(%)
+Recall(%)
+F1-score
+PCA
+24.92
+21.63
+0.23
+KNN
+7.83
+7.83
+0.08
+FB
+10.17
+10.17
+0.10
+AE
+72.63
+52.63
+0.61
+DAGMM
+27.46
+69.52
+0.39
+LSTM-VAE
+96.24
+59.91
+0.74
+MAD-GAN
+98.97
+63.74
+0.77
+GDN
+99.35
+68.12
+0.81
+GTA∗(ours)
+74.91
+96.41
+0.84
+GTA∗∗
+94.83
+88.10
+0.91
+SWaT
+∆↑(best F1)
+-4.55%
++29.33%
++12.35%
+PCA
+39.53
+5.63
+0.10
+KNN
+7.76
+7.75
+0.08
+FB
+8.60
+8.60
+0.09
+AE
+34.35
+34.35
+0.34
+DAGMM
+54.44
+26.99
+0.36
+LSTM-VAE
+87.79
+14.45
+0.25
+MAD-GAN
+41.44
+33.92
+0.37
+GDN
+97.50
+40.19
+0.57
+GTA∗(ours)
+74.56
+90.50
+0.82
+GTA∗∗
+83.91
+83.61
+0.84
+WADI
+∆↑(best F1)
+-13.94%
++108.04%
++47.37%
+Best performance in bold. Second-best with underlines.
+∗represents the results chosen by best Recall.
+∗∗represents the results chosen by best F1-score.
+∆↑represents the percentage increase between our best F1-score
+performance and the second-best method (GDN).
+TABLE V: Experimental results on SMAP and MSL.
+SMAP
+MSL
+Precision(%)
+Recall(%)
+F1-score
+Precision(%)
+Recall(%)
+F1-score
+KitNet
+77.25
+83.27
+0.8014
+63.12
+79.36
+0.7031
+GAN-Li
+67.10
+87.06
+0.7579
+71.02
+87.06
+0.7823
+LSTM-VAE
+85.51
+63.66
+0.7298
+52.57
+95.46
+0.6780
+MAD-GAN
+80.49
+82.14
+0.8131
+85.17
+89.91
+0.8747
+R-Models
+OmniAnomaly
+74.16
+97.76
+0.8434
+88.67
+91.17
+0.8989
+LSTM-NDT
+89.65
+88.46
+0.8905
+59.44
+53.74
+0.5640
+DAGMM
+58.45
+90.58
+0.7105
+54.12
+99.34
+0.7007
+MTAD-GAT
+89.06
+91.23
+0.9013
+87.54
+94.40
+0.9084
+F-Models
+GTA∗∗(ours)
+89.11
+91.76
+0.9041
+91.04
+91.17
+0.9111
+Best performance in bold. Second-best with underlines.
+∗∗represents the results chosen by best F1-score.
+in many real-world anomaly detection scenarios, it is more
+vital for the system to detect all the real attacks or anomalies
+by tolerating a few false alarms. As such, we generally give
+more concern to Recall and the overall F1 score instead
+of Precision. Considering different anomaly score thresholds
+may result in different metric scores, we hence report both
+our best Recall and F1 results (with notations
+∗and
+∗∗
+respectively) on all datasets for a thorough comparison.
+Also, we adopt the point-adjust way to calculate the perfor-
+mance metrics following [13]. In practice, anomalous observa-
+tions usually occur consecutively to form contiguous anomaly
+segments. An alert for anomalies can be triggered within any
+subset of an actual anomaly window. Thus, for any observation
+in the ground truth anomaly segment, if it is detected as an
+anomaly or attack, we would consider this whole anomaly
+window is correctly detected and every observation point in
+this segment has been classiﬁed as anomalies. The observa-
+tions outside the ground truth anomaly segment are treated as
+usual. In all, we ﬁrst train our model on the training set to
+learn the general sequence pattern and make the forecasting
+on the test set for anomaly detection.
+3) Baselines: We compare our GTA with a wide range of
+state-of-the-arts in multivariate time series anomaly detection,
+including: (1) reconstruction-based models: PCA, AE [10],
+KitNet [57], DAGMM [12], GAN-Li [20], OmniAnomaly
+[13], LSTM-VAE [11], MAD-GAN [6], and (2) forecasting-
+9
+based models: KNN [14], FB [15], MTAD-GAT [17] and GDN
+[4].
+4) Training Settings: We implement our method and all its
+variants using Pytorch1 version 1.7.0 with CUDA 10.1 and
+Pytorch Geometric Library [58] version 1.6.3. We conduct
+all experiments on four NVIDIA Tesla P100 GPUs. For time
+series forecasting, we set the historical window size to 60
+frames with a label series length as 30 to predict the value at
+next timestamp. The number of dilated convolution levels for
+temporal context modeling is set to 3. Also, the general model
+input embedding dimension is set to 128. For the conventional
+multi-head attention mechanism, the number of heads is set
+to 8. In total, we have 3 encoder layers and 2 decoder layers
+and the dimensional of fully connected network is set to 128
+which is equal to the model dimension. Additionally, we apply
+the dropout strategy to prevent overﬁtting with dropout rate
+consistently equals to 0.05. The models are trained using the
+Adam optimizer with learning rate initialized as 1e−4 and
+β1, β2 as 0.9, 0.99, respectively. A learning rate adjusting
+strategy is also applied. We train our models for up to 50
+epochs and early stopping strategy is applied with patience of
+10. We run each experiment for 5 trials and report the mean
+value.
 and other state-of-the-arts on datasets SWaT and
 WADI. Each of these baselines provides a speciﬁc threshold
 selection method, and the reported F1-score is calculated
@@ -1533,6 +1049,481 @@ to study the necessity of the Transformer-based architecture
 for sequence modeling, we substitute the Transformer with
 a GRU-based recurrent neural network for forecasting. The
 
+### Formula Slots
+
+<!-- formula_id: formula_003 | origin: parser_latex | section: Method | page: 3 | bbox: [356.203125, 632.25, 563.25, 659.35546875] | ocr_status: cropped -->
+```latex
+\mathbf{x}_{i}' = \sum_{j \in \mathcal{N}(i)} h_{\mathbf{\Theta}}(\mathbf{x}_{i}||\mathbf{x}_{j} - \mathbf{x}_{j}||\mathbf{x}_{j} + \mathbf{x}_{i})
+```
+
+<!-- formula_id: formula_008 | origin: parser_latex | section: Method | page: 5 | bbox: [102.19921875, 584.71875, 299.42578125, 595.546875] | ocr_status: cropped -->
+```latex
+Attention(S, V) = Softmax(S)V
+```
+
+<!-- formula_id: formula_009 | origin: parser_latex | section: Method | page: 5 | bbox: [367.5, 408.375, 563.25, 453.234375] | ocr_status: cropped -->
+```latex
+\mathbf{A}^{(1)}, \mathbf{A}^{(2)}
+```
+
+<!-- formula_id: formula_010 | origin: parser_latex | section: Method | page: 5 | bbox: [309.5859375, 461.7421875, 538.5, 473.25] | ocr_status: cropped -->
+```latex
+\mathbf{X}^{(1)} \in \mathcal{R}^{n \times d_1}
+```
+
+## Experiments
+
+A. Datasets
+We evaluate our method over a wide range of real-world
+anomaly detection datasets. SWaT [55] The Secure Water
+Treatment dataset is collected from a water treatment testbed
+for cyber-attack investigation initially launched in May 2015.
+The SWaT dataset collection process lasted for 11 days, with
+the system operated 24 hours per day such that the network
+trafﬁc and all the values obtained from all 51 sensors and
+actuators are recorded. Due to the system working ﬂow char-
+acteristics, there is a natural topological structure relationship
+between all sensing nodes. After this, a total of 41 attacks
+derived through an attack model considering the intent space
+of a CPS were launched during the last 4 days of the 2016
+SWaT data collection process. As such, the overall sequential
+data is labeled according to normal and abnormal behaviors
+at each timestamp. WADI [9] Water Distribution dataset is
+collected from a water distribution testbed as an extension
+of the SWaT testbed. It consists of a total of 16 days of
+continuous operations with 14 days under regular operation
+and 2 days with attack scenarios. The entire testbed contains
+123 sensors and actuators. Moreover, SMAP (Soil Moisture
+Active Passive satellite) and MSL (Mars Science Laboratory
+rover) are two public datasets published by NASA [56]. Each
+dataset has a training and a testing subset, and anomalies in
+both testing subsets have been labeled [8].
+Table II and III summarises the statistics of the four datasets.
+In order to fair comparison with other methods, the original
+data samples for SWaT and WADI are downsampled to one
+measurement every 10 seconds by taking the median values
+following [4].
+TABLE II: Statistical summary of datasets SWaT and WADI.
+Datasets
+SWaT
+WADI
+Feature Desc.
+All sensors and actuators.
+# Features
+51
+112
+# Attacks
+41
+15
+Attack durations (mins)
+2 ∼25
+1.5 ∼30
+Training size (normal data)
+49619
+120899
+Testing size (data with attacks)
+44931
+17219
+Anomaly rate (%)
+12.14
+5.75
+TABLE III: Statistical summary of datasets SMAP and MSL.
+Datasets
+SMAP
+MSL
+Feature Desc.
+Radiation, temperature,
+power, etc.
+# Features
+25
+25
+Training size (normal data)
+135183
+58317
+Testing size (data with anomalies)
+427617
+73729
+Anomaly rate (%)
+13.13
+10.72
+B. Experimental Setup
+1) Data preprocessing: We perform a data standardization
+before training to improve the robustness of our model. Data
+preprocessing is applied on both training and testing set:
+˜x =
+x −min Xtrain
+max Xtrain −min Xtrain
+(12)
+where max(Xtrain) and min(Xtrain) are the maximum value
+and the minimum value of the training set respectively.
+metrics: We adopt the standard evaluation
+metrics in anomaly detection tasks, namely Precision, Recall
+and F1 score, to evaluate the performance of our approach, in
+which:
+Precision =
+TP
+TP + FP
+(13)
+Recall =
+TP
+TP + FN
+(14)
+F1 = 2 × Precision × Recall
+Precision + Recall
+(15)
+where TP represents the truly detected anomalies (aka. true
+positives), FP stands for the falsely detected anomalies (aka.
+false positives), TN represents the correctly classiﬁed normal
+samples (aka. true negatives), and FN is the misclassiﬁed
+normal samples (aka. false negatives). Given the fact that
+8
+TABLE IV: Experimental results on SWaT and WADI.
+Datasets
+In Table IV, we show the anomaly detection accuracy in
+terms of precision, recall, and F1-score, of our proposed GTA
+are summarized in Table VI and provide the following
+observations: (1) Our proposed learning policy helps the graph
+convolution operation by capturing only proper information
+ﬂow with noises ﬁltered out. (2) There is a considerable gap
+between GTA and the variant without graph learning which
+again demonstrates the importance of topological structure
+modeling in handling multivariate time series anomaly detec-
+tion. (3) Transformer-based architecture exhibits superiority
+in sequence modeling, where the self-attention mechanism
+plays a critical role. Moreover, these results again conﬁrm that
+every component of our method is indispensable and make
+this framework powerful in multivariate time series anomaly
+detection.
+E. Graph Learning and Case Study
+By introducing a case study of an actual attack from
+the Cyber-attack dataset WADI, we evaluate what a graph
+structure would the graph learning policy learn and how this
+helps us localize and comprehend an anomaly in this section.
+An assault with a period of 25.16 minutes was logged in the
+WADI data collecting log, which fraudulently turned on the
+motorized valve 1 MV 001 STATUS and caused an overﬂow
+on the primary tank. It’s difﬁcult for the operation engineers
+to ﬁnd out the status of this valve manually because it’s still
+within normal range. As a result, it’s not easy to spot this
+oddity.
+The water distribution treatment, for example, consists
+of three-state processes from the water supply, distribution
+network, and return water system, which are denoted as
+P1, P2, and P3, respectively. Every sensor and actuator, in
+every condition, is inextricably linked. The raw water inlet
+valve that regulates the SUTD entering, for example, is
+represented by 1 MV 001 STATUS. Because 1 FIT 001 PV
+is a downstream ﬂow indicator transmitter of the water dis-
+tribution, the value of 1 FIT 001 PV rises rapidly if the
+1 MV 001 valve is turned on abruptly. As its outcome of
+the ﬁrst stage propagates the inﬂuence from the raw water
+transfer pump to the second stage, 2 FIT 001 PV is also
+vulnerable to the same malicious attack. In addition, as
+LEAK DIFF PRESSURE becomes irregular during this pro-
+cedure, the leaking water pressure grows without a doubt. Our
+graph learning policy learned a partial graph in Fig. 5a, which
+almost properly depicts the topological interactions among
+sensors. The LEAD DIFF PRESSURE is almost related to
+every other displayed node as malicious information passes
+from upstream sensors to downstream ones. More importantly,
+Fig. 5b shows our model’s predicted sensor curves (blue lines)
+against the ground truth (red lines) of sensor 1 FIT 001 PV,
+2 FIT 001 PV, and 2 PIT 001 PV within the attack dura-
+tion. The predictions of these sensors are consistently higher
+than the ground truth, where the anomaly score increases
+correspondingly. It is mainly because the input time series has
+been embedded with the graph structure information through
+the inﬂuence propagation convolution operation. Sensors that
+are not directly attacked will still be severely affected if
+sensors that are highly related to them are attacked. Therefore,
+our model can capture this dependency and result in an
+abnormal prediction, which is vital for the following anomaly
+detection.
+
+## Conclusion
+
+In this work, we proposed GTA, a Transformer-based frame-
+work for anomaly detection that uses the introduced connec-
+tion learning policy to automatically learn sensor dependen-
+cies. To simulate the information ﬂow among the sensors in the
+graph, we devised an unique Inﬂuence Propagation (IP) graph
+convolution. The inference speed of our proposed multi-branch
+attention technique is greatly improved without sacriﬁcing
+model performance. Extensive experiments on four real-world
+datasets demonstrated that our strategy outperformed other
+state-of-the-art approaches in terms of prediction accuracy. We
+also provided a case study to demonstrate how our approach
+identiﬁes the anomaly by utilizing our proposed techniques.
+We aim to explore more about combining this approach with
+the online learning strategy to land it on the mobile IoT
+scenarios for future work.
+11
+
+## References
+
+[1] M. S. Mahdavinejad, M. Rezvan, M. Barekatain, P. Adibi, P. M.
+Barnaghi, and A. P. Sheth, “Machine learning for internet of things
+data analysis: A survey,” CoRR, vol. abs/1802.06305, 2018.
+[2] Z. Cai and Z. He, “Trading private range counting over big iot data,” in
+39th IEEE International Conference on Distributed Computing Systems,
+ICDCS 2019, Dallas, TX, USA, July 7-10, 2019.
+IEEE, 2019, pp. 144–
+153. [Online]. Available: https://doi.org/10.1109/ICDCS.2019.00023
+[3] M. Mohammadi, A. I. Al-Fuqaha, S. Sorour, and M. Guizani, “Deep
+learning for iot big data and streaming analytics: A survey,” IEEE
+Commun. Surv. Tutorials, vol. 20, no. 4, pp. 2923–2960, 2018.
+[4] A. Deng and B. Hooi, “Graph neural network-based anomaly detection
+in multivariate time series,” in Proceedings of the 35th AAAI Conference
+on Artiﬁcial Intelligence, 2021.
+[5] Z. Cai and X. Zheng, “A private and efﬁcient mechanism for
+data uploading in smart cyber-physical systems,” IEEE Trans. Netw.
+Sci. Eng., vol. 7, no. 2, pp. 766–775, 2020. [Online]. Available:
+https://doi.org/10.1109/TNSE.2018.2830307
+[6] D. Li, D. Chen, B. Jin, L. Shi, J. Goh, and S. Ng, “MAD-GAN:
+multivariate anomaly detection for time series data with generative
+adversarial networks,” in 28th International Conference on Artiﬁcial
+Neural Networks, ser. Lecture Notes in Computer Science, vol. 11730.
+Springer, 2019, pp. 703–716.
+[7] X. Zheng and Z. Cai, “Privacy-preserved data sharing towards
+multiple parties in industrial iots,” IEEE J. Sel. Areas Commun.,
+vol.
+38,
+no.
+5,
+pp.
+968–979,
+2020.
+[Online].
+Available:
+https:
+//doi.org/10.1109/JSAC.2020.2980802
+[8] K.
+Hundman,
+V.
+Constantinou,
+C.
+Laporte,
+I.
+Colwell,
+and
+T. S¨oderstr¨om, “Detecting spacecraft anomalies using lstms and non-
+parametric dynamic thresholding,” in Proceedings of the 24th ACM
+SIGKDD International Conference on Knowledge Discovery & Data
+Mining.
+ACM, 2018, pp. 387–395.
+[9] C. M. Ahmed, V. R. Palleti, and A. P. Mathur, “WADI: a water
+distribution testbed for research in the design of secure cyber physical
+systems,” in Proceedings of the 3rd International Workshop on Cyber-
+Physical Systems for Smart Water Networks.
+ACM, 2017, pp. 25–28.
+[10] C. C. Aggarwal, Outlier Analysis.
+Springer, 2013.
+[11] D. Park, Y. Hoshi, and C. C. Kemp, “A multimodal anomaly detector
+for robot-assisted feeding using an lstm-based variational autoencoder,”
+CoRR, vol. abs/1711.00614, 2017.
+[12] B. Zong, Q. Song, M. R. Min, W. Cheng, C. Lumezanu, D. Cho, and
+H. Chen, “Deep autoencoding gaussian mixture model for unsupervised
+anomaly detection,” in 6th International Conference on Learning Rep-
+resentations.
+OpenReview.net, 2018.
+[13] Y. Su, Y. Zhao, C. Niu, R. Liu, W. Sun, and D. Pei, “Robust anomaly
+detection for multivariate time series through stochastic recurrent neural
+network,” in Proceedings of the 25th ACM SIGKDD International
+Conference on Knowledge Discovery & Data Mining.
+ACM, 2019,
+pp. 2828–2837.
+[14] F. Angiulli and C. Pizzuti, “Fast outlier detection in high dimensional
+spaces,” in Principles of Data Mining and Knowledge Discovery, 6th
+European Conference, ser. Lecture Notes in Computer Science, vol.
+2431.
+Springer, 2002, pp. 15–26.
+[15] A. Lazarevic and V. Kumar, “Feature bagging for outlier detection,”
+in Proceedings of the 11th ACM SIGKDD International Conference on
+Knowledge Discovery & Data Mining.
+ACM, 2005, pp. 157–166.
+[16] Y. Liang, Z. Cai, J. Yu, Q. Han, and Y. Li, “Deep learning based
+inference of private information using embedded sensors in smart
+devices,” IEEE Netw., vol. 32, no. 4, pp. 8–14, 2018. [Online].
+Available: https://doi.org/10.1109/MNET.2018.1700349
+[17] H. Zhao, Y. Wang, J. Duan, C. Huang, D. Cao, Y. Tong, B. Xu, J. Bai,
+J. Tong, and Q. Zhang, “Multivariate time-series anomaly detection via
+graph attention network,” in 20th IEEE International Conference on
+Data Mining.
+IEEE, 2020, pp. 841–850.
+[18] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley,
+S. Ozair, A. C. Courville, and Y. Bengio, “Generative adversarial
+networks,” CoRR, vol. abs/1406.2661, 2014.
+[19] Z.
+Cai,
+Z.
+Xiong,
+H.
+Xu,
+P.
+Wang,
+W.
+Li,
+and
+Y.
+Pan,
+“Generative adversarial networks: A survey towards private and secure
+applications,” CoRR, vol. abs/2106.03785, 2021. [Online]. Available:
+https://arxiv.org/abs/2106.03785
+[20] D. Li, D. Chen, J. Goh, and S. Ng, “Anomaly detection with gen-
+erative adversarial networks for multivariate time series,” CoRR, vol.
+abs/1809.04758, 2018.
+[21] J. Zhou, G. Cui, Z. Zhang, C. Yang, Z. Liu, and M. Sun, “Graph
+neural networks: A review of methods and applications,” CoRR, vol.
+abs/1812.08434, 2018.
+[22] P. Velickovic, G. Cucurull, A. Casanova, A. Romero, P. Li`o, and
+Y. Bengio, “Graph attention networks,” in 6th International Conference
+on Learning Representations.
+OpenReview.net, 2018.
+[23] F. Wu, A. H. S. Jr., T. Zhang, C. Fifty, T. Yu, and K. Q. Weinberger,
+“Simplifying graph convolutional networks,” in Proceedings of the 36th
+International Conference on Machine Learning, ser. Proceedings of
+Machine Learning Research, vol. 97.
+PMLR, 2019, pp. 6861–6871.
+[24] Y. Wang, Y. Sun, Z. Liu, S. E. Sarma, M. M. Bronstein, and J. M.
+Solomon, “Dynamic graph CNN for learning on point clouds,” ACM
+Trans. Graph., vol. 38, no. 5, pp. 146:1–146:12, 2019.
+[25] Z. Wu, S. Pan, G. Long, J. Jiang, X. Chang, and C. Zhang, “Con-
+necting the dots: Multivariate time series forecasting with graph neural
+networks,” in Proceedings of the 26th ACM SIGKDD International
+Conference on Knowledge Discovery & Data Mining.
+ACM, 2020,
+pp. 753–763.
+[26] D. Cao, Y. Wang, J. Duan, C. Zhang, X. Zhu, C. Huang, Y. Tong, B. Xu,
+J. Bai, J. Tong, and Q. Zhang, “Spectral temporal graph neural network
+for multivariate time-series forecasting,” in NeurIPS, 2020.
+[27] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez,
+L. Kaiser, and I. Polosukhin, “Attention is all you need,” in NeurIPS,
+2017, pp. 5998–6008.
+[28] A. Bl´azquez-Garc´ıa, A. Conde, U. Mori, and J. A. Lozano, “A re-
+view on outlier/anomaly detection in time series data,” CoRR, vol.
+abs/2002.04236, 2020.
+[29] Y. Zhang, Z. Ge, A. G. Greenberg, and M. Roughan, “Network anomog-
+raphy,” in Proceedings of the 5th Internet Measurement Conference,
+IMC 2005, Berkeley, California, USA, October 19-21, 2005.
+USENIX
+Association, 2005, pp. 317–330.
+[30] W. Lu and A. A. Ghorbani, “Network anomaly detection based on
+wavelet analysis,” EURASIP J. Adv. Signal Process., vol. 2009, 2009.
+[31] M. Munir, S. A. Siddiqui, A. Dengel, and S. Ahmed, “Deepant: A deep
+learning approach for unsupervised anomaly detection in time series,”
+IEEE Access, vol. 7, pp. 1991–2005, 2019.
+[32] P. Malhotra, A. Ramakrishnan, G. Anand, L. Vig, P. Agarwal, and
+G. Shroff, “Lstm-based encoder-decoder for multi-sensor anomaly de-
+tection,” CoRR, vol. abs/1607.00148, 2016.
+[33] P. Filonov, A. Lavrentyev, and A. Vorontsov, “Multivariate industrial
+time series with cyber-attack simulation: Fault detection using an lstm-
+based predictive data model,” CoRR, vol. abs/1612.06676, 2016.
+[34] A. A. Cook, G. Misirli, and Z. Fan, “Anomaly detection for iot time-
+series data: A survey,” IEEE Internet Things J., vol. 7, no. 7, pp. 6481–
+6494, 2020.
+[35] M. Jones, D. Nikovski, M. Imamura, and T. Hirata, “Exemplar learning
+for extremely efﬁcient anomaly detection in real-valued time series,”
+Data Min. Knowl. Discov., vol. 30, no. 6, pp. 1427–1454, 2016.
+[36] M. Sakurada and T. Yairi, “Anomaly detection using autoencoders with
+nonlinear dimensionality reduction,” in Proceedings of the MLSDA 2014
+2nd Workshop on Machine Learning for Sensory Data Analysis, Gold
+Coast, Australia, QLD, Australia, December 2, 2014, A. Rahman, J. D.
+Deng, and J. Li, Eds.
+ACM, 2014, p. 4.
+[37] H. Lu, Y. Liu, Z. Fei, and C. Guan, “An outlier detection algorithm
+based on cross-correlation analysis for time series dataset,” IEEE Access,
+vol. 6, pp. 53 593–53 610, 2018.
+[38] A. Siffer, P. Fouque, A. Termier, and C. Largou¨et, “Anomaly detection
+in streams with extreme value theory,” in Proceedings of the 23rd ACM
+SIGKDD International Conference on Knowledge Discovery and Data
+Mining.
+ACM, 2017, pp. 1067–1075.
+[39] P. Senin, J. Lin, X. Wang, T. Oates, S. Gandhi, A. P. Boedihardjo,
+C. Chen, and S. Frankenstein, “Time series anomaly discovery with
+grammar-based compression,” in Proceedings of the 18th International
+Conference on Extending Database Technology, EDBT 2015, Brussels,
+Belgium, March 23-27, 2015, G. Alonso, F. Geerts, L. Popa, P. Barcel´o,
+J. Teubner, M. Ugarte, J. V. den Bussche, and J. Paredaens, Eds.
+OpenProceedings.org, 2015, pp. 481–492.
+[40] H. N. Akouemo and R. J. Povinelli, “Data improving in time series using
+arx and ann models,” IEEE Transactions on Power Systems, vol. 32,
+no. 5, pp. 3352–3359, 2017.
+[41] M. Defferrard, X. Bresson, and P. Vandergheynst, “Convolutional neural
+networks on graphs with fast localized spectral ﬁltering,” in Advances
+in Neural Information Processing Systems 29: Annual Conference on
+Neural Information Processing Systems 2016, December 5-10, 2016,
+Barcelona, Spain, D. D. Lee, M. Sugiyama, U. von Luxburg, I. Guyon,
+and R. Garnett, Eds., 2016, pp. 3837–3845.
+12
+[42] C. J. Maddison, D. Tarlow, and T. Minka, “A* sampling,” in NeurIPS,
+2014, pp. 3086–3094.
+[43] E. Jang, S. Gu, and B. Poole, “Categorical reparameterization with
+gumbel-softmax,” in 5th International Conference on Learning Repre-
+sentations.
+OpenReview.net, 2017.
+[44] C. Rosenbaum, T. Klinger, and M. Riemer, “Routing networks: Adaptive
+selection of non-linear functions for multi-task learning,” in 6th Inter-
+national Conference on Learning Representations.
+OpenReview.net,
+2018.
+[45] Y. Guo, H. Shi, A. Kumar, K. Grauman, T. Rosing, and R. S. Feris,
+“Spottune: Transfer learning through adaptive ﬁne-tuning,” in IEEE
+Conference on Computer Vision and Pattern Recognition.
+Computer
+Vision Foundation / IEEE, 2019, pp. 4805–4814.
+[46] F. Yu and V. Koltun, “Multi-scale context aggregation by dilated convo-
+lutions,” in 4th International Conference on Learning Representations,
+Y. Bengio and Y. LeCun, Eds., 2016.
+[47] C. Szegedy, W. Liu, Y. Jia, P. Sermanet, S. E. Reed, D. Anguelov,
+D. Erhan, V. Vanhoucke, and A. Rabinovich, “Going deeper with
+convolutions,” in IEEE Conference on Computer Vision and Pattern
+Recognition.
+IEEE Computer Society, 2015, pp. 1–9.
+[48] A. Raganato and J. Tiedemann, “An analysis of encoder representations
+in transformer-based machine translation,” in EMNLP.
+Association for
+Computational Linguistics, 2018, pp. 287–297.
+[49] E. Voita, R. Sennrich, and I. Titov, “The bottom-up evolution of
+representations in the transformer: A study with machine translation
+and language modeling objectives,” in EMNLP-IJCNLP.
+Association
+for Computational Linguistics, 2019, pp. 4395–4405.
+[50] A. Raganato, Y. Scherrer, and J. Tiedemann, “Fixed encoder self-
+attention patterns in transformer-based machine translation,” in EMNLP,
+T. Cohn, Y. He, and Y. Liu, Eds.
+Association for Computational
+Linguistics, 2020, pp. 556–568.
+[51] Y. Tay, D. Bahri, D. Metzler, D. Juan, Z. Zhao, and C. Zheng,
+“Synthesizer: Rethinking self-attention in transformer models,” CoRR,
+vol. abs/2005.00743, 2020.
+[52] Z. Wu, Z. Liu, J. Lin, Y. Lin, and S. Han, “Lite transformer with
+long-short range attention,” in 8th International Conference on Learning
+Representations.
+OpenReview.net, 2020.
+[53] F. Wu, A. Fan, A. Baevski, Y. N. Dauphin, and M. Auli, “Pay less atten-
+tion with lightweight and dynamic convolutions,” in 7th International
+Conference on Learning Representations.
+OpenReview.net, 2019.
+[54] H. Zhou, S. Zhang, J. Peng, S. Zhang, J. Li, H. Xiong, and W. Zhang,
+“Informer: Beyond efﬁcient transformer for long sequence time-series
+forecasting,” CoRR, vol. abs/2012.07436, 2020.
+[55] A. P. Mathur and N. O. Tippenhauer, “Swat: a water treatment testbed for
+research and training on ICS security,” in 2016 International Workshop
+on Cyber-physical Systems for Smart Water Networks.
+IEEE Computer
+Society, 2016, pp. 31–36.
+[56] P. O’Neill, D. Entekhabi, E. G. Njoku, and K. H. Kellogg, “The
+NASA soil moisture active passive (SMAP) mission: Overview,” in IEEE
+International Geoscience & Remote Sensing Symposium.
+IEEE, 2010,
+pp. 3236–3239.
+[57] Y. Mirsky, T. Doitshman, Y. Elovici, and A. Shabtai, “Kitsune: An
+ensemble of autoencoders for online network intrusion detection,” in
+25th Annual Network and Distributed System Security Symposium. The
+Internet Society, 2018.
+[58] M. Fey and J. E. Lenssen, “Fast graph representation learning with
+pytorch geometric,” CoRR, vol. abs/1903.02428, 2019.
+
 ## Other
 
 1
@@ -1541,7 +1532,7 @@ Multivariate Time Series Anomaly Detection in IoT
 Zekai Chen, Student Member, IEEE, Dingshuo Chen, Xiao Zhang, Member, IEEE, Zixuan Yuan,
 and Xiuzhen Cheng, Fellow, IEEE
 
-## Formula Blocks
+## Formula Slots
 
 <!-- formula_id: formula_001 | origin: parser_latex | section:  | page: 3 | bbox: [371.25, 81.75, 563.25, 105.0] | ocr_status: cropped -->
 ```latex
@@ -1553,17 +1544,14 @@ z^{i,j} = \underset{c \in \{0,1\}}{\arg \max} (\log \pi_c^{i,j} + g_c^{i,j})
 z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j} + g_c^{i,j})/\tau)}{\sum_{v \in \{0,1\}} \exp((\log \pi_v^{i,j} + g_v^{i,j})/\tau)}
 ```
 
-<!-- formula_id: formula_003 | origin: parser_latex | section:  | page: 3 | bbox: [356.203125, 632.25, 563.25, 659.35546875] | ocr_status: cropped -->
-```latex
-\mathbf{x}_{i}' = \sum_{j \in \mathcal{N}(i)} h_{\mathbf{\Theta}}(\mathbf{x}_{i}||\mathbf{x}_{j} - \mathbf{x}_{j}||\mathbf{x}_{j} + \mathbf{x}_{i})
-```
-
 <!-- formula_id: formula_004 | origin: parser_latex | section:  | page: 4 | bbox: [117.0, 474.75, 300.0, 501.57421875] | ocr_status: cropped -->
 ```latex
 \mathcal{L}_s = \sum_{1 \le i, j \le M, i \ne j} \log \pi_1^{i,j} \tag{4}
 ```
 
-<!-- formula_id: formula_005 | origin: parser_latex | section:  | page: 4 | bbox: [345.75, 686.8125, 563.25, 714.65625] | ocr_status: cropped -->
+<!-- formula_id: formula_005 | origin: parser_latex | section: j∈N (i)
+hΘ(xi||xj −xj||xj + xi)
+(3) | page: 4 | bbox: [345.75, 686.8125, 563.25, 714.65625] | ocr_status: cropped -->
 ```latex
 \frac{QK^T}{\sqrt{d_k}}
 ```
@@ -1578,21 +1566,6 @@ MultiHead(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = Concat(head_1, \cdots, head_h)W^
 head_i = Attention(\mathbf{Q}W_i^Q, \mathbf{K}W_i^K, \mathbf{V}W_i^V)
 ```
 
-<!-- formula_id: formula_008 | origin: parser_latex | section:  | page: 5 | bbox: [102.19921875, 584.71875, 299.42578125, 595.546875] | ocr_status: cropped -->
-```latex
-Attention(S, V) = Softmax(S)V
-```
-
-<!-- formula_id: formula_009 | origin: parser_latex | section:  | page: 5 | bbox: [367.5, 408.375, 563.25, 453.234375] | ocr_status: cropped -->
-```latex
-\mathbf{A}^{(1)}, \mathbf{A}^{(2)}
-```
-
-<!-- formula_id: formula_010 | origin: parser_latex | section:  | page: 5 | bbox: [309.5859375, 461.7421875, 538.5, 473.25] | ocr_status: cropped -->
-```latex
-\mathbf{X}^{(1)} \in \mathcal{R}^{n \times d_1}
-```
-
 <!-- formula_id: formula_011 | origin: parser_latex | section:  | page: 6 | bbox: [106.5, 191.8125, 300.75, 219.65625] | ocr_status: cropped -->
 ```latex
 \mathcal{L}_{mse} = \frac{1}{M} \sum_{t=1}^{n} ||\mathcal{Y}^{(t)} - \hat{\mathcal{Y}}^{(t)}||_{2}^{2}
@@ -1603,22 +1576,25 @@ Attention(S, V) = Softmax(S)V
 \hat{\mathbf{y}}^{(t)} = \sum_{i=1}^{M} ||\mathcal{Y}_i^{(t)} - \hat{\mathcal{Y}}_i^{(t)}||_2^2
 ```
 
-<!-- formula_id: formula_013 | origin: parser_latex | section:  | page: 6 | bbox: [371.14453125, 509.25, 563.25, 533.28515625] | ocr_status: cropped -->
+<!-- formula_id: formula_013 | origin: parser_latex | section: A(2) = Global(X(2)) | page: 6 | bbox: [371.14453125, 509.25, 563.25, 533.28515625] | ocr_status: cropped -->
 ```latex
 \tilde{x} = \frac{x - \min X_{train}}{\max X_{train} - \min X_{train}} \tag{12}
 ```
 
-<!-- formula_id: formula_014 | origin: parser_latex | section:  | page: 6 | bbox: [385.5, 604.5, 563.25, 629.578125] | ocr_status: cropped -->
+<!-- formula_id: formula_014 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
+(8) | page: 6 | bbox: [385.5, 604.5, 563.25, 629.578125] | ocr_status: cropped -->
 ```latex
 Precision = \frac{TP}{TP + FP}
 ```
 
-<!-- formula_id: formula_015 | origin: parser_latex | section:  | page: 6 | bbox: [390.75, 632.25, 563.25, 657.03515625] | ocr_status: cropped -->
+<!-- formula_id: formula_015 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
+(8) | page: 6 | bbox: [390.75, 632.25, 563.25, 657.03515625] | ocr_status: cropped -->
 ```latex
 Recall = \frac{TP}{TP + FN}
 ```
 
-<!-- formula_id: formula_016 | origin: parser_latex | section:  | page: 6 | bbox: [373.5, 659.25, 563.25, 685.65234375] | ocr_status: cropped -->
+<!-- formula_id: formula_016 | origin: parser_latex | section: Attention(S, V) = Softmax(S)V
+(8) | page: 6 | bbox: [373.5, 659.25, 563.25, 685.65234375] | ocr_status: cropped -->
 ```latex
 F1 = 2 \times \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
 ```

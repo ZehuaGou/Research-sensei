@@ -1,6 +1,6 @@
 # M1 Three-Pipeline Architecture — Eval Report (2510.18998)
 
-**Date**: 2026-06-08
+**Date**: 2026-06-09
 **PDF**: reports\m1_parser_review\paper_3\source.pdf
 **Title**: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection
 
@@ -11,15 +11,14 @@
 | Question | Answer |
 |----------|--------|
 | body_selected_parser | `pymupdf` |
-| body parser score | `87.6` |
+| body parser score | `100.0` |
 | selection_reason | `Good quality` |
 
 ### Parser Scores
 
 | parser | overall_score | sections | formulas | spacing |
 |--------|--------------|----------|----------|---------|
-| pymupdf | 87.6 | 0 | 10 | 1.000 |
-| markitdown_pdf | 43.5 | 0 | 2 | 1.000 |
+| pymupdf | 100.0 | 8 | 18 | 1.000 |
 
 ---
 
@@ -37,6 +36,9 @@
 | bbox count | 18 |
 | crop success count | 18 |
 | crop success rate | 18/18 |
+| section non-empty count | 18/18 |
+| nearby_text_before non-empty | 18/18 |
+| nearby_text_after non-empty | 18/18 |
 
 ### Block Type Distribution
 
@@ -69,9 +71,11 @@
 
 | Question | Answer |
 |----------|--------|
-| canonical_paper.md exists | NO |
-| formula slot comments present | NO |
+| canonical_paper.md exists | YES |
+| canonical_paper.md size | 96930 bytes |
+| formula slot comments present | YES |
 | unresolved slots present | NO |
+| formula comments with empty section | 0 |
 
 ---
 
@@ -86,6 +90,15 @@
 
 ---
 
+## Formula Overlays
+
+| Metric | Value |
+|--------|-------|
+| overlays generated | 2 |
+| overlay_dir | formula_overlays/ |
+
+---
+
 ## OCR Status
 
 | Question | Answer |
@@ -97,6 +110,4 @@
 
 ## Remaining Work
 
-- formula_overlays/ not yet implemented (placeholder only)
 - OCR blocked (pix2tex model unavailable)
-- Section inference for FormulaSlots not yet implemented

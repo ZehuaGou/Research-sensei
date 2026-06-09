@@ -10,40 +10,19 @@ venue: "arXiv 2025"
 source_type: pdf
 source_confidence: 0.8
 canonicalization_status: success
-canonical_quality_status: pass
+canonical_quality_status: PASS
 parser_used: pymupdf
 m2_ready: true
-degradation_reason: ""
-parser_candidates: ['pymupdf', 'markitdown_pdf']
-selected_parser: pymupdf
-parser_quality_score: 87.6
-parser_selection_reason: "Good quality"
-body_selected_parser: pymupdf
-body_parser_quality_score: 87.6
-body_parser_selection_reason: "Good quality"
-formula_detector: marker_document
 formula_slot_count: 18
 formula_crop_count: 18
 parser_latex_count: 18
-ocr_latex_count: 0
-raw_formula_text_count: 0
-unresolved_formula_count: 0
-canonical_quality_status_formula: pass
 ---
 
 # An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection
 
-## Body Text
+## Abstract
 
-An Encode-then-Decompose Approach to
-Unsupervised Time Series Anomaly Detection on
-Contaminated Training Data–Extended Version
-Buang Zhang1, Tung Kieu2, Xiangfei Qiu1, Chenjuan Guo1, Jilin Hu1
-Aoying Zhou1, Christian S. Jensen2, Bin Yang1
-1School of Data Science & Engineering, East China Normal University, Shanghai, China
-2Department of Computer Science, Aalborg University, Aalborg, Denmark
-1{buazhang, xfqiu}@stu.ecnu.edu.cn, 1{cjguo, jlhu, ayzhou, byang}@dase.ecnu.edu.cn, 2{tungkvt,csj}@cs.aau.dk
-Abstract—Time series anomaly detection is important in mod-
+Time series anomaly detection is important in mod-
 ern large-scale systems and is applied in a variety of domains
 to analyze and monitor the operation of diverse systems. Unsu-
 pervised approaches have received widespread interest, as they
@@ -63,7 +42,9 @@ Our proposal demonstrates competitive or state-of-the-art per-
 formance on eight commonly used multi- and univariate time
 series benchmarks and exhibits robustness to time series with
 different contamination ratios.
-I. INTRODUCTION
+
+## Introduction
+
 Time-ordered data, known as time series, from a variety
 of embedded sensors has become the foundation for the
 continuous monitoring and management of large-scale sys-
@@ -96,7 +77,7 @@ features
 module
 Decompose
 Hidden Representation
-(w/o compression) 
+(w/o compression)
 Encoder
 Compress
 Decoder
@@ -110,10 +91,8 @@ module
 Encode
 Anomaly Scores:
 Reconstruct error
- 
 Anomaly Scores:
 Mutual information
- 
 Bottleneck
 Representation
 Figure 1: Autoencoders (AE) vs. Encode-then-Decompose Anomaly
@@ -366,7 +345,14 @@ If we use different techniques to deal with the factor in
 Equation 2, we get a variety of different variational mu-
 tual information estimators, including MINE [7], NWJ [7],
 InfoNCE [66], and JSD [22].
-III. METHODOLOGY
+
+## Related Work
+
+Time Series Anomaly Detection. Many time series anomaly
+detection approaches exist, including traditional statistical
+
+## Method
+
 We first present an overview of the Encode-then-Decompose
 Anomaly Detection (EDAD) framework that efficiently de-
 composes a learned hidden time series representation into
@@ -571,7 +557,7 @@ Auxiliary
 feature
 module
 Mutual Information
-Unified 
+Unified
 features
 Encoder
 Decomposer
@@ -818,168 +804,7 @@ AS(si) = −Iθ(Y, Yaux)
 A high score indicates that the input Y and Yaux share less
 information. Since Yaux includes only short-term variations,
 si is more likely to be anomalous.
-IV. EXPERIMENTS
-A. Experimental Settings
-1) Datasets: We conduct experiments on eight real-world
-datasets that span a wide range of domains, such as manu-
-facturing, natural sciences, and healthcare: (1) Pooled Server
-Metrics (PSM) [2] is collected from EBAY servers and
-records the server monitoring metrics; (2) Soil Moisture Active
-Passive (SMAP) [23] is collected by NASA and presents
-soil samples and telemetry information from the Mars explo-
-ration project; (3) Secure Water Treatment (SWAT) [41] is
-collected from a water treatment process in an infrastructure
-for research on cyber-security; (4) Mars Science Laboratory
-(MSL) [31] is collected by NASA and shows the state of
-the sensors in the Mars exploration project; (5) NIPSTS-
-SWAN (SWAN) [31] is extracted from solar photospheric
-vector magnetograms in Spaceweather HMI Active Region
-Patch series; (6) KDD21 [47] is a composite dataset released
-for a SIGKDD 2021 competition; (7) Numenta Anomaly
-Benchmark (NAB) [3] comprises labeled time series data from
-diverse sources, encompassing AWS server metrics, online
-ad click rates, real-time traffic data, and Twitter mentions of
-major publicly traded firms; (8) Supraventricular Arrhythmia
-Database (SVDB) [43] includes 78 half-hour ECG recordings
-that supplement supraventricular arrhythmias in the MIT-BIH
-Arrhythmia Database. The eight datasets encompass both
-multivariate and univariate time series. We acknowledge that
-datasets such as SWaT, SMAP, and MSL have known lim-
-itations, including high anomaly density, inconsistent labels,
-long anomaly windows, and unrealistic distributions. These
-issues are discussed in TimeSeAD [68]. Nevertheless, these
-datasets are widely used in the time-series anomaly detection
-literature, which motivated our decision to include them in
-our experiments. We provide statistical information on the
-experimental datasets in Table II, including the dimensionality
-of each dataset, its length, and the proportion of anomalies.
-2) Baselines: We compare EDAD with thirteen strong and
-well-known anomaly detection methods. To be comprehensive,
-we include neural network based anomaly detection methods
-as well as traditional anomaly detection methods with good
-performance and published in top venues. Specifically, we
-include eleven methods: (1) OC-SVM [60] learns a boundary
-that encompasses the normal data while leaving anomalies
-outside the boundary; (2) IForest [37] uses an ensemble of
-isolation trees to detect anomalies; (3) DAGMM [82] integrates a
-GMM and AE to model the distribution of multidimensional data;
-(4) Series2Graph [10] is an anomaly detection algorithm that
-transforms time series into graph structures; (5) SAND [12]
-is an anomaly detection algorithm designed for streaming
-data. It identifies anomalous patterns by clustering input data
-sequences; (6) LSTM-AD [23] uses RNNs to detect anomalies
-by forecasting over long sequences of data; (7) MAD-GAN [34]
-employs GAN to recognize anomalies by reconstructing test-
-ing samples from the latent space; (8) TranAD [64] utilizes
-transformer models to infer anomalies by considering broader
-temporal trends in the data; (9) GDN [19] integrates GNNs
-and meta-learning with past and recent information to enable
-anomaly detection; (10) OmniAnomaly [58] integrates GRUs
-and VAEs to learn robust representations of time series data;
-(11) IMdiffusion [16] combines time series imputation and
-diffusion models to achieve robust anomaly detection. (12)
-AnomalyTrans [76] models prior associations and series
-associations to capture the association discrepancies; (13)
-DCdetector [77] detects time series anomalies using robust
-representations based on contrastive learning. Note that we use
-the publicly available implementations from the authors of the
-above methods.
-3) Metrics: We use standard metrics for anomaly detection,
-including Precision (P), Recall (R), F1-score (F1), Area Under
-the Precision-Recall Curve (A-PR), and Area Under the Re-
-ceiver Operating Characteristic Curve (A-ROC) [36]. In addi-
-tion, we report Volume-under-the-Surface of Precision-Recall
-7
-Table II: Dataset statistics.
-Dataset
-Dimension Average Length Anomaly Ratio (%)
-PSM
-25
-220,322
-27.8
-SMAP
-25
-562,800
-12.8
-SWAT
-51
-944,919
-12.0
-MSL
-55
-132,046
-10.5
-SWAN
-38
-120,000
-32.6
-KDD21 1
-77,415
-10.67
-NAB
-1
-6,301
-2.67
-SVDB
-1
-230,400
-4.68
-(V-PR) and Volume-under-the-Surface of Receiver Operating
-Characteristic (V-ROC) [46] to alleviate bias stemming from
-threshold selections and provide an alternative evaluation per-
-spective on anomaly detection methods, utilizing continuous
-buffer regions [47]. Each metric offers valuable information.
-4) Implementation Details: We implement the proposed
-framework and baselines by utilizing PyTorch [49] and Scikit-
-learn 0.24 [50] in Python 3.10. All experiments were executed
-on a cluster server, which runs Linux Ubuntu 18.04.6 LTS. The
-server is equipped with an NVIDIA Tesla-A800 GPU with two
-64-core AMD CPUs and 512 GiB RAM. The source code is
-available at https://github.com/zhangbububu/EDAD/.
-5) Hyperparameter Settings: Following recent studies [64],
-[76], [77], the dimensionality d of the hidden layer is set to
-256, the number of encoder layers is set to 3, the number
-of heads M in the multi-head attention is set to 8, and the
-window of the input model B is set to 100. By doing this we
-ensure a similar backbone and the fairness of comparison. We
-set the anomaly ratio to 1% so that the 1% of the data points
-with the highest anomaly scores are anomalies [76]. We use the
-InfoNCE [66] with separable critics as the mutual information
-estimator. In addition, we use the Adam optimizer [29] with
-a learning rate of 5 × 10−4 for model training. Early stopping
-is adopted in the training process.
-To tune λ1, λ2, and λ3, we vary each of λ1, λ2, and λ3
-among 0.1, 0.5, 1, 2, and 3. After getting the results for
-all combinations of λ1, λ2, and λ3, we identify the median
-result and use the corresponding hyperparameter setting as the
-default setting. We do not use the best result because, in unsu-
-pervised settings, we have no labeled data to enable identifying
-the best result. Further, we conduct experiments to study the
-sensitivity of different λ1, λ2, and λ3 in Section IV-C7. To
-do so, we vary a chosen hyperparameter in its range while
-fixing the other hyperparameters to their default values. We
-also study the effect of window size B in Section IV-C8.
-For the other baselines, we use the hyperparameter settings
-recommended in existing studies if provided. Otherwise, we
-randomly vary parameters in specific methods, such as the
-kernel degree in OC-SVM. Then, we report the median of
-multiple runs using different hyperparameters.
-B. Experimental Results
-1) Overall results: We report on the performance of the
-proposed EDAD and the baselines on all datasets in terms
-of all metrics—see Table III. We also report average results
-(see AVERAGE). The top 3 best results for each metric are
-highlighted in blue. We observe that the proposed framework
-achieves the top 3 highest accuracies on most datasets. Ac-
-cording to the average results, EDAD achieves the highest P,
-R, F1, V-PR, and V-ROC, and it achieves the top 3 highest
-A-PR and A-ROC. This indicates the strong performance of
-EDAD as well as significant improvements of EDAD over the
-baselines.
-To justify whether the accuracy improvements of the pro-
-posed methods EDAD over the baselines are statistically signifi-
-cant, we conduct t-tests to test the significance of the proposed
-methods against baselines. We consider a null hypothesis
+against baselines. We consider a null hypothesis
 H0 that the mean of the anomaly scores of our methods is
 similar to the mean of the anomaly scores of baselines, and an
 alternative hypothesis H1 that the mean of the anomaly scores
@@ -989,16 +814,16 @@ value, which is smaller than 0.001. This shows strong evidence
 to reject the null hypothesis H0, which in turn suggests that
 our models have statistically outperformed baselines.
 Finally, we acknowledge that it is unrealistic for a single
-method to be able to outperform all other methods across all
+to be able to outperform all other methods across all
 datasets and metrics. In other words, there is no one-size-
 fits-all solution. Thus, it is unrealistic to expect our proposed
-method EDAD to outperform all baselines in all 56 testing
+EDAD to outperform all baselines in all 56 testing
 cases (8 datasets × 7 metrics). Among the 56 cases and when
 compared to 11 other methods, the proposed EDAD is best in 26
 cases, and second-best in 9 cases, as shown in Table IV. The
 state-of-the-art method DCdetector is best in only 2 cases
 and 2nd best in 18 cases. The Compress-the-Reconstruct based
-method LSTM-AD is best in 5 cases and 2nd best in 2 cases.
+LSTM-AD is best in 5 cases and 2nd best in 2 cases.
 This clearly shows that EDAD achieves superior performance.
 C. Ablation Study
 1) Effect of Components: We proceed to assess the effec-
@@ -1027,7 +852,6 @@ MINE [7], and JSD [52]. The results show that InfoNCE
 8
 Table III: P, R, F1, A-PR, A-ROC, V-PR, and V-ROC of anomaly detection methods. The top three highest accuracies are highlighted in
 blue, where the best and the runner-up results are in bold and underlined text, respectively.
-Method
 PSM
 SMAP
 SWAT
@@ -1226,7 +1050,6 @@ EDAD (ours)
 0.571
 0.334
 0.512
-Method
 MSL
 SWAN
 KDD21
@@ -1425,7 +1248,6 @@ EDAD (ours)
 0.693
 0.035
 0.633
-Method
 NAB
 SVDB
 AVERAGE
@@ -1762,7 +1584,6 @@ initialization, which may affect its robustness. In addition, NWJ
 and MINE can also suffer from instability due to their reliance
 9
 Table IV: Overall ranking of anomaly detection methods.
-Method
 1st
 2nd
 3rd
@@ -1829,7 +1650,6 @@ symbol ◦indicates that we use the corresponding estimator/critic
 function instead of the default one. The top three highest accuracies
 are highlighted with blue, where the best and the runner-up results
 are in bold and underline text, respectively.
-Method
 P
 R
 F1
@@ -1977,39 +1797,7 @@ EDAD DCdetector LSTM-AD
 noise found in real-world contaminated data. However, they
 still serve as a useful proxy for evaluating the robustness of
 anomaly detection methods. Figure 5 shows the experimental
-results. We observe that DCdetector performs well with a
-competitive result due to its ability to learn robust represen-
-tations by using contrastive learning. However, DCdetector
-achieves an inferior performance to EDAD. This demonstrates
-that DCdetector is less robust than EDAD. The results show
-that EDAD outperforms LSTM-AE w.r.t. all metrics. When the
-contamination ratio increases, EDAD maintains good perfor-
-mance w.r.t. all metrics. In contrast, LSTM-AE tends to exhibit
-serious drops in performance. This suggests that EDAD is
-able to work on contaminated data with performance that is
-insensitive to the level of contamination.
-5) Runtime Analysis: To study the deployment potential
-of EDAD, we compare its runtime (i.e., online detection time)
-with two methods in previous experiments: DCdetector and
-LSTM-AD. First, we determine the runtime on each dataset.
-Then, we report the average runtime over all datasets. To
-achieve fair comparisons, we keep the dimensionality of the
-hidden states d the same across the methods. We also observe
-that the runtime mainly comes from the offline training time.
-Table VI reports the time needed (in minutes) to finish one
-training epoch. The highest results are highlighted with bold
-text.
-The training time results show that EDAD performs the
-fastest, whereas DCdetector runs much slower. This is be-
-cause DCdetector has a dual attention component whereas
-EDAD employs only a single attention. Further, the results show
-that EDAD is able to train in a very short time. The online
-detection time of EDAD is small, i.e., less than 0.1 second,
-making it applicable to online anomaly detection in streaming
-settings.
-6) Memory Analysis: We study the memory consumption
-of EDAD and compare it with the memory consumption of two
-methods in previous experiments: DCdetector and LSTM-AD.
+in previous experiments: DCdetector and LSTM-AD.
 First, we determine the memory consumption on each dataset.
 Then, we report the average memory consumption over all
 datasets. To achieve fair comparisons, we keep the dimen-
@@ -2342,62 +2130,7 @@ hyperparameters λ1, λ2, and λ3 in the objective function of
 EDAD (see Eq. 25). Specifically, we vary one λ among 0.1, 0.5,
 1, 2, and 3 while keeping the other two fixed at 1 to investigate
 the sensitivity to the hyper-parameter. Figure 6 shows the
-results. First, λ3 controls the strength of the regularization
-loss. In most cases, as it increases, the model’s performance
-decreases gradually. This indicates that an excessively high
-regularization strength can hinder representation learning. Sec-
-ond, λ1 and λ2 control the trade-off between the two novel
-modules in EDAD. They mutually learn different features in
-the representations of time series. We observe that when the
-weights of the two modules are approximately equal, the
-model achieves the best performance in most cases. This is
-evidence that the stable and auxiliary modules are equally
-important and indispensable components of EDAD.
-8) Effect of window size B: We study the effect of window
-size B. More specifically, we vary B among 10, 25, 50,
-100, and 200 to investigate the sensitivity to B. Figure 7
-shows the experimental results. We observe that when B
-increases, the model’s performance increases gradually and
-becomes stable with B ≥50. In many cases, the model’s
-performance achieves the peak with B = 100. Then, the
-model’s performance starts to decrease with B > 100. This
-observation aligns with existing studies [58], [75], where they
-claim that deep anomaly detection methods frequently achieve
-the best accuracy with B is set around 100.
-11
-AnomalyScore
-of EDAD
-Time series
-Trend
-Shapelet
-Seasonal
-Global
-Time Series Anomaly
-Point Anomaly
-Collective Anomaly
-Contextual
-Figure 8: Visualization of case study on anomalies built upon from Lai et al. [31]. Global anomalies and contextual anomalies are types
-of point anomalies. Global anomalies refer to data points that significantly deviate from the normal pattern of the entire time series, while
-contextual anomalies are data points that are considered abnormal only in a specific context. Shapelet anomalies, seasonal anomalies,
-and trend anomalies belong to the type of collective anomaly. Shapelet anomalies refer to a subsequence within the data whose shape is
-inconsistent with the normal pattern of the entire time series. Seasonal anomalies refer to abnormalities in the seasonal pattern of the data.
-Trend anomalies are patterns that contradict the long-term trend of a time series.
-Figure 9: An example of the distribution of stable features and
-auxiliary features.
-D. Visualization
-In order to offer a more comprehensible and intuitive
-illustration of how our method excels in detecting diverse
-anomalies within time series data, we intentionally designed
-and generated various types of anomaly sequences. The pri-
-mary aim was to visually showcase the model’s proficiency
-in identifying anomalies across different categories. Building
-upon the categorization of anomaly types as summarized in
-the work by Lai et al. [31], we subjected our method to the
-assessment of five specific anomaly types: global, contextual,
-shapelet, seasonal, and trend. Figure 8 visualizes the detection
-results. While the figure is adapted from Lai et al., it accurately
-reflects the characteristics observed by using our proposed
-method, which is why we chose to include it. The results
+, which is why we chose to include it. The results
 demonstrate that our proposed framework can detect different
 types of anomalies. This offers evidence of the effectiveness of
 our approach and its capability to work on practical problems
@@ -2430,12 +2163,9 @@ the final stages of training, the auxiliary feature representation
 provides a clearer separation between normal instances and
 anomalies, whereas the stable feature representation fails to
 distinguish them.
-V. RELATED WORK
-Time Series Anomaly Detection. Many time series anomaly
-detection approaches exist, including traditional statistical
-methods, classical machine learning algorithms [14], [56],
+, classical machine learning algorithms [14], [56],
 and modern deep learning methods. Traditional statistical
-methods detect anomalies by applying an auto-regression
+detect anomalies by applying an auto-regression
 mechanism [15], [20], [40]. These methods are easy to im-
 plement and deploy. However, their accuracy is relatively
 low. Classical machine algorithms can be categorized into
@@ -2444,7 +2174,7 @@ based methods, time series subsequences are compared. The
 most different subsequences are likely to be anomalies. Senin
 et al. [56] converted time series subsequences into characters
 and used grammar rules to detect anomalies. In density-based
-methods, time series subsequences are grouped into clusters.
+, time series subsequences are grouped into clusters.
 Clusters with low density are then considered as anomalies.
 Breunig et al. [14] propose Local Outlier Factor (LOF), which
 considers the local density of clusters and is able to detect
@@ -2499,7 +2229,258 @@ supervised learning problems where labeled data is available.
 To the best of our knowledge, our proposal is the first to
 use mutual information for unsupervised time series anomaly
 detection.
-VI. CONCLUSION
+
+## Experiments
+
+A. Experimental Settings
+1) Datasets: We conduct experiments on eight real-world
+datasets that span a wide range of domains, such as manu-
+facturing, natural sciences, and healthcare: (1) Pooled Server
+Metrics (PSM) [2] is collected from EBAY servers and
+records the server monitoring metrics; (2) Soil Moisture Active
+Passive (SMAP) [23] is collected by NASA and presents
+soil samples and telemetry information from the Mars explo-
+ration project; (3) Secure Water Treatment (SWAT) [41] is
+collected from a water treatment process in an infrastructure
+for research on cyber-security; (4) Mars Science Laboratory
+(MSL) [31] is collected by NASA and shows the state of
+the sensors in the Mars exploration project; (5) NIPSTS-
+SWAN (SWAN) [31] is extracted from solar photospheric
+vector magnetograms in Spaceweather HMI Active Region
+Patch series; (6) KDD21 [47] is a composite dataset released
+for a SIGKDD 2021 competition; (7) Numenta Anomaly
+Benchmark (NAB) [3] comprises labeled time series data from
+diverse sources, encompassing AWS server metrics, online
+ad click rates, real-time traffic data, and Twitter mentions of
+major publicly traded firms; (8) Supraventricular Arrhythmia
+Database (SVDB) [43] includes 78 half-hour ECG recordings
+that supplement supraventricular arrhythmias in the MIT-BIH
+Arrhythmia Database. The eight datasets encompass both
+multivariate and univariate time series. We acknowledge that
+datasets such as SWaT, SMAP, and MSL have known lim-
+itations, including high anomaly density, inconsistent labels,
+long anomaly windows, and unrealistic distributions. These
+issues are discussed in TimeSeAD [68]. Nevertheless, these
+datasets are widely used in the time-series anomaly detection
+literature, which motivated our decision to include them in
+our experiments. We provide statistical information on the
+experimental datasets in Table II, including the dimensionality
+of each dataset, its length, and the proportion of anomalies.
+2) Baselines: We compare EDAD with thirteen strong and
+well-known anomaly detection methods. To be comprehensive,
+we include neural network based anomaly detection methods
+as well as traditional anomaly detection methods with good
+performance and published in top venues. Specifically, we
+include eleven methods: (1) OC-SVM [60] learns a boundary
+that encompasses the normal data while leaving anomalies
+outside the boundary; (2) IForest [37] uses an ensemble of
+isolation trees to detect anomalies; (3) DAGMM [82] integrates a
+GMM and AE to model the distribution of multidimensional data;
+(4) Series2Graph [10] is an anomaly detection algorithm that
+transforms time series into graph structures; (5) SAND [12]
+is an anomaly detection algorithm designed for streaming
+data. It identifies anomalous patterns by clustering input data
+sequences; (6) LSTM-AD [23] uses RNNs to detect anomalies
+by forecasting over long sequences of data; (7) MAD-GAN [34]
+employs GAN to recognize anomalies by reconstructing test-
+ing samples from the latent space; (8) TranAD [64] utilizes
+transformer models to infer anomalies by considering broader
+temporal trends in the data; (9) GDN [19] integrates GNNs
+and meta-learning with past and recent information to enable
+anomaly detection; (10) OmniAnomaly [58] integrates GRUs
+and VAEs to learn robust representations of time series data;
+(11) IMdiffusion [16] combines time series imputation and
+diffusion models to achieve robust anomaly detection. (12)
+AnomalyTrans [76] models prior associations and series
+associations to capture the association discrepancies; (13)
+DCdetector [77] detects time series anomalies using robust
+representations based on contrastive learning. Note that we use
+the publicly available implementations from the authors of the
+above methods.
+3) Metrics: We use standard metrics for anomaly detection,
+including Precision (P), Recall (R), F1-score (F1), Area Under
+the Precision-Recall Curve (A-PR), and Area Under the Re-
+ceiver Operating Characteristic Curve (A-ROC) [36]. In addi-
+tion, we report Volume-under-the-Surface of Precision-Recall
+7
+Table II: Dataset statistics.
+Dataset
+Dimension Average Length Anomaly Ratio (%)
+PSM
+25
+220,322
+27.8
+SMAP
+25
+562,800
+12.8
+SWAT
+51
+944,919
+12.0
+MSL
+55
+132,046
+10.5
+SWAN
+38
+120,000
+32.6
+KDD21 1
+77,415
+10.67
+NAB
+1
+6,301
+2.67
+SVDB
+1
+230,400
+4.68
+(V-PR) and Volume-under-the-Surface of Receiver Operating
+Characteristic (V-ROC) [46] to alleviate bias stemming from
+threshold selections and provide an alternative evaluation per-
+spective on anomaly detection methods, utilizing continuous
+buffer regions [47]. Each metric offers valuable information.
+4) Implementation Details: We implement the proposed
+framework and baselines by utilizing PyTorch [49] and Scikit-
+learn 0.24 [50] in Python 3.10. All experiments were executed
+on a cluster server, which runs Linux Ubuntu 18.04.6 LTS. The
+server is equipped with an NVIDIA Tesla-A800 GPU with two
+64-core AMD CPUs and 512 GiB RAM. The source code is
+available at https://github.com/zhangbububu/EDAD/.
+5) Hyperparameter Settings: Following recent studies [64],
+[76], [77], the dimensionality d of the hidden layer is set to
+256, the number of encoder layers is set to 3, the number
+of heads M in the multi-head attention is set to 8, and the
+window of the input model B is set to 100. By doing this we
+ensure a similar backbone and the fairness of comparison. We
+set the anomaly ratio to 1% so that the 1% of the data points
+with the highest anomaly scores are anomalies [76]. We use the
+InfoNCE [66] with separable critics as the mutual information
+estimator. In addition, we use the Adam optimizer [29] with
+a learning rate of 5 × 10−4 for model training. Early stopping
+is adopted in the training process.
+To tune λ1, λ2, and λ3, we vary each of λ1, λ2, and λ3
+among 0.1, 0.5, 1, 2, and 3. After getting the results for
+all combinations of λ1, λ2, and λ3, we identify the median
+result and use the corresponding hyperparameter setting as the
+default setting. We do not use the best result because, in unsu-
+pervised settings, we have no labeled data to enable identifying
+the best result. Further, we conduct experiments to study the
+sensitivity of different λ1, λ2, and λ3 in Section IV-C7. To
+do so, we vary a chosen hyperparameter in its range while
+fixing the other hyperparameters to their default values. We
+also study the effect of window size B in Section IV-C8.
+For the other baselines, we use the hyperparameter settings
+recommended in existing studies if provided. Otherwise, we
+randomly vary parameters in specific methods, such as the
+kernel degree in OC-SVM. Then, we report the median of
+multiple runs using different hyperparameters.
+1) Overall results: We report on the performance of the
+proposed EDAD and the baselines on all datasets in terms
+of all metrics—see Table III. We also report average results
+(see AVERAGE). The top 3 best results for each metric are
+highlighted in blue. We observe that the proposed framework
+achieves the top 3 highest accuracies on most datasets. Ac-
+cording to the average results, EDAD achieves the highest P,
+R, F1, V-PR, and V-ROC, and it achieves the top 3 highest
+A-PR and A-ROC. This indicates the strong performance of
+EDAD as well as significant improvements of EDAD over the
+baselines.
+To justify whether the accuracy improvements of the pro-
+posed methods EDAD over the baselines are statistically signifi-
+cant, we conduct t-tests to test the significance of the proposed
+We observe that DCdetector performs well with a
+competitive result due to its ability to learn robust represen-
+tations by using contrastive learning. However, DCdetector
+achieves an inferior performance to EDAD. This demonstrates
+that DCdetector is less robust than EDAD. The results show
+that EDAD outperforms LSTM-AE w.r.t. all metrics. When the
+contamination ratio increases, EDAD maintains good perfor-
+mance w.r.t. all metrics. In contrast, LSTM-AE tends to exhibit
+serious drops in performance. This suggests that EDAD is
+able to work on contaminated data with performance that is
+insensitive to the level of contamination.
+5) Runtime Analysis: To study the deployment potential
+of EDAD, we compare its runtime (i.e., online detection time)
+with two methods in previous experiments: DCdetector and
+LSTM-AD. First, we determine the runtime on each dataset.
+Then, we report the average runtime over all datasets. To
+achieve fair comparisons, we keep the dimensionality of the
+hidden states d the same across the methods. We also observe
+that the runtime mainly comes from the offline training time.
+Table VI reports the time needed (in minutes) to finish one
+training epoch. The highest results are highlighted with bold
+text.
+The training time results show that EDAD performs the
+fastest, whereas DCdetector runs much slower. This is be-
+cause DCdetector has a dual attention component whereas
+EDAD employs only a single attention. Further, the results show
+that EDAD is able to train in a very short time. The online
+detection time of EDAD is small, i.e., less than 0.1 second,
+making it applicable to online anomaly detection in streaming
+settings.
+6) Memory Analysis: We study the memory consumption
+of EDAD and compare it with the memory consumption of two
+First, λ3 controls the strength of the regularization
+loss. In most cases, as it increases, the model’s performance
+decreases gradually. This indicates that an excessively high
+regularization strength can hinder representation learning. Sec-
+ond, λ1 and λ2 control the trade-off between the two novel
+modules in EDAD. They mutually learn different features in
+the representations of time series. We observe that when the
+weights of the two modules are approximately equal, the
+model achieves the best performance in most cases. This is
+evidence that the stable and auxiliary modules are equally
+important and indispensable components of EDAD.
+8) Effect of window size B: We study the effect of window
+size B. More specifically, we vary B among 10, 25, 50,
+100, and 200 to investigate the sensitivity to B. Figure 7
+shows the experimental results. We observe that when B
+increases, the model’s performance increases gradually and
+becomes stable with B ≥50. In many cases, the model’s
+performance achieves the peak with B = 100. Then, the
+model’s performance starts to decrease with B > 100. This
+observation aligns with existing studies [58], [75], where they
+claim that deep anomaly detection methods frequently achieve
+the best accuracy with B is set around 100.
+11
+AnomalyScore
+of EDAD
+Time series
+Trend
+Shapelet
+Seasonal
+Global
+Time Series Anomaly
+Point Anomaly
+Collective Anomaly
+Contextual
+Figure 8: Visualization of case study on anomalies built upon from Lai et al. [31]. Global anomalies and contextual anomalies are types
+of point anomalies. Global anomalies refer to data points that significantly deviate from the normal pattern of the entire time series, while
+contextual anomalies are data points that are considered abnormal only in a specific context. Shapelet anomalies, seasonal anomalies,
+and trend anomalies belong to the type of collective anomaly. Shapelet anomalies refer to a subsequence within the data whose shape is
+inconsistent with the normal pattern of the entire time series. Seasonal anomalies refer to abnormalities in the seasonal pattern of the data.
+Trend anomalies are patterns that contradict the long-term trend of a time series.
+Figure 9: An example of the distribution of stable features and
+auxiliary features.
+D. Visualization
+In order to offer a more comprehensible and intuitive
+illustration of how our method excels in detecting diverse
+anomalies within time series data, we intentionally designed
+and generated various types of anomaly sequences. The pri-
+mary aim was to visually showcase the model’s proficiency
+in identifying anomalies across different categories. Building
+upon the categorization of anomaly types as summarized in
+the work by Lai et al. [31], we subjected our method to the
+assessment of five specific anomaly types: global, contextual,
+shapelet, seasonal, and trend. Figure 8 visualizes the detection
+While the figure is adapted from Lai et al., it accurately
+reflects the characteristics observed by using our proposed
+
+## Conclusion
+
 We propose EDAD for unsupervised time series anomaly
 detection. The framework addresses a key problem in
 autoencoder-based anomaly detection methods: their high
@@ -2519,7 +2500,9 @@ information [17], continual learning settings [73], and concept
 drift settings [62], [69]. It is also of interest to study different
 approaches such as ensemble learning [26] and explainabil-
 ity [27] to further improve anomaly detection accuracy.
-REFERENCES
+
+## References
+
 [1] E. Abdelaleem, I. Nemenman, and K. M. Martini, “Deep variational mul-
 tivariate information bottleneck - A framework for variational losses,”
 CoRR, vol. abs/2310.03311, 2023.
@@ -2673,7 +2656,6 @@ Networks (CySWater), 2016, pp. 31–36.
 [42] U.
 Michelucci,
 “An
-introduction
 to
 autoencoders,”
 CoRR,
@@ -2830,105 +2812,131 @@ anomaly detection,” in Proceedings of the International Conference on
 Learning Representations (ICLR), 2018.
 15
 
+## Other
+
+An Encode-then-Decompose Approach to
+Unsupervised Time Series Anomaly Detection on
+Contaminated Training Data–Extended Version
+Buang Zhang1, Tung Kieu2, Xiangfei Qiu1, Chenjuan Guo1, Jilin Hu1
+Aoying Zhou1, Christian S. Jensen2, Bin Yang1
+1School of Data Science & Engineering, East China Normal University, Shanghai, China
+2Department of Computer Science, Aalborg University, Aalborg, Denmark
+1{buazhang, xfqiu}@stu.ecnu.edu.cn, 1{cjguo, jlhu, ayzhou, byang}@dase.ecnu.edu.cn, 2{tungkvt,csj}@cs.aau.dk
 
 ## Formula Slots
 
-### Page 2
-
-<!-- formula_id: formula_001 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_001 | origin: parser_latex | section: Training Data Clean Time Series
+Contaminated Time Series | page: 2 | bbox: [79.5, 527.09765625, 298.23046875, 557.26171875] | ocr_status: cropped -->
 ```latex
 I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \mathbb{P}(x,y) \log \left( \frac{\mathbb{P}(x,y)}{\mathbb{P}(x)\mathbb{P}(y)} \right)
 ```
 
-<!-- formula_id: formula_002 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_002 | origin: parser_latex | section: Training Data Clean Time Series
+Contaminated Time Series | page: 2 | bbox: [309.884765625, 294.29296875, 565.5, 346.5] | ocr_status: cropped -->
 ```latex
 I_{\text{UBA}}(X,Y) \triangleq \mathbb{E}_{p(x,y)}[\log q(x|y)] + h(X)
 ```
 
-<!-- formula_id: formula_003 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_003 | origin: parser_latex | section: Training Data Clean Time Series
+Contaminated Time Series | page: 2 | bbox: [388.5, 393.6796875, 563.25, 418.4296875] | ocr_status: cropped -->
 ```latex
 q(x|y) = \frac{p(x)}{Z(y)}e^{f(x,y)}
 ```
 
-### Page 3
-
-<!-- formula_id: formula_004 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_004 | origin: parser_latex | section: Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | page: 3 | bbox: [90.75, 662.0625, 300.75, 689.90625] | ocr_status: cropped -->
 ```latex
 \mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t:t+B} - \mathbb{E}[\mathbf{s}_{t:t+B}]}{\sqrt{\text{Var}[\mathbf{s}_{t:t+B}] + \epsilon}} \cdot \gamma_1 + \beta_1
 ```
 
-<!-- formula_id: formula_005 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_005 | origin: parser_latex | section: A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
+time-ordered observatio | page: 3 | bbox: [398.0390625, 204.75, 563.25, 215.7890625] | ocr_status: cropped -->
 ```latex
 \mathbf{H}_{\text{emb}} = \mathbf{W}_{\text{emb}} \cdot \mathbf{H} \tag{5}
 ```
 
-<!-- formula_id: formula_006 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_006 | origin: parser_latex | section: A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
+time-ordered observatio | page: 3 | bbox: [383.994140625, 267.609375, 563.25, 349.59375] | ocr_status: cropped -->
 ```latex
 \mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cdot \mathbf{H}_{\text{emb}}
 ```
 
-<!-- formula_id: formula_007 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_007 | origin: parser_latex | section: Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | page: 3 | bbox: [372.75, 469.86328125, 563.25, 486.10546875] | ocr_status: cropped -->
 ```latex
 \mathbf{Y}_1 = \mathbf{W}_{\text{mult}} \cdot [\mathbf{Y}_1^1, \dots, \mathbf{Y}_1^M]^\top \tag{7}
 ```
 
-<!-- formula_id: formula_008 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_008 | origin: parser_latex | section: Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | page: 3 | bbox: [355.5, 557.25, 563.25, 588.19921875] | ocr_status: cropped -->
 ```latex
 \mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{\mathbf{Y}_{1} - \mathbb{E}[\mathbf{Y}_{1}]}{\sqrt{\operatorname{Var}[\mathbf{Y}_{1}] + \epsilon}} \cdot \gamma_{2} + \beta_{2}
 ```
 
-<!-- formula_id: formula_009 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_009 | origin: parser_latex | section: Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | page: 3 | bbox: [375.0, 674.05078125, 563.25, 687.19921875] | ocr_status: cropped -->
 ```latex
 \mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{ReLU}(\mathbf{W}_1 \cdot \mathbf{Y}_2) \tag{9}
 ```
 
-### Page 4
-
-<!-- formula_id: formula_010 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_010 | origin: parser_latex | section: Y1 = Wmult · [Y1
+1, . . . , YM
+1 ]⊤
+(7) | page: 4 | bbox: [368.25, 516.26953125, 563.25, 561.90234375] | ocr_status: cropped -->
 ```latex
 \begin{aligned} \mathbf{Y}_{\text{sta}}^{I} &= \text{identity}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{aux}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{I}, \mathbf{Y}_{\text{aux}}^{S}) \cdot \mathbf{W}_{p} \end{aligned} \tag{10}
 ```
 
-<!-- formula_id: formula_011 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_011 | origin: parser_latex | section: Var[Y1] + ϵ
+· γ2 + β2
+(8) | page: 4 | bbox: [372.75, 602.12109375, 563.25, 616.81640625] | ocr_status: cropped -->
 ```latex
 \mathcal{L}_{aux} = \|\text{shuffle}(\mathbf{Y}) - \hat{\mathbf{Y}}_{aux}\|_{\mathcal{F}}^{2}
 ```
 
-### Page 5
-
-<!-- formula_id: formula_012 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_012 | origin: parser_latex | section: Add & Norm | page: 5 | bbox: [106.5, 94.359375, 301.5, 138.0] | ocr_status: cropped -->
 ```latex
 \begin{aligned} \mathbf{Y}_{\text{sta}}^{S} &= \text{shuffle}(\mathbf{Y}_{\text{sta}}) \\ \mathbf{Y}_{\text{aux}}^{I} &= \text{identity}(\mathbf{Y}_{\text{aux}}) \\ \mathbf{\hat{Y}}_{\text{sta}} &= \text{concat}(\mathbf{Y}_{\text{sta}}^{S}, \mathbf{Y}_{\text{aux}}^{I}) \cdot \mathbf{W}_{p} \end{aligned} \tag{12}
 ```
 
-<!-- formula_id: formula_013 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_013 | origin: parser_latex | section: (b) EDAD Achitecture
+(a) Attention Module | page: 5 | bbox: [100.5, 335.25, 300.75, 348.43359375] | ocr_status: cropped -->
 ```latex
 \mathcal{L}_{\text{sta}} = \|\mathbf{Y} - \hat{\mathbf{Y}}_{\text{sta}}\|_{\mathcal{F}}^2 - I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})
 ```
 
-<!-- formula_id: formula_014 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_014 | origin: parser_latex | section: (b) EDAD Achitecture
+(a) Attention Module | page: 5 | bbox: [46.5, 444.33984375, 304.5, 469.86328125] | ocr_status: cropped -->
 ```latex
 I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb{P}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}[f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})] - \mathbb{E}_{\mathbb{P}(\mathbf{Y}_{\text{sta}})}[\mathbb{E}_{\mathbb{P}(\mathbf{Y})}[e^{f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}})}]]
 ```
 
-<!-- formula_id: formula_015 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_015 | origin: parser_latex | section: 2
+and Yaux ∈RB× d | page: 5 | bbox: [106.5, 504.75, 300.75, 520.5234375] | ocr_status: cropped -->
 ```latex
 f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{sta}}) = \phi_{\theta}(\mathbf{Y})^{\top} \phi_{\theta}(\mathbf{Y}_{\text{sta}}),
 ```
 
-<!-- formula_id: formula_016 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_016 | origin: parser_latex | section: 2
+and Yaux ∈RB× d | page: 5 | bbox: [367.5, 509.25, 563.25, 522.0] | ocr_status: cropped -->
 ```latex
 \mathcal{L}_{\text{reg}} = \|\mathbf{Y}'_{u} \cdot \mathbf{W}_{p} - \mathbf{Y}'_{y} \cdot \mathbf{W}_{p}\|_{\mathcal{F}}^{2}
 ```
 
-<!-- formula_id: formula_017 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_017 | origin: parser_latex | section: Laux = ∥shuffle(Y) −ˆYaux∥2
+F
+(11) | page: 5 | bbox: [362.25, 666.0, 563.25, 676.5] | ocr_status: cropped -->
 ```latex
 \mathcal{L} = \lambda_1 \cdot \mathcal{L}_{\text{sta}} + \lambda_2 \cdot \mathcal{L}_{\text{aux}} + \lambda_3 \cdot \mathcal{L}_{\text{reg}}
 ```
 
-### Page 6
-
-<!-- formula_id: formula_018 | origin: parser_latex | block_type: Equation -->
+<!-- formula_id: formula_018 | origin: parser_latex | section: Lsta = ∥Y −ˆYsta∥2
+F −Iθ(Y, Ysta)
+(13) | page: 6 | bbox: [122.25, 465.75, 300.75, 477.984375] | ocr_status: cropped -->
 ```latex
 \mathcal{AS}(\mathbf{s}_i) = -I_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text{aux}}) \tag{18}
 ```
