@@ -129,7 +129,10 @@ Output:
 | Crossref DOI metadata | `habanero` | `CrossrefAdapter` |
 | Best available source resolution | arXiv source / structured HTML / PDF with retry/backoff | `PaperSourceResolver` |
 | Structured paper reading | DeepXiv structured output / publisher HTML/XML through adapter | `StructuredSourceAdapter` |
-| PDF/layout normalization | MinerU / Marker / Docling through adapter | `MaterialNormalizerAdapter` |
+| PDF/layout normalization (PRIMARY) | MinerU2.5-Pro via mineru-vl-utils | `MinerU25ProAdapter` |
+| PDF/layout normalization (FALLBACK) | Marker build_document() | `MarkerDocumentFormulaDetector` |
+| Structure refinement (optional) | local Llama model | `LlamaSectionRefiner` |
+| Structure refinement (always) | rule-based sanity checks | `RuleBasedStructureRefiner` |
 | Formula region detection | layout/parser formula bbox extraction | `FormulaRegionDetector` |
 | Formula OCR | pix2tex / LaTeX-OCR through adapter | `FormulaOCRAdapter` |
 
@@ -417,10 +420,51 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 
 M1 Material Normalization converts the best available source into `canonical_paper.md`. This is the M1→M2 core contract.
 
-**Architecture update (2026-06-08)**: M1 PDF canonicalization is no longer "pick one parser and extract text + formulas". It is now a three-pipeline architecture:
+### Architecture v2 (2026-06-09)
+
+M1 PDF canonicalization v2: MinerU2.5-Pro primary + Llama structure refiner + Marker fallback.
 
 ```
 PDF
+  -> MinerU2.5-Pro adapter (PRIMARY)
+       mineru-vl-utils
+       opendatalab/MinerU2.5-Pro-2604-1.2B
+       output: page/block JSON
+       blocks: title / text / formula / table / figure
+       bbox / page / latex / reading_order
+  -> StructureRefiner
+       RuleBasedStructureRefiner (always)
+         section hierarchy sanity
+         reading_order validation
+         formula context checks
+       LlamaSectionRefiner (optional, local)
+         section / context / reading_order refinement
+         strict JSON output only
+         forbidden: modify formula_latex, bbox, page, paper metadata
+  -> CanonicalBuilder
+       canonical_paper.md
+       formula_slots.json
+       visual audit artifacts
+  -> M1 Quality Gate
+       source/title verification
+       formula bbox / crop / overlay
+       latex / canonical match
+       section contradiction detection
+       all_formulas_same_section_suspicious
+       abstract_formula_overload
+       nearby_heading_conflict
+       fallback_used flag
+       llama_refined flag
+```
+
+### Architecture v1 (fallback / audit baseline)
+
+v1 is the Marker three-pipeline architecture, retained as fallback when MinerU2.5-Pro is unavailable.
+
+**IMPORTANT**: The current code uses `magic_pdf.tools.common.do_parse` via `MinerUPdfAdapter`. This is the OLD MinerU CLI (magic-pdf package). It is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The v2 adapter must use the new MinerU2.5-Pro model via `mineru-vl-utils`.
+
+```
+PDF (v1 fallback)
   -> Body pipeline
        MarkItDown / PyMuPDF / optional Marker body output
        parser quality scoring
@@ -436,6 +480,17 @@ PDF
        sections + FormulaSlot + final_latex/unresolved
        canonical_paper.md
 ```
+
+### Parser positioning
+
+| Component | Role in v2 | Role in v1 fallback |
+|---|---|---|
+| MinerU2.5-Pro | **PRIMARY** canonical parser | not available |
+| MarkerDocumentFormulaDetector | fallback formula bbox/LaTeX detector, audit baseline | primary formula detector |
+| MarkItDown | fast text fallback, source/title verification | default body parser |
+| PyMuPDF | page text extraction, crop, overlay, debug/audit | text fallback, crop engine |
+| LlamaSectionRefiner | optional structure refinement | not available |
+| RuleBasedStructureRefiner | always-on sanity checks | always-on sanity checks |
 
 ### Inputs
 
@@ -464,33 +519,94 @@ class FormulaSlot(SenseiModel):
     bbox: list[float]                  # [x1, y1, x2, y2] in PDF points
     polygon: list[list[float]] | None  # 4-corner coords if available
     block_type: str                    # "Equation" | "TextInlineMath" | "Math" | "Formula"
-    detection_source: str              # "marker_document" | "mineru" | "pymupdf"
+    detection_source: str              # "marker_document" | "mineru25pro" | "pymupdf"
     detection_confidence: float        # 0-1
     marker_text: str                   # raw text from Marker block (if any)
     marker_latex: str                  # LaTeX from Marker block (if any)
+    mineru_latex: str                  # LaTeX from MinerU2.5-Pro (if any)
     nearby_text_before: str            # text context before the formula
     nearby_text_after: str             # text context after the formula
     section: str                       # matched section name
+    section_confidence: str            # "high" | "medium" | "low"
+    section_source: str                # "heading_above" | "nearby_heading" | "nearby_after_heading" | "llama_refined" | "unknown"
+    section_reason: str                # human-readable explanation
     slot_marker: str                   # "marker_equation" | "marker_inlinemath" | "regex" | etc.
+    block_source: str                  # "mineru25pro" | "marker_document" | "ocr" | "latex_source"
     crop_path: str | None              # path to cropped formula image
+    overlay_path: str | None           # path to overlay image
     ocr_latex: str                     # OCR result (if OCR was run)
     ocr_status: str                    # "not_required" | "success" | "failed" | "skipped_by_policy"
     final_latex: str                   # final resolved LaTeX
-    final_origin: str                  # "source_latex" | "parser_latex" | "ocr_latex" | "raw_formula_text" | "unresolved"
+    final_origin: str                  # "source_latex" | "mineru_latex" | "marker_latex" | "ocr_latex" | "raw_formula_text" | "unresolved"
     unresolved_reason: str             # why it couldn't be resolved (if unresolved)
+    risk_flags: list[str]              # e.g. ["SECTION_CONTRADICTION", "ABSTRACT_OVERLOAD"]
 ```
 
 ### Formula origin priority
 
 ```
-source_latex > parser_latex (Marker/MinerU) > ocr_latex > raw_formula_text > unresolved
+source_latex > mineru_latex > marker_latex > ocr_latex > raw_formula_text > unresolved
 ```
 
 - `source_latex`: From original LaTeX source (highest confidence)
-- `parser_latex`: From Marker `build_document()` Equation block or MinerU (reliable when block has LaTeX)
+- `mineru_latex`: From MinerU2.5-Pro (primary parser, reliable when block has LaTeX)
+- `marker_latex`: From Marker `build_document()` Equation block (fallback)
 - `ocr_latex`: From FormulaOCRAdapter on cropped image
 - `raw_formula_text`: Extracted from text but no reliable LaTeX
 - `unresolved`: Formula detected but could not be resolved
+
+### DocumentBlock (M2.1 input)
+
+```python
+class DocumentBlock(SenseiModel):
+    block_id: str                    # unique block ID
+    page: int                        # page number
+    bbox: list[float]                # [x1, y1, x2, y2]
+    block_type: str                  # title / text / formula / table / figure / caption / reference / unknown
+    text: str                        # plain text content
+    latex: str                       # LaTeX if applicable
+    html: str                        # HTML if applicable
+    reading_order: int               # reading order within document
+    source: str                      # mineru25pro / marker_document / pymupdf / markitdown
+    confidence: float                # 0-1
+    parent_section: str              # section name
+    raw_payload_ref: str             # reference to raw parser output
+```
+
+### MinerU25ProAdapter contract
+
+- Uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`
+- Input: PDF path or page image
+- Output: normalized document JSON with blocks
+- Must preserve: page, bbox, block_type, text, latex, reading_order, confidence, source=mineru25pro
+- **NOT** the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
+- The old MinerUPdfAdapter uses `magic_pdf` CLI; the new adapter uses `mineru-vl-utils` + the MinerU2.5-Pro model
+
+### LlamaSectionRefiner contract
+
+- Only refines document structure and formula context
+- Input: blocks from MinerU / Marker / PyMuPDF
+- Output: strict JSON
+- May modify: section, section_confidence, section_reason, reading_order_warning, formula_context_reason, risk_flags
+- **Forbidden**: modify formula_latex, bbox, page, source_pdf identity, paper metadata
+- If Llama output is invalid JSON: fallback to RuleBasedStructureRefiner, record risk
+
+### StructureRefiner contract
+
+Two layers:
+
+1. **RuleBasedStructureRefiner** (always active)
+   - Section hierarchy sanity checks
+   - Reading order validation
+   - Formula context checks
+   - Abstract overload detection
+
+2. **LlamaSectionRefiner** (optional, local)
+   - Section / context / reading_order refinement
+   - Requires local Llama model
+   - Strict JSON output only
+
+Priority: MinerU sections/layout → rule-based sanity → optional Llama → audit gate. Llama cannot decide alone.
 
 ### canonical_paper.md front matter
 
@@ -830,6 +946,38 @@ If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`
 |---|---|
 | `paper_relation_graph.json` | Graph of upstream/downstream/related papers |
 | `seed_expansion_result.json` | Structured expansion result |
+
+## M1 Quality Gate
+
+M1 quality gate validates the canonical output before M2 consumption. The gate checks both artifact completeness and semantic correctness.
+
+### Gate checks
+
+| Check | Severity | Condition |
+|---|---|---|
+| source/title verified | BLOCKING | `title_verified in {YES, YES_WITH_BAD_METADATA}` |
+| formula_slot_count | BLOCKING | `>= 5` for method papers |
+| crop_exists | BLOCKING | 100% of formula slots |
+| overlay_exists | BLOCKING | 100% of formula slots |
+| latex_non_empty | BLOCKING | 100% of formula slots |
+| final_vs_canonical_match | BLOCKING | 100% of formula slots |
+| polluted_section | BLOCKING | must be 0 |
+| section_contradiction_count | HIGH | must be 0 for PASSED |
+| all_formulas_same_section_suspicious | HIGH | if 5+ formulas all in Abstract for a method paper → BLOCKED |
+| abstract_formula_overload | HIGH | formulas on Method/Experiment pages labeled Abstract |
+| nearby_heading_conflict | MEDIUM | section and nearby text disagree |
+| reading_order_conflict | MEDIUM | MinerU reading_order inconsistent |
+| llama_json_invalid_count | HIGH | Llama output not valid JSON |
+| mineru_parse_failed | HIGH | MinerU2.5-Pro returned error |
+| fallback_used | INFO | Marker fallback was used instead of MinerU |
+
+### Hard rules
+
+1. If 5+ formulas in a method paper are all assigned to Abstract: must be HIGH risk, cannot be PASSED.
+2. If section=Abstract but nearby_text contains Method / Experiments / Conclusion / References: must be SECTION_CONTRADICTION, cannot be high confidence.
+3. If MinerU2.5-Pro is unavailable and fallback to Marker: must record `fallback_used`, cannot claim primary success.
+4. If Llama participates in refinement: must record model name, base_url type, JSON valid count. Never record API key.
+5. If Llama modifies formula_latex / page / bbox: must be BLOCKED (越权).
 
 ## Live Acceptance
 

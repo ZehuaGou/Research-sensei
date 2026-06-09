@@ -174,6 +174,13 @@ class ClaimEvidence(SenseiModel):
     formula_ocr_status: str = ""
     canonical_source_path: str = "canonical_paper.md"
     source_location: dict = Field(default_factory=dict)  # latex_file, latex_line_start/end, html_selector, pdf_page, pdf_bbox
+    # M1 v2 pipeline fields
+    block_source: str = ""           # mineru25pro | marker_document | ocr | latex_source
+    section_confidence: str = ""     # high | medium | low
+    risk_flags: list[str] = Field(default_factory=list)
+    parse_quality_status: str = ""   # PASS | DEGRADED | BLOCKED
+    fallback_used: bool = False
+    llama_refined: bool = False
 ```
 
 ### ClaimExtractor / EvidenceRetriever
@@ -302,6 +309,11 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 | 无 claims 提取 | `WarningItem(code="NO_CLAIMS")` |
 | claim 无匹配 passage | `evidence_type = INSUFFICIENT_EVIDENCE` |
 | passage 太短 (< 50 chars) | 跳过 |
+| HIGH risk in risk_flags | `BLOCKED_UNDERSTANDING` |
+| section_contradiction | `DEGRADED_STRUCTURAL` or `BLOCKED_UNDERSTANDING` |
+| formula_latex_empty for core formula | `BLOCKED_UNDERSTANDING` |
+| parse_quality_status=BLOCKED | `BLOCKED_UNDERSTANDING` |
+| source_mismatch | `BLOCKED_UNDERSTANDING` |
 
 ## 12. 测试要求
 

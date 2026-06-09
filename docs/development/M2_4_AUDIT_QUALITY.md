@@ -20,6 +20,8 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts + ca
 | formula teaching quality | 符号有依据，作用有解释 | symbol 来自上下文或 REASONABLE_INFERENCE | symbol 解释与论文矛盾 |
 | canonical provenance | 解释来自 canonical_paper.md 派生证据 | canonical status / evidence_ref / formula_origin | 绕过 canonical 或来源缺失 |
 | formula origin safety | OCR / parser / reconstruction 不冒充原始公式 | formula_origin / formula_ocr_status | OCR/reconstructed 被标成 high-confidence original |
+| section correctness | 公式/段落归属正确章节 | section_contradiction / abstract_formula_overload | 方法论文 5+ 公式全归 Abstract |
+| parse provenance | 公式来自哪个 parser | block_source / fallback_used / llama_refined | fallback 被冒充 primary success |
 | research thinking | 讲清假设/创新点/代价/边界 | claim_type 覆盖 PROBLEM/METHOD/LIMITATION | — |
 | advisor readiness | 追问具体、基于证据 | drill 问题含论文特有术语 | — |
 | non-genericness | 贴合具体论文 | paper-specific terms 命中 | 输出无论文特有术语 |
@@ -376,6 +378,11 @@ If evidence is insufficient, direction-related fields must NOT be used to update
 | FSA-5 | `unknown` formula_origin blocks detailed formula derivation | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-6 | source-level formula available but formula_card missing `original_latex` → warning/block depending severity | P1 | BLOCK/WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-7 | FormulaRegionDetector / FormulaOCRAdapter failure must be visible in formula_ocr_status and warnings | P1 | WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-8 | section_contradiction in risk_flags → warning or block depending on severity | P1 | WARNING/BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-9 | all_formulas_same_section_suspicious (5+ formulas all in Abstract for method paper) → BLOCK | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-10 | fallback_used=true must be recorded, cannot claim primary MinerU success | P1 | WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-11 | llama_refined=true must record model name and JSON valid count; never record API key | P1 | INFO | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-12 | Llama modified formula_latex/page/bbox → BLOCKED (越权) | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 
 ## 18. 当前未解决问题
 

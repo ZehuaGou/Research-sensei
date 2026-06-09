@@ -263,6 +263,17 @@ class DocumentBlock(SenseiModel):
     formula_context_after: str = ""
     formula_ocr_status: str = ""
     formula_explanation_status: str = ""
+    # M1 v2 pipeline fields (consumed from canonical_paper.md front matter / formula_slots.json)
+    block_source: str = ""           # mineru25pro | marker_document | ocr | latex_source
+    section_confidence: str = ""     # high | medium | low
+    risk_flags: list[str] = Field(default_factory=list)  # SECTION_CONTRADICTION, ABSTRACT_OVERLOAD, etc.
+    crop_path: str = ""              # path to cropped formula image
+    overlay_path: str = ""           # path to overlay image
+    parse_quality_status: str = ""   # PASS | DEGRADED | BLOCKED
+    fallback_used: bool = False      # true if Marker fallback was used instead of MinerU
+    llama_refined: bool = False      # true if LlamaSectionRefiner was applied
+    mineru_available: bool = False   # true if MinerU2.5-Pro was available
+    structure_audit_status: str = "" # PASS | WARNING | BLOCKED
 ```
 
 ### ParserAdapter
@@ -304,6 +315,14 @@ class LightweightParserAdapter(ParserAdapter):
 | metadata_only 输入 | `BLOCKED_UNDERSTANDING`, `METADATA_ONLY_NOT_ALLOWED` |
 | formula block 缺 origin | `DEGRADED_STRUCTURAL` 或 `BLOCKED_UNDERSTANDING`，取决于是否影响核心公式 |
 | formula_origin unknown | 允许正文证据链，详细公式推导 blocked |
+| HIGH risk in risk_flags | `BLOCKED_UNDERSTANDING`, quality gate failed |
+| section_contradiction in risk_flags | `BLOCKED_UNDERSTANDING` or `DEGRADED_STRUCTURAL` depending on severity |
+| formula_latex_empty | `BLOCKED_UNDERSTANDING` for core formulas |
+| source_mismatch | `BLOCKED_UNDERSTANDING`, wrong paper |
+| parse_quality_status=BLOCKED | `BLOCKED_UNDERSTANDING` |
+| canonical_quality_status != PASS | `BLOCKED_UNDERSTANDING` or degraded mode |
+| fallback_used=true | INFO level, does not block M2 but must be recorded |
+| llama_refined=true | INFO level, must record model name and JSON valid count |
 
 ## 11. 测试要求
 

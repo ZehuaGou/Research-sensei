@@ -257,6 +257,26 @@ multi-formula OCR batch
 | `network` | 需要网络的测试 |
 | `llm` | 真实 LLM 调用测试 |
 | `slow` | 耗时测试 |
+| `gpu` | 需要 GPU 的测试 |
+| `optional` | 不阻塞默认回归的可选测试 |
+
+### M1 v2 pipeline test layering
+
+**Default tests** (must pass in `python -m pytest -q`):
+- schema validation (FormulaSlot, DocumentBlock, etc.)
+- parser output normalization
+- risk gate logic (section_contradiction, abstract_formula_overload, etc.)
+- Llama JSON validation with mocked response
+- StructureRefiner rule tests
+- section inference (nearby_text heading detection)
+
+**Optional / live / manual tests** (not default blockers):
+- MinerU2.5-Pro real model (requires GPU + model download)
+- local Llama real call (requires local model)
+- GPU/VLM runtime tests
+- unseen paper blind eval
+- full visual audit with real PDFs
+- pix2tex / LaTeX-OCR real OCR
 
 ### 验收标准
 

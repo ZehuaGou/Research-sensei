@@ -83,10 +83,17 @@ Source priority:
 
 **M1 Material Normalization Contract**:
 
-Three-pipeline architecture:
-1. **Body pipeline** — extracts text body from PDF: MarkItDown (default, MIT) → PyMuPDF (text fallback) → optional Marker (text path)
-2. **Formula pipeline** — detects and extracts formulas with positions: MarkerDocumentFormulaDetector (`build_document()` → Equation blocks with bbox) → FormulaSlot → FormulaCropper (PyMuPDF crop)
-3. **FormulaMerger** — merges body sections + formula slots → `canonical_paper.md`
+Canonical pipeline v2 (MinerU2.5-Pro primary + Llama refiner + Marker fallback):
+1. **MinerU2.5-Pro adapter** (PRIMARY) — `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`, outputs page/block JSON with bbox/latex/reading_order
+2. **StructureRefiner** — RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional, local)
+3. **CanonicalBuilder** — `canonical_paper.md`, `formula_slots.json`, visual audit
+
+v1 fallback (Marker three-pipeline, retained as audit baseline):
+1. **Body pipeline** — MarkItDown / PyMuPDF / optional Marker body output
+2. **Formula pipeline** — MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
+3. **FormulaMerger** — sections + FormulaSlot → `canonical_paper.md`
+
+**IMPORTANT**: The current code's `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). This is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The v2 adapter must use the new MinerU2.5-Pro model.
 
 Input:
 - verified candidate metadata
@@ -101,28 +108,35 @@ Output:
 - canonical front matter (see below)
 - canonical sections: Title, Abstract, Introduction, Related Work, Method, Experiments, Conclusion, References when available
 
-FormulaSlot fields (17):
+FormulaSlot fields (22):
 - `formula_id`: unique ID (e.g. `formula_001`)
 - `page`: 0-indexed page number
 - `bbox`: `[min_x, min_y, max_x, max_y]` in PDF points
 - `polygon`: 4-corner coordinates (clockwise from top-left)
 - `block_type`: `Equation` or `TextInlineMath`
-- `detection_source`: `marker_document`
+- `detection_source`: `mineru25pro` | `marker_document` | `pymupdf`
 - `detection_confidence`: float 0-1
 - `marker_text`: raw text from Marker block
 - `marker_latex`: LaTeX extracted from Marker block (if available)
+- `mineru_latex`: LaTeX from MinerU2.5-Pro (if available)
 - `nearby_text_before`: text before formula in reading order
 - `nearby_text_after`: text after formula in reading order
 - `section`: inferred section name
+- `section_confidence`: `high` | `medium` | `low`
+- `section_source`: `heading_above` | `nearby_heading` | `nearby_after_heading` | `llama_refined` | `unknown`
+- `section_reason`: human-readable explanation
 - `slot_marker`: Marker block ID
+- `block_source`: `mineru25pro` | `marker_document` | `ocr` | `latex_source`
 - `crop_path`: path to cropped formula image (relative to paper output dir)
+- `overlay_path`: path to overlay image
 - `ocr_latex`: OCR result (only when triggered)
 - `ocr_status`: `not_required`, `cropped`, `ocr_pending`, `ocr_success`, `ocr_failed`, `skipped_by_policy`
 - `final_latex`: resolved LaTeX (after priority merge)
-- `final_origin`: `source_latex` | `parser_latex` | `ocr_latex` | `raw_formula_text` | `unresolved`
+- `final_origin`: `source_latex` | `mineru_latex` | `marker_latex` | `ocr_latex` | `raw_formula_text` | `unresolved`
 - `unresolved_reason`: reason if unresolved
+- `risk_flags`: list of risk flags (e.g. `SECTION_CONTRADICTION`, `ABSTRACT_OVERLOAD`)
 
-Formula origin priority: `source_latex` > `parser_latex` (Marker/MinerU) > `ocr_latex` > `raw_formula_text` > `unresolved`
+Formula origin priority: `source_latex` > `mineru_latex` > `marker_latex` > `ocr_latex` > `raw_formula_text` > `unresolved`
 
 Front matter (extended):
 - existing: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
@@ -141,6 +155,38 @@ MarkerDocumentFormulaDetector:
 - output: list of FormulaSlot with page, bbox, polygon, block_type, marker_text, marker_latex
 - failure: Marker timeout, no Equation blocks found, bbox out of bounds
 - current status: IMPLEMENTED
+- new role: fallback formula detector and audit baseline (not primary parser in v2)
+
+MinerU25ProAdapter (DOC_DESIGNED / NOT_IMPLEMENTED):
+- uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`
+- input: PDF path or page image
+- output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
+- NOT the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
+- failure: model unavailable, GPU OOM, parse error
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+DocumentBlock (DOC_DESIGNED / NOT_IMPLEMENTED):
+- fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
+- consumed by M2.1 as evidence-ready input
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+LlamaSectionRefiner (DOC_DESIGNED / NOT_IMPLEMENTED):
+- input: blocks from MinerU / Marker / PyMuPDF
+- output: strict JSON with refined section, section_confidence, section_reason, reading_order_warning, formula_context_reason, risk_flags
+- forbidden: modify formula_latex, bbox, page, source_pdf identity, paper metadata
+- if Llama output invalid JSON: fallback to RuleBasedStructureRefiner, record risk
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+StructureRefiner (DOC_DESIGNED / NOT_IMPLEMENTED):
+- two layers: RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional)
+- priority: MinerU sections → rule-based sanity → optional Llama → audit gate
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
+
+M1 Quality Gate:
+- checks: source/title, formula bbox/crop/overlay, latex/canonical match, section_contradiction, all_formulas_same_section_suspicious, abstract_formula_overload, fallback_used, llama_refined
+- hard rule: 5+ formulas all in Abstract for method paper → HIGH risk / BLOCKED
+- hard rule: Llama modifies formula_latex/page/bbox → BLOCKED (越权)
+- current status: DOC_DESIGNED / NOT_IMPLEMENTED
 
 FormulaCropper:
 - input: PDF path, FormulaSlot with bbox

@@ -28,10 +28,14 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
-| M1 | canonical_paper.md pipeline (three-pipeline) | implemented | unit tested | IMPLEMENTED | 三阶段架构：Body pipeline (MarkItDown/PyMuPDF/Marker text) + Formula pipeline (MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper) + FormulaMerger → canonical_paper.md |
+| M1 | canonical_paper.md pipeline (three-pipeline) | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | 三阶段架构在 3 篇调试样本上验证通过；blind eval (paper_4_unseen MEMTO) 暴露 section inference 泛化失败；Marker section inference 不能作为最终主线，已修复 nearby_text heading 检测 |
 | M1 | MarkItDownAdapter (default PDF parser) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，0.6-2.9s/paper，内容覆盖 2-4x PyMuPDF，公式检测好，已接入 Body pipeline 作为默认 PDF parser |
-| M1 | MarkerPdfAdapter (optional heavy) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，~16min/paper，section 结构最好，作为 optional heavy adapter，同时用于 Formula pipeline (build_document → Equation blocks) |
-| M1 | MinerUPdfAdapter (optional heavy) | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | magic-pdf 已安装 (AGPL-3.0)，do_parse API 可用，但 live eval 中未被触发 |
+| M1 | MarkerPdfAdapter (fallback) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，~16min/paper，section 结构最好，作为 fallback formula detector 和 audit baseline |
+| M1 | MinerUPdfAdapter (old, NOT v2) | dependency available | — | DEPENDENCY_AVAILABLE_NOT_WIRED | magic-pdf 已安装 (AGPL-3.0)，do_parse API 可用。注意：这是旧 MinerU CLI (magic_pdf)，不是 MinerU2.5-Pro (mineru-vl-utils) |
+| M1 | MinerU25ProAdapter (v2 PRIMARY) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | MinerU2.5-Pro-2604-1.2B via mineru-vl-utils，新主线 primary parser，代码未实现 |
+| M1 | LlamaSectionRefiner | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | local Llama section/context refinement，代码未实现 |
+| M1 | StructureRefiner | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | RuleBasedStructureRefiner + LlamaSectionRefiner，代码未实现 |
+| M1 | M1 Quality Gate (v2) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | section_contradiction, abstract_formula_overload, fallback_used 等新 gate，文档已设计，代码未实现 |
 | M1 | MarkerDocumentFormulaDetector | implemented | unit tested | IMPLEMENTED | 使用 Marker build_document() 获取 Equation blocks with bbox，输出 FormulaSlot 列表 |
 | M1 | FormulaCropper | implemented | unit tested | IMPLEMENTED | PyMuPDF crop with padding，bbox in PDF points，输出 cropped formula images |
 | M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MarkerDocumentFormulaDetector 取代，保留用于 backward compatibility |
@@ -117,8 +121,10 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - M2 mock 测试已删除。M2 必须真实 PDF + 真实 LLM 验收。
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
-- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate。
-- 当前未实现能力包含：FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、MinerU/DeepXiv adapter、M2 canonical input reader、formula_origin 全链路。
+- 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)。
+- 当前未实现能力包含：MinerU2.5-Pro adapter (mineru-vl-utils)、LlamaSectionRefiner、StructureRefiner、M1 Quality Gate v2、FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、M2 canonical input reader、formula_origin 全链路。
+- MinerU2.5-Pro (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B) 是新主线 primary parser，但代码未实现。当前代码中的 MinerUPdfAdapter 使用旧 magic_pdf CLI，不等价。
+- paper_4_unseen blind eval (MEMTO, arXiv 2312.02530) 暴露 Marker section inference 泛化失败：11 个公式全部被错误归到 Abstract。已通过 nearby_text heading 检测修复，但 Marker 不再作为最终主线。
 - FormulaOCRAdapter 接口已实现，但 OCR 模型未集成，返回 UNAVAILABLE 状态。
 - MarkerDocumentFormulaDetector 使用 Marker build_document() 获取 Equation blocks with bbox，已实现并测试。
 - FormulaCropper 使用 PyMuPDF crop formula regions，已实现并测试。
