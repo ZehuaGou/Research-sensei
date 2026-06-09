@@ -163,16 +163,17 @@ canonicalization_status:
 parser_used:
 m2_ready:
 degradation_reason:
-# body parser selection
-body_selected_parser:
-body_parser_quality_score:
-body_parser_selection_reason:
+# parser pipeline (v2)
+primary_parser:                 # "mineru25pro" | "marker_document" (fallback)
+fallback_used:
+llama_refined:
+mineru_available:
 # formula pipeline
 formula_detector:
-formula_selected_parser:
 formula_slot_count:
 formula_crop_count:
-parser_latex_count:
+mineru_latex_count:
+marker_latex_count:
 ocr_latex_count:
 raw_formula_text_count:
 unresolved_formula_count:
@@ -348,8 +349,8 @@ seed_paper_metadata → paper_relation_graph.json → seed_expansion_result.json
 | Source-aware acquisition (LaTeX/HTML priority) | M1.3 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | canonical_paper.md pipeline | M1 / M2.1 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | M1 material normalization | M1.3 | DOC_DESIGNED, NOT_IMPLEMENTED |
-| FormulaRegionDetector | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
-| FormulaOCRAdapter / pix2tex adapter | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
+| FormulaRegionDetector | M1 formula detection | SUPERSEDED by MinerU25ProAdapter (primary) and MarkerDocumentFormulaDetector (fallback) |
+| FormulaOCRAdapter / pix2tex adapter | M1 formula OCR (fallback only) | interface exists, model not integrated; fallback for unresolved crops only |
 | DeepXiv structured adapter | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
 | Survey Deep Reading | M2 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | M2 canonical input reader / validator | M2.1 | DOC_DESIGNED, NOT_IMPLEMENTED |

@@ -14,7 +14,7 @@ M2.1 的目标是读取 M1 输出的 `canonical_paper.md`，校验 canonical fro
 - 不新增依赖
 - 不改变现有 parser 行为，除非明确迁移到 canonical reader
 - web / frontend 不直接依赖 ParserAdapter
-- 不执行 FormulaRegionDetector / FormulaOCRAdapter
+- 不执行 formula detection / FormulaOCRAdapter (these are M1 responsibilities)
 - 不把 `parser_latex`、`ocr_latex`、`reconstructed` 冒充 `source_latex`
 
 ## 3. 产品流程位置
@@ -33,7 +33,7 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | FormulaMerger: body sections + formula slots → canonical_paper.md | M1 | IMPLEMENTED |
 | MarkerDocumentFormulaDetector (build_document → Equation blocks) | M1 | IMPLEMENTED |
 | FormulaCropper (PyMuPDF crop with padding) | M1 | IMPLEMENTED |
-| FormulaOCRAdapter (pix2tex) | M1 | BLOCKED (model unavailable) |
+| FormulaOCRAdapter (pix2tex) | M1 | FALLBACK_ONLY (interface exists, model not integrated; used for unresolved formula crops only) |
 | `canonical_paper.md` generation | M1 | IMPLEMENTED |
 | 读取 `canonical_paper.md` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 校验 canonical front matter | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
@@ -52,7 +52,7 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | Marker | M1 material normalization | PDF -> Markdown/JSON/HTML，equations、inline math、tables | Marker CLI / JSON / chunks output；必须调研 equation blocks、bbox、license 约束 | OPTIONAL_ADAPTER | 否 | GPL-3.0 / 模型许可；不能作为默认依赖 | RESEARCH_REQUIRED |
 | Nougat | M1 material normalization | academic PDF -> MMD / Mathpix Markdown | `nougat` CLI, `.mmd` output；必须调研失败检测、公式输出、模型要求 | OPTIONAL_ADAPTER | 否 | 模型老、GPU 依赖、失败检测不稳定 | RESEARCH_REQUIRED |
 | pix2tex / LaTeX-OCR | M1 FormulaOCRAdapter | 公式图片 -> LaTeX | `pix2tex` CLI / Python API；必须调研 image input、timeout、confidence/beam 输出 | OPTIONAL_ADAPTER | 否 | 不定位 bbox；只负责公式图像识别；GPU/模型依赖 | RESEARCH_REQUIRED |
-| PyMuPDF | M1 material normalization / FormulaRegionDetector support | PDF 页面渲染、bbox crop、文本提取、低置信 fallback | `fitz.open`, `page.get_text`, `page.get_pixmap`, clipping/crop APIs | DIRECT_DEPENDENCY | 是 | 不识别 LaTeX 公式；fallback 不能产生高置信 formula_card | IMPLEMENTED |
+| PyMuPDF | M1 material normalization / formula crop support | PDF 页面渲染、bbox crop、文本提取、低置信 fallback | `fitz.open`, `page.get_text`, `page.get_pixmap`, clipping/crop APIs | DIRECT_DEPENDENCY | 是 | 不识别 LaTeX 公式；fallback 不能产生高置信 formula_card | IMPLEMENTED |
 | GROBID | M1 material normalization | metadata、references、citation contexts、TEI XML | GROBID service API / TEI XML；必须调研 references/citation context endpoints | OPTIONAL_ADAPTER | 否 | Java/service 依赖；不是主公式 parser | RESEARCH_REQUIRED |
 
 ## 4.5 Canonical Reader Priority
@@ -64,7 +64,7 @@ M2.1 must read `canonical_paper.md`. It no longer chooses raw-source parsers as 
 3. **CanonicalBlockBuilder** — converts sections, paragraphs, tables, figures, and formulas into `DocumentBlock`.
 4. **FormulaBlockReader** — preserves `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, context, OCR status, and explanation status.
 
-LaTeXSourceParser, StructuredHTMLParser, MinerUAdapter, MarkerAdapter, DoclingAdapter, GROBIDReferenceAdapter, PyMuPDFLowConfidenceAdapter, MarkerDocumentFormulaDetector, FormulaCropper, and FormulaOCRAdapter are M1 material normalization components. M2.1 validates their canonical output.
+MinerU25ProAdapter, MarkerDocumentFormulaDetector (fallback), FormulaCropper, LlamaSectionRefiner, StructureRefiner, and FormulaOCRAdapter (fallback for unresolved crops) are M1 material normalization components. M2.1 validates their canonical output.
 
 ## 5. 外部项目调研（详细）
 

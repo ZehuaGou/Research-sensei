@@ -38,8 +38,8 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | M1 Quality Gate (v2) | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | section_contradiction, abstract_formula_overload, fallback_used 等新 gate，文档已设计，代码未实现 |
 | M1 | MarkerDocumentFormulaDetector | implemented | unit tested | IMPLEMENTED | 使用 Marker build_document() 获取 Equation blocks with bbox，输出 FormulaSlot 列表 |
 | M1 | FormulaCropper | implemented | unit tested | IMPLEMENTED | PyMuPDF crop with padding，bbox in PDF points，输出 cropped formula images |
-| M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MarkerDocumentFormulaDetector 取代，保留用于 backward compatibility |
-| M1 | FormulaOCRAdapter / pix2tex | blocked | — | BLOCKED | pix2tex 已安装但模型权重下载太慢 (97.4MB at ~5KB/s)，无法完成 OCR 测试 |
+| M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MinerU25ProAdapter (primary) 和 MarkerDocumentFormulaDetector (fallback) 取代 |
+| M1 | FormulaOCRAdapter / pix2tex | interface exists | — | FALLBACK_ONLY | pix2tex adapter 接口存在但模型未集成；仅作为 unresolved formula crops 的 fallback，不是默认主线 |
 | M1 | DeepXiv | — | — | BLOCKED | pip 包不存在，无确认的公开 API |
 | M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
 | M2 | Paper Deep Reading | partial code exists | structural tests exist, not completion | NOT_REAL_E2E_VERIFIED | 文档存在，部分代码存在，结构性测试不能替代验收；真实 PDF + 真实 LLM + 真实 audit e2e 尚未验证 |
@@ -122,10 +122,10 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
 - 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、三阶段 MaterialNormalizer（Body + Formula + Merger）、canonical_paper.md 生成、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)。
-- 当前未实现能力包含：MinerU2.5-Pro adapter (mineru-vl-utils)、LlamaSectionRefiner、StructureRefiner、M1 Quality Gate v2、FormulaOCRAdapter（pix2tex/LaTeX-OCR 未集成）、M2 canonical input reader、formula_origin 全链路。
+- 当前未实现能力包含：MinerU2.5-Pro adapter (mineru-vl-utils)、LlamaSectionRefiner、StructureRefiner、M1 Quality Gate v2、M2 canonical input reader、formula_origin 全链路。
 - MinerU2.5-Pro (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B) 是新主线 primary parser，但代码未实现。当前代码中的 MinerUPdfAdapter 使用旧 magic_pdf CLI，不等价。
 - paper_4_unseen blind eval (MEMTO, arXiv 2312.02530) 暴露 Marker section inference 泛化失败：11 个公式全部被错误归到 Abstract。已通过 nearby_text heading 检测修复，但 Marker 不再作为最终主线。
-- FormulaOCRAdapter 接口已实现，但 OCR 模型未集成，返回 UNAVAILABLE 状态。
+- FormulaOCRAdapter 接口存在但模型未集成。在 v2 pipeline 中仅作为 unresolved formula crops 的 fallback，不是默认主线。
 - MarkerDocumentFormulaDetector 使用 Marker build_document() 获取 Equation blocks with bbox，已实现并测试。
 - FormulaCropper 使用 PyMuPDF crop formula regions，已实现并测试。
 - M1 direction exploration and seed paper expansion are NOT complete.

@@ -377,7 +377,7 @@ If evidence is insufficient, direction-related fields must NOT be used to update
 | FSA-4 | `reconstructed` explanation must be marked speculative and cannot be used as direct evidence | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-5 | `unknown` formula_origin blocks detailed formula derivation | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-6 | source-level formula available but formula_card missing `original_latex` → warning/block depending severity | P1 | BLOCK/WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
-| FSA-7 | FormulaRegionDetector / FormulaOCRAdapter failure must be visible in formula_ocr_status and warnings | P1 | WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-7 | FormulaOCRAdapter failure (fallback only) must be visible in formula_ocr_status and warnings | P1 | WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-8 | section_contradiction in risk_flags → warning or block depending on severity | P1 | WARNING/BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-9 | all_formulas_same_section_suspicious (5+ formulas all in Abstract for method paper) → BLOCK | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
 | FSA-10 | fallback_used=true must be recorded, cannot claim primary MinerU success | P1 | WARNING | DOC_DESIGNED / NOT_IMPLEMENTED |

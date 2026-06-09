@@ -51,12 +51,20 @@ user query
   -> quality ranking
   -> best available source resolution
   -> source download
-  -> material normalization
-  -> FormulaRegionDetector
-  -> FormulaOCRAdapter if triggered by policy
-  -> canonical_paper.md
+  -> MinerU25ProAdapter (PRIMARY, via mineru-vl-utils)
+  -> DocumentBlock JSON normalization
+  -> RuleBasedStructureRefiner (always)
+  -> optional LlamaSectionRefiner (local, bounded)
+  -> CanonicalBuilder
+  -> M1 Quality Gate
   -> m2_ready gate
   -> reading_plan.json (A_READ_FOR_M2)
+
+Fallback (when MinerU2.5-Pro unavailable):
+  -> MarkerDocumentFormulaDetector (fallback formula bbox/LaTeX)
+  -> FormulaCropper
+  -> FormulaMerger
+  -> canonical_paper.md
 ```
 
 A_READ_FOR_M2 must satisfy ALL:
@@ -75,7 +83,7 @@ A_READ_FOR_M2 must satisfy ALL:
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
 
-Current implemented capability: PDF-focused focused acquisition live eval. DOC_DESIGNED / NOT_IMPLEMENTED capabilities: `canonical_paper.md` pipeline, material normalization, FormulaRegionDetector, FormulaOCRAdapter, MinerU/Marker/DeepXiv structured adapters, formula_origin full chain.
+Current implemented capability: PDF-focused focused acquisition live eval + v1 Marker three-pipeline (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure). DOC_DESIGNED / NOT_IMPLEMENTED capabilities: MinerU2.5-Pro primary pipeline (mineru-vl-utils), LlamaSectionRefiner, StructureRefiner, M1 Quality Gate v2, formula_origin full chain.
 
 ### Seed Paper Expansion Mode
 
@@ -95,10 +103,13 @@ Output:
 
 - Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
 - Search/acquisition must use mature projects or official clients through adapters.
-- Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed. arXiv uses a robust official endpoint adapter (ARIS-style) with full diagnostic discipline. OpenAlex uses `pyalex`. Semantic Scholar uses official REST API via httpx with proxy support. Crossref uses `habanero`.
-- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML/XML/DeepXiv structured output, or validated PDF parser output. Current verified implementation uses PDF-only path; canonical material normalization is DOC_DESIGNED / NOT_IMPLEMENTED.
+- Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed.
+- M1 primary parser is MinerU2.5-Pro through `mineru-vl-utils` when available. The old `magic_pdf`/MinerU CLI (`magic_pdf.tools.common.do_parse`) is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`.
+- Marker (`MarkerDocumentFormulaDetector`) is fallback/audit baseline, not primary parser. After paper_4_unseen blind eval failure, Marker section inference cannot be the final mainline.
+- LlamaSectionRefiner may refine document structure (section, reading_order, context) but CANNOT alter formula_latex, bbox, page, or source identity. If Llama modifies these fields, the result must be BLOCKED.
+- M1 quality gate must block: section_contradiction, all_formulas_in_Abstract_suspicious (5+ formulas all in Abstract for method paper), abstract_formula_overload.
+- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML/XML/DeepXiv structured output, or validated PDF parser output.
 - M1 must produce `canonical_paper.md` before M2. `metadata_only` cannot enter M2. A raw PDF cannot bypass M1 canonicalization.
-- Formula parsing, formula region detection, pix2tex/LaTeX-OCR, MinerU, Marker, and DeepXiv structured adapters are formal architecture components. They are adapter-based, status-gated, and policy-triggered; they are not default full-batch operations.
 - M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Mock/fake/skip are not valid test outcomes for M1.
@@ -133,8 +144,9 @@ Output:
 | PDF/layout normalization (FALLBACK) | Marker build_document() | `MarkerDocumentFormulaDetector` |
 | Structure refinement (optional) | local Llama model | `LlamaSectionRefiner` |
 | Structure refinement (always) | rule-based sanity checks | `RuleBasedStructureRefiner` |
-| Formula region detection | layout/parser formula bbox extraction | `FormulaRegionDetector` |
-| Formula OCR | pix2tex / LaTeX-OCR through adapter | `FormulaOCRAdapter` |
+| Formula region detection (fallback) | Marker build_document() Equation blocks | `MarkerDocumentFormulaDetector` |
+| Formula region detection (PRIMARY) | MinerU2.5-Pro block JSON | `MinerU25ProAdapter` |
+| Formula OCR (fallback) | pix2tex / LaTeX-OCR for unresolved crops | `FormulaOCRAdapter` |
 
 All third-party packages are isolated behind adapters so the core schemas and selection logic remain replaceable.
 
@@ -246,10 +258,10 @@ PaperSourceResolver.resolve_many()
   -> source_resolution.json
 MaterialNormalizationService.normalize()
   -> read best available source
-  -> generate normalized Markdown sections
-  -> detect formula regions
-  -> run FormulaOCRAdapter when policy triggers
-  -> canonical_paper.md
+  -> MinerU25ProAdapter (PRIMARY) or MarkerDocumentFormulaDetector (fallback)
+  -> RuleBasedStructureRefiner (always) + optional LlamaSectionRefiner
+  -> CanonicalBuilder -> canonical_paper.md
+  -> M1 Quality Gate
   -> canonicalization_status + m2_ready
 SelectionService.build_reading_plan()
   -> filtered_candidates.json + reading_plan.json
@@ -464,18 +476,17 @@ v1 is the Marker three-pipeline architecture, retained as fallback when MinerU2.
 **IMPORTANT**: The current code uses `magic_pdf.tools.common.do_parse` via `MinerUPdfAdapter`. This is the OLD MinerU CLI (magic-pdf package). It is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The v2 adapter must use the new MinerU2.5-Pro model via `mineru-vl-utils`.
 
 ```
-PDF (v1 fallback)
+PDF (v1 fallback, IMPLEMENTED but demoted)
   -> Body pipeline
        MarkItDown / PyMuPDF / optional Marker body output
        parser quality scoring
-       body_selected_parser
        sections
   -> Formula pipeline
        Marker build_document()
        Equation/TextInlineMath blocks
        FormulaSlot(page, bbox, marker_latex/text)
        FormulaCropper(PyMuPDF crop)
-       FormulaOCRAdapter if needed
+       FormulaOCRAdapter for unresolved crops only
   -> FormulaMerger
        sections + FormulaSlot + final_latex/unresolved
        canonical_paper.md
@@ -624,22 +635,26 @@ parser_used:                    # legacy, kept for compatibility
 m2_ready:
 degradation_reason:
 
-# Body pipeline
-body_selected_parser:           # "markitdown" | "pymupdf" | "marker"
-body_parser_quality_score:      # 0-100
-body_parser_selection_reason:   # why this parser was selected
+# Parser pipeline
+primary_parser:                 # "mineru25pro" | "marker_document" (fallback)
+fallback_used:                  # true if Marker fallback was used instead of MinerU
+llama_refined:                  # true if LlamaSectionRefiner was applied
+mineru_available:               # true if MinerU2.5-Pro was available
 
 # Formula pipeline
-formula_detector:               # "marker_document" | "regex" | "none"
-formula_selected_parser:        # which parser produced the final formula LaTeX
+formula_detector:               # "mineru25pro" | "marker_document" | "regex" | "none"
 formula_slot_count:             # total FormulaSlot count
 formula_crop_count:             # how many were cropped
-parser_latex_count:             # formulas with parser-provided LaTeX
-ocr_latex_count:                # formulas resolved via OCR
+mineru_latex_count:             # formulas with MinerU-provided LaTeX
+marker_latex_count:             # formulas with Marker-provided LaTeX (fallback)
+ocr_latex_count:                # formulas resolved via OCR (fallback)
 raw_formula_text_count:         # formulas with raw text only
 unresolved_formula_count:       # formulas that couldn't be resolved
 
+# Quality gate
 canonical_quality_status:       # "PASS" | "DEGRADED" | "BLOCKED"
+structure_audit_status:         # "PASS" | "WARNING" | "BLOCKED"
+section_contradiction_count:    # number of section contradictions detected
 ---
 ```
 
@@ -698,38 +713,15 @@ OCR is not run by default on all formulas:
    - OCR fails → `final_origin = unresolved`
 3. **OCR result must never be labeled as `source_latex`** — OCR is a fallback, not a source-quality signal
 
-### FormulaRegionDetector (legacy, superseded by MarkerDocumentFormulaDetector)
+### FormulaRegionDetector (legacy, superseded)
 
-Input:
-- parser/layout blocks
-- page images if available
-- page size / text region metadata
-- section context
+FormulaRegionDetector was the original formula detection approach. It has been superseded by:
+- **PRIMARY**: MinerU2.5-Pro block JSON (MinerU25ProAdapter) — provides formula bbox, LaTeX, and reading_order directly
+- **FALLBACK**: MarkerDocumentFormulaDetector — uses Marker `build_document()` Equation blocks
 
-Output:
-- `formula_id`
-- `formula_bbox`
-- `formula_page`
-- `formula_context_before`
-- `formula_context_after`
-- `detector_confidence`
-- warnings
+Current status: SUPERSEDED. Not used in v2 pipeline.
 
-Failure conditions:
-- no bbox
-- bbox outside page bounds
-- duplicate or unstable formula_id
-- no section alignment
-- confidence below configured threshold
-
-Gate rules:
-- detector failure does not block `canonical_paper.md` when text is sufficient
-- detector failure sets formula extraction status degraded
-- formula explanation is blocked unless a reliable LaTeX source exists from another path
-
-Current status: Superseded by MarkerDocumentFormulaDetector for PDF sources.
-
-### FormulaOCRAdapter
+### FormulaOCRAdapter (fallback only)
 
 Input:
 - formula region image
@@ -776,7 +768,7 @@ Gate rules:
 - OCR result never becomes `source_latex`
 - OCR result cannot silently upgrade to high-confidence explanation
 
-Current status: IMPLEMENTED (pix2tex adapter exists, model weight download slow).
+Current status: FormulaOCRAdapter interface exists but model not integrated. In v2 pipeline, OCR is a fallback only for unresolved formula crops — not part of the primary pipeline. pix2tex model weight download is slow (97.4MB at ~5KB/s).
 
 ### m2_ready gate
 
@@ -1097,13 +1089,18 @@ M1 still does not perform:
 - direction synthesis
 - advisor/drill/interactive learning
 
-M1 DOC_DESIGNED / NOT_IMPLEMENTED capabilities:
+M1 IMPLEMENTED (v1, demoted to fallback):
+- Marker three-pipeline (Body + Formula + FormulaMerger) — works on 3 debug papers, failed paper_4_unseen blind eval
+- `canonical_paper.md` generation via v1 pipeline
+- FormulaCropper, visual audit, public PDF verify report
 
-- `canonical_paper.md` generation
-- material normalization from LaTeX / structured HTML / XML / DeepXiv / PDF parser output
-- FormulaRegionDetector
-- FormulaOCRAdapter
-- MinerU / Marker / DeepXiv structured adapters
+M1 DOC_DESIGNED / NOT_IMPLEMENTED (v2):
+- MinerU2.5-Pro primary pipeline (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B)
+- MinerU25ProAdapter
+- LlamaSectionRefiner
+- StructureRefiner (RuleBasedStructureRefiner + LlamaSectionRefiner)
+- M1 Quality Gate v2 (section_contradiction, abstract_formula_overload, fallback_used)
 - formula_origin full-chain propagation
+- DeepXiv structured adapter
 
-Those are later phases and must not be counted as completed by M1 live validation.
+FormulaOCRAdapter: interface exists, model not integrated. Fallback only for unresolved formula crops.

@@ -140,8 +140,8 @@ Formula origin priority: `source_latex` > `mineru_latex` > `marker_latex` > `ocr
 
 Front matter (extended):
 - existing: `paper_id`, `title`, `authors`, `year`, `venue`, `source_type`, `source_confidence`, `canonicalization_status`, `parser_used`, `m2_ready`, `degradation_reason`
-- new body parser fields: `body_selected_parser`, `body_parser_quality_score`, `body_parser_selection_reason`
-- new formula fields: `formula_detector`, `formula_selected_parser`, `formula_slot_count`, `formula_crop_count`, `parser_latex_count`, `ocr_latex_count`, `raw_formula_text_count`, `unresolved_formula_count`, `canonical_quality_status`
+- parser pipeline fields: `primary_parser` ("mineru25pro" | "marker_document"), `fallback_used`, `llama_refined`, `mineru_available`
+- formula fields: `formula_detector`, `formula_slot_count`, `formula_crop_count`, `mineru_latex_count`, `marker_latex_count`, `ocr_latex_count`, `raw_formula_text_count`, `unresolved_formula_count`, `canonical_quality_status`, `structure_audit_status`, `section_contradiction_count`
 
 Status fields:
 - `canonicalization_status`: `SUCCESS`, `DEGRADED`, `BLOCKED`

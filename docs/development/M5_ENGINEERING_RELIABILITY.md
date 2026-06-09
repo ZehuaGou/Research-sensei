@@ -53,12 +53,12 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 - formula blocks include formula_id and formula_origin when formulas are present
 - Status: DOC_DESIGNED / NOT_IMPLEMENTED
 
-### M1 FormulaRegionDetector / FormulaOCRAdapter
+### M1 Formula Detection / OCR
 
 - 1 real paper
 - 1 real formula region
-- real FormulaRegionDetector output: formula_id, bbox, page, confidence
-- real FormulaOCRAdapter output when policy triggers: formula_latex, formula_origin=ocr_latex, formula_ocr_status
+- real formula detection output (MinerU25ProAdapter or MarkerDocumentFormulaDetector): formula_id, bbox, page, confidence
+- real FormulaOCRAdapter output when policy triggers (fallback only for unresolved crops): formula_latex, formula_origin=ocr_latex, formula_ocr_status
 - `canonical_paper.md` writes OCR result with origin and warning
 - Status: DOC_DESIGNED / NOT_IMPLEMENTED
 
@@ -209,7 +209,7 @@ existing backend pytest suite
 existing frontend component tests when invoked separately
 implemented API/workspace/parser/status checks
 no requirement to generate canonical_paper.md until canonical pipeline code exists
-no requirement to run FormulaRegionDetector / FormulaOCRAdapter until those adapters exist
+no requirement to run MinerU25ProAdapter / FormulaOCRAdapter until those adapters are implemented
 ```
 
 ### Target default tests after canonical pipeline implementation
@@ -228,8 +228,8 @@ Target formula chain default test:
 ```text
 1 real paper
 1 real formula region
-real FormulaRegionDetector output
-real FormulaOCRAdapter output when policy triggers
+real formula detection output (MinerU25ProAdapter or MarkerDocumentFormulaDetector)
+real FormulaOCRAdapter output when policy triggers (fallback only)
 real canonical_paper.md write
 M2 reads that formula block
 ```
@@ -423,7 +423,7 @@ python scripts/run_live_eval.py
 | test_real_pdf_end_to_end | 真实搜索 → 真实 PDF 下载 → parser → evidence → LLM → audit → status |
 | test_full_live_eval_writes_report | 写出 live eval report 且不包含 secret 值 |
 | test_target_default_real_canonical_chain | after canonical pipeline implementation: one real paper → canonical_paper.md → M2 reader → basic paper_card |
-| test_target_default_formula_chain_one_region | after formula pipeline implementation: one real formula region → FormulaRegionDetector → FormulaOCRAdapter when triggered → canonical block → M2 read |
+| test_target_default_formula_chain_one_region | after formula pipeline implementation: one real formula region → MinerU25ProAdapter or MarkerDocumentFormulaDetector → FormulaOCRAdapter when triggered (fallback) → canonical block → M2 read |
 | test_nightly_formula_ocr_batch | multi-formula OCR batch under nightly/manual marker |
 | test_nightly_mineru_marker_pipeline | MinerU/Marker full flow under nightly/manual marker |
 
@@ -449,7 +449,7 @@ python scripts/run_live_eval.py
 - 支持 OpenAI-compatible provider（通过现有 `LLMClient` 和 `config/local.toml`）
 - 真实 PDF e2e：搜索 → PDF 下载 → parser → evidence → LLM → audit → understanding_status
 - 成本估算默认只在配置价格环境变量时有意义；未配置价格时仍以 token limit 控制
-- canonical_paper.md 默认真实链路、FormulaRegionDetector、FormulaOCRAdapter、MinerU/Marker/pix2tex manual/nightly validation 为 DOC_DESIGNED / NOT_IMPLEMENTED
+- canonical_paper.md 默认真实链路、MinerU25ProAdapter、LlamaSectionRefiner、FormulaOCRAdapter (fallback)、MinerU/Marker/pix2tex manual/nightly validation 为 DOC_DESIGNED / NOT_IMPLEMENTED
 
 ---
 
