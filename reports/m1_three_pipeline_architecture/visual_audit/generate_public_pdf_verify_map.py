@@ -555,17 +555,41 @@ def generate_report_md(records: list, paper_infos: dict, title_status: dict, ris
         lines.append("No source/title mismatches detected.")
         lines.append("")
 
-    # 7. Blocking Status
+    # 7. M1 Review Status
     lines.extend(["---", ""])
     lines.append("## 7. M1 Review Status")
+    lines.append("")
+
+    # 7a. Source/Title Verification
+    lines.append("### Source/Title Verification")
     lines.append("")
     if blocked_papers:
         for pk in blocked_papers:
             lines.append(f"- **{pk}**: BLOCKED — SOURCE_MISMATCH")
         lines.append("")
-        lines.append("Action required: Replace source.pdf with correct paper or update metadata to match.")
     else:
-        lines.append("All papers pass source/title verification. No blocks.")
+        lines.append("All papers pass source/title verification.")
+        lines.append("")
+
+    # 7b. Visual Audit
+    lines.append("### Visual Audit")
+    lines.append("")
+    if high_risks:
+        lines.append(f"**NOT PASSED** — {len(high_risks)} HIGH-risk item(s) remain.")
+        lines.append("")
+    else:
+        lines.append("**PASSED** — no HIGH-risk items.")
+        lines.append("")
+
+    # 7c. Overall
+    lines.append("### Overall M1 Review Status")
+    lines.append("")
+    if blocked_papers:
+        lines.append("**BLOCKED** — source/title mismatch must be resolved first.")
+    elif high_risks:
+        lines.append("**NOT PASSED** — visual audit has unresolved HIGH-risk items.")
+    else:
+        lines.append("**PASSED** — source/title verification and visual audit both clear.")
     lines.append("")
 
     return "\n".join(lines)

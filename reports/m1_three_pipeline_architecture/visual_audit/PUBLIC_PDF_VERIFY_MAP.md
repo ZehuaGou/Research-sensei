@@ -44,13 +44,13 @@
 |-------|-----------|-----:|---------|------|---------|-------------|------------|-----------------|--------|-----------|
 | paper_1 | formula_001 | 3 | Unknown | YES | YES | `\begin{split} \mathcal{Z}^{l} &= \text{L` | `\begin{split} \mathcal{Z}^{l} &= \text{L` | YES | parser_latex | YES |
 | paper_1 | formula_002 | 3 | Unknown | YES | YES | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | YES | parser_latex | YES |
-| paper_1 | formula_003 | 4 | Unknown | YES | YES | `\operatorname{AssDis}(\mathcal{P}, \math` | `\operatorname{AssDis}(\mathcal{P}, \math` | YES | parser_latex | YES |
-| paper_1 | formula_004 | 4 | Unknown | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_003 | 4 | Unknown | YES | YES | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | YES | parser_latex | YES |
+| paper_1 | formula_004 | 4 | Unknown | YES | YES | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | YES | parser_latex | YES |
 | paper_1 | formula_005 | 4 | Unknown | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
-| paper_1 | formula_006 | 5 | Unknown | YES | NO | `AnomalyScore(\mathcal{X}) = Softmax\Big(` | `AnomalyScore(\mathcal{X}) = Softmax\Big(` | YES | parser_latex | YES |
-| paper_1 | formula_007 | 14 | Unknown | YES | NO | `\begin{aligned} &1: \ \mathcal{P}' = \te` | `\begin{aligned} &1: \ \mathcal{P}' = \te` | YES | parser_latex | YES |
-| paper_1 | formula_008 | 15 | Unknown | YES | NO | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | YES | parser_latex | YES |
-| paper_1 | formula_009 | 15 | Unknown | YES | NO | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_006 | 5 | Unknown | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_007 | 14 | Unknown | YES | YES | `\begin{aligned} &1: \ \mathcal{P}' = \te` | `\begin{aligned} &1: \ \mathcal{P}' = \te` | YES | parser_latex | YES |
+| paper_1 | formula_008 | 15 | Unknown | YES | YES | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | YES | parser_latex | YES |
+| paper_1 | formula_009 | 15 | Unknown | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
 | paper_2 | formula_001 | 3 | Related Work | YES | YES | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | YES | parser_latex | YES |
 | paper_2 | formula_002 | 3 | Related Work | YES | YES | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | YES | parser_latex | YES |
 | paper_2 | formula_003 | 3 | Related Work | YES | YES | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | YES | parser_latex | YES |

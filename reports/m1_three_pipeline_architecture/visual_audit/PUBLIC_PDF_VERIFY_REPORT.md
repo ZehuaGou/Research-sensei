@@ -9,7 +9,7 @@
 
 | paper | title_verified | public_pdf_url | formula_count | crop_exists | overlay_exists | latex_match | canonical_match | section_trusted | public_pdf_context_found |
 |-------|---------------|---------------|:-------------:|:-----------:|:--------------:|:-----------:|:---------------:|:---------------:|:------------------------:|
-| paper_1 | YES_WITH_BAD_METADATA | https://arxiv.org/pdf/2110.02642 | 9 | 9/9 | 5/9 | 9/9 | 9/9 | 9/9 | 9/9 |
+| paper_1 | YES_WITH_BAD_METADATA | https://arxiv.org/pdf/2110.02642 | 9 | 9/9 | 9/9 | 9/9 | 9/9 | 9/9 | 9/9 |
 | paper_2 | YES_WITH_BAD_METADATA | https://arxiv.org/pdf/2104.03466 | 16 | 16/16 | 16/16 | 16/16 | 16/16 | 16/16 | 16/16 |
 | paper_3 | YES | https://arxiv.org/pdf/2510.18998 | 18 | 18/18 | 18/18 | 18/18 | 18/18 | 18/18 | 17/18 |
 
@@ -27,7 +27,7 @@
 - **public_pdf_url**: https://arxiv.org/pdf/2110.02642
 - **formula_count**: 9
 - **crop_exists**: 9/9
-- **overlay_exists**: 5/9
+- **overlay_exists**: 9/9
 - **latex_non_empty**: 9/9
 - **marker_vs_final_match**: 9/9
 - **final_vs_canonical_match**: 9/9
@@ -79,13 +79,13 @@
 |---|-------|-----------|-----:|---------|------|---------|-------------|------------|-----------|--------|-----------|---------|----------|
 | 1 | paper_1 | formula_001 | 3 | Unknown | Y | Y | `\begin{split} \mathcal{Z}^{l} ...` | `\begin{split} \mathcal{Z}^{l} ...` | Y | parser_latex | Y | Y | N |
 | 2 | paper_1 | formula_002 | 3 | Unknown | Y | Y | `\mathcal{Q}, \mathcal{K}, \mat...` | `\mathcal{Q}, \mathcal{K}, \mat...` | Y | parser_latex | Y | Y | N |
-| 3 | paper_1 | formula_003 | 4 | Unknown | Y | Y | `\operatorname{AssDis}(\mathcal...` | `\operatorname{AssDis}(\mathcal...` | Y | parser_latex | Y | Y | N |
-| 4 | paper_1 | formula_004 | 4 | Unknown | Y | Y | `\mathcal{L}_{Total}(\widehat{\...` | `\mathcal{L}_{Total}(\widehat{\...` | Y | parser_latex | Y | Y | N |
+| 3 | paper_1 | formula_003 | 4 | Unknown | Y | Y | `AssDis(\mathcal{P}, \mathcal{S...` | `AssDis(\mathcal{P}, \mathcal{S...` | Y | parser_latex | Y | Y | N |
+| 4 | paper_1 | formula_004 | 4 | Unknown | Y | Y | `\mathcal{L}_{\text{Total}}(\wi...` | `\mathcal{L}_{\text{Total}}(\wi...` | Y | parser_latex | Y | Y | N |
 | 5 | paper_1 | formula_005 | 4 | Unknown | Y | Y | `\mathcal{L}_{Total}(\widehat{\...` | `\mathcal{L}_{Total}(\widehat{\...` | Y | parser_latex | Y | Y | N |
-| 6 | paper_1 | formula_006 | 5 | Unknown | Y | N | `AnomalyScore(\mathcal{X}) = So...` | `AnomalyScore(\mathcal{X}) = So...` | Y | parser_latex | Y | Y | N |
-| 7 | paper_1 | formula_007 | 14 | Unknown | Y | N | `\begin{aligned} &1: \ \mathcal...` | `\begin{aligned} &1: \ \mathcal...` | Y | parser_latex | Y | Y | N |
-| 8 | paper_1 | formula_008 | 15 | Unknown | Y | N | `\mathcal{C}_{AD} = \text{Softm...` | `\mathcal{C}_{AD} = \text{Softm...` | Y | parser_latex | Y | Y | N |
-| 9 | paper_1 | formula_009 | 15 | Unknown | Y | N | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
+| 6 | paper_1 | formula_006 | 5 | Unknown | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
+| 7 | paper_1 | formula_007 | 14 | Unknown | Y | Y | `\begin{aligned} &1: \ \mathcal...` | `\begin{aligned} &1: \ \mathcal...` | Y | parser_latex | Y | Y | N |
+| 8 | paper_1 | formula_008 | 15 | Unknown | Y | Y | `\mathcal{C}_{AD} = \text{Softm...` | `\mathcal{C}_{AD} = \text{Softm...` | Y | parser_latex | Y | Y | N |
+| 9 | paper_1 | formula_009 | 15 | Unknown | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
 | 10 | paper_2 | formula_001 | 3 | Related Work | Y | Y | `z^{i,j} = \underset{c \in \{0,...` | `z^{i,j} = \underset{c \in \{0,...` | Y | parser_latex | Y | Y | N |
 | 11 | paper_2 | formula_002 | 3 | Related Work | Y | Y | `z_c^{i,j} = \frac{\exp((\log \...` | `z_c^{i,j} = \frac{\exp((\log \...` | Y | parser_latex | Y | Y | N |
 | 12 | paper_2 | formula_003 | 3 | Related Work | Y | Y | `\mathbf{x}_{i}' = \sum_{j \in ...` | `\mathbf{x}_{i}' = \sum_{j \in ...` | Y | parser_latex | Y | Y | N |
@@ -125,21 +125,16 @@
 
 ## 4. High-Risk Items
 
-| priority | paper | formula_id | reason | what_to_check |
-|----------|-------|-----------|--------|---------------|
-| HIGH | paper_1 | formula_006 | OVERLAY_MISSING | Overlay file not found |
-| HIGH | paper_1 | formula_007 | OVERLAY_MISSING | Overlay file not found |
-| HIGH | paper_1 | formula_008 | OVERLAY_MISSING | Overlay file not found |
-| HIGH | paper_1 | formula_009 | OVERLAY_MISSING | Overlay file not found |
+No high-risk items detected.
 
 ---
 
 ## 5. Risk Summary
 
-- **HIGH**: 4
+- **HIGH**: 0
 - **MEDIUM**: 0
 - **LOW**: 3
-- **Total**: 7
+- **Total**: 3
 
 ### LOW Priority
 
@@ -157,4 +152,14 @@ No source/title mismatches detected.
 
 ## 7. M1 Review Status
 
-All papers pass source/title verification. No blocks.
+### Source/Title Verification
+
+All papers pass source/title verification.
+
+### Visual Audit
+
+**PASSED** — no HIGH-risk items.
+
+### Overall M1 Review Status
+
+**PASSED** — source/title verification and visual audit both clear.

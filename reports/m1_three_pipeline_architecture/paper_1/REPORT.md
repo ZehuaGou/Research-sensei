@@ -72,7 +72,7 @@
 | Question | Answer |
 |----------|--------|
 | canonical_paper.md exists | YES |
-| canonical_paper.md size | 107066 bytes |
+| canonical_paper.md size | 106835 bytes |
 | formula slot comments present | YES |
 | unresolved slots present | NO |
 | formula comments with empty section | 40 |

@@ -3,27 +3,27 @@
     "formula_id": "formula_001",
     "page": 3,
     "bbox": [
-      184.67578125,
-      309.375,
-      504.0003356933594,
-      351.3254089355469
+      184.5,
+      306.0,
+      504.75,
+      351.140625
     ],
     "polygon": [
       [
-        184.67578125,
-        310.921875
+        184.5,
+        310.5
       ],
       [
-        504.0003356933594,
-        309.375
+        504.75,
+        306.0
       ],
       [
-        504.0003356933594,
-        351.3254089355469
+        504.75,
+        349.59375
       ],
       [
-        184.67578125,
-        351.3254089355469
+        184.5,
+        351.140625
       ]
     ],
     "block_type": "Equation",
@@ -49,27 +49,27 @@
     "formula_id": "formula_002",
     "page": 3,
     "bbox": [
-      146.42578125,
-      535.21875,
-      504.0003662109375,
-      632.0169372558594
+      145.5,
+      531.75,
+      504.75,
+      628.5
     ],
     "polygon": [
       [
-        146.42578125,
-        536.2181701660156
+        145.5,
+        534.75
       ],
       [
-        504.0003662109375,
-        535.21875
+        504.75,
+        531.75
       ],
       [
-        504.0003662109375,
-        632.0169372558594
+        504.75,
+        625.5
       ],
       [
-        146.42578125,
-        632.0169372558594
+        145.5,
+        628.5
       ]
     ],
     "block_type": "Equation",
@@ -95,34 +95,34 @@
     "formula_id": "formula_003",
     "page": 4,
     "bbox": [
-      160.171875,
+      159.0,
       357.71484375,
-      504.0003356933594,
-      390.3154602050781
+      504.75,
+      387.87890625
     ],
     "polygon": [
       [
-        161.3671875,
-        358.9056701660156
+        159.0,
+        358.5
       ],
       [
-        504.0003356933594,
+        504.75,
         357.71484375
       ],
       [
-        504.0003356933594,
-        390.3154602050781
+        504.75,
+        386.33203125
       ],
       [
-        160.171875,
-        390.3154602050781
+        159.0,
+        387.87890625
       ]
     ],
     "block_type": "Equation",
     "detection_source": "marker_document",
     "detection_confidence": 0.8,
     "marker_text": "",
-    "marker_latex": "\\operatorname{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[ \\frac{1}{L} \\sum_{l=1}^{L} \\left( \\operatorname{KL}(\\mathcal{P}_{i,:}^{l} \\| \\mathcal{S}_{i,:}^{l}) + \\operatorname{KL}(\\mathcal{S}_{i,:}^{l} \\| \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
+    "marker_latex": "AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[\\frac{1}{L} \\sum_{l=1}^{L} \\left( KL(\\mathcal{P}_{i,:}^{l} || \\mathcal{S}_{i,:}^{l}) + KL(\\mathcal{S}_{i,:}^{l} || \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
     "nearby_text_before": "rchitecture. Anomaly-Attention (left) models the prior-association\nand series-association simultaneously. In addition to the reconstruction loss, our model is also opti-\nmized by the minimax strategy with a specially-designed stop-gradient mechanism (gray arrows) to\nconstrain the prior- and series- associations for more distinguishable association discrepancy.\ninput time series X ∈RN×d. The overall equations of the l-th layer are formalized as:\nZl = Layer-Norm\n�\nAnomaly-Attention(X l−1) + X l−1�",
     "nearby_text_after": "2\n2\n�\n�\n�\nAnomaly-Attention\nNote that the single-branch self-attention mechanism (Vaswani et al., 2017)\ncannot model the prior-association and series-association simultaneously. We propose the Anomaly-\nAttention with a two-branch structure (Figure 1). For the prior-association, we adopt a learnable\nGaussian kernel to calculate the prior with respect to the relative temporal distance. Benefiting from\nthe unimodal property of the Gaussian kernel, this design can pay more attention to the adjacent\n",
     "section": "Unknown",
@@ -133,7 +133,7 @@
     "crop_path": "formula_003_p4.png",
     "ocr_latex": "",
     "ocr_status": "cropped",
-    "final_latex": "\\operatorname{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[ \\frac{1}{L} \\sum_{l=1}^{L} \\left( \\operatorname{KL}(\\mathcal{P}_{i,:}^{l} \\| \\mathcal{S}_{i,:}^{l}) + \\operatorname{KL}(\\mathcal{S}_{i,:}^{l} \\| \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
+    "final_latex": "AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) = \\left[\\frac{1}{L} \\sum_{l=1}^{L} \\left( KL(\\mathcal{P}_{i,:}^{l} || \\mathcal{S}_{i,:}^{l}) + KL(\\mathcal{S}_{i,:}^{l} || \\mathcal{P}_{i,:}^{l}) \\right) \\right]_{i=1,\\dots,N}",
     "final_origin": "parser_latex",
     "unresolved_reason": ""
   },
@@ -141,36 +141,36 @@
     "formula_id": "formula_004",
     "page": 4,
     "bbox": [
-      176.30859375,
+      176.25,
       553.39453125,
-      504.0003967285156,
-      572.6937408447266
+      503.82421875,
+      568.08984375
     ],
     "polygon": [
       [
-        177.50390625,
+        176.25,
         553.39453125
       ],
       [
-        504.0003967285156,
+        503.82421875,
         553.39453125
       ],
       [
-        504.0003967285156,
-        572.6937408447266
+        502.62890625,
+        568.08984375
       ],
       [
-        176.30859375,
-        572.6937408447266
+        176.25,
+        568.08984375
       ]
     ],
     "block_type": "Equation",
     "detection_source": "marker_document",
     "detection_confidence": 0.8,
     "marker_text": "",
-    "marker_latex": "\\mathcal{L}_{Total}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
+    "marker_latex": "\\mathcal{L}_{\\text{Total}}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
     "nearby_text_before": "s of anomaly\nsegments. The series-association branch is to learn the associations from raw series, which can\nfind the most effective associations adaptively. Note that these two forms maintain the temporal\ndependencies of each time point, which are more informative than point-wise representation. They\nalso reflect the adjacent-concentration prior and the learned real associations respectively, whose\ndiscrepancy shall be normal-abnormal distinguishable. The Anomaly-Attention in the l-th layer is:",
-    "nearby_text_after": "2\ni,j∈{1,··· ,N}\nSeries-Association: Sl = Softmax\n�QKT\n√dmodel\n�\nReconstruction: �\nZl = SlV,\n(2)\nwhere Q, K, V ∈RN×dmodel, σ ∈RN×1 represent the query, key, value of self-attention and the\nlearned scale respectively. W l\nQ, W l\nK, W l\nV ∈Rdmodel×dmodel, W l\nσ ∈Rdmodel×1 represent the parameter\nmatrices for Q, K, V, σ in the l-th layer respectively. Prior-association Pl ∈RN×N is generated\nbased on the learned scale σ ∈RN×1 and the i-th element σi corresponds to the i-th time point.\nConcretely, fo",
+    "nearby_text_after": "2\n2σ2\ni\ni,j∈{1,··· ,N}\nSeries-Association: Sl = Softmax\n�QKT\n√dmodel\n�\nReconstruction: �\nZl = SlV,\n(2)\nwhere Q, K, V ∈RN×dmodel, σ ∈RN×1 represent the query, key, value of self-attention and the\nlearned scale respectively. W l\nQ, W l\nK, W l\nV ∈Rdmodel×dmodel, W l\nσ ∈Rdmodel×1 represent the parameter\nmatrices for Q, K, V, σ in the l-th layer respectively. Prior-association Pl ∈RN×N is generated\nbased on the learned scale σ ∈RN×1 and the i-th element σi corresponds to the i-th time point.\nConcrete",
     "section": "Unknown",
     "section_confidence": "low",
     "section_source": "unknown",
@@ -179,7 +179,7 @@
     "crop_path": "formula_004_p4.png",
     "ocr_latex": "",
     "ocr_status": "cropped",
-    "final_latex": "\\mathcal{L}_{Total}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
+    "final_latex": "\\mathcal{L}_{\\text{Total}}(\\widehat{\\mathcal{X}}, \\mathcal{P}, \\mathcal{S}, \\lambda; \\mathcal{X}) = \\|\\mathcal{X} - \\widehat{\\mathcal{X}}\\|_{F}^{2} - \\lambda \\times \\|\\text{AssDis}(\\mathcal{P}, \\mathcal{S}; \\mathcal{X})\\|_{1}",
     "final_origin": "parser_latex",
     "unresolved_reason": ""
   },
@@ -187,27 +187,27 @@
     "formula_id": "formula_005",
     "page": 4,
     "bbox": [
-      214.55859375,
+      213.0,
       703.0546875,
-      504.0004577636719,
-      738.3767471313477
+      504.75,
+      732.4453125
     ],
     "polygon": [
       [
-        215.22201538085938,
+        213.0,
         704.6015625
       ],
       [
-        504.0004577636719,
+        504.75,
         703.0546875
       ],
       [
-        504.0004577636719,
-        738.3767471313477
+        504.75,
+        732.0
       ],
       [
-        214.55859375,
-        738.3767471313477
+        213.0,
+        732.4453125
       ]
     ],
     "block_type": "Equation",
@@ -233,35 +233,35 @@
     "formula_id": "formula_006",
     "page": 5,
     "bbox": [
-      137.4609375,
-      189.10546875,
-      504.0004577636719,
-      211.93548583984375
+      137.25,
+      186.75,
+      503.2265625,
+      211.53515625
     ],
     "polygon": [
       [
-        138.65625,
-        190.65234375
+        137.25,
+        186.75
       ],
       [
-        504.0004577636719,
-        189.10546875
+        503.2265625,
+        189.0
       ],
       [
-        504.0004577636719,
-        211.93548583984375
+        502.03125,
+        209.98828125
       ],
       [
-        137.4609375,
-        211.93548583984375
+        137.25,
+        211.53515625
       ]
     ],
     "block_type": "Equation",
     "detection_source": "marker_document",
     "detection_confidence": 0.8,
     "marker_text": "",
-    "marker_latex": "AnomalyScore(\\mathcal{X}) = Softmax\\Big( - AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) \\Big) \\odot \\Big[ \\|\\mathcal{X}_{i,:} - \\widehat{\\mathcal{X}}_{i,:}\\|_2^2 \\Big]_{i=1,\\dots,N}",
-    "nearby_text_before": "Published as a conference paper at ICLR 2022\nMaximize Phase\nMinimize Phase\nAssociation\nDiscrepancy\nPrior-Association\nSeries-Association\nDistribution Family\nFrom Gaussian Kernel\nReconstruction Loss\nConstrained Space\nPrior-\nAssociation\nSeries-\nAssociation\nConstrained by\nReconstruction\nSeries-\nAssociation\nPrior-\nAssociation\nConstrained by \nGaussian Kernel\nTime series\nTime series\nOptimization\nDirection\nAssociation\nDiscrepancy",
+    "marker_latex": "\\mathcal{X}",
+    "nearby_text_before": "Published as a conference paper at ICLR 2022\nMaximize Phase\nMinimize Phase\nAssociation\nDiscrepancy\nPrior-Association\nSeries-Association\nDistribution Family\nPrior-\nAssociation\nSeries-\nAssociation\nConstrained by\nReconstruction\nSeries-\nAssociation\nPrior-\nAssociation\nConstrained by \nGaussian Kernel\nTime series\nTime series\nAssociation\nDiscrepancy",
     "nearby_text_after": "Thus, each row of Sl forms a discrete distribution. �\nZl ∈RN×dmodel is the hidden representation after\nthe Anomaly-Attention in the l-th layer. We use Anomaly-Attention(·) to summarize Equation 2.\nIn the multi-head version that we use, the learned scale is σ ∈RN×h for h heads. Qm, Km, Vm ∈\nRN×\ndmodel\nh\ndenote the query, key and value of the m-th head respectively. The block concatenates\nthe outputs { �\nZl\nm ∈RN×\ndmodel\nh }1≤m≤h from multiple heads and gets the final result �\nZl ∈RN×dmodel.\nAssoc",
     "section": "Unknown",
     "section_confidence": "low",
@@ -271,7 +271,7 @@
     "crop_path": "formula_006_p5.png",
     "ocr_latex": "",
     "ocr_status": "cropped",
-    "final_latex": "AnomalyScore(\\mathcal{X}) = Softmax\\Big( - AssDis(\\mathcal{P}, \\mathcal{S}; \\mathcal{X}) \\Big) \\odot \\Big[ \\|\\mathcal{X}_{i,:} - \\widehat{\\mathcal{X}}_{i,:}\\|_2^2 \\Big]_{i=1,\\dots,N}",
+    "final_latex": "\\mathcal{X}",
     "final_origin": "parser_latex",
     "unresolved_reason": ""
   },
@@ -281,32 +281,32 @@
     "bbox": [
       110.56640625,
       645.43359375,
-      503.498291015625,
-      712.3954391479492
+      503.25,
+      709.62890625
     ],
     "polygon": [
       [
-        111.76171875,
+        111.0,
         646.98046875
       ],
       [
-        503.498291015625,
+        503.25,
         645.43359375
       ],
       [
-        503.498291015625,
-        712.3954391479492
+        503.25,
+        708.75
       ],
       [
         110.56640625,
-        712.3954391479492
+        709.62890625
       ]
     ],
     "block_type": "Equation",
     "detection_source": "marker_document",
     "detection_confidence": 0.8,
     "marker_text": "",
-    "marker_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim=1}) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim=1}) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim=-1}\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim=-1}\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim=0}) \\end{aligned} \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad",
+    "marker_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim}=1) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim}=1) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim}=-1\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim}=-1\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim}=0) \\end{aligned} \\qquad \\qquad \\triangleright \\mathcal{P}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{N \\times N} \\end{aligned}",
     "nearby_text_before": "ments (first row). The failure cases of the baselines are bounded by red boxes.\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\n20\n0\n40\n60\n80\n100\nTime\nTime\nTime\nTime\nTime\nTime\nTime\nTime\nTime\nTime\n-0.6\n-0.7\n-0.8\n-0.9\n10\n8\n6\n4\n2\n0\n1\n0\n-1\n10\n5\n0\n3\n2\n1\n0\n0.4\n0.2\n0\n0.5\n-0.5\n-1.5\n0.06\n0.04\n0.02\n0\n-0.4\n-0.6\n-0.8\n2.5\n1.5\n0.5\nInput\nTime Series\nAssociation-based\nCriterion\nEarly Stage\nDetection",
     "nearby_text_after": "We present the pseudo code of the calculation in Algorithm 2.\n14",
     "section": "Unknown",
@@ -317,7 +317,7 @@
     "crop_path": "formula_007_p14.png",
     "ocr_latex": "",
     "ocr_status": "cropped",
-    "final_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim=1}) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim=1}) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim=-1}\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim=-1}\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim=0}) \\end{aligned} \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad \\qquad",
+    "final_latex": "\\begin{aligned} &1: \\ \\mathcal{P}' = \\texttt{Mean}(\\mathcal{P}, \\texttt{dim}=1) \\\\ &2: \\ \\mathcal{S}' = \\texttt{Mean}(\\mathcal{S}, \\texttt{dim}=1) \\\\ &3: \\ \\mathcal{R}' = \\texttt{KL}\\Big((\\mathcal{P}', \\mathcal{S}'), \\texttt{dim}=-1\\Big) + \\texttt{KL}\\Big((\\mathcal{S}', \\mathcal{P}'), \\texttt{dim}=-1\\Big) \\\\ &4: \\ \\mathcal{R} = \\texttt{Mean}(\\mathcal{R}', \\texttt{dim}=0) \\end{aligned} \\qquad \\qquad \\triangleright \\mathcal{P}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{L \\times N \\times N} \\\\ &\\triangleright \\mathcal{R}' \\in \\mathbb{R}^{N \\times N} \\end{aligned}",
     "final_origin": "parser_latex",
     "unresolved_reason": ""
   },
@@ -326,8 +326,8 @@
     "page": 15,
     "bbox": [
       110.56640625,
-      406.0546875,
-      503.4991455078125,
+      405.75,
+      504.0,
       457.1015625
     ],
     "polygon": [
@@ -336,12 +336,12 @@
         407.6015625
       ],
       [
-        503.4991455078125,
-        406.0546875
+        503.25,
+        405.75
       ],
       [
-        503.4991455078125,
-        456.0814514160156
+        504.0,
+        455.5546875
       ],
       [
         110.56640625,
@@ -373,8 +373,8 @@
     "bbox": [
       104.58984375,
       565.76953125,
-      548.6925659179688,
-      669.0220642089844
+      549.0,
+      667.08984375
     ],
     "polygon": [
       [
@@ -382,16 +382,16 @@
         567.31640625
       ],
       [
-        548.6925659179688,
+        549.0,
         565.76953125
       ],
       [
-        548.6925659179688,
-        669.0220642089844
+        549.0,
+        665.54296875
       ],
       [
         104.58984375,
-        669.0220642089844
+        667.08984375
       ]
     ],
     "block_type": "Equation",

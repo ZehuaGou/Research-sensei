@@ -2159,55 +2159,55 @@ National Natural Science Foundation of China (62022050 and 62021002), Beijing No
 
 ## Page 3 Formulas
 
-<!-- formula_id: formula_001 | origin: parser_latex | section: Unknown | page: 3 | bbox: [184.67578125, 309.375, 504.0003356933594, 351.3254089355469] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_001 | origin: parser_latex | section: Unknown | page: 3 | bbox: [184.5, 306.0, 504.75, 351.140625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
 \begin{split} \mathcal{Z}^{l} &= \text{Layer-Norm} \Big( \text{Anomaly-Attention}(\mathcal{X}^{l-1}) + \mathcal{X}^{l-1} \Big) \\ \mathcal{X}^{l} &= \text{Layer-Norm} \Big( \text{Feed-Forward}(\mathcal{Z}^{l}) + \mathcal{Z}^{l} \Big), \end{split} \tag{1}
 ```
 
-<!-- formula_id: formula_002 | origin: parser_latex | section: Unknown | page: 3 | bbox: [146.42578125, 535.21875, 504.0003662109375, 632.0169372558594] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_002 | origin: parser_latex | section: Unknown | page: 3 | bbox: [145.5, 531.75, 504.75, 628.5] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
 \mathcal{Q}, \mathcal{K}, \mathcal{V}, \sigma = \mathcal{X}^{l-1}W_{\mathcal{Q}}^{l}, \mathcal{X}^{l-1}W_{\mathcal{K}}^{l}, \mathcal{X}^{l-1}W_{\mathcal{V}}^{l}, \mathcal{X}^{l-1}W_{\sigma}^{l}
 ```
 
 ## Page 4 Formulas
 
-<!-- formula_id: formula_003 | origin: parser_latex | section: Unknown | page: 4 | bbox: [160.171875, 357.71484375, 504.0003356933594, 390.3154602050781] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_003 | origin: parser_latex | section: Unknown | page: 4 | bbox: [159.0, 357.71484375, 504.75, 387.87890625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
-\operatorname{AssDis}(\mathcal{P}, \mathcal{S}; \mathcal{X}) = \left[ \frac{1}{L} \sum_{l=1}^{L} \left( \operatorname{KL}(\mathcal{P}_{i,:}^{l} \| \mathcal{S}_{i,:}^{l}) + \operatorname{KL}(\mathcal{S}_{i,:}^{l} \| \mathcal{P}_{i,:}^{l}) \right) \right]_{i=1,\dots,N}
+AssDis(\mathcal{P}, \mathcal{S}; \mathcal{X}) = \left[\frac{1}{L} \sum_{l=1}^{L} \left( KL(\mathcal{P}_{i,:}^{l} || \mathcal{S}_{i,:}^{l}) + KL(\mathcal{S}_{i,:}^{l} || \mathcal{P}_{i,:}^{l}) \right) \right]_{i=1,\dots,N}
 ```
 
-<!-- formula_id: formula_004 | origin: parser_latex | section: Unknown | page: 4 | bbox: [176.30859375, 553.39453125, 504.0003967285156, 572.6937408447266] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_004 | origin: parser_latex | section: Unknown | page: 4 | bbox: [176.25, 553.39453125, 503.82421875, 568.08984375] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
-\mathcal{L}_{Total}(\widehat{\mathcal{X}}, \mathcal{P}, \mathcal{S}, \lambda; \mathcal{X}) = \|\mathcal{X} - \widehat{\mathcal{X}}\|_{F}^{2} - \lambda \times \|AssDis(\mathcal{P}, \mathcal{S}; \mathcal{X})\|_{1}
+\mathcal{L}_{\text{Total}}(\widehat{\mathcal{X}}, \mathcal{P}, \mathcal{S}, \lambda; \mathcal{X}) = \|\mathcal{X} - \widehat{\mathcal{X}}\|_{F}^{2} - \lambda \times \|\text{AssDis}(\mathcal{P}, \mathcal{S}; \mathcal{X})\|_{1}
 ```
 
-<!-- formula_id: formula_005 | origin: parser_latex | section: Unknown | page: 4 | bbox: [214.55859375, 703.0546875, 504.0004577636719, 738.3767471313477] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_005 | origin: parser_latex | section: Unknown | page: 4 | bbox: [213.0, 703.0546875, 504.75, 732.4453125] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
 \mathcal{L}_{Total}(\widehat{\mathcal{X}}, \mathcal{P}, \mathcal{S}_{detach}, -\lambda; \mathcal{X})
 ```
 
 ## Page 5 Formulas
 
-<!-- formula_id: formula_006 | origin: parser_latex | section: Unknown | page: 5 | bbox: [137.4609375, 189.10546875, 504.0004577636719, 211.93548583984375] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_006 | origin: parser_latex | section: Unknown | page: 5 | bbox: [137.25, 186.75, 503.2265625, 211.53515625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
-AnomalyScore(\mathcal{X}) = Softmax\Big( - AssDis(\mathcal{P}, \mathcal{S}; \mathcal{X}) \Big) \odot \Big[ \|\mathcal{X}_{i,:} - \widehat{\mathcal{X}}_{i,:}\|_2^2 \Big]_{i=1,\dots,N}
+\mathcal{X}
 ```
 
 ## Page 14 Formulas
 
-<!-- formula_id: formula_007 | origin: parser_latex | section: Unknown | page: 14 | bbox: [110.56640625, 645.43359375, 503.498291015625, 712.3954391479492] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_007 | origin: parser_latex | section: Unknown | page: 14 | bbox: [110.56640625, 645.43359375, 503.25, 709.62890625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
-\begin{aligned} &1: \ \mathcal{P}' = \texttt{Mean}(\mathcal{P}, \texttt{dim=1}) \\ &2: \ \mathcal{S}' = \texttt{Mean}(\mathcal{S}, \texttt{dim=1}) \\ &3: \ \mathcal{R}' = \texttt{KL}\Big((\mathcal{P}', \mathcal{S}'), \texttt{dim=-1}\Big) + \texttt{KL}\Big((\mathcal{S}', \mathcal{P}'), \texttt{dim=-1}\Big) \\ &4: \ \mathcal{R} = \texttt{Mean}(\mathcal{R}', \texttt{dim=0}) \end{aligned} \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad \qquad
+\begin{aligned} &1: \ \mathcal{P}' = \texttt{Mean}(\mathcal{P}, \texttt{dim}=1) \\ &2: \ \mathcal{S}' = \texttt{Mean}(\mathcal{S}, \texttt{dim}=1) \\ &3: \ \mathcal{R}' = \texttt{KL}\Big((\mathcal{P}', \mathcal{S}'), \texttt{dim}=-1\Big) + \texttt{KL}\Big((\mathcal{S}', \mathcal{P}'), \texttt{dim}=-1\Big) \\ &4: \ \mathcal{R} = \texttt{Mean}(\mathcal{R}', \texttt{dim}=0) \end{aligned} \qquad \qquad \triangleright \mathcal{P}' \in \mathbb{R}^{L \times N \times N} \\ &\triangleright \mathcal{R}' \in \mathbb{R}^{L \times N \times N} \\ &\triangleright \mathcal{R}' \in \mathbb{R}^{L \times N \times N} \\ &\triangleright \mathcal{R}' \in \mathbb{R}^{N \times N} \end{aligned}
 ```
 
 ## Page 15 Formulas
 
-<!-- formula_id: formula_008 | origin: parser_latex | section: Unknown | page: 15 | bbox: [110.56640625, 406.0546875, 503.4991455078125, 457.1015625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_008 | origin: parser_latex | section: Unknown | page: 15 | bbox: [110.56640625, 405.75, 504.0, 457.1015625] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
 \mathcal{C}_{AD} = \text{Softmax}(-\text{AssDis}(\mathcal{P}, \mathcal{S}; \mathcal{X}), \text{dim=0})
 ```
 
-<!-- formula_id: formula_009 | origin: parser_latex | section: Unknown | page: 15 | bbox: [104.58984375, 565.76953125, 548.6925659179688, 669.0220642089844] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
+<!-- formula_id: formula_009 | origin: parser_latex | section: Unknown | page: 15 | bbox: [104.58984375, 565.76953125, 549.0, 667.08984375] | ocr_status: cropped | section_confidence: low | section_source: unknown | section_reason: no_heading_found -->
 ```latex
 \mathcal{X}
 ```
