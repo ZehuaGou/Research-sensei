@@ -1,12 +1,12 @@
 # Structure Refine Report
 
-Generated: 2026-06-09 20:41
+Generated: 2026-06-09 21:28
 
 ## Pipeline
 
 1. MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2604-1.2B) via mineru-vl-utils
 2. RuleBasedStructureRefiner (always)
-3. LlamaSectionRefiner (optional, not available/not applied)
+3. LlamaSectionRefiner (optional, available but ineffective — JSON valid=0, invalid=17)
 
 ## Block Statistics
 

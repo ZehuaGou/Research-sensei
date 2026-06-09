@@ -633,8 +633,9 @@ Generated: {time.strftime('%Y-%m-%d %H:%M')}
 - arXiv: 2312.02530
 - PDF: {PDF_PATH}
 
-## v1 Marker Results (baseline)
+## v1 Marker Results (ORIGINAL baseline — before section inference fix)
 
+Source: git commit 6b49e01 (original Marker output, before nearby_text heading fix)
 Formula count: {len(v1_slots)}
 Section distribution:
 """

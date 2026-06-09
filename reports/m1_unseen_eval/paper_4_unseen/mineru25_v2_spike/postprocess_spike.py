@@ -33,14 +33,15 @@ def main():
     blocks = [DocumentBlock(**b) for b in blocks_data]
     print(f"Loaded {len(blocks)} blocks")
 
-    # Load v1 slots for comparison
-    v1_slots_path = PAPER_DIR.parent / "paper_4_unseen" / "formula_slots.json"
-    # Try the old location first
-    if not v1_slots_path.exists():
-        v1_slots_path = Path("D:/Code/Python/Research-sensei/reports/m1_unseen_eval/paper_4_unseen/formula_slots.json")
-    with open(v1_slots_path, "r", encoding="utf-8") as f:
-        v1_slots = json.load(f)
-    print(f"Loaded v1 slots: {len(v1_slots)}")
+    # Load v1 ORIGINAL baseline from git history (before section fix)
+    # The current formula_slots.json has been patched — use the original
+    import subprocess
+    v1_original_bytes = subprocess.check_output(
+        ["git", "show", "6b49e01:reports/m1_unseen_eval/paper_4_unseen/formula_slots.json"],
+        cwd=str(PAPER_DIR.parent.parent.parent),
+    )
+    v1_slots = json.loads(v1_original_bytes.decode("utf-8"))
+    print(f"Loaded v1 ORIGINAL baseline from git 6b49e01: {len(v1_slots)} slots")
 
     # Apply RuleBasedStructureRefiner
     print("\nApplying RuleBasedStructureRefiner...")
@@ -85,7 +86,7 @@ Generated: {time.strftime('%Y-%m-%d %H:%M')}
 
 1. MinerU2.5-Pro (opendatalab/MinerU2.5-Pro-2604-1.2B) via mineru-vl-utils
 2. RuleBasedStructureRefiner (always)
-3. LlamaSectionRefiner (optional, {'applied' if llama.available and llama.json_valid_count > 0 else 'not available/not applied'})
+3. LlamaSectionRefiner (optional, {'applied — ' + str(llama.json_valid_count) + ' pages refined' if llama.available and llama.json_valid_count > 0 else 'available but ineffective — JSON valid=' + str(llama.json_valid_count) + ', invalid=' + str(llama.json_invalid_count) if llama.available else 'not available'})
 
 ## Block Statistics
 
@@ -138,16 +139,26 @@ Generated: {time.strftime('%Y-%m-%d %H:%M')}
     print("\n" + "=" * 60)
     print("SUMMARY")
     print("=" * 60)
-    print(f"v1 formulas: {len(v1_slots)}")
-    print(f"v2 blocks: {len(blocks)}")
-    print(f"v2 formula slots: {len(v2_slots)}")
+    v1_sections = {}
+    for s in v1_slots:
+        v1_sections[s.get("section", "Unknown")] = v1_sections.get(s.get("section", "Unknown"), 0) + 1
+    print(f"v1 baseline source: git 6b49e01 (original Marker output)")
+    print(f"v1 formula sections: {v1_sections}")
+    print(f"v1 all_Abstract_suspicious: {sum(1 for s in v1_slots if s.get('section') == 'Abstract') == len(v1_slots)}")
+    print()
     v2_sections = {}
     for s in v2_slots:
         v2_sections[s.get("section", "Unknown")] = v2_sections.get(s.get("section", "Unknown"), 0) + 1
+    print(f"v2 MinerU blocks: {len(blocks)}")
+    print(f"v2 formula slots: {len(v2_slots)}")
     print(f"v2 formula sections: {v2_sections}")
     print(f"v2 latex: {sum(1 for s in v2_slots if s.get('mineru_latex'))}")
     print(f"v2 all_Abstract_suspicious: {sum(1 for s in v2_slots if 'ALL_FORMULAS_IN_ABSTRACT_SUSPICIOUS' in s.get('risk_flags', []))}")
+    print()
     print(f"Llama available: {llama.available}")
+    print(f"Llama JSON valid: {llama.json_valid_count}")
+    print(f"Llama JSON invalid: {llama.json_invalid_count}")
+    print(f"Llama participated: {'YES' if llama.json_valid_count > 0 else 'NO'}")
 
 
 if __name__ == "__main__":

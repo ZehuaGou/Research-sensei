@@ -1,6 +1,6 @@
 # MinerU2.5-Pro v2 Spike Report
 
-Generated: 2026-06-09 20:41
+Generated: 2026-06-09 21:28
 
 ## Paper
 
@@ -8,13 +8,14 @@ Generated: 2026-06-09 20:41
 - arXiv: 2312.02530
 - PDF: D:\Code\Python\Research-sensei\reports\m1_unseen_eval\paper_4_unseen\source.pdf
 
-## v1 Marker Results (baseline)
+## v1 Marker Results (ORIGINAL baseline — before section inference fix)
 
+Source: git commit 6b49e01 (original Marker output, before nearby_text heading fix)
 Formula count: 11
 Section distribution:
-- Method: 11
+- Abstract: 11
 
-all_formulas_in_Abstract_suspicious: NO
+all_formulas_in_Abstract_suspicious: YES
 section_contradiction_count: 0
 
 ## v2 MinerU2.5-Pro Results
@@ -78,6 +79,6 @@ Block type distribution:
 
 ## Conclusion
 
-See analysis above.
-v1 had 0/11 formulas in Abstract.
+v2 MinerU2.5-Pro FIXED the all-Abstract problem.
+v1 had 11/11 formulas in Abstract.
 v2 has 0/11 formulas in Abstract.
