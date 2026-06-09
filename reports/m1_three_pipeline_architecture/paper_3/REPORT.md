@@ -97,7 +97,7 @@
 
 | Metric | Value |
 |--------|-------|
-| overlays generated | 2 |
+| overlays generated | 5 |
 | overlay_dir | formula_overlays/ |
 
 ---
