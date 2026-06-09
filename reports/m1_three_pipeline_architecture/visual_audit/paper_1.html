@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M1 Visual Audit — paper_1 (2112.14436)</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 20px; background: #fafafa; }
+  h1 { color: #333; border-bottom: 2px solid #4a90d9; padding-bottom: 8px; }
+  h2 { color: #555; margin-top: 30px; }
+  .stats { background: #e8f4fd; padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .formula-card {
+    background: white; border: 1px solid #ddd; border-radius: 8px;
+    padding: 16px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .formula-card h3 { margin: 0 0 8px 0; color: #2c5aa0; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0; font-size: 14px; }
+  .meta dt { font-weight: bold; color: #666; }
+  .meta dd { margin: 0; }
+  .images { display: flex; gap: 16px; flex-wrap: wrap; margin: 12px 0; }
+  .images img { max-height: 300px; border: 1px solid #ccc; border-radius: 4px; }
+  .images .caption { font-size: 12px; color: #888; text-align: center; }
+  pre { background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+  .badge-ok { background: #d4edda; color: #155724; }
+  .badge-missing { background: #f8d7da; color: #721c24; }
+  .badge-warn { background: #fff3cd; color: #856404; }
+  .text-box { background: #f8f9fa; border-left: 3px solid #4a90d9; padding: 8px 12px; margin: 8px 0; font-size: 13px; max-height: 120px; overflow-y: auto; white-space: pre-wrap; word-break: break-word; }
+</style>
+</head>
+<body>
+<h1>M1 Visual Audit — paper_1</h1>
+<div class="stats">
+  <strong>Paper:</strong> Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy (2112.14436)<br>
+  <strong>Total FormulaSlots:</strong> 3<br>
+  <strong>Overlays:</strong> 3/3 |
+  <strong>Crops:</strong> 3/3 |
+  <strong>Canonical match:</strong> 3/3
+</div>
+<a href="index.html">← Back to Index</a>
+
+<div class="formula-card" id="formula_001">
+  <h3>formula_001 <span class="badge badge-ok">parser_latex</span></h3>
+  <dl class="meta">
+    <dt>Paper</dt><dd>2112.14436</dd>
+    <dt>Page</dt><dd>1</dd>
+    <dt>Bbox</dt><dd>[108.75, 339.5390625, 288.0703125, 370.4765625]</dd>
+    <dt>Section</dt><dd>Introduction <span class="badge badge-ok">high</span></dd>
+    <dt>Section Source</dt><dd>heading_above</dd>
+    <dt>Section Reason</dt><dd>exact_match: introduction</dd>
+    <dt>Origin</dt><dd>parser_latex</dd>
+    <dt>OCR Status</dt><dd>cropped</dd>
+    <dt>Overlay</dt><dd><span class="badge badge-ok">EXISTS</span></dd>
+    <dt>Crop</dt><dd><span class="badge badge-ok">EXISTS</span> ../paper_1/formula_crops/formula_001_p1.png</dd>
+    <dt>Canonical Match</dt><dd><span class="badge badge-ok">YES</span></dd>
+  </dl>
+
+  <h4>Nearby Text Before</h4>
+  <div class="text-box">Monte Carlo EM for Deep Time Series Anomaly Detection
+Franc¸ois-Xavier Aubet 1 Daniel Z¨ugner 2 Jan Gasthaus 1
+Abstract
+(explicitly or implicitly) assume access to nominal data can
+often also successfully be applied to mixed data by assum-
+ing it is nominal, as long as the proportion of anomalies is
+sufficiently small., they are however biased by training on
+some anomalous data.</div>
+
+  <h4>Nearby Text After</h4>
+  <div class="text-box">1. Introduction
+In many time series anomaly detection applications one only
+has access to unlabeled data. This data is usually mostly
+nominal but may contain some (unlabeled) anomalies. Ex-
+amples of this setting are e.g. the widely used anomaly
+detection benchmarks SMAP, MSL (Hundman et al., 2018),
+and SMD (Su et al., 2019).
+This “true” unsupervised setting with mixed data can be con-
+trasted with the “nominal-only” setting, where one assumes
+access to “clean” nominal data. In practice, techniq</div>
+
+  <div class="images">
+    <div>
+      <div><strong>Overlay (page 1)</strong></div>
+      <img src='../paper_1/formula_overlays/overlay_page1.png' alt='overlay' />
+      <div class="caption">Red bbox on page image</div>
+    </div>
+    <div>
+      <div><strong>Crop</strong></div>
+      <img src='../paper_1/formula_crops/formula_001_p1.png' alt='crop' />
+      <div class="caption">Cropped formula image</div>
+    </div>
+  </div>
+
+  <h4>Marker LaTeX</h4>
+  <pre>p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) &amp; \text{if } z = 0\\ p^-(\mathbf{x}) &amp; \text{if } z = 1, \end{cases}</pre>
+
+  <h4>Final LaTeX</h4>
+  <pre>p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) &amp; \text{if } z = 0\\ p^-(\mathbf{x}) &amp; \text{if } z = 1, \end{cases}</pre>
+
+  <h4>Canonical Comment</h4>
+  <pre>p(\mathbf{x}|z) = \begin{cases} p^+(\mathbf{x}) &amp; \text{if } z = 0\\ p^-(\mathbf{x}) &amp; \text{if } z = 1, \end{cases}</pre>
+</div>
+
+<div class="formula-card" id="formula_002">
+  <h3>formula_002 <span class="badge badge-ok">parser_latex</span></h3>
+  <dl class="meta">
+    <dt>Paper</dt><dd>2112.14436</dd>
+    <dt>Page</dt><dd>2</dd>
+    <dt>Bbox</dt><dd>[123.0, 420.0, 290.25, 432.0]</dd>
+    <dt>Section</dt><dd>Method <span class="badge badge-ok">high</span></dd>
+    <dt>Section Source</dt><dd>heading_above</dd>
+    <dt>Section Reason</dt><dd>exact_match: method</dd>
+    <dt>Origin</dt><dd>parser_latex</dd>
+    <dt>OCR Status</dt><dd>cropped</dd>
+    <dt>Overlay</dt><dd><span class="badge badge-ok">EXISTS</span></dd>
+    <dt>Crop</dt><dd><span class="badge badge-ok">EXISTS</span> ../paper_1/formula_crops/formula_002_p2.png</dd>
+    <dt>Canonical Match</dt><dd><span class="badge badge-ok">YES</span></dd>
+  </dl>
+
+  <h4>Nearby Text Before</h4>
+  <div class="text-box">l., 2019; Xu et al.,
+2018; Park et al., 2018; Zhang et al., 2019; Ehrlich et al.,
+2021)), and any of them can be used to model y+, the latent
+nominal time series. Our method is agnostic to the type of
+model used, so that it can be combined with any probabilis-
+tic time series model, be it a deep or shallow probabilistic
+forecasting method, a reconstruction method, or any other
+type of model. We call the model of the latent normal time
+series p+
+θ , which is parametrised by a set of parameters θ.</div>
+
+  <h4>Nearby Text After</h4>
+  <div class="text-box">In time series setting, where the the observations are time
+series x1:T = x1, . . . , xT that exhibit temporal dependen-
+cies, and anomalies are time points or regions within these
+time series, we have one anomaly indicator variable zt
+corresponding to each time point xt.
+Like before, the
+nominal data is drawn from a parametrized probabilistic
+model p+
+θ (y1:T ), and the anomalies are generated from
+a fixed model p−(y1:T ). For time series data, the mix-
+ture data model then amounts to drawing y</div>
+
+  <div class="images">
+    <div>
+      <div><strong>Overlay (page 2)</strong></div>
+      <img src='../paper_1/formula_overlays/overlay_page2.png' alt='overlay' />
+      <div class="caption">Red bbox on page image</div>
+    </div>
+    <div>
+      <div><strong>Crop</strong></div>
+      <img src='../paper_1/formula_crops/formula_002_p2.png' alt='crop' />
+      <div class="caption">Cropped formula image</div>
+    </div>
+  </div>
+
+  <h4>Marker LaTeX</h4>
+  <pre>p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}</pre>
+
+  <h4>Final LaTeX</h4>
+  <pre>p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}</pre>
+
+  <h4>Canonical Comment</h4>
+  <pre>p(\mathbf{x}_t|z_t=0) = p_{\theta}^+(\mathbf{x}_t) \tag{2}</pre>
+</div>
+
+<div class="formula-card" id="formula_003">
+  <h3>formula_003 <span class="badge badge-ok">parser_latex</span></h3>
+  <dl class="meta">
+    <dt>Paper</dt><dd>2112.14436</dd>
+    <dt>Page</dt><dd>2</dd>
+    <dt>Bbox</dt><dd>[123.1171875, 436.5, 289.5, 447.8203125]</dd>
+    <dt>Section</dt><dd>Method <span class="badge badge-ok">high</span></dd>
+    <dt>Section Source</dt><dd>heading_above</dd>
+    <dt>Section Reason</dt><dd>exact_match: method</dd>
+    <dt>Origin</dt><dd>parser_latex</dd>
+    <dt>OCR Status</dt><dd>cropped</dd>
+    <dt>Overlay</dt><dd><span class="badge badge-ok">EXISTS</span></dd>
+    <dt>Crop</dt><dd><span class="badge badge-ok">EXISTS</span> ../paper_1/formula_crops/formula_003_p2.png</dd>
+    <dt>Canonical Match</dt><dd><span class="badge badge-ok">YES</span></dd>
+  </dl>
+
+  <h4>Nearby Text Before</h4>
+  <div class="text-box">l., 2019; Xu et al.,
+2018; Park et al., 2018; Zhang et al., 2019; Ehrlich et al.,
+2021)), and any of them can be used to model y+, the latent
+nominal time series. Our method is agnostic to the type of
+model used, so that it can be combined with any probabilis-
+tic time series model, be it a deep or shallow probabilistic
+forecasting method, a reconstruction method, or any other
+type of model. We call the model of the latent normal time
+series p+
+θ , which is parametrised by a set of parameters θ.</div>
+
+  <h4>Nearby Text After</h4>
+  <div class="text-box">In time series setting, where the the observations are time
+series x1:T = x1, . . . , xT that exhibit temporal dependen-
+cies, and anomalies are time points or regions within these
+time series, we have one anomaly indicator variable zt
+corresponding to each time point xt.
+Like before, the
+nominal data is drawn from a parametrized probabilistic
+model p+
+θ (y1:T ), and the anomalies are generated from
+a fixed model p−(y1:T ). For time series data, the mix-
+ture data model then amounts to drawing y</div>
+
+  <div class="images">
+    <div>
+      <div><strong>Overlay (page 2)</strong></div>
+      <img src='../paper_1/formula_overlays/overlay_page2.png' alt='overlay' />
+      <div class="caption">Red bbox on page image</div>
+    </div>
+    <div>
+      <div><strong>Crop</strong></div>
+      <img src='../paper_1/formula_crops/formula_003_p2.png' alt='crop' />
+      <div class="caption">Cropped formula image</div>
+    </div>
+  </div>
+
+  <h4>Marker LaTeX</h4>
+  <pre>p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}</pre>
+
+  <h4>Final LaTeX</h4>
+  <pre>p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}</pre>
+
+  <h4>Canonical Comment</h4>
+  <pre>p(\mathbf{x}_t|z_t=1) = p^-(\mathbf{x}_t) \tag{3}</pre>
+</div>
+
+</body>
+</html>
