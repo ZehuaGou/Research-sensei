@@ -1,0 +1,508 @@
+[
+  {
+    "formula_id": "formula_001",
+    "page": 3,
+    "bbox": [
+      207.685546875,
+      335.28515625,
+      504.66741943359375,
+      365.6975402832031
+    ],
+    "polygon": [
+      [
+        207.685546875,
+        336.7017517089844
+      ],
+      [
+        504.66741943359375,
+        335.28515625
+      ],
+      [
+        504.66741943359375,
+        365.6975402832031
+      ],
+      [
+        207.685546875,
+        365.6975402832031
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "v_{i,t}^s = P(m_i \\to q_t^s) = \\frac{\\exp(\\langle m_i, q_t^s \\rangle / \\tau)}{\\sum_{p=1}^L \\exp(\\langle m_i, q_p^s \\rangle / \\tau)},\\tag{1}",
+    "nearby_text_before": "Figure 1: Illustration of proposed MEMTO. Green ▷◁depicts the update gate ψ in the Gated memory\nupdate stage, which controls the degree of updating items. Red ⊕represents concatenation of queries\nqs\nt and retrieved memory items ˜qs\nt . ‘Weak Decoder’ represents two fully-connected layers.",
+    "nearby_text_after": "3\nMethod\n3.1\nOverall description of MEMTO\nWe define the raw time series D as a set of sub-series D = {X1, . . . , XN}, where N represents the\ntotal number of sub-series. Each sub-series Xs ∈RL×n is a sequence of timestamps [xs\n1, . . . , xs\nL]. L,\nn, and xs\nt ∈Rn represent sub-series length, input dimension, and timestamp at time t, respectively.\nqs = [qs\n1, . . . , qs\nL] ∈RL×C refers to the encoder output feature (i.e., a query sequence) corresponding\nto Xs, where C denotes a latent dimension. ",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_3_equation_1",
+    "crop_path": "formula_001_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "v_{i,t}^s = P(m_i \\to q_t^s) = \\frac{\\exp(\\langle m_i, q_t^s \\rangle / \\tau)}{\\sum_{p=1}^L \\exp(\\langle m_i, q_p^s \\rangle / \\tau)},\\tag{1}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_002",
+    "page": 3,
+    "bbox": [
+      233.68359375,
+      452.07421875,
+      504.6673889160156,
+      485.45556640625
+    ],
+    "polygon": [
+      [
+        234.87890625,
+        453.62109375
+      ],
+      [
+        504.6673889160156,
+        452.07421875
+      ],
+      [
+        504.6673889160156,
+        485.45556640625
+      ],
+      [
+        233.68359375,
+        485.45556640625
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\psi = \\sigma \\left( U_{\\psi} m_i + W_{\\psi} \\sum_{t=1}^L v_{i,t}^s q_t^s \\right), \\tag{2}",
+    "nearby_text_before": "which involves\nexplicitly storing diverse normal patterns of normal data in memory items. Nonetheless, this approach\nsimply adds a weighted sum of the relevant queries to each memory item without controlling the\ndegree of new information being injected into existing memory items. However, our Gated memory\nmodule in MEMTO is the first to adapt to diverse normal patterns in a data-driven way by learning\nhow intensively each existing memory item should be updated in response to new normal patterns.",
+    "nearby_text_after": "We define the raw time series D as a set of sub-series D = {X1, . . . , XN}, where N represents the\ntotal number of sub-series. Each sub-series Xs ∈RL×n is a sequence of timestamps [xs\n1, . . . , xs\nL]. L,\nn, and xs\nt ∈Rn represent sub-series length, input dimension, and timestamp at time t, respectively.\nqs = [qs\n1, . . . , qs\nL] ∈RL×C refers to the encoder output feature (i.e., a query sequence) corresponding\nto Xs, where C denotes a latent dimension. qs\nt ∈RC (t = 1, . . . , L) is an individu",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_3_equation_2",
+    "crop_path": "formula_002_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\psi = \\sigma \\left( U_{\\psi} m_i + W_{\\psi} \\sum_{t=1}^L v_{i,t}^s q_t^s \\right), \\tag{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_003",
+    "page": 3,
+    "bbox": [
+      229.201171875,
+      488.0390625,
+      504.66741943359375,
+      520.5245666503906
+    ],
+    "polygon": [
+      [
+        229.201171875,
+        489.4637451171875
+      ],
+      [
+        504.66741943359375,
+        488.0390625
+      ],
+      [
+        504.66741943359375,
+        520.5245666503906
+      ],
+      [
+        229.201171875,
+        520.5245666503906
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "m_i \\leftarrow (1 - \\psi) \\circ m_i + \\psi \\circ \\sum_{t=1}^L v_{i,t}^s q_t^s, \\tag{3}",
+    "nearby_text_before": "olves\nexplicitly storing diverse normal patterns of normal data in memory items. Nonetheless, this approach\nsimply adds a weighted sum of the relevant queries to each memory item without controlling the\ndegree of new information being injected into existing memory items. However, our Gated memory\nmodule in MEMTO is the first to adapt to diverse normal patterns in a data-driven way by learning\nhow intensively each existing memory item should be updated in response to new normal patterns.\n3\nMethod",
+    "nearby_text_after": "Figure 1 illustrates the overall architecture of MEMTO, which mainly consists of encoder-decoder\narchitecture with the Gated memory module. The input sub-series Xs is first fed to the encoder, and\nthe encoder output features are then used as queries to retrieve relevant items or update items in the\nGated memory module. The inputs of the decoder are the updated queries ˆqs\nt ∈R2C (t = 1, . . . , L),\nwhich are the combined features of the queries qs\nt and the retrieved memory items ˜qs\nt ∈RC. The\n",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_3_equation_3",
+    "crop_path": "formula_003_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "m_i \\leftarrow (1 - \\psi) \\circ m_i + \\psi \\circ \\sum_{t=1}^L v_{i,t}^s q_t^s, \\tag{3}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_004",
+    "page": 3,
+    "bbox": [
+      206.490234375,
+      617.58984375,
+      504.6673889160156,
+      647.8185424804688
+    ],
+    "polygon": [
+      [
+        207.685546875,
+        618.8227691650391
+      ],
+      [
+        504.6673889160156,
+        617.58984375
+      ],
+      [
+        504.6673889160156,
+        647.8185424804688
+      ],
+      [
+        206.490234375,
+        647.8185424804688
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "w_{t,i}^{s} = P(q_{t}^{s} \\to m_{i}) = \\frac{\\exp(\\langle m_{i}, q_{t}^{s} \\rangle / \\tau)}{\\sum_{j=1}^{M} \\exp(\\langle m_{j}, q_{t}^{s} \\rangle / \\tau)},",
+    "nearby_text_before": "f sub-series D = {X1, . . . , XN}, where N represents the\ntotal number of sub-series. Each sub-series Xs ∈RL×n is a sequence of timestamps [xs\n1, . . . , xs\nL]. L,\nn, and xs\nt ∈Rn represent sub-series length, input dimension, and timestamp at time t, respectively.\nqs = [qs\n1, . . . , qs\nL] ∈RL×C refers to the encoder output feature (i.e., a query sequence) corresponding\nto Xs, where C denotes a latent dimension. qs\nt ∈RC (t = 1, . . . , L) is an individual query vector\n(i.e., a query) at time t.",
+    "nearby_text_after": "3.1.1\nEncoder and decoder\nTransformer [36] is well known to capture long-term complex temporal patterns in time series\ndata [43]. MEMTO uses a Transformer encoder to project the input sub-series into a latent space.\n3",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_3_equation_4",
+    "crop_path": "formula_004_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "w_{t,i}^{s} = P(q_{t}^{s} \\to m_{i}) = \\frac{\\exp(\\langle m_{i}, q_{t}^{s} \\rangle / \\tau)}{\\sum_{j=1}^{M} \\exp(\\langle m_{j}, q_{t}^{s} \\rangle / \\tau)},",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_005",
+    "page": 3,
+    "bbox": [
+      264.76171875,
+      690.29296875,
+      504.6673278808594,
+      725.5085525512695
+    ],
+    "polygon": [
+      [
+        265.95703125,
+        691.83984375
+      ],
+      [
+        504.6673278808594,
+        690.29296875
+      ],
+      [
+        504.6673278808594,
+        725.5085525512695
+      ],
+      [
+        264.76171875,
+        725.5085525512695
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "\\tilde{q}_{t}^{s} = \\sum_{i'=1}^{M} w_{t,i'}^{s} m_{i'}. \\tag{5}",
+    "nearby_text_before": "then used as queries to retrieve relevant items or update items in the\nGated memory module. The inputs of the decoder are the updated queries ˆqs\nt ∈R2C (t = 1, . . . , L),\nwhich are the combined features of the queries qs\nt and the retrieved memory items ˜qs\nt ∈RC. The\ndecoder maps the updated query sequence ˆqs = [ˆqs\n1, . . . , ˆqs\nL] back to the input space, and outputs\nthe reconstructed input sub-series ˆXs ∈RL×n. Algorithm 2 shows the overall mechanism for our\nproposed model in Appendix B.",
+    "nearby_text_after": "3",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_3_equation_5",
+    "crop_path": "formula_005_p3.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "\\tilde{q}_{t}^{s} = \\sum_{i'=1}^{M} w_{t,i'}^{s} m_{i'}. \\tag{5}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_006",
+    "page": 4,
+    "bbox": [
+      244.740234375,
+      209.21484375,
+      504.66748046875,
+      242.196533203125
+    ],
+    "polygon": [
+      [
+        245.935546875,
+        210.76171875
+      ],
+      [
+        504.66748046875,
+        209.21484375
+      ],
+      [
+        504.66748046875,
+        242.196533203125
+      ],
+      [
+        244.740234375,
+        242.196533203125
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "L_{rec} = \\frac{1}{N} \\sum_{s=1}^{N} \\left\\| X^s - \\hat{X}^s \\right\\|_2^2.",
+    "nearby_text_before": "In contrast, we adopt a weak decoder consisting of two fully-connected layers. It is essential that\nthe decoder should not be overly powerful, as this can lead to a situation where its performance is\nindependent of the encoder’s ability to encode input time series. In the extreme case, a strong decoder\ncomprised of multiple deep layers can generate the input data accurately even from random noise\nthat contains no information about input data [37].\n3.1.2\nGated memory module",
+    "nearby_text_after": "Gated memory update stage\nMemory item mi ∈RC (i = 1, . . . , M), where M denotes the\nnumber of memory items, is trained to contain prototypical normal patterns of the input time\nseries [24]. We expect memory items to contain prototypes of all queries qs\nt corresponding to normal\ntimestamps. Thus, we adopt an incremental approach for updating the memory items by defining\nquery-conditioned memory attention vs\ni,t. It is calculated by softmax on dot product between each\nmemory item and queries as f",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_4_equation_6",
+    "crop_path": "formula_006_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "L_{rec} = \\frac{1}{N} \\sum_{s=1}^{N} \\left\\| X^s - \\hat{X}^s \\right\\|_2^2.",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_007",
+    "page": 4,
+    "bbox": [
+      224.12109375,
+      305.5078125,
+      504.6673583984375,
+      340.23455810546875
+    ],
+    "polygon": [
+      [
+        225.31640625,
+        307.0546875
+      ],
+      [
+        504.6673583984375,
+        305.5078125
+      ],
+      [
+        504.6673583984375,
+        340.23455810546875
+      ],
+      [
+        224.12109375,
+        340.23455810546875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "L_{entr} = \\frac{1}{N} \\sum_{s=1}^{N} \\sum_{t=1}^{L} \\sum_{i=1}^{M} -w_{t,i}^{s} log(w_{t,i}^{s}).",
+    "nearby_text_before": "stored in the memory module represents the prototypical features of normal\ndata. Our proposed two-stage iterative update process allows us to extract latent representations\nof input sub-series using the prototypical patterns of normal data stored in the memory module,\nwhich acts as regularization to mitigate over-generalization. This mechanism is designed to limit the\nencoder’s ability to capture the unique properties of anomalies, thereby making it more challenging\nto reconstruct abnormal data.",
+    "nearby_text_after": "where τ denotes a temperature hyperparameter. We have proposed an update gate ψ in our memory\nmodule mechanism to train each memory item flexibly according to various normal patterns. This\ngate controls the extent to which the newly acquired normal patterns from queries are infused into\nthe existing prototypical normal patterns stored in memory items. It allows our model to learn to\nwhat degree each existing memory item should be updated in a data-driven way. Equations for our\nmemory update mech",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_4_equation_7",
+    "crop_path": "formula_007_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "L_{entr} = \\frac{1}{N} \\sum_{s=1}^{N} \\sum_{t=1}^{L} \\sum_{i=1}^{M} -w_{t,i}^{s} log(w_{t,i}^{s}).",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_008",
+    "page": 4,
+    "bbox": [
+      263.56640625,
+      373.95703125,
+      504.6673889160156,
+      386.9834899902344
+    ],
+    "polygon": [
+      [
+        264.76171875,
+        375.50390625
+      ],
+      [
+        504.6673889160156,
+        373.95703125
+      ],
+      [
+        504.6673889160156,
+        386.9834899902344
+      ],
+      [
+        263.56640625,
+        386.9834899902344
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "L = L_{rec} + \\lambda L_{entr}, \\tag{8}",
+    "nearby_text_before": "emory update stage\nMemory item mi ∈RC (i = 1, . . . , M), where M denotes the\nnumber of memory items, is trained to contain prototypical normal patterns of the input time\nseries [24]. We expect memory items to contain prototypes of all queries qs\nt corresponding to normal\ntimestamps. Thus, we adopt an incremental approach for updating the memory items by defining\nquery-conditioned memory attention vs\ni,t. It is calculated by softmax on dot product between each\nmemory item and queries as follows:",
+    "nearby_text_after": "ψ = σ\n�\nUψmi + Wψ\nL\n�\nt=1\nvs\ni,tqs\nt\n�\n,\n(2)\nmi ←(1 −ψ) ◦mi + ψ ◦\nL\n�\nt=1\nvs\ni,tqs\nt ,\n(3)\nwhere Uψ and Wψ denote linear projections, and σ and ◦denotes sigmoid activation and element-wise\nmultiplication, respectively. The memory update stage is only executed in the training phase.\nQuery update stage\nIn query update stage, we generate updated queries ˆqs\nt which are then fed\nto decoder as inputs. Similar to the Gated memory update stage, we define memory-conditioned\nquery-attention ws\nt,i, calcu",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_4_equation_8",
+    "crop_path": "formula_008_p4.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "L = L_{rec} + \\lambda L_{entr}, \\tag{8}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_009",
+    "page": 5,
+    "bbox": [
+      239.958984375,
+      211.921875,
+      504.6673889160156,
+      227.8255615234375
+    ],
+    "polygon": [
+      [
+        241.154296875,
+        212.53570556640625
+      ],
+      [
+        504.6673889160156,
+        211.921875
+      ],
+      [
+        504.6673889160156,
+        227.8255615234375
+      ],
+      [
+        239.958984375,
+        227.8255615234375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "LSD(q_t^s, m) = \\|q_t^s - m_t^{s, pos}\\|_2^2",
+    "nearby_text_before": "n be offset by the relevant normal patterns in the\nmemory items. Reconstruction outputs of anomalies often appear similar to normal samples, making\nit more challenging to reconstruct anomalies. Such intensified difficulty can help distinguish between\nnormal and abnormal data more effectively and prevent over-generalization.\n3.2\nTraining\nFor the pretext task for self-supervision, we minimize reconstruction loss while training. The\nreconstruction loss Lrec is defined as L2 loss between Xs and ˆXs:",
+    "nearby_text_after": "N\ns=1\nDense W s enables some anomalies to have the probability of being well reconstructed [8], where\nW s denotes the matrix form of ws\nt,i (t = 1, . . . , L) and (i = 1, . . . , M) in (4). Hence, to guarantee\nretrieving only a restricted number of closely relevant normal prototypes in memory, we introduce\nentropy loss Lentr as our auxiliary loss for sparsity regularization on W s:\nLentr = 1\nN\nN\n�\ns=1\nL\n�\nt=1\nM\n�\ni=1\n−ws\nt,ilog(ws\nt,i).\n(7)\nThe objective function L is to minimize the combination",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_5_equation_9",
+    "crop_path": "formula_009_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "LSD(q_t^s, m) = \\|q_t^s - m_t^{s, pos}\\|_2^2",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_010",
+    "page": 5,
+    "bbox": [
+      234.28125,
+      238.9921875,
+      504.6676940917969,
+      265.14794921875
+    ],
+    "polygon": [
+      [
+        235.4765625,
+        240.5390625
+      ],
+      [
+        504.6676940917969,
+        238.9921875
+      ],
+      [
+        504.6676940917969,
+        265.14794921875
+      ],
+      [
+        234.28125,
+        265.14794921875
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "ISD(X_{t,:}^{s}, \\hat{X}_{t,:}^{s}) = \\left\\| X_{t,:}^{s} - \\hat{X}_{t,:}^{s} \\right\\|_{2}^{2}",
+    "nearby_text_before": " relevant normal patterns in the\nmemory items. Reconstruction outputs of anomalies often appear similar to normal samples, making\nit more challenging to reconstruct anomalies. Such intensified difficulty can help distinguish between\nnormal and abnormal data more effectively and prevent over-generalization.\n3.2\nTraining\nFor the pretext task for self-supervision, we minimize reconstruction loss while training. The\nreconstruction loss Lrec is defined as L2 loss between Xs and ˆXs:\nLrec = 1\nN\n2.\n(6)",
+    "nearby_text_after": "Lentr = 1\nN\nN\n�\ns=1\nL\n�\nt=1\nM\n�\ni=1\n−ws\nt,ilog(ws\nt,i).\n(7)\nThe objective function L is to minimize the combination of loss term (6) and (7) as follows:\nL = Lrec + λLentr,\n(8)\nwhere λ denotes a weighting coefficient.\n3.3\nTwo-phase training paradigm\nAlgorithm 1 Memory module initialization with K-means clustering\nInput: X ∈RNrand×L×n: randomly sampled sub-series\n˜fe: trained encoder of MEMTO after first phase\nm ∈RM×C: randomly initialized memory items\n(Nrand: number of sub-series, M: number of me",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_5_equation_10",
+    "crop_path": "formula_010_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "ISD(X_{t,:}^{s}, \\hat{X}_{t,:}^{s}) = \\left\\| X_{t,:}^{s} - \\hat{X}_{t,:}^{s} \\right\\|_{2}^{2}",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  },
+  {
+    "formula_id": "formula_011",
+    "page": 5,
+    "bbox": [
+      158.080078125,
+      303.57421875,
+      504.667724609375,
+      318.82958984375
+    ],
+    "polygon": [
+      [
+        159.275390625,
+        304.5389404296875
+      ],
+      [
+        504.667724609375,
+        303.57421875
+      ],
+      [
+        504.667724609375,
+        318.82958984375
+      ],
+      [
+        158.080078125,
+        318.82958984375
+      ]
+    ],
+    "block_type": "Equation",
+    "detection_source": "marker_document",
+    "detection_confidence": 0.8,
+    "marker_text": "",
+    "marker_latex": "A(X^{s}) = softmax([LSD(q_{t}^{s}, m)]_{t=1,\\dots,L}) \\circ [ISD(X_{t,:}^{s}, \\hat{X}_{t,:}^{s})]_{t=1,\\dots,L},",
+    "nearby_text_before": "raining. The\nreconstruction loss Lrec is defined as L2 loss between Xs and ˆXs:\nLrec = 1\nN\nN\n�\ns=1\n���Xs −ˆXs���\n2\n2.\n(6)\nDense W s enables some anomalies to have the probability of being well reconstructed [8], where\nW s denotes the matrix form of ws\nt,i (t = 1, . . . , L) and (i = 1, . . . , M) in (4). Hence, to guarantee\nretrieving only a restricted number of closely relevant normal prototypes in memory, we introduce\nentropy loss Lentr as our auxiliary loss for sparsity regularization on W s:",
+    "nearby_text_after": "N\ns=1\nt=1\nThe objective function L is to minimize the combination of loss term (6) and (7) as follows:\nL = Lrec + λLentr,\n(8)\nwhere λ denotes a weighting coefficient.\n3.3\nTwo-phase training paradigm\nAlgorithm 1 Memory module initialization with K-means clustering\nInput: X ∈RNrand×L×n: randomly sampled sub-series\n˜fe: trained encoder of MEMTO after first phase\nm ∈RM×C: randomly initialized memory items\n(Nrand: number of sub-series, M: number of memory items, C: latent dimension)\n1: qrand = ˜fe (X",
+    "section": "Abstract",
+    "section_confidence": "high",
+    "section_source": "heading_above",
+    "section_reason": "exact_match: abstract",
+    "slot_marker": "marker_5_equation_11",
+    "crop_path": "formula_011_p5.png",
+    "ocr_latex": "",
+    "ocr_status": "cropped",
+    "final_latex": "A(X^{s}) = softmax([LSD(q_{t}^{s}, m)]_{t=1,\\dots,L}) \\circ [ISD(X_{t,:}^{s}, \\hat{X}_{t,:}^{s})]_{t=1,\\dots,L},",
+    "final_origin": "parser_latex",
+    "unresolved_reason": ""
+  }
+]

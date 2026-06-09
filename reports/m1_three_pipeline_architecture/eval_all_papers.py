@@ -247,8 +247,10 @@ def generate_artifacts(body_result: dict, formula_slots: list, pdf_path: Path, o
     """Generate all required artifacts for a single paper."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Copy source.pdf
-    shutil.copy2(pdf_path, output_dir / "source.pdf")
+    # Copy source.pdf (skip if source and dest are the same file)
+    dest_pdf = output_dir / "source.pdf"
+    if pdf_path.resolve() != dest_pdf.resolve():
+        shutil.copy2(pdf_path, dest_pdf)
 
     # Parser outputs
     (output_dir / "markitdown.md").write_text(body_result.get("md_text", ""), encoding="utf-8")
