@@ -42,18 +42,18 @@
 
 | paper | formula_id | page | section | crop | overlay | marker_latex | final_latex | canonical_match | origin | public_ctx |
 |-------|-----------|-----:|---------|------|---------|-------------|------------|-----------------|--------|-----------|
-| paper_1 | formula_001 | 3 | Unknown | YES | YES | `\begin{split} \mathcal{Z}^{l} &= \text{L` | `\begin{split} \mathcal{Z}^{l} &= \text{L` | YES | parser_latex | YES |
-| paper_1 | formula_002 | 3 | Unknown | YES | YES | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | YES | parser_latex | YES |
-| paper_1 | formula_003 | 4 | Unknown | YES | YES | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | YES | parser_latex | YES |
-| paper_1 | formula_004 | 4 | Unknown | YES | YES | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | YES | parser_latex | YES |
-| paper_1 | formula_005 | 4 | Unknown | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
-| paper_1 | formula_006 | 5 | Unknown | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
-| paper_1 | formula_007 | 14 | Unknown | YES | YES | `\begin{aligned} &1: \ \mathcal{P}' = \te` | `\begin{aligned} &1: \ \mathcal{P}' = \te` | YES | parser_latex | YES |
-| paper_1 | formula_008 | 15 | Unknown | YES | YES | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | YES | parser_latex | YES |
-| paper_1 | formula_009 | 15 | Unknown | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_001 | 3 | Method | YES | YES | `\begin{split} \mathcal{Z}^{l} &= \text{L` | `\begin{split} \mathcal{Z}^{l} &= \text{L` | YES | parser_latex | YES |
+| paper_1 | formula_002 | 3 | Method | YES | YES | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | YES | parser_latex | YES |
+| paper_1 | formula_003 | 4 | Method | YES | YES | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | `AssDis(\mathcal{P}, \mathcal{S}; \mathca` | YES | parser_latex | YES |
+| paper_1 | formula_004 | 4 | Method | YES | YES | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | `\mathcal{L}_{\text{Total}}(\widehat{\mat` | YES | parser_latex | YES |
+| paper_1 | formula_005 | 4 | Method | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_006 | 5 | Method | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_007 | 14 | Conclusion | YES | YES | `\begin{aligned} &1: \ \mathcal{P}' = \te` | `\begin{aligned} &1: \ \mathcal{P}' = \te` | YES | parser_latex | YES |
+| paper_1 | formula_008 | 15 | Conclusion | YES | YES | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | YES | parser_latex | YES |
+| paper_1 | formula_009 | 15 | Conclusion | YES | YES | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
 | paper_2 | formula_001 | 3 | Related Work | YES | YES | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | YES | parser_latex | YES |
 | paper_2 | formula_002 | 3 | Related Work | YES | YES | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | YES | parser_latex | YES |
-| paper_2 | formula_003 | 3 | Related Work | YES | YES | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | YES | parser_latex | YES |
+| paper_2 | formula_003 | 3 | Method | YES | YES | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | YES | parser_latex | YES |
 | paper_2 | formula_004 | 4 | Method | YES | YES | `\mathcal{L}_s = \sum_{1 \le i, j \le M, ` | `\mathcal{L}_s = \sum_{1 \le i, j \le M, ` | YES | parser_latex | YES |
 | paper_2 | formula_005 | 4 | Method | YES | YES | `\frac{QK^T}{\sqrt{d_k}}` | `\frac{QK^T}{\sqrt{d_k}}` | YES | parser_latex | YES |
 | paper_2 | formula_006 | 5 | Method | YES | YES | `MultiHead(\mathbf{Q}, \mathbf{K}, \mathb` | `MultiHead(\mathbf{Q}, \mathbf{K}, \mathb` | YES | parser_latex | YES |
@@ -71,8 +71,8 @@
 | paper_3 | formula_002 | 2 | Introduction | YES | YES | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | YES | parser_latex | YES |
 | paper_3 | formula_003 | 2 | Introduction | YES | YES | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | YES | parser_latex | YES |
 | paper_3 | formula_004 | 3 | Method | YES | YES | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | YES | parser_latex | YES |
-| paper_3 | formula_005 | 3 | Method | YES | YES | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | YES | parser_latex | YES |
-| paper_3 | formula_006 | 3 | Method | YES | YES | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | YES | parser_latex | YES |
+| paper_3 | formula_005 | 3 | Related Work | YES | YES | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | YES | parser_latex | YES |
+| paper_3 | formula_006 | 3 | Related Work | YES | YES | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | YES | parser_latex | YES |
 | paper_3 | formula_007 | 3 | Method | YES | YES | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | YES | parser_latex | YES |
 | paper_3 | formula_008 | 3 | Method | YES | YES | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | YES | parser_latex | YES |
 | paper_3 | formula_009 | 3 | Method | YES | YES | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | YES | parser_latex | YES |

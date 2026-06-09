@@ -349,6 +349,8 @@ def detect_risks(records: list, paper_title_status: dict) -> list:
             risks.append({"priority": "HIGH", "paper": pk, "formula_id": fid, "reason": "CANONICAL_MISMATCH", "what_to_check": "Formula not in canonical"})
         if r["section_is_formula_polluted"]:
             risks.append({"priority": "HIGH", "paper": pk, "formula_id": fid, "reason": "SECTION_POLLUTED", "what_to_check": f"Section '{r['section']}' contains formula text"})
+        if "SECTION_CONTRADICTION" in r.get("section_reason", ""):
+            risks.append({"priority": "MEDIUM", "paper": pk, "formula_id": fid, "reason": "SECTION_CONTRADICTION", "what_to_check": f"Section '{r['section']}' contradicts nearby text headings: {r['section_reason']}"})
         if not r["section_is_trusted"]:
             risks.append({"priority": "MEDIUM", "paper": pk, "formula_id": fid, "reason": "SECTION_UNKNOWN", "what_to_check": f"Section '{r['section']}' is not trusted"})
         if not r["public_pdf_text_context_found"]:

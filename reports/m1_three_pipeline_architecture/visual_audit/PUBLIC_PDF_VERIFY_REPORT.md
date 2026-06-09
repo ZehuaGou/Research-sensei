@@ -77,18 +77,18 @@
 
 | # | paper | formula_id | page | section | crop | overlay | marker_latex | final_latex | canonical | origin | public_ctx | trusted | polluted |
 |---|-------|-----------|-----:|---------|------|---------|-------------|------------|-----------|--------|-----------|---------|----------|
-| 1 | paper_1 | formula_001 | 3 | Unknown | Y | Y | `\begin{split} \mathcal{Z}^{l} ...` | `\begin{split} \mathcal{Z}^{l} ...` | Y | parser_latex | Y | Y | N |
-| 2 | paper_1 | formula_002 | 3 | Unknown | Y | Y | `\mathcal{Q}, \mathcal{K}, \mat...` | `\mathcal{Q}, \mathcal{K}, \mat...` | Y | parser_latex | Y | Y | N |
-| 3 | paper_1 | formula_003 | 4 | Unknown | Y | Y | `AssDis(\mathcal{P}, \mathcal{S...` | `AssDis(\mathcal{P}, \mathcal{S...` | Y | parser_latex | Y | Y | N |
-| 4 | paper_1 | formula_004 | 4 | Unknown | Y | Y | `\mathcal{L}_{\text{Total}}(\wi...` | `\mathcal{L}_{\text{Total}}(\wi...` | Y | parser_latex | Y | Y | N |
-| 5 | paper_1 | formula_005 | 4 | Unknown | Y | Y | `\mathcal{L}_{Total}(\widehat{\...` | `\mathcal{L}_{Total}(\widehat{\...` | Y | parser_latex | Y | Y | N |
-| 6 | paper_1 | formula_006 | 5 | Unknown | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
-| 7 | paper_1 | formula_007 | 14 | Unknown | Y | Y | `\begin{aligned} &1: \ \mathcal...` | `\begin{aligned} &1: \ \mathcal...` | Y | parser_latex | Y | Y | N |
-| 8 | paper_1 | formula_008 | 15 | Unknown | Y | Y | `\mathcal{C}_{AD} = \text{Softm...` | `\mathcal{C}_{AD} = \text{Softm...` | Y | parser_latex | Y | Y | N |
-| 9 | paper_1 | formula_009 | 15 | Unknown | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
+| 1 | paper_1 | formula_001 | 3 | Method | Y | Y | `\begin{split} \mathcal{Z}^{l} ...` | `\begin{split} \mathcal{Z}^{l} ...` | Y | parser_latex | Y | Y | N |
+| 2 | paper_1 | formula_002 | 3 | Method | Y | Y | `\mathcal{Q}, \mathcal{K}, \mat...` | `\mathcal{Q}, \mathcal{K}, \mat...` | Y | parser_latex | Y | Y | N |
+| 3 | paper_1 | formula_003 | 4 | Method | Y | Y | `AssDis(\mathcal{P}, \mathcal{S...` | `AssDis(\mathcal{P}, \mathcal{S...` | Y | parser_latex | Y | Y | N |
+| 4 | paper_1 | formula_004 | 4 | Method | Y | Y | `\mathcal{L}_{\text{Total}}(\wi...` | `\mathcal{L}_{\text{Total}}(\wi...` | Y | parser_latex | Y | Y | N |
+| 5 | paper_1 | formula_005 | 4 | Method | Y | Y | `\mathcal{L}_{Total}(\widehat{\...` | `\mathcal{L}_{Total}(\widehat{\...` | Y | parser_latex | Y | Y | N |
+| 6 | paper_1 | formula_006 | 5 | Method | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
+| 7 | paper_1 | formula_007 | 14 | Conclusion | Y | Y | `\begin{aligned} &1: \ \mathcal...` | `\begin{aligned} &1: \ \mathcal...` | Y | parser_latex | Y | Y | N |
+| 8 | paper_1 | formula_008 | 15 | Conclusion | Y | Y | `\mathcal{C}_{AD} = \text{Softm...` | `\mathcal{C}_{AD} = \text{Softm...` | Y | parser_latex | Y | Y | N |
+| 9 | paper_1 | formula_009 | 15 | Conclusion | Y | Y | `\mathcal{X}` | `\mathcal{X}` | Y | parser_latex | Y | Y | N |
 | 10 | paper_2 | formula_001 | 3 | Related Work | Y | Y | `z^{i,j} = \underset{c \in \{0,...` | `z^{i,j} = \underset{c \in \{0,...` | Y | parser_latex | Y | Y | N |
 | 11 | paper_2 | formula_002 | 3 | Related Work | Y | Y | `z_c^{i,j} = \frac{\exp((\log \...` | `z_c^{i,j} = \frac{\exp((\log \...` | Y | parser_latex | Y | Y | N |
-| 12 | paper_2 | formula_003 | 3 | Related Work | Y | Y | `\mathbf{x}_{i}' = \sum_{j \in ...` | `\mathbf{x}_{i}' = \sum_{j \in ...` | Y | parser_latex | Y | Y | N |
+| 12 | paper_2 | formula_003 | 3 | Method | Y | Y | `\mathbf{x}_{i}' = \sum_{j \in ...` | `\mathbf{x}_{i}' = \sum_{j \in ...` | Y | parser_latex | Y | Y | N |
 | 13 | paper_2 | formula_004 | 4 | Method | Y | Y | `\mathcal{L}_s = \sum_{1 \le i,...` | `\mathcal{L}_s = \sum_{1 \le i,...` | Y | parser_latex | Y | Y | N |
 | 14 | paper_2 | formula_005 | 4 | Method | Y | Y | `\frac{QK^T}{\sqrt{d_k}}` | `\frac{QK^T}{\sqrt{d_k}}` | Y | parser_latex | Y | Y | N |
 | 15 | paper_2 | formula_006 | 5 | Method | Y | Y | `MultiHead(\mathbf{Q}, \mathbf{...` | `MultiHead(\mathbf{Q}, \mathbf{...` | Y | parser_latex | Y | Y | N |
@@ -106,8 +106,8 @@
 | 27 | paper_3 | formula_002 | 2 | Introduction | Y | Y | `I_{\text{UBA}}(X,Y) \triangleq...` | `I_{\text{UBA}}(X,Y) \triangleq...` | Y | parser_latex | Y | Y | N |
 | 28 | paper_3 | formula_003 | 2 | Introduction | Y | Y | `q(x/y) = \frac{p(x)}{Z(y)}e^{f...` | `q(x/y) = \frac{p(x)}{Z(y)}e^{f...` | Y | parser_latex | Y | Y | N |
 | 29 | paper_3 | formula_004 | 3 | Method | Y | Y | `\mathbf{H}_{t:t+B} = \frac{\ma...` | `\mathbf{H}_{t:t+B} = \frac{\ma...` | Y | parser_latex | Y | Y | N |
-| 30 | paper_3 | formula_005 | 3 | Method | Y | Y | `\mathbf{H}_{\text{emb}} = \mat...` | `\mathbf{H}_{\text{emb}} = \mat...` | Y | parser_latex | Y | Y | N |
-| 31 | paper_3 | formula_006 | 3 | Method | Y | Y | `\mathbf{Q} = \mathbf{W}_{\math...` | `\mathbf{Q} = \mathbf{W}_{\math...` | Y | parser_latex | Y | Y | N |
+| 30 | paper_3 | formula_005 | 3 | Related Work | Y | Y | `\mathbf{H}_{\text{emb}} = \mat...` | `\mathbf{H}_{\text{emb}} = \mat...` | Y | parser_latex | Y | Y | N |
+| 31 | paper_3 | formula_006 | 3 | Related Work | Y | Y | `\mathbf{Q} = \mathbf{W}_{\math...` | `\mathbf{Q} = \mathbf{W}_{\math...` | Y | parser_latex | Y | Y | N |
 | 32 | paper_3 | formula_007 | 3 | Method | Y | Y | `\mathbf{Y}_1 = \mathbf{W}_{\te...` | `\mathbf{Y}_1 = \mathbf{W}_{\te...` | Y | parser_latex | Y | Y | N |
 | 33 | paper_3 | formula_008 | 3 | Method | Y | Y | `\mathbf{Y}_{2} = \mathbf{Y}_{1...` | `\mathbf{Y}_{2} = \mathbf{Y}_{1...` | Y | parser_latex | Y | Y | N |
 | 34 | paper_3 | formula_009 | 3 | Method | Y | Y | `\mathbf{Y}_3 = \mathbf{W}_2 \c...` | `\mathbf{Y}_3 = \mathbf{W}_2 \c...` | Y | parser_latex | Y | Y | N |
@@ -132,9 +132,15 @@ No high-risk items detected.
 ## 5. Risk Summary
 
 - **HIGH**: 0
-- **MEDIUM**: 0
+- **MEDIUM**: 3
 - **LOW**: 3
-- **Total**: 3
+- **Total**: 6
+
+### MEDIUM Priority
+
+1. **paper_2/formula_003** — SECTION_CONTRADICTION: Section 'Method' contradicts nearby text headings: SECTION_CONTRADICTION: nearby='Method' vs timeline='Related Work'
+1. **paper_3/formula_005** — SECTION_CONTRADICTION: Section 'Related Work' contradicts nearby text headings: SECTION_CONTRADICTION: nearby='Related Work' vs timeline='Method'
+1. **paper_3/formula_006** — SECTION_CONTRADICTION: Section 'Related Work' contradicts nearby text headings: SECTION_CONTRADICTION: nearby='Related Work' vs timeline='Method'
 
 ### LOW Priority
 

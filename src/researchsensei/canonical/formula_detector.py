@@ -212,6 +212,20 @@ class MarkerDocumentFormulaDetector:
                     if not first_line_text:
                         continue
 
+                    # If first line is just a number (e.g., "3", "3.1"),
+                    # combine with the next line (e.g., "Method")
+                    combined_text = first_line_text
+                    import re
+                    if re.match(r'^\d+(?:\.\d+)*$', first_line_text.strip()):
+                        for line2 in block.get("lines", [])[1:]:
+                            line2_text = ""
+                            for span2 in line2.get("spans", []):
+                                line2_text += span2.get("text", "")
+                            line2_text = line2_text.strip()
+                            if line2_text:
+                                combined_text = first_line_text.strip() + " " + line2_text
+                                break
+
                     # Check if first line looks like a heading
                     is_heading = False
                     if first_line_font_size >= 14:
@@ -219,15 +233,14 @@ class MarkerDocumentFormulaDetector:
                     if first_line_bold and first_line_font_size >= 11:
                         is_heading = True
                     # IEEE-style: Roman numeral + uppercase, e.g. "V. EXPERIMENTS"
-                    import re
-                    if re.match(r'^[IVXLC]+\.\s+[A-Z]', first_line_text):
+                    if re.match(r'^[IVXLC]+\.\s+[A-Z]', combined_text):
                         is_heading = True
-                    # Numbered section: "1. Introduction", "2.1 Background"
-                    if re.match(r'^\d+(\.\d+)?\.\s+\w', first_line_text):
+                    # Numbered section: "1. Introduction", "2.1 Background", "3 Method"
+                    if re.match(r'^\d+(?:\.\d+)*\s+[A-Z]', combined_text):
                         is_heading = True
 
                     if is_heading:
-                        headings_on_page.append((bb[1], first_line_text))
+                        headings_on_page.append((bb[1], combined_text))
 
                 page_headings[page_idx] = headings_on_page
 
@@ -280,15 +293,203 @@ class MarkerDocumentFormulaDetector:
                 slot.nearby_text_before = "\n".join(text_before_parts)[-500:] if text_before_parts else ""
                 slot.nearby_text_after = "\n".join(text_after_parts)[:500] if text_after_parts else ""
 
-                sec_name, sec_conf, sec_reason = section_timeline.get(
+                # Get timeline-based section (page-level)
+                tl_name, tl_conf, tl_reason = section_timeline.get(
                     page_idx, ("Unknown", "low", "no_heading_found")
                 )
-                slot.section = sec_name
-                slot.section_confidence = sec_conf
-                slot.section_source = "heading_above" if sec_name != "Unknown" else "unknown"
-                slot.section_reason = sec_reason
+
+                # Try to get a closer heading from nearby text
+                nearby_name, nearby_raw = _detect_section_from_nearby_text(
+                    slot.nearby_text_before
+                )
+
+                if nearby_name is not None:
+                    # Nearby text has a heading — use it
+                    slot.section = nearby_name
+                    slot.section_confidence = "high"
+                    slot.section_source = "nearby_heading"
+                    slot.section_reason = f"nearby_text_heading: {nearby_raw}"
+                    # Check contradiction with timeline
+                    if tl_name not in ("Unknown", nearby_name):
+                        slot.section_confidence = "low"
+                        slot.section_reason = (
+                            f"SECTION_CONTRADICTION: nearby='{nearby_name}' "
+                            f"vs timeline='{tl_name}'"
+                        )
+                else:
+                    # Fall back to timeline
+                    slot.section = tl_name
+                    slot.section_confidence = tl_conf
+                    slot.section_source = "heading_above" if tl_name != "Unknown" else "unknown"
+                    slot.section_reason = tl_reason
+
+                # Also check nearby_text_after for a heading that applies to
+                # the CURRENT formula (e.g., heading appears between this
+                # formula and the previous one on the same page).
+                after_name, after_raw = _detect_section_from_nearby_text(
+                    slot.nearby_text_after
+                )
+                if after_name is not None and after_name != slot.section:
+                    # Check if nearby_text_before already has a heading
+                    before_has_heading = (
+                        slot.section_source == "nearby_heading"
+                    )
+                    if not before_has_heading:
+                        # nearby_text_before had no heading — the "after"
+                        # heading is the closest one; use it.
+                        slot.section = after_name
+                        slot.section_confidence = "high"
+                        slot.section_source = "nearby_after_heading"
+                        slot.section_reason = (
+                            f"nearby_after_heading: {after_raw}"
+                        )
+                        if tl_name not in ("Unknown", after_name):
+                            slot.section_confidence = "low"
+                            slot.section_reason = (
+                                f"SECTION_CONTRADICTION: "
+                                f"after='{after_name}' vs "
+                                f"timeline='{tl_name}'"
+                            )
         finally:
             doc.close()
+
+
+def _extract_section_name_from_line(line: str) -> str | None:
+    """Extract a section name from a single heading line.
+
+    Handles:
+    - "3 Method" -> "method"
+    - "3.1 Overall description of MEMTO" -> "method" (via prefix lookup)
+    - "Method" -> "method"
+    - "1 Introduction" -> "introduction"
+    - "III. Method" -> "method"
+    """
+    import re as _re
+
+    cleaned = line.strip()
+    if not cleaned:
+        return None
+
+    # Roman numeral prefix
+    m = _re.match(r'^[IVXLC]+\.\s+(.+)', cleaned)
+    if m:
+        name = m.group(1).strip().lower()
+        if name in _TRUSTED_SECTIONS:
+            return _TRUSTED_SECTIONS[name]
+        for key in _TRUSTED_SECTIONS:
+            if key in name:
+                return _TRUSTED_SECTIONS[key]
+
+    # Number prefix: "3 Method", "3.1 Overall description", "3.1.1 Encoder"
+    m = _re.match(r'^(\d+(?:\.\d+)*)\s+(.+)', cleaned)
+    if m:
+        prefix = m.group(1)
+        rest = m.group(2).strip()
+
+        # "3 Method" -> check if "method" is a trusted section
+        rest_lower = rest.lower()
+        if rest_lower in _TRUSTED_SECTIONS:
+            return _TRUSTED_SECTIONS[rest_lower]
+        for key in _TRUSTED_SECTIONS:
+            if key in rest_lower:
+                return _TRUSTED_SECTIONS[key]
+
+        # "3.1 Overall description..." -> strip to "3", look up parent section
+        parts = prefix.split('.')
+        for i in range(len(parts) - 1, 0, -1):
+            parent_prefix = '.'.join(parts[:i])
+            if parent_prefix in _SECTION_NUM_MAP:
+                return _SECTION_NUM_MAP[parent_prefix]
+
+        return None
+
+    # Plain heading (no number prefix): "Method", "Abstract", "Introduction"
+    lower = cleaned.lower()
+    if lower in _TRUSTED_SECTIONS:
+        return _TRUSTED_SECTIONS[lower]
+    for key in _TRUSTED_SECTIONS:
+        if key in lower:
+            return _TRUSTED_SECTIONS[key]
+
+    return None
+
+
+# Module-level map of section numbers to section names, built during nearby text parsing
+_SECTION_NUM_MAP: dict[str, str] = {}
+
+
+def _detect_section_from_nearby_text(
+    nearby_text: str,
+) -> tuple[str | None, str]:
+    """Extract the most recent heading from nearby text.
+
+    Uses a two-pass approach:
+    1. Build a map of section numbers to section names (e.g., "3" -> "Method")
+    2. Use the map to resolve subsection prefixes (e.g., "3.1" -> "Method")
+
+    Returns:
+        (section_name or None, raw_heading_text)
+    """
+    import re as _re
+
+    global _SECTION_NUM_MAP
+
+    if not nearby_text:
+        return (None, "")
+
+    # Preprocess: merge adjacent lines where one is just a number prefix
+    # e.g., "3\nMethod" -> "3 Method", "3.1\nOverall description..." -> "3.1 Overall description..."
+    import re as _re_merge
+    lines = nearby_text.split("\n")
+    merged = []
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if _re_merge.match(r'^\d+(?:\.\d+)*$', line) and i + 1 < len(lines):
+            next_line = lines[i + 1].strip()
+            if next_line and not _re_merge.match(r'^\d+(?:\.\d+)*$', next_line):
+                merged.append(line + " " + next_line)
+                i += 2
+                continue
+        merged.append(line)
+        i += 1
+    lines = merged
+
+    # Pass 1: Build section number map from direct headings
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or len(stripped) > 80:
+            continue
+        if _looks_like_formula_text(stripped):
+            continue
+        alpha_ratio = sum(c.isalpha() or c.isspace() for c in stripped) / max(len(stripped), 1)
+        if alpha_ratio < 0.5:
+            continue
+        m = _re.match(r'^(\d+(?:\.\d+)*)\s+([A-Z].*)', stripped)
+        if m:
+            prefix = m.group(1)
+            rest = m.group(2).strip().lower()
+            if '.' not in prefix and rest in _TRUSTED_SECTIONS:
+                _SECTION_NUM_MAP[prefix] = _TRUSTED_SECTIONS[rest]
+
+    # Pass 2: Find the closest heading using the map
+    best_section = None
+    best_raw = ""
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or len(stripped) > 80:
+            continue
+        if _looks_like_formula_text(stripped):
+            continue
+        alpha_ratio = sum(c.isalpha() or c.isspace() for c in stripped) / max(len(stripped), 1)
+        if alpha_ratio < 0.5:
+            continue
+        section_name = _extract_section_name_from_line(stripped)
+        if section_name is not None:
+            best_section = section_name
+            best_raw = stripped
+
+    return (best_section, best_raw)
 
 
 def _is_valid_bbox(bbox) -> bool:
@@ -321,6 +522,7 @@ _TRUSTED_SECTIONS = {
     "model": "Method",
     "model architecture": "Method",
     "experiments": "Experiments",
+    "experiment": "Experiments",
     "experimental results": "Experiments",
     "evaluation": "Experiments",
     "experiments and results": "Experiments",
