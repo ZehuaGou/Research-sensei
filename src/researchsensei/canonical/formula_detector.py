@@ -71,7 +71,10 @@ class MarkerDocumentFormulaDetector:
         from marker.schema import BlockTypes
 
         models = create_model_dict()
-        converter = PdfConverter(artifact_dict=models)
+        # Skip OCR — the PDF already has extractable text via PyMuPDF.
+        # This avoids the 30+ minute OCR bottleneck.
+        config = {"disable_ocr": True}
+        converter = PdfConverter(artifact_dict=models, config=config)
 
         # build_document returns the internal Document with full block tree
         doc = converter.build_document(str(pdf_path))

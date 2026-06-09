@@ -2,6 +2,16 @@
 
 Cross-verifies: public PDF vs local source.pdf vs FormulaSlot bbox/crop
 vs Marker LaTeX vs canonical LaTeX vs section/nearby_text.
+
+Title verification strategy:
+  1. Extract PDF metadata title
+  2. Extract first page body text title (first substantial line)
+  3. Compare both against expected title from report
+  4. Classification:
+     - YES: metadata or body text matches expected
+     - YES_WITH_BAD_METADATA: body text matches but metadata is empty/wrong
+     - TITLE_MISMATCH: neither metadata nor body text matches
+     - SOURCE_MISMATCH: body text is a completely different paper
 """
 import json
 import os
@@ -34,12 +44,12 @@ FORMULA_POLLUTION_PATTERNS = [
 PAPERS = {
     "paper_1": {
         "pdf_path": ROOT / "reports" / "m1_parser_review" / "paper_1" / "source.pdf",
-        "pid": "2112.14436",
+        "pid": "2110.02642",
         "title_from_report": "Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy",
-        "arxiv_id": "2112.14436",
+        "arxiv_id": "2110.02642",
         "doi": None,
-        "public_abs_url": "https://arxiv.org/abs/2112.14436",
-        "public_pdf_url": "https://arxiv.org/pdf/2112.14436",
+        "public_abs_url": "https://arxiv.org/abs/2110.02642",
+        "public_pdf_url": "https://arxiv.org/pdf/2110.02642",
     },
     "paper_2": {
         "pdf_path": ROOT / "reports" / "m1_parser_review" / "paper_2" / "source.pdf",
@@ -62,35 +72,103 @@ PAPERS = {
 }
 
 
-def get_pdf_title(pdf_path: Path) -> str:
-    """Extract title from PDF metadata or first page text."""
+def get_pdf_metadata_title(pdf_path: Path) -> str:
+    """Extract title from PDF metadata."""
     import fitz
     doc = fitz.open(str(pdf_path))
     meta_title = doc.metadata.get("title", "").strip()
-    if meta_title:
-        doc.close()
-        return meta_title
-    # Fallback: first line of page 1
+    doc.close()
+    return meta_title
+
+
+def get_pdf_body_title(pdf_path: Path) -> str:
+    """Extract title from first page body text.
+
+    Strategy: skip lines that look like headers (e.g. "Published as..."),
+    then take the first substantial line as the title.
+    """
+    import fitz
+    doc = fitz.open(str(pdf_path))
     text = doc[0].get_text()
     doc.close()
-    first_line = text.strip().split("\n")[0].strip()
-    return first_line[:120]
+
+    skip_patterns = [
+        r'^Published\s+as',
+        r'^arXiv:',
+        r'^\d{4}\.\d{4,5}',
+        r'^Vol\.',
+        r'^IEEE',
+        r'^©',
+        r'^Copyright',
+    ]
+
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped or len(stripped) < 5:
+            continue
+        if any(re.match(pat, stripped, re.IGNORECASE) for pat in skip_patterns):
+            continue
+        # Skip lines that are just numbers or single words
+        if len(stripped.split()) < 3:
+            continue
+        return stripped[:200]
+
+    # Fallback: first non-empty line
+    for line in text.split("\n"):
+        if line.strip():
+            return line.strip()[:200]
+    return ""
 
 
-def get_pdf_page_text(pdf_path: Path, page_num: int) -> str:
-    """Extract text from a specific page (1-indexed)."""
-    import fitz
-    try:
-        doc = fitz.open(str(pdf_path))
-        idx = page_num - 1
-        if idx < 0 or idx >= len(doc):
-            doc.close()
-            return ""
-        text = doc[idx].get_text()
-        doc.close()
-        return text
-    except Exception:
-        return ""
+def classify_title(meta_title: str, body_title: str, expected_title: str) -> tuple[str, str]:
+    """Classify title match between PDF and expected.
+
+    Returns (classification, detail) where classification is one of:
+      YES, YES_WITH_BAD_METADATA, TITLE_MISMATCH, SOURCE_MISMATCH
+    """
+    exp_lower = expected_title.lower().strip()
+    meta_lower = meta_title.lower().strip()
+    body_lower = body_title.lower().strip()
+
+    def titles_match(a: str, b: str) -> bool:
+        """Check if two titles match (flexible: first 40 chars or key words)."""
+        if not a or not b:
+            return False
+        # Exact match (first 40 chars)
+        if a[:40] == b[:40]:
+            return True
+        # Key word overlap: at least 3 significant words in common
+        stop_words = {"the", "a", "an", "of", "for", "in", "on", "with", "and", "to", "by", "at"}
+        a_words = {w for w in a.split() if w not in stop_words and len(w) > 2}
+        b_words = {w for w in b.split() if w not in stop_words and len(w) > 2}
+        common = a_words & b_words
+        if len(common) >= 3:
+            return True
+        return False
+
+    body_matches = titles_match(body_lower, exp_lower)
+    meta_matches = titles_match(meta_lower, exp_lower)
+
+    if body_matches and meta_matches:
+        return "YES", "metadata and body text both match"
+    elif body_matches and not meta_matches:
+        if not meta_lower or meta_lower in ("1", "untitled", ""):
+            return "YES_WITH_BAD_METADATA", f"body text matches but metadata is '{meta_title}'"
+        else:
+            return "YES_WITH_BAD_METADATA", f"body text matches but metadata title differs"
+    elif not body_matches and meta_matches:
+        return "YES", "metadata matches"
+    else:
+        # Neither matches. Check if it's a completely different paper.
+        # If body title has zero overlap with expected, it's SOURCE_MISMATCH
+        if body_lower and exp_lower:
+            stop_words = {"the", "a", "an", "of", "for", "in", "on", "with", "and", "to", "by", "at"}
+            exp_words = {w for w in exp_lower.split() if w not in stop_words and len(w) > 2}
+            body_words = {w for w in body_lower.split() if w not in stop_words and len(w) > 2}
+            common = exp_words & body_words
+            if len(common) == 0:
+                return "SOURCE_MISMATCH", f"body text '{body_title[:60]}' has zero overlap with expected"
+        return "TITLE_MISMATCH", f"neither metadata nor body text matches expected"
 
 
 def extract_canonical_formulas(canonical_path: Path) -> dict:
@@ -99,7 +177,6 @@ def extract_canonical_formulas(canonical_path: Path) -> dict:
         return {}
     content = canonical_path.read_text(encoding="utf-8")
     formulas = {}
-    # Match formula comment blocks
     pattern = re.compile(
         r"<!-- formula_id:\s*(\S+)\s*\|(.+?)-->\s*"
         r"(?:```latex\s*\n(.*?)\n```|<!-- No formula content.*?-->|\{\{FORMULA:.*?\}\})?",
@@ -219,9 +296,46 @@ def build_record(paper_key: str, paper_info: dict, slot: dict,
     }
 
 
-def detect_high_risk(records: list) -> list:
-    """Detect high-risk items from verification records."""
+def detect_risks(records: list, paper_title_status: dict) -> list:
+    """Detect all risks from verification records + paper-level title status.
+
+    Risk categories:
+      HIGH: source_mismatch, title_mismatch, crop_missing, overlay_missing,
+            latex_empty, canonical_mismatch, section_polluted
+      MEDIUM: section_unknown, page_offset_suspected
+      LOW: public_pdf_context_not_found, bad_pdf_metadata
+    """
     risks = []
+
+    # Paper-level risks from title verification
+    for pk, status_info in paper_title_status.items():
+        classification = status_info["classification"]
+        if classification == "SOURCE_MISMATCH":
+            risks.append({
+                "priority": "HIGH",
+                "paper": pk,
+                "formula_id": "(paper-level)",
+                "reason": "SOURCE_MISMATCH",
+                "what_to_check": f"{status_info['detail']}. Local source.pdf is NOT the intended paper.",
+            })
+        elif classification == "TITLE_MISMATCH":
+            risks.append({
+                "priority": "HIGH",
+                "paper": pk,
+                "formula_id": "(paper-level)",
+                "reason": "TITLE_MISMATCH",
+                "what_to_check": f"{status_info['detail']}. Neither metadata nor body text matches.",
+            })
+        elif classification == "YES_WITH_BAD_METADATA":
+            risks.append({
+                "priority": "LOW",
+                "paper": pk,
+                "formula_id": "(paper-level)",
+                "reason": "BAD_PDF_METADATA",
+                "what_to_check": f"{status_info['detail']}. Content is correct, metadata is bad.",
+            })
+
+    # Per-formula risks
     for r in records:
         fid = r["formula_id"]
         pk = r["paper_key"]
@@ -244,7 +358,7 @@ def detect_high_risk(records: list) -> list:
     return risks
 
 
-def generate_map_md(records: list, paper_infos: dict, title_verified: dict) -> str:
+def generate_map_md(records: list, paper_infos: dict, title_status: dict) -> str:
     """Generate PUBLIC_PDF_VERIFY_MAP.md."""
     lines = [
         "# PUBLIC_PDF_VERIFY_MAP",
@@ -256,12 +370,16 @@ def generate_map_md(records: list, paper_infos: dict, title_verified: dict) -> s
         "",
     ]
     for pk, pi in paper_infos.items():
-        tv = title_verified.get(pk, "UNKNOWN")
+        ts = title_status.get(pk, {})
+        classification = ts.get("classification", "UNKNOWN")
+        detail = ts.get("detail", "")
         lines.append(f"### {pk}")
         lines.append(f"- paper_id: {pi['pid']}")
         lines.append(f"- title_from_report: {pi['title_from_report']}")
-        lines.append(f"- title_from_pdf: {pi.get('title_from_pdf', '?')}")
-        lines.append(f"- title_verified: **{tv}**")
+        lines.append(f"- title_from_pdf_metadata: {pi.get('title_from_pdf_metadata', '?')}")
+        lines.append(f"- title_from_pdf_body: {pi.get('title_from_pdf_body', '?')}")
+        lines.append(f"- title_verified: **{classification}**")
+        lines.append(f"- title_detail: {detail}")
         lines.append(f"- arxiv_id: {pi.get('arxiv_id', 'N/A')}")
         lines.append(f"- public_pdf_url: {pi['public_pdf_url']}")
         lines.append(f"- source_pdf_path: {pi['pdf_path'].relative_to(ROOT)}")
@@ -286,25 +404,31 @@ def generate_map_md(records: list, paper_infos: dict, title_verified: dict) -> s
     return "\n".join(lines)
 
 
-def generate_report_md(records: list, paper_infos: dict, title_verified: dict, risks: list) -> str:
+def generate_report_md(records: list, paper_infos: dict, title_status: dict, risks: list) -> str:
     """Generate PUBLIC_PDF_VERIFY_REPORT.md."""
+    # Check if any paper has SOURCE_MISMATCH → BLOCKED
+    blocked_papers = [pk for pk, ts in title_status.items() if ts.get("classification") == "SOURCE_MISMATCH"]
+
     lines = [
         "# PUBLIC_PDF_VERIFY_REPORT",
         "",
         f"**Generated**: 2026-06-09",
         f"**Total FormulaSlots**: {len(records)}",
-        "",
-        "---",
-        "",
-        "## 1. Overview",
-        "",
-        "| paper | title_verified | public_pdf_url | formula_count | crop_exists | overlay_exists | latex_match | canonical_match | section_trusted | public_pdf_context_found |",
-        "|-------|---------------|---------------|:-------------:|:-----------:|:--------------:|:-----------:|:---------------:|:---------------:|:------------------------:|",
     ]
+    if blocked_papers:
+        lines.append(f"**BLOCKED**: {', '.join(blocked_papers)} — SOURCE_MISMATCH (local source.pdf != intended paper)")
+    lines.extend(["", "---", ""])
+
+    # 1. Overview
+    lines.append("## 1. Overview")
+    lines.append("")
+    lines.append("| paper | title_verified | public_pdf_url | formula_count | crop_exists | overlay_exists | latex_match | canonical_match | section_trusted | public_pdf_context_found |")
+    lines.append("|-------|---------------|---------------|:-------------:|:-----------:|:--------------:|:-----------:|:---------------:|:---------------:|:------------------------:|")
 
     for pk, pi in paper_infos.items():
         paper_records = [r for r in records if r["paper_key"] == pk]
-        tv = title_verified.get(pk, "UNKNOWN")
+        ts = title_status.get(pk, {})
+        classification = ts.get("classification", "UNKNOWN")
         fc = len(paper_records)
         ce = sum(1 for r in paper_records if r["crop_exists"])
         oe = sum(1 for r in paper_records if r["overlay_exists"])
@@ -313,25 +437,27 @@ def generate_report_md(records: list, paper_infos: dict, title_verified: dict, r
         st = sum(1 for r in paper_records if r["section_is_trusted"])
         pc = sum(1 for r in paper_records if r["public_pdf_text_context_found"])
         lines.append(
-            f"| {pk} | {tv} | {pi['public_pdf_url']} | {fc} | {ce}/{fc} | {oe}/{fc} | {lm}/{fc} | {cm}/{fc} | {st}/{fc} | {pc}/{fc} |"
+            f"| {pk} | {classification} | {pi['public_pdf_url']} | {fc} | {ce}/{fc} | {oe}/{fc} | {lm}/{fc} | {cm}/{fc} | {st}/{fc} | {pc}/{fc} |"
         )
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## 2. Per-Paper Detail",
-        "",
-    ])
+    lines.extend(["", "---", ""])
+
+    # 2. Per-Paper Detail
+    lines.append("## 2. Per-Paper Detail")
+    lines.append("")
 
     for pk, pi in paper_infos.items():
         paper_records = [r for r in records if r["paper_key"] == pk]
+        ts = title_status.get(pk, {})
+        classification = ts.get("classification", "UNKNOWN")
+        detail = ts.get("detail", "")
         lines.append(f"### {pk} — {pi['pid']}")
         lines.append("")
-        tv = title_verified.get(pk, "UNKNOWN")
         lines.append(f"- **title_from_report**: {pi['title_from_report']}")
-        lines.append(f"- **title_from_pdf**: {pi.get('title_from_pdf', '?')}")
-        lines.append(f"- **title_verified**: {tv}")
+        lines.append(f"- **title_from_pdf_metadata**: {pi.get('title_from_pdf_metadata', '?')}")
+        lines.append(f"- **title_from_pdf_body**: {pi.get('title_from_pdf_body', '?')}")
+        lines.append(f"- **title_verified**: {classification}")
+        lines.append(f"- **title_detail**: {detail}")
         lines.append(f"- **public_pdf_url**: {pi['public_pdf_url']}")
         lines.append(f"- **formula_count**: {len(paper_records)}")
         lines.append(f"- **crop_exists**: {sum(1 for r in paper_records if r['crop_exists'])}/{len(paper_records)}")
@@ -344,14 +470,13 @@ def generate_report_md(records: list, paper_infos: dict, title_verified: dict, r
         lines.append(f"- **public_pdf_context_found**: {sum(1 for r in paper_records if r['public_pdf_text_context_found'])}/{len(paper_records)}")
         lines.append("")
 
-    lines.extend([
-        "---",
-        "",
-        "## 3. Full Formula Verification Table",
-        "",
-        "| # | paper | formula_id | page | section | crop | overlay | marker_latex | final_latex | canonical | origin | public_ctx | trusted | polluted |",
-        "|---|-------|-----------|-----:|---------|------|---------|-------------|------------|-----------|--------|-----------|---------|----------|",
-    ])
+    lines.extend(["---", ""])
+
+    # 3. Full Formula Verification Table
+    lines.append("## 3. Full Formula Verification Table")
+    lines.append("")
+    lines.append("| # | paper | formula_id | page | section | crop | overlay | marker_latex | final_latex | canonical | origin | public_ctx | trusted | polluted |")
+    lines.append("|---|-------|-----------|-----:|---------|------|---------|-------------|------------|-----------|--------|-----------|---------|----------|")
     for i, r in enumerate(records, 1):
         crop_s = "Y" if r["crop_exists"] else "N"
         overlay_s = "Y" if r["overlay_exists"] else "N"
@@ -365,39 +490,33 @@ def generate_report_md(records: list, paper_infos: dict, title_verified: dict, r
             f"| {i} | {r['paper_key']} | {r['formula_id']} | {r['page']} | {r['section']} | {crop_s} | {overlay_s} | `{ml}` | `{fl}` | {can_s} | {r['formula_origin']} | {ctx_s} | {trust_s} | {poll_s} |"
         )
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## 4. High-Risk Items",
-        "",
-    ])
-    if risks:
-        lines.append("| priority | paper | formula_id | reason | what_to_check |")
-        lines.append("|----------|-------|-----------|--------|---------------|")
-        for risk in sorted(risks, key=lambda x: {"HIGH": 0, "MEDIUM": 1, "LOW": 2}.get(x["priority"], 3)):
-            lines.append(f"| {risk['priority']} | {risk['paper']} | {risk['formula_id']} | {risk['reason']} | {risk['what_to_check']} |")
-    else:
-        lines.append("No high-risk items detected.")
+    lines.extend(["", "---", ""])
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## 5. Manual Check Recommendations",
-        "",
-    ])
-    # Group by priority
+    # 4. High-Risk Items
+    lines.append("## 4. High-Risk Items")
+    lines.append("")
     high_risks = [r for r in risks if r["priority"] == "HIGH"]
     med_risks = [r for r in risks if r["priority"] == "MEDIUM"]
     low_risks = [r for r in risks if r["priority"] == "LOW"]
 
     if high_risks:
-        lines.append("### HIGH Priority")
-        lines.append("")
-        for risk in high_risks:
-            lines.append(f"1. **{risk['paper']}/{risk['formula_id']}** — {risk['reason']}: {risk['what_to_check']}")
-        lines.append("")
+        lines.append("| priority | paper | formula_id | reason | what_to_check |")
+        lines.append("|----------|-------|-----------|--------|---------------|")
+        for risk in sorted(high_risks, key=lambda x: x["paper"]):
+            lines.append(f"| {risk['priority']} | {risk['paper']} | {risk['formula_id']} | {risk['reason']} | {risk['what_to_check']} |")
+    else:
+        lines.append("No high-risk items detected.")
+
+    lines.extend(["", "---", ""])
+
+    # 5. All Risks by Priority
+    lines.append("## 5. Risk Summary")
+    lines.append("")
+    lines.append(f"- **HIGH**: {len(high_risks)}")
+    lines.append(f"- **MEDIUM**: {len(med_risks)}")
+    lines.append(f"- **LOW**: {len(low_risks)}")
+    lines.append(f"- **Total**: {len(risks)}")
+    lines.append("")
 
     if med_risks:
         lines.append("### MEDIUM Priority")
@@ -409,30 +528,45 @@ def generate_report_md(records: list, paper_infos: dict, title_verified: dict, r
     if low_risks:
         lines.append("### LOW Priority")
         lines.append("")
-        for risk in low_risks[:10]:  # Limit to 10
+        for risk in low_risks[:15]:
             lines.append(f"1. **{risk['paper']}/{risk['formula_id']}** — {risk['reason']}: {risk['what_to_check']}")
-        if len(low_risks) > 10:
-            lines.append(f"   ... and {len(low_risks) - 10} more LOW priority items")
+        if len(low_risks) > 15:
+            lines.append(f"   ... and {len(low_risks) - 15} more LOW priority items")
         lines.append("")
 
-    lines.extend([
-        "---",
-        "",
-        "## 6. TITLE_MISMATCH Alert",
-        "",
-    ])
-    mismatches = [(pk, pi) for pk, pi in paper_infos.items() if title_verified.get(pk) == "TITLE_MISMATCH"]
-    if mismatches:
-        for pk, pi in mismatches:
-            lines.append(f"**{pk}**: TITLE MISMATCH DETECTED!")
-            lines.append(f"- title_from_report: {pi['title_from_report']}")
-            lines.append(f"- title_from_pdf: {pi.get('title_from_pdf', '?')}")
-            lines.append(f"- public_pdf_url: {pi['public_pdf_url']}")
+    lines.extend(["---", ""])
+
+    # 6. SOURCE_MISMATCH / TITLE_MISMATCH Alert
+    lines.append("## 6. Source/Title Mismatch Alert")
+    lines.append("")
+    mismatch_papers = [(pk, ts) for pk, ts in title_status.items()
+                       if ts.get("classification") in ("SOURCE_MISMATCH", "TITLE_MISMATCH")]
+    if mismatch_papers:
+        for pk, ts in mismatch_papers:
+            lines.append(f"**{pk}**: {ts['classification']} DETECTED!")
+            lines.append(f"- title_from_report: {paper_infos[pk]['title_from_report']}")
+            lines.append(f"- title_from_pdf_metadata: {paper_infos[pk].get('title_from_pdf_metadata', '?')}")
+            lines.append(f"- title_from_pdf_body: {paper_infos[pk].get('title_from_pdf_body', '?')}")
+            lines.append(f"- detail: {ts['detail']}")
+            lines.append(f"- public_pdf_url: {paper_infos[pk]['public_pdf_url']}")
             lines.append(f"- Action required: Verify that the local source.pdf matches the intended paper.")
             lines.append("")
     else:
-        lines.append("No title mismatches detected.")
+        lines.append("No source/title mismatches detected.")
         lines.append("")
+
+    # 7. Blocking Status
+    lines.extend(["---", ""])
+    lines.append("## 7. M1 Review Status")
+    lines.append("")
+    if blocked_papers:
+        for pk in blocked_papers:
+            lines.append(f"- **{pk}**: BLOCKED — SOURCE_MISMATCH")
+        lines.append("")
+        lines.append("Action required: Replace source.pdf with correct paper or update metadata to match.")
+    else:
+        lines.append("All papers pass source/title verification. No blocks.")
+    lines.append("")
 
     return "\n".join(lines)
 
@@ -441,28 +575,26 @@ def main():
     import fitz
 
     all_records = []
-    title_verified = {}
-    paper_infos_with_pdf_title = {}
+    title_status = {}
+    paper_infos_enriched = {}
 
     for pk, pi in PAPERS.items():
         print(f"\nProcessing {pk}...")
 
-        # Get PDF title
-        pdf_title = get_pdf_title(pi["pdf_path"])
-        pi["title_from_pdf"] = pdf_title
+        # Get metadata title
+        meta_title = get_pdf_metadata_title(pi["pdf_path"])
+        pi["title_from_pdf_metadata"] = meta_title
 
-        # Check title match
-        report_title = pi["title_from_report"].lower().strip()
-        pdf_title_lower = pdf_title.lower().strip()
-        # Flexible match: first 40 chars
-        if report_title[:40] == pdf_title_lower[:40]:
-            title_verified[pk] = "YES"
-        elif any(w in pdf_title_lower for w in report_title.split()[:3]):
-            title_verified[pk] = "PARTIAL"
-        else:
-            title_verified[pk] = "TITLE_MISMATCH"
-        print(f"  PDF title: {pdf_title}")
-        print(f"  Title verified: {title_verified[pk]}")
+        # Get body title from first page
+        body_title = get_pdf_body_title(pi["pdf_path"])
+        pi["title_from_pdf_body"] = body_title
+
+        # Classify
+        classification, detail = classify_title(meta_title, body_title, pi["title_from_report"])
+        title_status[pk] = {"classification": classification, "detail": detail}
+        print(f"  metadata title: {repr(meta_title)}")
+        print(f"  body title: {repr(body_title[:80])}")
+        print(f"  classification: {classification} — {detail}")
 
         # Load formula slots
         slots_path = BASE / pk / "formula_slots.json"
@@ -488,30 +620,38 @@ def main():
             rec = build_record(pk, pi, slot, canonical_formulas, public_page_texts)
             all_records.append(rec)
 
-        paper_infos_with_pdf_title[pk] = pi
+        paper_infos_enriched[pk] = pi
 
     # Detect risks
-    risks = detect_high_risk(all_records)
-    print(f"\nHigh-risk items: {len([r for r in risks if r['priority'] == 'HIGH'])}")
-    print(f"Medium-risk items: {len([r for r in risks if r['priority'] == 'MEDIUM'])}")
-    print(f"Low-risk items: {len([r for r in risks if r['priority'] == 'LOW'])}")
+    risks = detect_risks(all_records, title_status)
+    high_count = len([r for r in risks if r["priority"] == "HIGH"])
+    med_count = len([r for r in risks if r["priority"] == "MEDIUM"])
+    low_count = len([r for r in risks if r["priority"] == "LOW"])
+    print(f"\nRisks: {high_count} HIGH, {med_count} MEDIUM, {low_count} LOW")
 
     # Generate PUBLIC_PDF_VERIFY_MAP.md
-    map_md = generate_map_md(all_records, paper_infos_with_pdf_title, title_verified)
+    map_md = generate_map_md(all_records, paper_infos_enriched, title_status)
     map_path = AUDIT_DIR / "PUBLIC_PDF_VERIFY_MAP.md"
     map_path.write_text(map_md, encoding="utf-8")
     print(f"\nWrote {map_path}")
 
     # Generate PUBLIC_PDF_VERIFY_MAP.json
     map_json_path = AUDIT_DIR / "PUBLIC_PDF_VERIFY_MAP.json"
+    map_json_data = {
+        "generated": "2026-06-09",
+        "total_formula_slots": len(all_records),
+        "title_status": {pk: ts for pk, ts in title_status.items()},
+        "risk_summary": {"high": high_count, "medium": med_count, "low": low_count},
+        "records": all_records,
+    }
     map_json_path.write_text(
-        json.dumps(all_records, indent=2, ensure_ascii=False),
+        json.dumps(map_json_data, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     print(f"Wrote {map_json_path}")
 
     # Generate PUBLIC_PDF_VERIFY_REPORT.md
-    report_md = generate_report_md(all_records, paper_infos_with_pdf_title, title_verified, risks)
+    report_md = generate_report_md(all_records, paper_infos_enriched, title_status, risks)
     report_path = AUDIT_DIR / "PUBLIC_PDF_VERIFY_REPORT.md"
     report_path.write_text(report_md, encoding="utf-8")
     print(f"Wrote {report_path}")
@@ -529,8 +669,10 @@ def main():
     print(f"trusted_section: {sum(1 for r in all_records if r['section_is_trusted'])}/{len(all_records)}")
     print(f"polluted_section: {sum(1 for r in all_records if r['section_is_formula_polluted'])}/{len(all_records)}")
     print(f"public_pdf_context_found: {sum(1 for r in all_records if r['public_pdf_text_context_found'])}/{len(all_records)}")
+    print(f"Risks: {high_count} HIGH, {med_count} MEDIUM, {low_count} LOW")
     for pk in PAPERS:
-        print(f"  {pk}: title_verified={title_verified.get(pk, '?')}")
+        ts = title_status.get(pk, {})
+        print(f"  {pk}: {ts.get('classification', '?')} — {ts.get('detail', '')[:60]}")
 
 
 if __name__ == "__main__":

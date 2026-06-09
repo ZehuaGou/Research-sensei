@@ -1,24 +1,28 @@
 # PUBLIC_PDF_VERIFY_MAP
 
 **Generated**: 2026-06-09
-**Total FormulaSlots**: 37
+**Total FormulaSlots**: 43
 
 ## Paper Sources
 
 ### paper_1
-- paper_id: 2112.14436
+- paper_id: 2110.02642
 - title_from_report: Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
-- title_from_pdf: Monte Carlo EM for Deep Time Series Anomaly Detection
-- title_verified: **PARTIAL**
-- arxiv_id: 2112.14436
-- public_pdf_url: https://arxiv.org/pdf/2112.14436
+- title_from_pdf_metadata: 
+- title_from_pdf_body: ANOMALY TRANSFORMER: TIME SERIES ANOMALY
+- title_verified: **YES_WITH_BAD_METADATA**
+- title_detail: body text matches but metadata is ''
+- arxiv_id: 2110.02642
+- public_pdf_url: https://arxiv.org/pdf/2110.02642
 - source_pdf_path: reports\m1_parser_review\paper_1\source.pdf
 
 ### paper_2
 - paper_id: W3184127157
 - title_from_report: Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT
-- title_from_pdf: 1
-- title_verified: **TITLE_MISMATCH**
+- title_from_pdf_metadata: 
+- title_from_pdf_body: Learning Graph Structures with Transformer for
+- title_verified: **YES_WITH_BAD_METADATA**
+- title_detail: body text matches but metadata is ''
 - arxiv_id: 2104.03466
 - public_pdf_url: https://arxiv.org/pdf/2104.03466
 - source_pdf_path: reports\m1_parser_review\paper_2\source.pdf
@@ -26,8 +30,10 @@
 ### paper_3
 - paper_id: 2510.18998
 - title_from_report: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection
-- title_from_pdf: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version
+- title_from_pdf_metadata: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version
+- title_from_pdf_body: An Encode-then-Decompose Approach to
 - title_verified: **YES**
+- title_detail: metadata matches
 - arxiv_id: 2510.18998
 - public_pdf_url: https://arxiv.org/pdf/2510.18998
 - source_pdf_path: reports\m1_parser_review\paper_3\source.pdf
@@ -36,9 +42,15 @@
 
 | paper | formula_id | page | section | crop | overlay | marker_latex | final_latex | canonical_match | origin | public_ctx |
 |-------|-----------|-----:|---------|------|---------|-------------|------------|-----------------|--------|-----------|
-| paper_1 | formula_001 | 1 | Introduction | YES | YES | `p(\mathbf{x}/z) = \begin{cases} p^+(\mat` | `p(\mathbf{x}/z) = \begin{cases} p^+(\mat` | YES | parser_latex | YES |
-| paper_1 | formula_002 | 2 | Method | YES | YES | `p(\mathbf{x}_t/z_t=0) = p_{\theta}^+(\ma` | `p(\mathbf{x}_t/z_t=0) = p_{\theta}^+(\ma` | YES | parser_latex | YES |
-| paper_1 | formula_003 | 2 | Method | YES | YES | `p(\mathbf{x}_t/z_t=1) = p^-(\mathbf{x}_t` | `p(\mathbf{x}_t/z_t=1) = p^-(\mathbf{x}_t` | YES | parser_latex | YES |
+| paper_1 | formula_001 | 3 | Unknown | YES | YES | `\begin{split} \mathcal{Z}^{l} &= \text{L` | `\begin{split} \mathcal{Z}^{l} &= \text{L` | YES | parser_latex | YES |
+| paper_1 | formula_002 | 3 | Unknown | YES | YES | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | `\mathcal{Q}, \mathcal{K}, \mathcal{V}, \` | YES | parser_latex | YES |
+| paper_1 | formula_003 | 4 | Unknown | YES | YES | `\operatorname{AssDis}(\mathcal{P}, \math` | `\operatorname{AssDis}(\mathcal{P}, \math` | YES | parser_latex | YES |
+| paper_1 | formula_004 | 4 | Unknown | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_005 | 4 | Unknown | YES | YES | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | `\mathcal{L}_{Total}(\widehat{\mathcal{X}` | YES | parser_latex | YES |
+| paper_1 | formula_006 | 5 | Unknown | YES | NO | `AnomalyScore(\mathcal{X}) = Softmax\Big(` | `AnomalyScore(\mathcal{X}) = Softmax\Big(` | YES | parser_latex | YES |
+| paper_1 | formula_007 | 14 | Unknown | YES | NO | `\begin{aligned} &1: \ \mathcal{P}' = \te` | `\begin{aligned} &1: \ \mathcal{P}' = \te` | YES | parser_latex | YES |
+| paper_1 | formula_008 | 15 | Unknown | YES | NO | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | `\mathcal{C}_{AD} = \text{Softmax}(-\text` | YES | parser_latex | YES |
+| paper_1 | formula_009 | 15 | Unknown | YES | NO | `\mathcal{X}` | `\mathcal{X}` | YES | parser_latex | YES |
 | paper_2 | formula_001 | 3 | Related Work | YES | YES | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | `z^{i,j} = \underset{c \in \{0,1\}}{\arg ` | YES | parser_latex | YES |
 | paper_2 | formula_002 | 3 | Related Work | YES | YES | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | `z_c^{i,j} = \frac{\exp((\log \pi_c^{i,j}` | YES | parser_latex | YES |
 | paper_2 | formula_003 | 3 | Related Work | YES | YES | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | `\mathbf{x}_{i}' = \sum_{j \in \mathcal{N` | YES | parser_latex | YES |
@@ -55,21 +67,47 @@
 | paper_2 | formula_014 | 6 | Method | YES | YES | `Precision = \frac{TP}{TP + FP}` | `Precision = \frac{TP}{TP + FP}` | YES | parser_latex | YES |
 | paper_2 | formula_015 | 6 | Method | YES | YES | `Recall = \frac{TP}{TP + FN}` | `Recall = \frac{TP}{TP + FN}` | YES | parser_latex | YES |
 | paper_2 | formula_016 | 6 | Method | YES | YES | `F1 = 2 \times \frac{\text{Precision} \ti` | `F1 = 2 \times \frac{\text{Precision} \ti` | YES | parser_latex | YES |
-| paper_3 | formula_001 | 2 | Introduction | YES | YES | `I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \` | `I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \` | YES | parser_latex | YES |
-| paper_3 | formula_002 | 2 | Introduction | YES | YES | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | YES | parser_latex | YES |
-| paper_3 | formula_003 | 2 | Introduction | YES | YES | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | YES | parser_latex | YES |
-| paper_3 | formula_004 | 3 | Method | YES | YES | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | YES | parser_latex | YES |
-| paper_3 | formula_005 | 3 | Method | YES | YES | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | YES | parser_latex | YES |
-| paper_3 | formula_006 | 3 | Method | YES | YES | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | YES | parser_latex | YES |
-| paper_3 | formula_007 | 3 | Method | YES | YES | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | YES | parser_latex | YES |
-| paper_3 | formula_008 | 3 | Method | YES | YES | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | YES | parser_latex | YES |
-| paper_3 | formula_009 | 3 | Method | YES | YES | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | YES | parser_latex | YES |
-| paper_3 | formula_010 | 4 | Method | YES | YES | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | YES | parser_latex | YES |
-| paper_3 | formula_011 | 4 | Method | YES | YES | `\mathcal{L}_{aux} = \/\text{shuffle}(\ma` | `\mathcal{L}_{aux} = \/\text{shuffle}(\ma` | YES | parser_latex | YES |
-| paper_3 | formula_012 | 5 | Method | YES | YES | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | YES | parser_latex | NO |
-| paper_3 | formula_013 | 5 | Method | YES | YES | `\mathcal{L}_{\text{sta}} = \/\mathbf{Y} ` | `\mathcal{L}_{\text{sta}} = \/\mathbf{Y} ` | YES | parser_latex | YES |
-| paper_3 | formula_014 | 5 | Method | YES | YES | `I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb` | `I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb` | YES | parser_latex | YES |
-| paper_3 | formula_015 | 5 | Method | YES | YES | `f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text` | `f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text` | YES | parser_latex | YES |
-| paper_3 | formula_016 | 5 | Method | YES | YES | `\mathcal{L}_{\text{reg}} = \/\mathbf{Y}'` | `\mathcal{L}_{\text{reg}} = \/\mathbf{Y}'` | YES | parser_latex | YES |
-| paper_3 | formula_017 | 5 | Method | YES | YES | `\mathcal{L} = \lambda_1 \cdot \mathcal{L` | `\mathcal{L} = \lambda_1 \cdot \mathcal{L` | YES | parser_latex | YES |
-| paper_3 | formula_018 | 6 | Method | YES | YES | `\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}` | `\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}` | YES | parser_latex | YES |
+| paper_3 | formula_001 | 2 | Training Data Clean Time Series
+Contaminated Time Series | YES | YES | `I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \` | `I(X,Y) = \sum_{x \in X} \sum_{y \in Y} \` | YES | parser_latex | YES |
+| paper_3 | formula_002 | 2 | Training Data Clean Time Series
+Contaminated Time Series | YES | YES | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | `I_{\text{UBA}}(X,Y) \triangleq \mathbb{E` | YES | parser_latex | YES |
+| paper_3 | formula_003 | 2 | Training Data Clean Time Series
+Contaminated Time Series | YES | YES | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | `q(x/y) = \frac{p(x)}{Z(y)}e^{f(x,y)}` | YES | parser_latex | YES |
+| paper_3 | formula_004 | 3 | Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | YES | YES | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | `\mathbf{H}_{t:t+B} = \frac{\mathbf{s}_{t` | YES | parser_latex | YES |
+| paper_3 | formula_005 | 3 | A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
+time-ordered observatio | YES | YES | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | `\mathbf{H}_{\text{emb}} = \mathbf{W}_{\t` | YES | parser_latex | YES |
+| paper_3 | formula_006 | 3 | A time series T = ⟨s1, s2, . . . , sN⟩is a sequence of N
+time-ordered observatio | YES | YES | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | `\mathbf{Q} = \mathbf{W}_{\mathbf{Q}} \cd` | YES | parser_latex | YES |
+| paper_3 | formula_007 | 3 | Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | YES | YES | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | `\mathbf{Y}_1 = \mathbf{W}_{\text{mult}} ` | YES | parser_latex | YES |
+| paper_3 | formula_008 | 3 | Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | YES | YES | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | `\mathbf{Y}_{2} = \mathbf{Y}_{1} + \frac{` | YES | parser_latex | YES |
+| paper_3 | formula_009 | 3 | Given a time series T
+= ⟨s1, s2, . . . , sN⟩, we aim at
+computing an anomaly sco | YES | YES | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | `\mathbf{Y}_3 = \mathbf{W}_2 \cdot \text{` | YES | parser_latex | YES |
+| paper_3 | formula_010 | 4 | Y1 = Wmult · [Y1
+1, . . . , YM
+1 ]⊤
+(7) | YES | YES | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | YES | parser_latex | YES |
+| paper_3 | formula_011 | 4 | Var[Y1] + ϵ
+· γ2 + β2
+(8) | YES | YES | `\mathcal{L}_{aux} = \/\text{shuffle}(\ma` | `\mathcal{L}_{aux} = \/\text{shuffle}(\ma` | YES | parser_latex | YES |
+| paper_3 | formula_012 | 5 | Add & Norm | YES | YES | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | `\begin{aligned} \mathbf{Y}_{\text{sta}}^` | YES | parser_latex | NO |
+| paper_3 | formula_013 | 5 | (b) EDAD Achitecture
+(a) Attention Module | YES | YES | `\mathcal{L}_{\text{sta}} = \/\mathbf{Y} ` | `\mathcal{L}_{\text{sta}} = \/\mathbf{Y} ` | YES | parser_latex | YES |
+| paper_3 | formula_014 | 5 | (b) EDAD Achitecture
+(a) Attention Module | YES | YES | `I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb` | `I_{\text{InfoNCE}} = \mathbb{E}_{\mathbb` | YES | parser_latex | YES |
+| paper_3 | formula_015 | 5 | 2
+and Yaux ∈RB× d | YES | YES | `f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text` | `f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\text` | YES | parser_latex | YES |
+| paper_3 | formula_016 | 5 | 2
+and Yaux ∈RB× d | YES | YES | `\mathcal{L}_{\text{reg}} = \/\mathbf{Y}'` | `\mathcal{L}_{\text{reg}} = \/\mathbf{Y}'` | YES | parser_latex | YES |
+| paper_3 | formula_017 | 5 | Laux = ∥shuffle(Y) −ˆYaux∥2
+F
+(11) | YES | YES | `\mathcal{L} = \lambda_1 \cdot \mathcal{L` | `\mathcal{L} = \lambda_1 \cdot \mathcal{L` | YES | parser_latex | YES |
+| paper_3 | formula_018 | 6 | Lsta = ∥Y −ˆYsta∥2
+F −Iθ(Y, Ysta)
+(13) | YES | YES | `\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}` | `\mathcal{AS}(\mathbf{s}_i) = -I_{\theta}` | YES | parser_latex | YES |
