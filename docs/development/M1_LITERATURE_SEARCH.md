@@ -104,7 +104,7 @@ Output:
 - Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
 - Search/acquisition must use mature projects or official clients through adapters.
 - Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed.
-- M1 primary parser is MinerU2.5-Pro through `mineru-vl-utils` when available. The old `magic_pdf`/MinerU CLI (`magic_pdf.tools.common.do_parse`) is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`.
+- M1 primary parser is MinerU2.5-Pro through `mineru-vl-utils`.
 - Marker (`MarkerDocumentFormulaDetector`) is fallback/audit baseline, not primary parser. After paper_4_unseen blind eval failure, Marker section inference cannot be the final mainline.
 - LlamaSectionRefiner may refine document structure (section, reading_order, context) but CANNOT alter formula_latex, bbox, page, or source identity. If Llama modifies these fields, the result must be BLOCKED.
 - M1 quality gate must block: section_contradiction, all_formulas_in_Abstract_suspicious (5+ formulas all in Abstract for method paper), abstract_formula_overload.
@@ -118,7 +118,7 @@ Output:
 
 MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The required adapter is `MinerU25ProAdapter` and it calls the `mineru-vl-utils` client for `opendatalab/MinerU2.5-Pro-2604-1.2B` output normalization.
 
-magic_pdf/do_parse is not an equivalent implementation. The old `MinerUPdfAdapter` / `magic_pdf.tools.common.do_parse` path is legacy dependency evidence only and must not be reported as MinerU2.5-Pro success.
+The legacy MinerUPdfAdapter (magic_pdf) has been removed from the codebase.
 
 Marker is fallback/audit baseline. It may supply fallback formula bbox/LaTeX and comparison artifacts, but it is no longer the default parser after the paper_4_unseen all-formulas-in-Abstract failure.
 
@@ -128,7 +128,7 @@ M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M
 
 ### 2026-06-10 acceptance result
 
-`reports/m1_v2_mineru_primary_acceptance/` and `reports/m1_v2_mineru_primary_acceptance_bundle.zip` contain the formal M1 primary-route acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. The older `reports/m1_v2_acceptance/` bundle is fallback/debug evidence for paper_1 through paper_5, not primary acceptance. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
+`reports/m1_canonical_acceptance/` contains the formal M1 primary-route acceptance artifacts (DDMT, TPIDM). The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
 
 Five-paper acceptance summary:
 - paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
@@ -500,9 +500,7 @@ PDF
 
 ### Fallback architecture (audit baseline)
 
-The Marker three-pipeline architecture is retained as fallback when MinerU2.5-Pro is unavailable.
-
-**IMPORTANT**: The current code uses `magic_pdf.tools.common.do_parse` via `MinerUPdfAdapter`. This is the OLD MinerU CLI (magic-pdf package). It is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The canonical adapter must use the new MinerU2.5-Pro model via `mineru-vl-utils`.
+The Marker three-pipeline architecture is retained as fallback when MinerU2.5-Pro is unavailable. The legacy MinerUPdfAdapter (magic_pdf) has been removed.
 
 ```
 PDF (fallback, IMPLEMENTED but demoted)
@@ -619,8 +617,6 @@ class DocumentBlock(SenseiModel):
 - Input: PDF path or page image
 - Output: normalized document JSON with blocks
 - Must preserve: page, bbox, block_type, text, latex, reading_order, confidence, source=mineru25pro
-- **NOT** the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
-- The old MinerUPdfAdapter uses `magic_pdf` CLI; the new adapter uses `mineru-vl-utils` + the MinerU2.5-Pro model
 
 ### LlamaSectionRefiner contract
 

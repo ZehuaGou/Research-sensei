@@ -31,7 +31,7 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | canonical_paper.md pipeline | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | MinerU2.5-Pro primary route verified with two unseen papers; Marker fallback retained for audit |
 | M1 | MarkItDownAdapter (fallback) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，fallback/debug only，不是主线 |
 | M1 | MarkerPdfAdapter (fallback) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，fallback/audit baseline |
-| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + real two-paper acceptance | REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser; two new unseen papers passed full primary-route acceptance in `reports/m1_v2_mineru_primary_acceptance/` |
+| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + real two-paper acceptance | REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser; two unseen papers (DDMT, TPIDM) passed in `reports/m1_canonical_acceptance/` |
 | M1 | OllamaSectionRefiner | implemented | unit tested + local compare | OPTIONAL_REFINER_NOT_DEFAULT | Ollama is an optional structured refiner, default OFF; must not modify latex/bbox/page/source |
 | M1 | RuleBasedStructureRefiner | implemented | unit tested | IMPLEMENTED | Always runs; assigns sections, normalizes headings, detects risks |
 | M1 | M1 Quality Gate | implemented | unit tested + acceptance enforced | IMPLEMENTED, REAL_E2E_VERIFIED | Blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas |
@@ -71,29 +71,32 @@ Focused query: "时间序列异常检测 transformer 方法"
 - Classification paper "Improving position encoding of transformers for multivariate time series classification" was excluded from A_READ by LLM relevance judge
 - LLM: mimo-v2.5-pro, 3265 tokens (3 calls: query planning + relevance judge)
 
-## M1 Canonical Acceptance Report (2026-06-10)
+## M1 Canonical Acceptance (2026-06-10)
 
-Primary report path: `reports/m1_v2_mineru_primary_acceptance/`
-Fallback/debug report path: `reports/m1_v2_acceptance/`
+Report path: `reports/m1_canonical_acceptance/`
 
-Default route: MinerU2.5-Pro via mineru-vl-utils → DocumentBlock → RuleBasedStructureRefiner → optional Ollama → CanonicalBuilder → M1QualityGate → visual audit. Marker, PyMuPDF, and MarkItDown are fallback/audit/debug only. Ollama is optional, default OFF.
+Pipeline: MinerU2.5-Pro via mineru-vl-utils → CanonicalDocumentBlock → RuleBasedStructureRefiner → optional OllamaSectionRefiner → CanonicalBuilder → M1QualityGate → visual audit.
 
-Acceptance set:
-- paper_1 Monte Carlo EM: marker fallback, DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
-- paper_2 GTA: MarkItDown/PyMuPDF fallback/debug, DEGRADED, m2_ready=false, formula_m2_ready=false, formulas=26, latex=0, raw_formula_text=26, high_risk=3.
-- paper_3 EDAD: MarkItDown/PyMuPDF fallback/debug, PASS, m2_ready=true, formula_m2_ready=true, formulas=9, latex=9, raw_formula_text=0, high_risk=0.
-- paper_4_unseen MEMTO: MinerU2.5-Pro cached output, PASS, m2_ready=true, formulas=11, latex=11, raw_formula_text=0, high_risk=0; formulas distribute Method=8 / Experiments=3 / Abstract=0 in the spike report.
-- paper_5_unseen TranAD: live_eval auto-downloaded unseen PDF, PyMuPDF fallback/debug, DEGRADED, m2_ready=false, formula_m2_ready=false, formulas=129, latex=0, raw_formula_text=129, high_risk=3.
+### Acceptance Samples
 
-Dense formula sets with `formula_count >= 5` and `latex_count == 0` are raw-text-only evidence: they stay `raw_formula_text`, set `m2_ready_for_formula_understanding=false`, and cannot be reported as formula-understanding-ready.
+| Paper | arXiv | Status | Formulas | Body | Ref | LaTeX | Crops | Overlays | High Risk | M2 Ready |
+|-------|-------|--------|----------|------|-----|-------|-------|----------|-----------|----------|
+| DDMT | 2310.08800 | PASS | 7 | 7 | 0 | 7 | 7 | 7 | 0 | true |
+| TPIDM | 2508.11528 | PASS | 17 | 12 | 5 | 17 | 17 | 17 | 0 | true |
 
-Primary MinerU acceptance set:
-- 2310_08800v2 DDMT: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=7, body_formulas=7, latex=7, bbox=7, crops=7, overlays=7, canonical_match=7, high_risk=0, m2_ready=true, formula_m2_ready=true.
-- 2508_11528v1 TPIDM: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=17, body_formulas=12, reference_formulas=5, latex=17, bbox=17, crops=17, overlays=17, canonical_match=17, high_risk=0, m2_ready=true, formula_m2_ready=true.
+Both papers: primary_parser=mineru25pro, fallback=false, title_ok=true, all criteria PASS.
 
-Ollama evaluation: cached paper_4_unseen eval JSON valid=0 / invalid=17. Current local compare on the two primary acceptance papers with qwen2.5:0.5b: available=true, JSON valid=0, invalid=2, retry=0, timeout=2, changed_by_count=0, forbidden_mutation_count=0. Decision: do not enable Ollama by default.
+### Ollama Status
 
-Formula dense pages in this report are computed by PyMuPDF page-level text scans and saved as `formula_dense_pages.md` plus `formula_page_*.png`.
+- OllamaSectionRefiner: optional, default OFF.
+- qwen2.5:0.5b: not recommended (timeout/unstable on real FormulaSlot prompts).
+- qwen2.5:7b-instruct: passed native `/api/chat` + JSON Schema real_slot smoke (JSON valid=YES, 3-11s latency).
+- Ollama may only modify section/context/risk fields; must not modify latex/bbox/page/source.
+- Default remains OFF unless user configures a 7B+ model.
+
+### Historical Notes
+
+Old Marker/MarkItDown/PyMuPDF fallback experiments have been cleaned. Only the primary MinerU2.5-Pro acceptance above is the formal M1 acceptance evidence.
 
 ## Current verified PDF-only A_READ Gate
 

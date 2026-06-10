@@ -21,7 +21,7 @@ from researchsensei.canonical.pipeline import M1CanonicalPipeline
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "reports" / "m1_v2_mineru_primary_acceptance"
+OUT = ROOT / "reports" / "m1_canonical_acceptance"
 KNOWN_PAPER_RE = re.compile(
     r"monte carlo em|learning graph structures with transformer|anomaly transformer|memto|tranad",
     re.I,
@@ -413,7 +413,7 @@ def write_top_level(candidates: list[Candidate], rows: list[dict[str, Any]], *, 
 
 
 def make_bundle() -> Path:
-    bundle = OUT.with_name("m1_v2_mineru_primary_acceptance_bundle.zip")
+    bundle = OUT.with_name("m1_canonical_acceptance_bundle.zip")
     if bundle.exists():
         bundle.unlink()
     with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as zf:

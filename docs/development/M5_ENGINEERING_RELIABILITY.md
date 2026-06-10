@@ -47,7 +47,7 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 ### M1 Material Normalization / canonical_paper.md
 
 - MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser.
-- magic_pdf/do_parse is not an equivalent implementation.
+- MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser.
 - Marker is fallback/audit baseline.
 - Ollama is an optional structured refiner.
 - Ollama must not modify latex, bbox, page, or source identity.
@@ -57,7 +57,7 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 - front matter contains paper_id/title/source_type/source_confidence/canonicalization_status/parser_used/m2_ready/degradation_reason
 - body contains abstract or enough body text
 - formula blocks include formula_id and formula_origin when formulas are present
-- Status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED for M1 primary route; two new unseen MinerU2.5-Pro papers passed in `reports/m1_v2_mineru_primary_acceptance/`
+- Status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED for M1 primary route; two unseen MinerU2.5-Pro papers passed in `reports/m1_canonical_acceptance/`
 
 ### M1 Formula Detection / OCR
 

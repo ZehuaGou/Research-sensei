@@ -1,5 +1,0 @@
-marker_status=skipped_by_policy
-marker_enabled=false
-trigger_mode=never
-timeout_seconds=90.0
-ordinary live eval does not run Marker; review bundle keeps Marker disabled for this paper.

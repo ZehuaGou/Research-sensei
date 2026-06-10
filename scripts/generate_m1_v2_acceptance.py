@@ -20,7 +20,7 @@ from researchsensei.schemas.enums import CanonicalQualityStatus
 
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "reports" / "m1_v2_acceptance"
+OUT = ROOT / "reports" / "m1_acceptance"
 REVIEW = ROOT / "reports" / "m1_parser_review"
 THREE_PIPELINE = ROOT / "reports" / "m1_three_pipeline_architecture"
 PAPER4 = ROOT / "reports" / "m1_unseen_eval" / "paper_4_unseen"
@@ -934,7 +934,7 @@ def write_top_level(rows: list[dict]) -> None:
 
 def make_bundle() -> Path:
     strip_report_text_trailing_whitespace(OUT)
-    bundle = OUT.with_name("m1_v2_acceptance_bundle.zip")
+    bundle = OUT.with_name("m1_acceptance_bundle.zip")
     if bundle.exists():
         bundle.unlink()
     with zipfile.ZipFile(bundle, "w", compression=zipfile.ZIP_DEFLATED) as zf:

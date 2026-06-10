@@ -93,7 +93,7 @@ Fallback (Marker three-pipeline, retained as audit baseline):
 2. **Formula pipeline** — MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
 3. **FormulaMerger** — sections + FormulaSlot → `canonical_paper.md`
 
-**IMPORTANT**: MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The current code's legacy `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). magic_pdf/do_parse is not an equivalent implementation. The canonical adapter must use the new MinerU2.5-Pro model.
+MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser.
 
 Input:
 - verified candidate metadata
@@ -162,9 +162,9 @@ MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`
 - input: PDF path or page image
 - output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
-- NOT the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
+- Primary parser: MinerU2.5-Pro via mineru-vl-utils
 - failure: model unavailable, GPU OOM, parse error
-- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; two new unseen primary-route papers passed in `reports/m1_v2_mineru_primary_acceptance/`
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; two new unseen primary-route papers passed in `reports/m1_canonical_acceptance/`
 
 DocumentBlock (IMPLEMENTED / UNIT_TESTED):
 - fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
@@ -192,7 +192,7 @@ M1 Quality Gate:
 - checks: source/title, formula bbox/crop/overlay, latex/canonical match, section_contradiction, all_formulas_same_section_suspicious, abstract_formula_overload, fallback_used, llama_refined
 - hard rule: 5+ formulas all in Abstract for method paper → HIGH risk / BLOCKED
 - hard rule: Llama modifies formula_latex/page/bbox → BLOCKED (越权)
-- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; enforced in `reports/m1_v2_mineru_primary_acceptance/`
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; enforced in `reports/m1_canonical_acceptance/`
 
 FormulaCropper:
 - input: PDF path, FormulaSlot with bbox

@@ -67,7 +67,7 @@ M2.1 must read `canonical_paper.md`. It no longer chooses raw-source parsers as 
 3. **CanonicalBlockBuilder** — converts sections, paragraphs, tables, figures, and formulas into `DocumentBlock`.
 4. **FormulaBlockReader** — preserves `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, context, OCR status, and explanation status.
 
-MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. magic_pdf/do_parse is not an equivalent implementation. Marker is fallback/audit baseline. M1 primary-route acceptance evidence is in `reports/m1_v2_mineru_primary_acceptance/`.
+MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. Marker is fallback/audit baseline. M1 primary-route acceptance evidence is in `reports/m1_canonical_acceptance/`.
 
 MinerU25ProAdapter, MarkerDocumentFormulaDetector (fallback), FormulaCropper, OllamaSectionRefiner, StructureRefiner, and FormulaOCRAdapter (fallback for unresolved crops) are M1 material normalization components. M2.1 validates their canonical output.
 
