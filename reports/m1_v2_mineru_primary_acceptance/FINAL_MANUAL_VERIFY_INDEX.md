@@ -1,6 +1,6 @@
 # M1 v2 Final Manual Verify Index
 
-Generated: 2026-06-10 15:40
+Generated: 2026-06-10 16:45
 
 ## Acceptance Criteria
 
@@ -15,7 +15,7 @@ Generated: 2026-06-10 15:40
 | section_contradiction = 0 | **PASS** | **PASS** |
 | all_formulas_in_Abstract_suspicious = 0 | **PASS** | **PASS** |
 | visual audit pages generated | **PASS** | **PASS** |
-| external-readable artifact check | PASS | PASS |
+| external-readable artifact check | **PASS** | **PASS** |
 
 ## Per-Paper Details
 
@@ -33,9 +33,8 @@ Generated: 2026-06-10 15:40
 | Reference Formula Count (Excluded) | 0 |
 | formula_m2_ready_count | 7 |
 | LaTeX Count | 7 |
-| Crop Count | 7 |
-| Overlay Count | 7 |
-| Risk Items | 0 |
+| Broken Image Links | 0 |
+| External Readable | YES |
 
 ### 2508_11528v1
 
@@ -51,21 +50,14 @@ Generated: 2026-06-10 15:40
 | Reference Formula Count (Excluded) | 5 |
 | formula_m2_ready_count | 12 |
 | LaTeX Count | 17 |
-| Crop Count | 17 |
-| Overlay Count | 17 |
-| Risk Items | 5 |
+| Broken Image Links | 0 |
+| External Readable | YES |
 
 ## Manual Visual Review Status
 
 **manual_visual_review_status = PENDING**
 
 Human must review contact sheets before final acceptance.
-
-## Risk Flag Clarification
-
-- DDMT: 0 risk flags (all quality checks pass)
-- TPIDM: 5 risk flags are all REFERENCE_FORMULA_EXCLUDED (design exclusion, not quality issue)
-- quality_risk_items = 0 for both papers
 
 ## References Formula Exclusion
 

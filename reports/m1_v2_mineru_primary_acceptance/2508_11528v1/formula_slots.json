@@ -22,7 +22,9 @@
     "final_latex": "\\mathbf {E L B O} = \\mathbb {E} [ \\log p (x | z) ] - D _ {K L} (q (z | x) | | p (z | x))",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_002",
@@ -47,7 +49,9 @@
     "final_latex": "q (x _ {t} | x _ {t - 1}) = \\mathcal {N} (x _ {t}; \\sqrt {\\alpha_ {t}} x _ {0}, (1 - \\alpha_ {t}) I)",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_003",
@@ -72,7 +76,9 @@
     "final_latex": "q (x _ {t} | x _ {0}) = \\mathcal {N} (x _ {t}; \\sqrt {\\overline {{\\alpha_ {t}}}} x _ {0}, (1 - \\overline {{\\alpha_ {t}}}) I)",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_004",
@@ -97,7 +103,9 @@
     "final_latex": "p _ {\\theta} (x _ {t - 1} | x _ {t}) = \\mathcal {N} (x _ {t - 1}; \\mu_ {\\theta} (x _ {t}, t), \\Sigma_ {\\theta} (x _ {t}, t))",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_005",
@@ -122,7 +130,9 @@
     "final_latex": "\\mathcal {L} _ {\\mathcal {D M}} = \\underbrace {D _ {K L} (q (x _ {T} | x _ {0}) | | p (x _ {T}))} _ {L _ {T}} \\underbrace {+ \\sum_ {t = 2} ^ {T} D _ {K L} (q (x _ {t - 1} | x _ {t} , x _ {0}) | | p _ {\\theta} (x _ {t - 1} | x _ {t}))} _ {L _ {t - 1}} - \\underbrace {\\log p _ {\\theta} (x _ {0} | x _ {1})} _ {L _ {0}}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_006",
@@ -147,7 +157,9 @@
     "final_latex": "L _ {t - 1} = \\mathbb {E} _ {q} \\left[ \\frac {1}{2 \\sigma^ {2}} | | \\tilde {\\mu} (x _ {t}, x _ {0}) - \\mu_ {\\theta} (x _ {t}, t) | | ^ {2} \\right] + C",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_007",
@@ -172,7 +184,9 @@
     "final_latex": "\\mathcal {L} _ {\\mathcal {D M}} = \\mathbb {E} _ {t, x _ {0}, \\epsilon} \\left[ | | \\epsilon - \\epsilon_ {\\theta} (\\sqrt {\\overline {{{\\alpha}}} _ {t}} x _ {0} + \\sqrt {1 - \\overline {{{\\alpha}}} _ {t}} \\epsilon , t) | | ^ {2} \\right]",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_008",
@@ -197,7 +211,9 @@
     "final_latex": "\\mathcal {L} = \\mathcal {L} _ {\\mathcal {F}} + \\mathcal {L} _ {\\mathcal {P I}}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_009",
@@ -222,7 +238,9 @@
     "final_latex": "\\mathcal {L} _ {\\mathcal {P I}} = \\frac {1}{N} \\sum_ {i = 1} ^ {N} \\mathcal {E} (\\mathcal {D}, F (x _ {i}; \\theta)) ^ {2}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_010",
@@ -247,7 +265,9 @@
     "final_latex": "\\mathcal {L} _ {\\mathcal {P I}} = \\overline {{\\lambda_ {P I _ {t}}}} \\frac {1}{N} \\sum_ {i = 1} ^ {N} \\mathcal {E} (\\mathcal {D}, \\widehat {x _ {i _ {0}}}) ^ {2}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_011",
@@ -272,7 +292,9 @@
     "final_latex": "\\mathcal {L} _ {T P I D, M} = \\mathcal {L} _ {D M} + \\mathcal {L} _ {P I}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_012",
@@ -297,7 +319,9 @@
     "final_latex": "\\mathcal {A} _ {t h r} = \\mu_ {t r i m} + k \\cdot \\mathrm{iqr}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_013",
@@ -324,7 +348,9 @@
     "risk_flags": [
       "REFERENCE_FORMULA_EXCLUDED"
     ],
-    "formula_m2_ready": false
+    "formula_m2_ready": false,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_014",
@@ -351,7 +377,9 @@
     "risk_flags": [
       "REFERENCE_FORMULA_EXCLUDED"
     ],
-    "formula_m2_ready": false
+    "formula_m2_ready": false,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_015",
@@ -378,7 +406,9 @@
     "risk_flags": [
       "REFERENCE_FORMULA_EXCLUDED"
     ],
-    "formula_m2_ready": false
+    "formula_m2_ready": false,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_016",
@@ -405,7 +435,9 @@
     "risk_flags": [
       "REFERENCE_FORMULA_EXCLUDED"
     ],
-    "formula_m2_ready": false
+    "formula_m2_ready": false,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_017",
@@ -432,6 +464,8 @@
     "risk_flags": [
       "REFERENCE_FORMULA_EXCLUDED"
     ],
-    "formula_m2_ready": false
+    "formula_m2_ready": false,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   }
 ]

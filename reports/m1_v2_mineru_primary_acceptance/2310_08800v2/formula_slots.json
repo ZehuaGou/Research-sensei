@@ -22,7 +22,9 @@
     "final_latex": "\\mathcal {T} = \\left( \\begin{array}{c c c c} \\mathbf {x} _ {(1, 1 | i)} & \\mathbf {x} _ {(2, 1 | i)} & \\dots & \\mathbf {x} _ {(T, 1 | i)} \\\\ \\mathbf {x} _ {(1, 2 | i)} & \\mathbf {x} _ {(2, 2 | i)} & \\dots & \\mathbf {x} _ {(T, 2 | i)} \\\\ \\vdots & \\vdots & \\ddots & \\vdots \\\\ \\mathbf {x} _ {(1, C | i)} & \\mathbf {x} _ {(2, C | i)} & \\dots & \\mathbf {x} _ {(T, C | i)} \\end{array} \\right)",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_002",
@@ -47,7 +49,9 @@
     "final_latex": "q (x _ {1}, \\dots , x _ {T} \\mid x _ {0}) = \\prod_ {t = 1} ^ {T} q (x _ {t} \\mid x _ {t - 1}) \\tag {1}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_003",
@@ -72,7 +76,9 @@
     "final_latex": "p _ {0} \\left(x _ {0}, \\dots , x _ {t - 1} \\mid x _ {T}\\right) = p \\left(x _ {T}\\right) \\prod_ {t = 1} ^ {T} p _ {0} \\left(x _ {t - 1} \\mid x _ {t}\\right) \\tag {2}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_004",
@@ -97,7 +103,9 @@
     "final_latex": "L = \\min _ {\\theta} \\mathbb {E} _ {x _ {0} \\sim \\mathrm{D}, \\epsilon \\sim \\mathcal {N} (0, t), t \\sim \\alpha (1, T)} \\| \\epsilon - \\epsilon_ {\\theta} \\left(\\sqrt {\\alpha_ {t}} x _ {0} + (1 - \\alpha_ {t}) \\epsilon , t\\right) \\| ^ {2} \\tag {3}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_005",
@@ -122,7 +130,9 @@
     "final_latex": "P r e c i s i o n = \\frac {T P}{T P + F P} \\tag {4}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_006",
@@ -147,7 +157,9 @@
     "final_latex": "\\text { Recall } = \\frac {T P}{T P + F N} \\tag {5}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   },
   {
     "formula_id": "formula_007",
@@ -172,6 +184,8 @@
     "final_latex": "F _ {1} = \\frac {2 * \\text { Precision } * \\text { Recall }}{\\text { Precision } + \\text { Recall }} \\tag {6}",
     "final_origin": "mineru_latex",
     "risk_flags": [],
-    "formula_m2_ready": true
+    "formula_m2_ready": true,
+    "nearby_text_before": "",
+    "nearby_text_after": ""
   }
 ]
