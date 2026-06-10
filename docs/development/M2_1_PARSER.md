@@ -27,7 +27,7 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 
 | 职责 | 归属 | 状态 |
 |---|---|---|
-| PDF / LaTeX / HTML / DeepXiv material normalization (three-pipeline) | M1 | IMPLEMENTED |
+| PDF / LaTeX / HTML / DeepXiv material normalization (fallback) | M1 | IMPLEMENTED |
 | Body pipeline: MarkItDown / PyMuPDF / Marker text | M1 | IMPLEMENTED |
 | Formula pipeline: MarkerDocumentFormulaDetector + FormulaCropper | M1 | IMPLEMENTED |
 | FormulaMerger: body sections + formula slots → canonical_paper.md | M1 | IMPLEMENTED |

@@ -88,7 +88,7 @@ Canonical pipeline (MinerU2.5-Pro primary + optional Ollama/Llama refiner + Mark
 2. **StructureRefiner** — RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional, local)
 3. **CanonicalBuilder** — `canonical_paper.md`, `formula_slots.json`, visual audit
 
-Fallback (Marker three-pipeline, retained as audit baseline):
+Fallback (Marker-based, retained as audit baseline):
 1. **Body pipeline** — MarkItDown / PyMuPDF / optional Marker body output
 2. **Formula pipeline** — MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
 3. **FormulaMerger** — sections + FormulaSlot → `canonical_paper.md`
@@ -1110,7 +1110,7 @@ This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 - `unresolved` origin → detailed derivation blocked
 - Marker timeout → body pipeline continues without formula detection
 
-**Current status**: IMPLEMENTED (MarkerDocumentFormulaDetector + FormulaCropper + three-pipeline MaterialNormalizer)
+**Current status**: IMPLEMENTED (MarkerDocumentFormulaDetector + FormulaCropper + MaterialNormalizer (deprecated fallback))
 
 ### M2 Survey Deep Reading
 

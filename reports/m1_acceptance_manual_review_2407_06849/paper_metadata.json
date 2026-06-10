@@ -1,0 +1,28 @@
+{
+  "paper_id": "2407_06849",
+  "title": "TeVAE: A Variational Autoencoder Approach for Discrete Online Anomaly Detection in Variable-state Multivariate Time-series Data",
+  "arxiv_id": "2407.06849",
+  "pdf_url": "https://arxiv.org/pdf/2407.06849v2",
+  "abstract": "As attention to recorded data grows in the realm of automotive testing and manual evaluation reaches its limits, there is a growing need for automatic online anomaly detection. This real-world data is complex in many ways and requires the modelling of testee behaviour. To address this, we propose a temporal variational autoencoder (TeVAE) that can detect anomalies with minimal false positives when trained on unlabelled data. Our approach also avoids the bypass phenomenon and introduces a new met",
+  "authors": [
+    "Lucas Correia",
+    "Jan-Christoph Goos",
+    "Philipp Klein",
+    "Thomas Bäck",
+    "Anna V. Kononova"
+  ],
+  "published": "2024-07-09",
+  "selected_reason": "Highest combined score (topic=0.68, formula_lines=162). Query: 'variational autoencoder time series anomaly'. Not previously used in M1 acceptance.",
+  "search_query_that_found_it": "variational autoencoder time series anomaly",
+  "formula_prescreen_count": 162,
+  "downloaded_pdf_sha256": "c99b28a541f5baaabcfdb5c7ae72a52f5617a204e86d0b17eed8320d8940797b",
+  "downloaded_pdf_path": "D:\\Code\\Python\\Research-sensei\\reports\\m1_unseen_paper_search\\_downloads\\2407_06849.pdf",
+  "timestamp": "2026-06-10T20:46:24.188296",
+  "pipeline_elapsed_seconds": 16606.206,
+  "quality_status": "PASS",
+  "m2_ready": true,
+  "formula_slot_count": 40,
+  "block_count": 307,
+  "primary_parser": "mineru25pro",
+  "ollama_enabled": false
+}

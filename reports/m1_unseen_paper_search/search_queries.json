@@ -1,0 +1,15 @@
+{
+  "queries": [
+    "time series anomaly detection transformer",
+    "multivariate time series anomaly detection deep learning",
+    "time series anomaly detection diffusion model",
+    "time series imputation transformer",
+    "time series imputation deep learning missing data",
+    "transformer time series long-term dependency",
+    "graph neural network time series anomaly",
+    "contrastive learning time series anomaly detection",
+    "variational autoencoder time series anomaly",
+    "self-supervised time series anomaly detection"
+  ],
+  "total_candidates": 125
+}

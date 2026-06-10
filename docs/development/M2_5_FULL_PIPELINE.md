@@ -263,8 +263,8 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - understanding_status.json / quality_report.json 已写入
 - DownstreamGates 已实现
 - 测试已覆盖：15+ tests
-- canonical_paper.md v1 pipeline: IMPLEMENTED (demoted to fallback after paper_4_unseen blind eval)
-- canonical_paper.md v2 pipeline (MinerU2.5-Pro + Llama refiner): DOC_DESIGNED / NOT_IMPLEMENTED
+- canonical_paper.md fallback pipeline: IMPLEMENTED (demoted to fallback after paper_4_unseen blind eval)
+- canonical_paper.md canonical pipeline (MinerU2.5-Pro + optional Llama refiner): DOC_DESIGNED / NOT_IMPLEMENTED
 - CanonicalPaperReader / formula_origin full chain: DOC_DESIGNED / NOT_IMPLEMENTED
 - FormulaOCRAdapter: fallback only for unresolved crops, model not integrated
 

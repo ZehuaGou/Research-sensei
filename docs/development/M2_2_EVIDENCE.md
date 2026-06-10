@@ -174,7 +174,7 @@ class ClaimEvidence(SenseiModel):
     formula_ocr_status: str = ""
     canonical_source_path: str = "canonical_paper.md"
     source_location: dict = Field(default_factory=dict)  # latex_file, latex_line_start/end, html_selector, pdf_page, pdf_bbox
-    # M1 v2 pipeline fields
+    # M1 pipeline fields
     block_source: str = ""           # mineru25pro | marker_document | ocr | latex_source
     section_confidence: str = ""     # high | medium | low
     risk_flags: list[str] = Field(default_factory=list)

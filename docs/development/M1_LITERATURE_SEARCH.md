@@ -83,7 +83,7 @@ A_READ_FOR_M2 must satisfy ALL:
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
 
-Current implemented capability: PDF-focused focused acquisition live eval + Marker three-pipeline fallback path (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilder, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
+Current implemented capability: PDF-focused focused acquisition live eval + Marker fallback path (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilder, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
 
 ### Seed Paper Expansion Mode
 
@@ -500,7 +500,7 @@ PDF
 
 ### Fallback architecture (audit baseline)
 
-The Marker three-pipeline architecture is retained as fallback when MinerU2.5-Pro is unavailable. The legacy MinerUPdfAdapter (magic_pdf) has been removed.
+The Marker-based architecture is retained as fallback when MinerU2.5-Pro is unavailable. The legacy MinerUPdfAdapter (magic_pdf) has been removed.
 
 ```
 PDF (fallback, IMPLEMENTED but demoted)
@@ -1115,7 +1115,7 @@ M1 still does not perform:
 - advisor/drill/interactive learning
 
 M1 IMPLEMENTED (fallback path):
-- Marker three-pipeline (Body + Formula + FormulaMerger) — works on 3 debug papers, failed paper_4_unseen blind eval
+- Marker-based fallback (Body + Formula + FormulaMerger) — works on 3 debug papers, failed paper_4_unseen blind eval
 - `canonical_paper.md` generation via fallback pipeline
 - FormulaCropper, visual audit, public PDF verify report
 
