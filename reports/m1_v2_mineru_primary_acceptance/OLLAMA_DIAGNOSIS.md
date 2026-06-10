@@ -1,87 +1,30 @@
 # Ollama Diagnosis Report
 
-Generated: 2026-06-10 15:21
+Generated: 2026-06-10 15:40
 
-## 1. Ollama Service Status
+## Models Tested
 
-```
-NAME                   ID              SIZE      MODIFIED      
-qwen2.5:7b-instruct    845dbda0ea48    4.7 GB    4 weeks ago      
-deepseek-coder:6.7b    ce298d984115    3.8 GB    5 weeks ago      
-qwen3.5:4b             2a654d98e6fb    3.4 GB    6 weeks ago      
-qwen2.5:3b             357c53fb659c    1.9 GB    6 weeks ago      
-qwen2.5:0.5b           a8b0c5157701    397 MB    6 weeks ago      
-deepseek-r1:32b        38056bbcbb2d    19 GB     16 months ago    
-deepseek-r1:14b        ea35dfe18182    9.0 GB    16 months ago
-```
+| Model | Prompt | Timeout | JSON Valid | Latency (s) | Response |
+|-------|--------|---------|:---:|---:|---|
+| qwen2.5:7b-instruct | simple | 120s | YES | 11.0 | {"section": "Method", "confidence": "high"} |
+| qwen2.5:7b-instruct | medium | 120s | YES | 3.0 | {"section": "Method", "confidence": "high"} |
+| qwen2.5:7b-instruct | real_slot | 120s | YES | 3.6 | {"section": "Method", "confidence": "high", "reason": "The text describes a loss |
+| qwen3.5:4b | simple | 120s | YES | 47.4 | {"section": "Method", "confidence": "high"} |
+| qwen3.5:4b | medium | 120s | YES | 49.3 | {"section": "Method", "confidence": "high"} |
+| qwen3.5:4b | real_slot | 120s | YES | 32.5 | {"section": "Method", "confidence": "high", "reason": "The text explicitly defin |
 
-- **Service**: Running
-
-## 2. Available Models (/api/tags)
-
-- **Model count**: 7
-
-  - `qwen2.5:7b-instruct` — size: 4466MB
-  - `deepseek-coder:6.7b` — size: 3650MB
-  - `qwen3.5:4b` — size: 3232MB
-  - `qwen2.5:3b` — size: 1840MB
-  - `qwen2.5:0.5b` — size: 379MB
-  - `deepseek-r1:32b` — size: 18931MB
-  - `deepseek-r1:14b` — size: 8571MB
-
-
-## 3. Ollama Version
-
-- **Version**: 0.30.6
-
-
-## 4. Native /api/chat Structured Output Test
-
-### Timeout: 30s
-
-- **Status**: OK
-- **Response**: `{
-  "section": "Anomaly Detection Loss Function",
-  "confidence": "high"
-}`
-
-- **JSON valid**: YES
-- **Parsed**: {"section": "Anomaly Detection Loss Function", "confidence": "high"}
-
-### Timeout: 120s
-
-- **Status**: OK
-- **Response**: `{
-  "section": "anomaly detection",
-  "confidence": "high"
-}`
-
-- **JSON valid**: YES
-- **Parsed**: {"section": "anomaly detection", "confidence": "high"}
-
-
-## 5. OpenAI-compatible /v1/chat/completions Test
-
-- **Status**: OK
-- **Response**: `{
-  "section": "anomaly detection",
-  "confidence": "high"
-}`
-
-
-## 6. Diagnosis
+## Diagnosis
 
 | Finding | Detail |
 |---------|--------|
-| qwen2.5:0.5b | Too small for reliable structured JSON output. Timeout on /v1 endpoint. |
-| Native /api/chat | May work with format schema but JSON quality depends on model size. |
-| Recommended | If Ollama is to be used, need qwen2.5:7b or llama3.2:8b or larger. |
-| Cold start | First call may take 30-60s for model loading; subsequent calls should be faster. |
-| Current status | **Available but not effective** — qwen2.5:0.5b too weak for section refinement. |
+| qwen2.5:7b-instruct | 4.7GB model, should handle real FormulaSlot prompts. |
+| qwen3.5:4b | 3.4GB model, may struggle with complex prompts. |
+| Native /api/chat | Works with JSON Schema format. Temperature=0 for deterministic output. |
+| Cold start | First call may take 30-60s for model loading. |
 
-## 7. Recommendation
+## Recommendation
 
-- Keep Ollama **optional and default OFF** for now.
-- If user has qwen2.5:7b+ or llama3.2:8b+, can enable for section refinement.
-- Ollama must NOT modify latex, bbox, page, or source identity.
-- Only allowed to modify: section, section_confidence, section_reason, risk_flags.
+- **qwen2.5:7b-instruct works for real FormulaSlot prompts.** JSON valid=YES for all 3 prompt sizes. Latency 3-11s warm, acceptable.
+- **Ollama can be effective with 7b+ models.** qwen2.5:7b-instruct is the recommended model.
+- Keep Ollama optional and default OFF for now. Can be enabled for section refinement.
+- Ollama must NOT modify latex, bbox, page, or source identity. Only allowed: section, section_confidence, section_reason, risk_flags.
