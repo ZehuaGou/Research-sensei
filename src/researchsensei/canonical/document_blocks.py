@@ -1,7 +1,7 @@
-"""M1 v2 canonical document block schema.
+"""M1 canonical document block schema.
 
 This schema is intentionally separate from ``schemas.document.DocumentBlock``:
-the latter is the downstream ingestion/evidence block.  M1 v2 needs parser
+the latter is the downstream ingestion/evidence block.  M1 needs parser
 provenance, page/bbox identity, source-specific latex, and section-risk fields
 before canonical markdown is safe for M2.
 """
@@ -27,7 +27,7 @@ CanonicalBlockType = Literal[
 
 
 class CanonicalDocumentBlock(SenseiModel):
-    """Normalized parser block for M1 v2."""
+    """Normalized parser block for M1 canonical pipeline."""
 
     block_id: str
     page: int = 1

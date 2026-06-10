@@ -83,17 +83,17 @@ Source priority:
 
 **M1 Material Normalization Contract**:
 
-Canonical pipeline v2 (MinerU2.5-Pro primary + optional Ollama/Llama refiner + Marker fallback):
+Canonical pipeline (MinerU2.5-Pro primary + optional Ollama/Llama refiner + Marker fallback):
 1. **MinerU2.5-Pro adapter** (PRIMARY) — `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`, outputs page/block JSON with bbox/latex/reading_order
 2. **StructureRefiner** — RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional, local)
 3. **CanonicalBuilder** — `canonical_paper.md`, `formula_slots.json`, visual audit
 
-v1 fallback (Marker three-pipeline, retained as audit baseline):
+Fallback (Marker three-pipeline, retained as audit baseline):
 1. **Body pipeline** — MarkItDown / PyMuPDF / optional Marker body output
 2. **Formula pipeline** — MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
 3. **FormulaMerger** — sections + FormulaSlot → `canonical_paper.md`
 
-**IMPORTANT**: MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The current code's legacy `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). magic_pdf/do_parse is not an equivalent implementation. The v2 adapter must use the new MinerU2.5-Pro model.
+**IMPORTANT**: MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The current code's legacy `MinerUPdfAdapter` uses `magic_pdf.tools.common.do_parse` (old MinerU CLI). magic_pdf/do_parse is not an equivalent implementation. The canonical adapter must use the new MinerU2.5-Pro model.
 
 Input:
 - verified candidate metadata
@@ -156,7 +156,7 @@ MarkerDocumentFormulaDetector:
 - output: list of FormulaSlot with page, bbox, polygon, block_type, marker_text, marker_latex
 - failure: Marker timeout, no Equation blocks found, bbox out of bounds
 - current status: IMPLEMENTED
-- new role: fallback formula detector and audit baseline (not primary parser in v2)
+- new role: fallback formula detector and audit baseline (not primary parser in canonical pipeline)
 
 MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`

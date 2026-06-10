@@ -36,7 +36,7 @@ ParserAdapter 已接入 SinglePaperIngestionRunner（pipeline）。
 | FormulaOCRAdapter (pix2tex) | M1 | FALLBACK_ONLY (interface exists, model not integrated; used for unresolved formula crops only) |
 | MinerU25ProAdapter (MinerU2.5-Pro via mineru-vl-utils) | M1 | IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED |
 | RuleBasedStructureRefiner + optional OllamaSectionRefiner | M1 | IMPLEMENTED / UNIT_TESTED; Ollama OPTIONAL_NOT_DEFAULT |
-| M1 Quality Gate v2 | M1 | IMPLEMENTED / UNIT_TESTED |
+| M1 Quality Gate | M1 | IMPLEMENTED / UNIT_TESTED |
 | `canonical_paper.md` generation | M1 | IMPLEMENTED |
 | 读取 `canonical_paper.md` | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
 | 校验 canonical front matter | M2.1 | DOC_DESIGNED / NOT_IMPLEMENTED |
@@ -203,7 +203,7 @@ Blocked input:
 - `parsed_document.json` 由 pipeline / workspace 写入。
 - `canonical_paper.md` is retained as the M1 input artifact and must be referenced by `parsed_document.json`.
 - Parser 层新增字段必须兼容旧 `parsed_document.json`。
-- v2 artifact 应显式 `schema_version="v2"`；旧 artifact 无 `schema_version` 时按 v1 读取。
+- artifact 应显式 `schema_version="v2"`；旧 artifact 无 `schema_version` 时按 v1 读取。
 - additive 字段通过默认值兼容，不需要 migration。
 
 ### canonical reader constraints
@@ -270,7 +270,7 @@ class DocumentBlock(SenseiModel):
     formula_context_after: str = ""
     formula_ocr_status: str = ""
     formula_explanation_status: str = ""
-    # M1 v2 pipeline fields (consumed from canonical_paper.md front matter / formula_slots.json)
+    # M1 pipeline fields (consumed from canonical_paper.md front matter / formula_slots.json)
     block_source: str = ""           # mineru25pro | marker_document | ocr | latex_source
     section_confidence: str = ""     # high | medium | low
     risk_flags: list[str] = Field(default_factory=list)  # SECTION_CONTRADICTION, ABSTRACT_OVERLOAD, etc.

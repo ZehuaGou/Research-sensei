@@ -1,4 +1,4 @@
-"""Optional Ollama structured section refiner for M1 v2."""
+"""Optional Ollama structured section refiner for M1 canonical pipeline."""
 from __future__ import annotations
 
 import json

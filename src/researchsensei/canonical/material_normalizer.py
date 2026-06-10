@@ -1,11 +1,10 @@
-"""M1.4 Material Normalizer — converts raw sources to canonical_paper.md.
+"""M1 Material Normalizer — DEPRECATED fallback path.
 
-Three-pipeline architecture:
-1. Body pipeline: MarkItDown (default) → PyMuPDF (text fallback) → optional Marker
-2. Formula pipeline: MarkerDocumentFormulaDetector → FormulaSlot → FormulaCropper
-3. FormulaMerger: body sections + formula slots → canonical_paper.md
+Converts raw sources to canonical_paper.md using a three-pipeline architecture.
+The formal M1 primary route is M1CanonicalPipeline (MinerU2.5-Pro via
+mineru-vl-utils). This module is retained as fallback/debug only.
 
-Source priority: latex_source > structured_html > marker_pdf > mineru_pdf > pymupdf > low_confidence_text > metadata_only.
+Source priority: latex_source > structured_html > marker_pdf > pymupdf > low_confidence_text > metadata_only.
 metadata_only cannot enter M2.
 """
 from __future__ import annotations
@@ -73,10 +72,10 @@ _STANDARD_SECTIONS = [
 class MaterialNormalizer:
     """Legacy M1 material normalizer: produces canonical_paper.md from raw sources.
 
-    This v1 three-pipeline remains the fallback/debug path. The formal M1 v2
-    primary route is M1V2CanonicalPipeline with MinerU25ProAdapter,
-    RuleBasedStructureRefiner, optional OllamaSectionRefiner, M1QualityGate,
-    CanonicalBuilderV2, and visual audit reports.
+    DEPRECATED: This is the fallback/debug path. The formal M1 primary route
+    is M1CanonicalPipeline with MinerU25ProAdapter, RuleBasedStructureRefiner,
+    optional OllamaSectionRefiner, M1QualityGate, CanonicalBuilder, and
+    visual audit reports.
 
     Three-pipeline architecture:
     1. Body pipeline: MarkItDown (default) → PyMuPDF (text fallback) → optional Marker
@@ -450,7 +449,7 @@ class MaterialNormalizer:
         Runs MarkItDown and PyMuPDF in parallel, scores quality, selects best.
         Only triggers Marker if quality is low and paper is high priority.
         """
-        from researchsensei.canonical.adapters import MarkItDownAdapter, MarkerPdfAdapter, MinerUPdfAdapter
+        from researchsensei.canonical.adapters import MarkItDownAdapter, MarkerPdfAdapter
         from researchsensei.canonical.parser_quality import select_best_parser, extract_formula_candidates
 
         warnings: list[str] = []
@@ -1498,7 +1497,7 @@ class MaterialNormalizer:
     def _build_adapter_info(self) -> list[AdapterInfo]:
         """Build adapter status report using real adapter probes."""
         from researchsensei.canonical.adapters import (
-            MarkItDownAdapter, MarkerPdfAdapter, MinerUPdfAdapter, Pix2TexFormulaOCRAdapter, DeepXivProbe,
+            MarkItDownAdapter, MarkerPdfAdapter, Pix2TexFormulaOCRAdapter, DeepXivProbe,
         )
 
         adapters = []
@@ -1623,22 +1622,12 @@ class MaterialNormalizer:
                 blocking_reason="marker-pdf not installed. GPL-3.0 license. pip install marker-pdf",
             ))
 
-        # MinerU - real probe
-        mineru_adapter = MinerUPdfAdapter()
-        if mineru_adapter.is_available():
-            mineru_used = getattr(self, '_last_parser_used', '') == 'mineru_pdf'
-            adapters.append(AdapterInfo(
-                name="mineru",
-                status=AdapterStatus.IMPLEMENTED if mineru_used else AdapterStatus.DEPENDENCY_AVAILABLE_NOT_WIRED,
-                blocking_reason="" if mineru_used else "magic-pdf installed but not yet invoked in this run",
-                attempt_details=["magic-pdf installed", f"invoked={mineru_used}"],
-            ))
-        else:
-            adapters.append(AdapterInfo(
-                name="mineru",
-                status=AdapterStatus.BLOCKED,
-                blocking_reason="magic-pdf not installed. AGPL-3.0 license. pip install magic-pdf",
-            ))
+        # MinerU legacy adapter removed; use MinerU25ProAdapter (primary) instead
+        adapters.append(AdapterInfo(
+            name="mineru",
+            status=AdapterStatus.BLOCKED,
+            blocking_reason="Legacy MinerU adapter removed. Use MinerU25ProAdapter (primary) via M1CanonicalPipeline.",
+        ))
 
         return adapters
 

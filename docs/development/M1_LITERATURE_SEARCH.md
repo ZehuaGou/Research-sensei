@@ -83,7 +83,7 @@ A_READ_FOR_M2 must satisfy ALL:
 
 `metadata_only` cannot enter `A_READ_FOR_M2`.
 
-Current implemented capability: PDF-focused focused acquisition live eval + v1 Marker three-pipeline (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 v2 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilderV2, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
+Current implemented capability: PDF-focused focused acquisition live eval + Marker three-pipeline fallback path (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilder, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
 
 ### Seed Paper Expansion Mode
 
@@ -114,7 +114,7 @@ Output:
 - `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
 - Mock/fake/skip are not valid test outcomes for M1.
 
-## M1 v2 Parser Boundary
+## M1 Parser Boundary
 
 MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The required adapter is `MinerU25ProAdapter` and it calls the `mineru-vl-utils` client for `opendatalab/MinerU2.5-Pro-2604-1.2B` output normalization.
 
@@ -128,7 +128,7 @@ M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M
 
 ### 2026-06-10 acceptance result
 
-`reports/m1_v2_mineru_primary_acceptance/` and `reports/m1_v2_mineru_primary_acceptance_bundle.zip` contain the formal M1 v2 primary-route acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. The older `reports/m1_v2_acceptance/` bundle is fallback/debug evidence for paper_1 through paper_5, not primary acceptance. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
+`reports/m1_v2_mineru_primary_acceptance/` and `reports/m1_v2_mineru_primary_acceptance_bundle.zip` contain the formal M1 primary-route acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. The older `reports/m1_v2_acceptance/` bundle is fallback/debug evidence for paper_1 through paper_5, not primary acceptance. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
 
 Five-paper acceptance summary:
 - paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
@@ -461,9 +461,9 @@ Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the respons
 
 M1 Material Normalization converts the best available source into `canonical_paper.md`. This is the M1→M2 core contract.
 
-### Architecture v2 (2026-06-09)
+### Architecture (2026-06-09)
 
-M1 PDF canonicalization v2: MinerU2.5-Pro primary + Llama structure refiner + Marker fallback.
+M1 PDF canonicalization: MinerU2.5-Pro primary + Llama structure refiner + Marker fallback.
 
 ```
 PDF
@@ -498,14 +498,14 @@ PDF
        llama_refined flag
 ```
 
-### Architecture v1 (fallback / audit baseline)
+### Fallback architecture (audit baseline)
 
-v1 is the Marker three-pipeline architecture, retained as fallback when MinerU2.5-Pro is unavailable.
+The Marker three-pipeline architecture is retained as fallback when MinerU2.5-Pro is unavailable.
 
-**IMPORTANT**: The current code uses `magic_pdf.tools.common.do_parse` via `MinerUPdfAdapter`. This is the OLD MinerU CLI (magic-pdf package). It is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The v2 adapter must use the new MinerU2.5-Pro model via `mineru-vl-utils`.
+**IMPORTANT**: The current code uses `magic_pdf.tools.common.do_parse` via `MinerUPdfAdapter`. This is the OLD MinerU CLI (magic-pdf package). It is NOT equivalent to `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B`. The canonical adapter must use the new MinerU2.5-Pro model via `mineru-vl-utils`.
 
 ```
-PDF (v1 fallback, IMPLEMENTED but demoted)
+PDF (fallback, IMPLEMENTED but demoted)
   -> Body pipeline
        MarkItDown / PyMuPDF / optional Marker body output
        parser quality scoring
@@ -523,7 +523,7 @@ PDF (v1 fallback, IMPLEMENTED but demoted)
 
 ### Parser positioning
 
-| Component | Role in v2 | Role in v1 fallback |
+| Component | Role in primary pipeline | Role in fallback |
 |---|---|---|
 | MinerU2.5-Pro | **PRIMARY** canonical parser | not available |
 | MarkerDocumentFormulaDetector | fallback formula bbox/LaTeX detector, audit baseline | primary formula detector |
@@ -742,13 +742,13 @@ OCR is not run by default on all formulas:
    - OCR fails → `final_origin = unresolved`
 3. **OCR result must never be labeled as `source_latex`** — OCR is a fallback, not a source-quality signal
 
-### FormulaRegionDetector (legacy, superseded)
+### FormulaRegionDetector (DEPRECATED)
 
 FormulaRegionDetector was the original formula detection approach. It has been superseded by:
 - **PRIMARY**: MinerU2.5-Pro block JSON (MinerU25ProAdapter) — provides formula bbox, LaTeX, and reading_order directly
 - **FALLBACK**: MarkerDocumentFormulaDetector — uses Marker `build_document()` Equation blocks
 
-Current status: SUPERSEDED. Not used in v2 pipeline.
+Current status: DEPRECATED. Not used in the canonical pipeline.
 
 ### FormulaOCRAdapter (fallback only)
 
@@ -797,7 +797,7 @@ Gate rules:
 - OCR result never becomes `source_latex`
 - OCR result cannot silently upgrade to high-confidence explanation
 
-Current status: FormulaOCRAdapter interface exists but model not integrated. In v2 pipeline, OCR is a fallback only for unresolved formula crops — not part of the primary pipeline. pix2tex model weight download is slow (97.4MB at ~5KB/s).
+Current status: FormulaOCRAdapter interface exists but model not integrated. In the canonical pipeline, OCR is a fallback only for unresolved formula crops — not part of the primary pipeline. pix2tex model weight download is slow (97.4MB at ~5KB/s).
 
 ### m2_ready gate
 
@@ -1118,17 +1118,17 @@ M1 still does not perform:
 - direction synthesis
 - advisor/drill/interactive learning
 
-M1 IMPLEMENTED (v1, demoted to fallback):
+M1 IMPLEMENTED (fallback path):
 - Marker three-pipeline (Body + Formula + FormulaMerger) — works on 3 debug papers, failed paper_4_unseen blind eval
-- `canonical_paper.md` generation via v1 pipeline
+- `canonical_paper.md` generation via fallback pipeline
 - FormulaCropper, visual audit, public PDF verify report
 
-M1 IMPLEMENTED / UNIT_TESTED (v2 canonical components):
+M1 IMPLEMENTED / UNIT_TESTED (canonical components):
 - MinerU2.5-Pro primary pipeline adapter contract (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B)
 - MinerU25ProAdapter
 - OllamaStructuredClient and OllamaSectionRefiner (optional, bounded structured refiner)
 - StructureRefiner (RuleBasedStructureRefiner + optional OllamaSectionRefiner)
-- M1 Quality Gate v2 (section_contradiction, abstract_formula_overload, source mismatch, missing latex/crop/overlay)
+- M1 Quality Gate (section_contradiction, abstract_formula_overload, source mismatch, missing latex/crop/overlay)
 - formula_origin propagation for mineru_latex / marker_latex / raw_formula_text / unresolved
 
 M1 DOC_DESIGNED / NOT_IMPLEMENTED:

@@ -1,4 +1,4 @@
-# M1 v2 Compare Report: MEMTO: Memory-guided Transformer for Multivariate Time Series Anomaly Detection
+# M1 Compare Report: MEMTO: Memory-guided Transformer for Multivariate Time Series Anomaly Detection
 
 - paper_id: paper_4_unseen
 - route: A MinerU2.5-Pro + RuleBasedStructureRefiner

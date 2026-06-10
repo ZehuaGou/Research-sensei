@@ -1,4 +1,4 @@
-"""Rule-based structure refinement for M1 v2."""
+"""Rule-based structure refinement for M1 canonical pipeline."""
 from __future__ import annotations
 
 import re

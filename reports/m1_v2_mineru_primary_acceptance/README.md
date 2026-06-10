@@ -1,4 +1,4 @@
-# M1 v2 MinerU Primary Acceptance
+# M1 MinerU Primary Acceptance
 
 Primary route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner.
 Fallback parsers are not used for PASS claims in this report.

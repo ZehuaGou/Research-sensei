@@ -17,7 +17,7 @@ from PIL import Image
 
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
 from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
-from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
+from researchsensei.canonical.pipeline import M1CanonicalPipeline
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,7 +61,7 @@ DEFAULT_KEYS = ("2310_08800v2", "2312_01729v1")
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run real MinerU2.5-Pro primary M1 v2 acceptance.")
+    parser = argparse.ArgumentParser(description="Run real MinerU2.5-Pro primary M1 acceptance.")
     parser.add_argument("--limit", type=int, default=2, help="Number of selected unseen papers to run.")
     parser.add_argument("--keys", default=",".join(DEFAULT_KEYS), help="Comma-separated arXiv short IDs from the candidate pool.")
     parser.add_argument("--max-pages", type=int, default=0, help="Developer smoke limit. Acceptance must use 0.")
@@ -168,7 +168,7 @@ def run_candidate(
         json.dumps(raw_payload, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    result = M1V2CanonicalPipeline(mineru_adapter=adapter).run_from_blocks(
+    result = M1CanonicalPipeline(mineru_adapter=adapter).run_from_blocks(
         paper_id=candidate.key,
         title=candidate.title,
         blocks=blocks,
@@ -378,7 +378,7 @@ def render_paper_readme(candidate: Candidate, metrics: dict[str, Any]) -> str:
 
 def write_top_level(candidates: list[Candidate], rows: list[dict[str, Any]], *, max_pages: int) -> None:
     lines = [
-        "# M1 v2 MinerU Primary Acceptance",
+        "# M1 MinerU Primary Acceptance",
         "",
         "Primary route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner.",
         "Fallback parsers are not used for PASS claims in this report.",

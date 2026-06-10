@@ -271,12 +271,6 @@ class TestAdapterWiring:
         # Should be True if marker-pdf is installed, False otherwise
         assert isinstance(result, bool)
 
-    def test_mineru_adapter_status_reported(self):
-        from researchsensei.canonical.adapters import MinerUPdfAdapter
-        adapter = MinerUPdfAdapter()
-        result = adapter.is_available()
-        assert isinstance(result, bool)
-
     def test_pix2tex_adapter_status_reported(self):
         from researchsensei.canonical.adapters import Pix2TexFormulaOCRAdapter
         adapter = Pix2TexFormulaOCRAdapter()

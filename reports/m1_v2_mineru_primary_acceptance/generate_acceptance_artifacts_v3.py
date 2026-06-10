@@ -1,4 +1,4 @@
-"""Generate M1 v2 acceptance artifacts with correct image paths and full quality checks."""
+"""Generate M1 acceptance artifacts with correct image paths and full quality checks."""
 import json
 import re
 import subprocess
@@ -194,7 +194,7 @@ pre {{ background: #161b22; padding: 10px; border-radius: 4px; overflow-x: auto;
     # Generate index.html
     index_html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<title>M1 v2 Visual Audit — {paper_key}</title>
+<title>M1 Visual Audit — {paper_key}</title>
 <style>
 * {{ box-sizing: border-box; margin: 0; padding: 0; }}
 body {{ font-family: 'SF Mono', 'Consolas', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; }}
@@ -211,7 +211,7 @@ a {{ color: #58a6ff; text-decoration: none; }}
 a:hover {{ text-decoration: underline; }}
 .risk-excluded {{ color: #d29922; }}
 </style></head><body>
-<h1>M1 v2 Visual Audit — {paper_key}</h1>
+<h1>M1 Visual Audit — {paper_key}</h1>
 <div class="subtitle">{paper_info['title']}<br>arXiv: {paper_info['arxiv_id']} | <a href="{paper_info['public_pdf_url']}">{paper_info['public_pdf_url']}</a></div>
 
 <div class="stats">
@@ -261,7 +261,7 @@ a:hover {{ text-decoration: underline; }}
 def generate_verify_index(all_stats: dict) -> str:
     """Generate FINAL_MANUAL_VERIFY_INDEX.md with real PASS/FAIL."""
     lines = [
-        "# M1 v2 Final Manual Verify Index",
+        "# M1 Final Manual Verify Index",
         "",
         f"Generated: {time.strftime('%Y-%m-%d %H:%M')}",
         "",
@@ -368,7 +368,7 @@ def generate_verify_index(all_stats: dict) -> str:
 
 def main():
     print("=" * 60)
-    print("M1 v2 Acceptance Artifact Generator v3")
+    print("M1 Acceptance Artifact Generator v3")
     print("=" * 60)
 
     all_stats = {}

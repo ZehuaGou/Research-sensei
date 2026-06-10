@@ -1,6 +1,6 @@
 # Ollama Structured Refiner Compare
 
-Scope: M1 v2 only. This report evaluates optional Ollama section/risk refinement on the two MinerU primary acceptance papers; it does not feed the acceptance artifacts.
+Scope: M1 canonical pipeline only. This report evaluates optional Ollama section/risk refinement on the two MinerU primary acceptance papers; it does not feed the acceptance artifacts.
 
 - endpoint: /api/chat
 - format: JSON Schema

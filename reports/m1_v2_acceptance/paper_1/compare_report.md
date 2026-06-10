@@ -1,4 +1,4 @@
-# M1 v2 Compare Report: Monte Carlo EM for Deep Time Series Anomaly Detection
+# M1 Compare Report: Monte Carlo EM for Deep Time Series Anomaly Detection
 
 - paper_id: paper_1
 - route: C Marker fallback/audit baseline

@@ -57,7 +57,7 @@ M5 定义 M1-M4 的真实验收矩阵，不替代各模块测试。
 - front matter contains paper_id/title/source_type/source_confidence/canonicalization_status/parser_used/m2_ready/degradation_reason
 - body contains abstract or enough body text
 - formula blocks include formula_id and formula_origin when formulas are present
-- Status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED for M1 v2 primary route; two new unseen MinerU2.5-Pro papers passed in `reports/m1_v2_mineru_primary_acceptance/`
+- Status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED for M1 primary route; two new unseen MinerU2.5-Pro papers passed in `reports/m1_v2_mineru_primary_acceptance/`
 
 ### M1 Formula Detection / OCR
 
@@ -266,7 +266,7 @@ multi-formula OCR batch
 | `gpu` | 需要 GPU 的测试 |
 | `optional` | 不阻塞默认回归的可选测试 |
 
-### M1 v2 pipeline test layering
+### M1 pipeline test layering
 
 **Default tests** (must pass in `python -m pytest -q`):
 - schema validation (FormulaSlot, DocumentBlock, etc.)
@@ -425,7 +425,7 @@ python scripts/run_live_eval.py
 | test_llm_smoke_token_limit | token 用量不超过限制 |
 | test_llm_smoke_records_metadata | 记录模型名、prompt version、运行日期 |
 | test_m1_live_search_and_source_resolution | 显式开启后真实 arXiv/OpenAlex 检索，并记录 source resolution |
-| test_m2_real_llm_smoke | 显式开启后真实 LLM 走 M2 parser/evidence/v2 builders/audit/status |
+| test_m2_real_llm_smoke | 显式开启后真实 LLM 走 M2 parser/evidence/builders/audit/status |
 | test_real_pdf_end_to_end | 真实搜索 → 真实 PDF 下载 → parser → evidence → LLM → audit → status |
 | test_full_live_eval_writes_report | 写出 live eval report 且不包含 secret 值 |
 | test_target_default_real_canonical_chain | after canonical pipeline implementation: one real paper → canonical_paper.md → M2 reader → basic paper_card |
@@ -781,7 +781,7 @@ CI / release readiness 必须区分三类结果：
 
 ## 13. Artifact Versioning
 
-- 每个 v2 artifact 顶层应显式写 `schema_version="v2"`
+- 每个 artifact 顶层应显式写 `schema_version="v2"`
 - 旧 artifact 没有 `schema_version` 时按 v1 读取
 - additive schema change 通过 Pydantic 默认值兼容
 - breaking change 的 migration 策略为 DOC_DESIGNED / NOT_IMPLEMENTED
@@ -820,7 +820,7 @@ CI / release readiness 必须区分三类结果：
 ## 15. 当前未解决问题
 
 - artifact_manifest 是否需要
-- content_hash 是否在 v2 初版加入
+- content_hash 是否在初版加入
 - resume 与 rerun 的 run_id 语义
 - cache 默认开启策略
 - debug/admin 鉴权机制

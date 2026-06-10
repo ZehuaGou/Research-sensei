@@ -1,4 +1,4 @@
-# M1 v2 Acceptance Report
+# M1 Acceptance Report (Fallback/Debug)
 
 Default route decision: MinerU2.5-Pro + RuleBasedStructureRefiner is the primary M1 route, but the MinerU route is verified on paper_4 only. Multi-paper MinerU acceptance remains pending. Fallback reports are allowed for parser review and debugging, but they cannot prove that the primary route is stable. Marker remains fallback/audit baseline. Ollama remains optional and disabled by default because the cached paper_4_unseen evaluation recorded JSON valid=0 / invalid=17, so it did not improve section/context quality reliably.
 

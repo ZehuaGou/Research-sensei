@@ -11,9 +11,9 @@ from typing import Iterable
 
 import fitz
 
-from researchsensei.canonical.canonical_builder_v2 import CanonicalBuilderV2
+from researchsensei.canonical.canonical_builder import CanonicalBuilder
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
-from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
+from researchsensei.canonical.pipeline import M1CanonicalPipeline
 from researchsensei.canonical.quality_gate import M1QualityGate
 from researchsensei.canonical.visual_audit import M1VisualAuditReportGenerator
 from researchsensei.schemas.enums import CanonicalQualityStatus
@@ -89,7 +89,7 @@ PAPERS = [
         parser_name="mineru25pro",
         core_samples=("Gated memory", "anomaly score", "bi-dimensional deviation", "K-means"),
         use_mineru_blocks=True,
-        unseen_reason="Selected before v2 work as blind MEMTO case: long, formula-heavy, transformer-based anomaly detection paper.",
+        unseen_reason="Selected as blind MEMTO case: long, formula-heavy, transformer-based anomaly detection paper.",
     ),
     PaperSpec(
         key="paper_5_unseen",
@@ -696,7 +696,7 @@ def write_formula_review(out_dir: Path, title: str, metrics: dict, blocks: list[
 
 def write_compare_report(out_dir: Path, spec: PaperSpec, metrics: dict, quality) -> str:
     lines = [
-        f"# M1 v2 Compare Report: {spec.title}",
+        f"# M1 Compare Report: {spec.title}",
         "",
         f"- paper_id: {spec.key}",
         f"- route: {spec.route}",
@@ -835,7 +835,7 @@ def build_paper(spec: PaperSpec) -> dict:
     metrics = metrics_for(spec, out_dir, blocks, quality, started, cov)
     compare = write_compare_report(out_dir, spec, metrics, quality)
 
-    result = CanonicalBuilderV2().build(
+    result = CanonicalBuilder().build(
         paper_id=spec.key,
         title=spec.title,
         blocks=blocks,
@@ -882,7 +882,7 @@ def build_paper(spec: PaperSpec) -> dict:
 
 def write_top_level(rows: list[dict]) -> None:
     lines = [
-        "# M1 v2 Acceptance Report",
+        "# M1 Acceptance Report",
         "",
         "Default route decision: MinerU2.5-Pro + RuleBasedStructureRefiner is the primary M1 route, but the MinerU route is verified on paper_4 only. Multi-paper MinerU acceptance remains pending. Fallback reports are allowed for parser review and debugging, but they cannot prove that the primary route is stable. Marker remains fallback/audit baseline. Ollama remains optional and disabled by default because the cached paper_4_unseen evaluation recorded JSON valid=0 / invalid=17, so it did not improve section/context quality reliably.",
         "",

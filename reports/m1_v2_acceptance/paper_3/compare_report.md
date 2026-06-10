@@ -1,4 +1,4 @@
-# M1 v2 Compare Report: Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
+# M1 Compare Report: Anomaly Transformer: Time Series Anomaly Detection with Association Discrepancy
 
 - paper_id: paper_3
 - route: C Marker formula audit + PyMuPDF body fallback

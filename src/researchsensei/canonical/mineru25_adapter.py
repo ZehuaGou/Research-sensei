@@ -1,9 +1,7 @@
-"""MinerU2.5-Pro adapter for M1 v2.
+"""MinerU2.5-Pro adapter for M1 canonical pipeline.
 
 The primary implementation uses ``mineru-vl-utils`` and the
-``opendatalab/MinerU2.5-Pro-2604-1.2B`` model.  The older MinerU CLI remains a
-separate fallback/debug path in the legacy adapter and is not part of this
-primary implementation.
+``opendatalab/MinerU2.5-Pro-2604-1.2B`` model.
 """
 from __future__ import annotations
 
@@ -115,7 +113,7 @@ class MinerU25ProAdapter:
         page: int,
         block_offset: int = 0,
     ) -> list[CanonicalDocumentBlock]:
-        """Normalize a MinerU page result into M1 v2 blocks."""
+        """Normalize a MinerU page result into canonical document blocks."""
         normalized: list[CanonicalDocumentBlock] = []
         for index, raw in enumerate(raw_blocks, start=1):
             raw_type = str(raw.get("type", raw.get("block_type", "text")))

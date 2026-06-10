@@ -1,4 +1,4 @@
-"""Visual/public audit report generation for M1 v2."""
+"""Visual/public audit report generation for M1 canonical pipeline."""
 from __future__ import annotations
 
 import html

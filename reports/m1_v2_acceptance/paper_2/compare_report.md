@@ -1,4 +1,4 @@
-# M1 v2 Compare Report: Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT
+# M1 Compare Report: Learning Graph Structures with Transformer for Multivariate Time Series Anomaly Detection in IoT
 
 - paper_id: paper_2
 - route: D MarkItDown/PyMuPDF fallback/debug

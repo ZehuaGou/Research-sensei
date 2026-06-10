@@ -1,4 +1,4 @@
-# M1 v2 Final Manual Verify Index
+# M1 Final Manual Verify Index
 
 Generated: 2026-06-10 16:45
 

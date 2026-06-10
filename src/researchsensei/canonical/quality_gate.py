@@ -1,4 +1,4 @@
-"""M1 v2 quality gate."""
+"""M1 quality gate."""
 from __future__ import annotations
 
 from pydantic import Field

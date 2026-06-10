@@ -1,4 +1,4 @@
-# M1 v2 Compare Report: TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data
+# M1 Compare Report: TranAD: Deep Transformer Networks for Anomaly Detection in Multivariate Time Series Data
 
 - paper_id: paper_5_unseen
 - route: D PyMuPDF fallback/debug for new unseen

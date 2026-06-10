@@ -122,24 +122,23 @@ ResearchSensei 不优先自研所有能力。每个模块在设计和实现前�
 
 M1 的职责不只是搜索和下载 PDF，而是完成高质量文献发现、多源验证、best available source 获取、原始材料归一化，并输出 M2 的统一主输入 `canonical_paper.md`。
 
-**M1 canonicalization pipeline v2**:
+**M1 canonicalization pipeline**:
 1. Search / metadata acquisition
 2. Candidate verification
 3. Quality ranking
 4. Best available source resolution
 5. Source download
-6. Material normalization (v2: MinerU2.5-Pro primary + Llama refiner + Marker fallback):
-   - **MinerU2.5-Pro adapter** (PRIMARY): `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B` → page/block JSON
-   - **StructureRefiner**: RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional)
+6. Material normalization:
+   - **MinerU2.5-Pro adapter** (PRIMARY): `mineru-vl-utils` + `opendatalab/MinerU2.5-Pro-2604-1.2B` → DocumentBlock
+   - **RuleBasedStructureRefiner** (always): section assignment, heading normalization, risk detection
+   - **OllamaSectionRefiner** (optional, default OFF): LLM-based section refinement
    - **CanonicalBuilder**: `canonical_paper.md`, `formula_slots.json`, visual audit
-   - **v1 fallback** (when MinerU unavailable): Body pipeline (MarkItDown/PyMuPDF) + Formula pipeline (MarkerDocumentFormulaDetector) + FormulaMerger
+   - **Fallback** (when MinerU unavailable): MaterialNormalizer (MarkItDown/PyMuPDF + MarkerDocumentFormulaDetector)
 7. `canonical_paper.md` generation
-8. M1 Quality Gate (v2): source/title, bbox/crop/overlay, latex/canonical match, section_contradiction, abstract_formula_overload, fallback_used
+8. M1 Quality Gate: source/title, bbox/crop/overlay, latex/canonical match, section_contradiction, abstract_formula_overload
 9. `m2_ready` gate
 
-**IMPORTANT**: MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. Current legacy code may still expose `MinerUPdfAdapter` with `magic_pdf.tools.common.do_parse` (old MinerU CLI), but magic_pdf/do_parse is not an equivalent implementation. Marker is fallback/audit baseline, not primary parser. The primary route has two-paper unseen acceptance evidence in `reports/m1_v2_mineru_primary_acceptance/`.
-
-Ollama is an optional structured refiner and is off by default after the current compare timed out. Ollama must not modify latex, bbox, page, or source identity. M1 gate blocks all-formulas-in-Abstract, section contradiction, source mismatch, missing latex/crop/overlay, and dense raw-only formulas from formula-understanding handoff.
+MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. Marker is fallback/audit baseline. PyMuPDF/MarkItDown are lightweight fallback/debug. Ollama is optional, default OFF, and must not modify latex/bbox/page/source identity. M1 gate blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas. References formulas are excluded from formula understanding.
 
 **M1 source priority**:
 1. LaTeX source / arXiv source
@@ -165,7 +164,7 @@ canonicalization_status:
 parser_used:
 m2_ready:
 degradation_reason:
-# parser pipeline (v2)
+# parser pipeline
 primary_parser:                 # "mineru25pro" | "marker_document" (fallback)
 fallback_used:
 llama_refined:
