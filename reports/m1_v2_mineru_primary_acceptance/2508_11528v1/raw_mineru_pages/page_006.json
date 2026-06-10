@@ -1,0 +1,81 @@
+[
+  {
+    "type": "page_number",
+    "bbox": [
+      0.217,
+      0.117,
+      0.23,
+      0.127
+    ],
+    "angle": 0,
+    "content": "6"
+  },
+  {
+    "type": "header",
+    "bbox": [
+      0.271,
+      0.115,
+      0.573,
+      0.129
+    ],
+    "angle": 0,
+    "content": "J. Soni, M. Lange-Hegermann, S. Windmann"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.147,
+      0.788,
+      0.178
+    ],
+    "angle": 0,
+    "content": "consistent model, resulting in a statistically significant improvement in anomaly detection performance.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.199,
+      0.78,
+      0.218
+    ],
+    "angle": 0,
+    "content": "4 Temporal Physics-informed Diffusion Model (TPIDM)"
+  },
+  {
+    "type": "image",
+    "bbox": [
+      0.224,
+      0.264,
+      0.785,
+      0.451
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.214,
+      0.485,
+      0.789,
+      0.528
+    ],
+    "angle": 0,
+    "content": "Fig. 1. Data-driven diffusion model vs physics-informed diffusion model training. A weighted Physics-informed loss is added to the diffusion model training, which leads to an improvement in the model's ability to approximate the underlying data distribution."
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.554,
+      0.789,
+      0.844
+    ],
+    "angle": 0,
+    "content": "To learn the physics-dependent temporal distribution of data, the underlying physics of the data is integrated into the loss function of the diffusion model, thereby embedding the physical knowledge of the data into the model's learning process. The physics-informed loss is formulated using the reconstructed signal processing algorithm. The physics-informed loss is calculated by the first 1 that the data near the time step \\(t = 0\\) exhibits significantly lower noise levels, indicating that earlier diffusion steps preserve more of the original signal structure. Furthermore, at earlier diffusion steps, the signal is closer to being a smooth curve; hence, derivatives can be estimated much more reliably. In contrast, when reconstructing the signals \\(\\lambda_{\\mathrm{f}}\\) from \\(\\lambda_{\\mathrm{f}}\\) at diffusion time step 3 or near time step 4, the signal is calculated by the reconstruction algorithm. The physics-informed loss is calculated from earlier time steps, as the model has not yet reached convergence. Due to these noisy reconstructed signals, the physics-informed loss is inadequately defined because of the highly noisy derivative estimations. This adversely affects the model's learning process, causing divergence from optimal solutions and resulting in anomalous or improbable outputs. So, to address this poorly defined solution, the physics-informed loss is calculated by the reconstruction algorithm. The physics-informed loss weight schedule for physics-informed loss functions. The physics-informed loss weight schedule, denoted \\(\\lambda_{\\rho_1}\\), is constructed to prioritize the initial \\(n\\)",
+    "merge_prev": false
+  }
+]

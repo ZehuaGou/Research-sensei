@@ -128,7 +128,7 @@ M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M
 
 ### 2026-06-10 acceptance result
 
-`reports/m1_v2_acceptance/` and `reports/m1_v2_acceptance_bundle.zip` contain the current M1 v2 acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner when MinerU output exists, but the MinerU route is verified on paper_4_unseen only and multi-paper MinerU acceptance remains pending. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
+`reports/m1_v2_mineru_primary_acceptance/` and `reports/m1_v2_mineru_primary_acceptance_bundle.zip` contain the formal M1 v2 primary-route acceptance artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. The older `reports/m1_v2_acceptance/` bundle is fallback/debug evidence for paper_1 through paper_5, not primary acceptance. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
 
 Five-paper acceptance summary:
 - paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
@@ -137,7 +137,11 @@ Five-paper acceptance summary:
 - paper_4_unseen MEMTO: PASS, m2_ready=true, formula_m2_ready=true, MinerU2.5-Pro cached output, formulas=11, latex=11, raw_formula_text=0, high_risk=0.
 - paper_5_unseen TranAD: DEGRADED, m2_ready=false, formula_m2_ready=false, live_eval auto-downloaded unseen PDF, formulas=129, latex=0, raw_formula_text=129, high_risk=3.
 
-Ollama remains optional/off by default. Cached paper_4_unseen eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b smoke had JSON valid=0, invalid=1, timeout=1, changed_by_count=0.
+Primary MinerU acceptance summary:
+- 2310_08800v2 DDMT: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=7, body_formulas=7, latex=7, bbox/crop/overlay/canonical_match=7, high_risk=0, m2_ready=true, formula_m2_ready=true.
+- 2508_11528v1 TPIDM: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=17, body_formulas=12, reference_formulas=5, latex=17, bbox/crop/overlay/canonical_match=17, high_risk=0, m2_ready=true, formula_m2_ready=true.
+
+Ollama remains optional/off by default. Cached paper_4_unseen eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0.
 
 ## Reused Components
 

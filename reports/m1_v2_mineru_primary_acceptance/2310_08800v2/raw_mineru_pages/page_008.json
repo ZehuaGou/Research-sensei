@@ -1,0 +1,185 @@
+[
+  {
+    "type": "image",
+    "bbox": [
+      0.31,
+      0.078,
+      0.685,
+      0.374
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.089,
+      0.401,
+      0.908,
+      0.431
+    ],
+    "angle": 0,
+    "content": "Figure 5: In the DDT, we utilize a standard Transformer encoder block as the internal neural network to learn the reverse process. For simplicity, we denote the query, key, and value of interest as Q, K, and V."
+  },
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.121,
+      0.452,
+      0.874,
+      0.466
+    ],
+    "angle": 0,
+    "content": "Table 1: Dataset Information. Anomalies represents the proportion of abnormal in the entire dataset."
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.092,
+      0.465,
+      0.907,
+      0.566
+    ],
+    "angle": 0,
+    "content": "<table><tr><td>Name</td><td>Train</td><td>Test</td><td>Dimension</td><td>Anomalies</td><td>Applications</td></tr><tr><td>SMD</td><td>708,405</td><td>708,420</td><td>38</td><td>0.042</td><td>Server</td></tr><tr><td>PSM</td><td>132,481</td><td>87,841</td><td>25</td><td>0.278</td><td>Server</td></tr><tr><td>MSL</td><td>58,317</td><td>73,729</td><td>55</td><td>0.105</td><td>Space</td></tr><tr><td>SMAP</td><td>135,183</td><td>427,617</td><td>25</td><td>0.128</td><td>Space</td></tr><tr><td>SWaT</td><td>495,000</td><td>449,919</td><td>51</td><td>0.121</td><td>Water</td></tr></table>"
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.587,
+      0.351,
+      0.604
+    ],
+    "angle": 0,
+    "content": "4.1 Experiment Settings"
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.61,
+      0.229,
+      0.623
+    ],
+    "angle": 0,
+    "content": "4.1.1 Datasets"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.12,
+      0.631,
+      0.888,
+      0.644
+    ],
+    "angle": 0,
+    "content": "We collected five real-world datasets to test our method. Here is a description of the five experimental datasets:",
+    "merge_prev": false
+  },
+  {
+    "type": "list",
+    "bbox": [
+      0.089,
+      0.645,
+      0.906,
+      0.786
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.645,
+      0.906,
+      0.669
+    ],
+    "angle": 0,
+    "content": "(1)Server Machine Dataset(SMD)[53]: The SMD dataset was collected from a large internet company and spans five weeks. It consists of multivariate time series data with 38 dimensions.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.67,
+      0.905,
+      0.695
+    ],
+    "angle": 0,
+    "content": "(2) Pooled Server Metrics(PSM)[54]: The PSM was collected internally from multiple application server nodes at eBay. It contains data from 26 dimensions.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.696,
+      0.906,
+      0.747
+    ],
+    "angle": 0,
+    "content": "(3) Mars Science Laboratory rover(MSL) and Soil Moisture Active Passive satellite(SMAP)[9]: The MSL and SMAP are public datasets provided by NASA. The MSL dataset consists of 55 dimensions, while the SMAP dataset has 25 dimensions. These datasets include telemetry anomaly data reported by the spacecraft detection system called Incident Surprise Anomaly (ISA).",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.747,
+      0.905,
+      0.786
+    ],
+    "angle": 0,
+    "content": "(4) Secure Water Treatment(SWaT)[55]: The SWaT dataset comprises data from 51 sensors and originates from a continuously operating critical infrastructure system, specifically a water treatment facility. The information on all datasets is shown in Table 1.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.802,
+      0.355,
+      0.817
+    ],
+    "angle": 0,
+    "content": "4.1.2 Implementation Details"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.824,
+      0.906,
+      0.914
+    ],
+    "angle": 0,
+    "content": "Based on the improved approach by Shen et al. [56], we adopted non-overlapping sliding windows to obtain a set of subsequences. For all the datasets, we set the sliding window size to 100. If the anomaly score exceeds a certain threshold, the corresponding time point is labeled as an anomaly. We determined the threshold based on the proportion of anomalies in the validation dataset, as shown in Table 1. We employed a widely used adjustment strategy [10, 53, 56], where if a time point within a consecutive period of anomalies is detected, all anomalies within that period are considered correctly detected. This strategy is reasonable because the observed time points of anomalies trigger alerts and further draw attention to the entire time period in practical applications.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.12,
+      0.914,
+      0.905,
+      0.928
+    ],
+    "angle": 0,
+    "content": "We utilized the SGD optimizer with an initial learning rate of 1e-4, a mask scale of 5, and 500 diffusion steps during",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.494,
+      0.959,
+      0.506,
+      0.969
+    ],
+    "angle": 0,
+    "content": "8"
+  }
+]

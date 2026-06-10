@@ -164,7 +164,7 @@ MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
 - NOT the same as old `magic_pdf.tools.common.do_parse` (magic-pdf package)
 - failure: model unavailable, GPU OOM, parse error
-- current status: IMPLEMENTED / UNIT_TESTED; real multi-paper acceptance report pending
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; two new unseen primary-route papers passed in `reports/m1_v2_mineru_primary_acceptance/`
 
 DocumentBlock (IMPLEMENTED / UNIT_TESTED):
 - fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
@@ -175,8 +175,8 @@ OllamaSectionRefiner / LlamaSectionRefiner (IMPLEMENTED / UNIT_TESTED, OPTIONAL)
 - input: blocks from MinerU / Marker / PyMuPDF
 - output: strict JSON with refined section, section_confidence, section_reason, reading_order_warning, formula_context_reason, risk_flags
 - forbidden: modify formula_latex, bbox, page, source identity, paper metadata
-- if Llama output invalid JSON: fallback to RuleBasedStructureRefiner, record risk
-- current status: IMPLEMENTED / UNIT_TESTED. Ollama is an optional structured refiner. Ollama must not modify latex, bbox, page, or source identity.
+- if Llama/Ollama output invalid JSON: retry once, then fallback to RuleBasedStructureRefiner/no-op and record warning
+- current status: IMPLEMENTED / UNIT_TESTED / OPTIONAL_REFINER_NOT_DEFAULT. Ollama is an optional structured refiner; current qwen2.5:0.5b compare timed out and made no accepted changes. Ollama must not modify latex, bbox, page, or source identity.
 
 StructureRefiner (IMPLEMENTED / UNIT_TESTED):
 - two layers: RuleBasedStructureRefiner (always) + LlamaSectionRefiner (optional)
@@ -188,10 +188,11 @@ M1 Quality Gate:
 - M1 gate blocks section contradiction
 - M1 gate blocks source mismatch
 - M1 gate blocks missing latex/crop/overlay
+- M1 gate degrades dense raw-only formula sets (`formula_count >= 5` and `latex_count == 0`) and sets `m2_ready_for_formula_understanding=false`
 - checks: source/title, formula bbox/crop/overlay, latex/canonical match, section_contradiction, all_formulas_same_section_suspicious, abstract_formula_overload, fallback_used, llama_refined
 - hard rule: 5+ formulas all in Abstract for method paper → HIGH risk / BLOCKED
 - hard rule: Llama modifies formula_latex/page/bbox → BLOCKED (越权)
-- current status: IMPLEMENTED / UNIT_TESTED; real multi-paper acceptance report pending
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; enforced in `reports/m1_v2_mineru_primary_acceptance/`
 
 FormulaCropper:
 - input: PDF path, FormulaSlot with bbox

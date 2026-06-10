@@ -20,6 +20,9 @@ TRUSTED_SECTIONS = {
     "proposed method": "Method",
     "proposed approach": "Method",
     "model": "Method",
+    "framework": "Method",
+    "architecture": "Method",
+    "algorithm": "Method",
     "experiments": "Experiments",
     "experiment": "Experiments",
     "experimental results": "Experiments",
@@ -36,7 +39,13 @@ TRUSTED_SECTIONS = {
 
 
 def _looks_like_formula(text: str) -> bool:
-    return bool(re.search(r"[=+\-*/^_{}]|\\(?:frac|sum|int|sqrt|alpha|beta|gamma)|\b(?:softmax|argmax|argmin)\s*\(", text, re.I))
+    return bool(
+        re.search(
+            r"(=|[_^{}]|\\(?:frac|sum|int|sqrt|alpha|beta|gamma)|\b(?:softmax|argmax|argmin)\s*\()",
+            text,
+            re.I,
+        )
+    )
 
 
 def extract_section_from_heading(text: str) -> str | None:
@@ -61,37 +70,27 @@ class RuleBasedStructureRefiner:
 
     def refine(self, blocks: list[CanonicalDocumentBlock]) -> list[CanonicalDocumentBlock]:
         ordered = sorted(blocks, key=lambda b: (b.page, b.reading_order, b.bbox[1] if b.bbox else 0))
-        timeline = self._build_timeline(ordered)
-        for block in ordered:
-            self._assign(block, timeline)
+        self._assign_ordered(ordered)
         self._detect_risks(ordered)
         return blocks
 
-    def _build_timeline(self, blocks: list[CanonicalDocumentBlock]) -> dict[int, str]:
-        timeline: dict[int, str] = {}
+    def _assign_ordered(self, blocks: list[CanonicalDocumentBlock]) -> None:
         current = "Unknown"
         for block in blocks:
             if block.block_type == "title":
                 section = extract_section_from_heading(block.text)
                 if section:
                     current = section
-            timeline[block.page] = current
-        return timeline
-
-    def _assign(self, block: CanonicalDocumentBlock, timeline: dict[int, str]) -> None:
-        if block.block_type == "title":
-            direct = extract_section_from_heading(block.text)
-            if direct:
-                block.section = direct
-                block.section_confidence = "high"
-                block.section_reason = f"title_block_match: {block.text[:80]}"
-                return
-        if block.section:
-            return
-        section = timeline.get(block.page, "Unknown")
-        block.section = section
-        block.section_confidence = "medium" if section != "Unknown" else "low"
-        block.section_reason = f"page_timeline: page {block.page}"
+                    block.section = section
+                    block.section_confidence = "high"
+                    block.section_reason = f"title_block_match: {block.text[:80]}"
+                    continue
+            if block.section:
+                current = block.section
+                continue
+            block.section = current
+            block.section_confidence = "medium" if current != "Unknown" else "low"
+            block.section_reason = f"reading_order_context: page {block.page}"
 
     def _detect_risks(self, blocks: list[CanonicalDocumentBlock]) -> None:
         formulas = [block for block in blocks if block.block_type == "formula"]

@@ -1,0 +1,146 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.35,
+      0.115,
+      0.733,
+      0.129
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.775,
+      0.117,
+      0.787,
+      0.127
+    ],
+    "angle": 0,
+    "content": "9"
+  },
+  {
+    "type": "image",
+    "bbox": [
+      0.217,
+      0.156,
+      0.391,
+      0.285
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.218,
+      0.287,
+      0.391,
+      0.313
+    ],
+    "angle": 0,
+    "content": "(a) Diffusion model without PINN"
+  },
+  {
+    "type": "image",
+    "bbox": [
+      0.406,
+      0.156,
+      0.578,
+      0.285
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.445,
+      0.287,
+      0.541,
+      0.302
+    ],
+    "angle": 0,
+    "content": "(b) PIDM [33]"
+  },
+  {
+    "type": "image",
+    "bbox": [
+      0.593,
+      0.156,
+      0.768,
+      0.285
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.62,
+      0.287,
+      0.742,
+      0.302
+    ],
+    "angle": 0,
+    "content": "(c) TPIDM (ours)"
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.214,
+      0.326,
+      0.788,
+      0.397
+    ],
+    "angle": 0,
+    "content": "Fig. 3. PCA plots of generated and original Lenze data. The red portion represents the synthetic data, while the black portion corresponds to the original data. The bounding boxes highlight areas not covered by the generated data in Figures 3a and 3b. These plots indicate that our model achieves more overlap between the red and black regions between the synthetic and original data, suggesting improved data diversity."
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.444,
+      0.491,
+      0.459
+    ],
+    "angle": 0,
+    "content": "5.2 Anomaly Detection Results"
+  },
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.214,
+      0.489,
+      0.789,
+      0.518
+    ],
+    "angle": 0,
+    "content": "Table 2. F1 score comparison of AE, VAE, K-means, data-driven diffusion model (without PINN), prior physics-informed diffusion model [2,33], and our method"
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.221,
+      0.528,
+      0.782,
+      0.676
+    ],
+    "angle": 0,
+    "content": "<table><tr><td></td><td colspan=\"4\">F1 Score</td></tr><tr><td></td><td>EMPS</td><td>Predator-Prey</td><td>Lenze</td><td>Air Compressor</td></tr><tr><td colspan=\"5\">Other models</td></tr><tr><td>VAE</td><td>0.9624 ± 0.0047</td><td>0.9133 ± 0.0011</td><td>0.8288 ± 0.0031</td><td>0.9664 ± 0.0389</td></tr><tr><td>AE</td><td>0.9168 ± 0.0030</td><td>0.8426 ± 0.0000</td><td>0.9820 ± 0.0000</td><td>0.9848 ± 0.0000</td></tr><tr><td>K-MEANS</td><td>0.8526 ± 0.0000</td><td>0.7868 ± 0.0000</td><td>0.8102 ± 0.0000</td><td>0.8235 ± 0.0000</td></tr><tr><td colspan=\"5\">DM with \\( x_s \\)</td></tr><tr><td>DM (\\( x_s \\))</td><td>0.9627 ± 0.0031</td><td>0.9712 ± 0.0017</td><td>0.9923 ± 0.0003</td><td>1.0 ± 0.0000</td></tr><tr><td>PIDM [33]</td><td>0.9606 ± 0.0067</td><td>0.9586 ± 0.0026</td><td>0.9485 ± 0.0167</td><td>1.0 ± 0.0000</td></tr><tr><td>TPIDM (Ours, \\( x_s \\))</td><td>0.9699 ± 0.0028</td><td>0.9830 ± 0.0000</td><td>0.9622 ± 0.0116</td><td>1.0 ± 0.0000</td></tr><tr><td colspan=\"5\">DM with \\( x_s \\)</td></tr><tr><td>DM (\\( x_s \\))</td><td>1.0 ± 0.0000</td><td>0.9557 ± 0.0000</td><td>0.9983 ± 0.0000</td><td>1.0 ± 0.0000</td></tr><tr><td>AE [33]</td><td>0.9674 ± 0.0014</td><td>1.0 ± 0.0000</td><td>0.9983 ± 0.0000</td><td>1.0 ± 0.0000</td></tr><tr><td>TPIDM (Ours, \\( x_s \\))</td><td>1.0 ± 0.0000</td><td>1.0 ± 0.0000</td><td>0.9983 ± 0.0000</td><td>1.0 ± 0.0000</td></tr></table>"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.704,
+      0.789,
+      0.841
+    ],
+    "angle": 0,
+    "content": "Table 2 shows the effectiveness of our method in detecting anomalies. It demonstrates that our method improves the F1 score and outperforms other methods for EMPS and Predator-Prey datasets when a  \\( \\epsilon \\)  prediction model ( \\( \\epsilon_{0} \\) ) is used for training. The Table 2 also reveals that the proposed physics-informed training approach results in higher F1 scores than the models proposed in previous work [2, 33]. Our method also improves the F1 score on the Predator-Prey dataset when training an  \\( x_{0} \\)  prediction model ( \\( x_{0} \\) ). The  \\( x_{0} \\)  model demonstrates competitive performance against DM and PIDM [2] models as a result of excluding highly noisy components from the PINN loss, while the DM loss remains fixed.",
+    "merge_prev": false
+  }
+]

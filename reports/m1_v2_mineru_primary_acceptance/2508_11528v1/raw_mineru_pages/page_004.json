@@ -1,0 +1,185 @@
+[
+  {
+    "type": "page_number",
+    "bbox": [
+      0.218,
+      0.117,
+      0.23,
+      0.127
+    ],
+    "angle": 0,
+    "content": "4"
+  },
+  {
+    "type": "header",
+    "bbox": [
+      0.272,
+      0.115,
+      0.573,
+      0.129
+    ],
+    "angle": 0,
+    "content": "J. Soni, M. Lange-Hegermann, S. Windmann"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.148,
+      0.355,
+      0.162
+    ],
+    "angle": 0,
+    "content": "where  \\( \\alpha_{t}=1-\\sigma_{t} \\)",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.377,
+      0.173,
+      0.629,
+      0.19
+    ],
+    "angle": 0,
+    "content": "\\[\nq (x _ {t} | x _ {0}) = \\mathcal {N} (x _ {t}; \\sqrt {\\overline {{\\alpha_ {t}}}} x _ {0}, (1 - \\overline {{\\alpha_ {t}}}) I)\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.199,
+      0.789,
+      0.231
+    ],
+    "angle": 0,
+    "content": "where \\(\\overline{\\alpha_{t}} = \\prod_{s=1}^{t}\\alpha_{s}\\). The reverse diffusion process is a generative process in which we invert the forward diffusion process. It is defined by",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.349,
+      0.242,
+      0.652,
+      0.259
+    ],
+    "angle": 0,
+    "content": "\\[\np _ {\\theta} (x _ {t - 1} | x _ {t}) = \\mathcal {N} (x _ {t - 1}; \\mu_ {\\theta} (x _ {t}, t), \\Sigma_ {\\theta} (x _ {t}, t))\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.269,
+      0.789,
+      0.331
+    ],
+    "angle": 0,
+    "content": "where \\(\\Sigma_{\\theta}(x_{t},t) = \\sigma_{t}^{2}I\\) or \\(\\frac{1 - \\overline{\\alpha}_{t - 1}}{1 - \\alpha_t}\\sigma_t\\) [12] and the generator \\(\\mu_{\\theta}(x_t,t)\\) approximate the data distribution. The combination of forward process \\(q\\) and reverse process \\(p\\) constitutes a variational autoencoder [18,19,27], and the model is trained by maximizing the ELBO.",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.253,
+      0.355,
+      0.756,
+      0.455
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} _ {\\mathcal {D M}} = \\underbrace {D _ {K L} (q (x _ {T} | x _ {0}) | | p (x _ {T}))} _ {L _ {T}} \\underbrace {+ \\sum_ {t = 2} ^ {T} D _ {K L} (q (x _ {t - 1} | x _ {t} , x _ {0}) | | p _ {\\theta} (x _ {t - 1} | x _ {t}))} _ {L _ {t - 1}} - \\underbrace {\\log p _ {\\theta} (x _ {0} | x _ {1})} _ {L _ {0}}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.464,
+      0.789,
+      0.496
+    ],
+    "angle": 0,
+    "content": "The \\(L_{T}\\) and \\(L_{0}\\) computed using standard techniques [19] and since all distributions are Gaussian \\(L_{t - 1}\\) can be defined by [12]",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.341,
+      0.505,
+      0.667,
+      0.54
+    ],
+    "angle": 0,
+    "content": "\\[\nL _ {t - 1} = \\mathbb {E} _ {q} \\left[ \\frac {1}{2 \\sigma^ {2}} | | \\tilde {\\mu} (x _ {t}, x _ {0}) - \\mu_ {\\theta} (x _ {t}, t) | | ^ {2} \\right] + C\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.547,
+      0.789,
+      0.579
+    ],
+    "angle": 0,
+    "content": "As per [12], the model can be parameterized as a noise \\(\\epsilon\\) prediction model \\(\\epsilon_{\\theta}\\) by using the simplified ELBO.",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.331,
+      0.589,
+      0.675,
+      0.608
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} _ {\\mathcal {D M}} = \\mathbb {E} _ {t, x _ {0}, \\epsilon} \\left[ | | \\epsilon - \\epsilon_ {\\theta} (\\sqrt {\\overline {{{\\alpha}}} _ {t}} x _ {0} + \\sqrt {1 - \\overline {{{\\alpha}}} _ {t}} \\epsilon , t) | | ^ {2} \\right]\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.617,
+      0.789,
+      0.647
+    ],
+    "angle": 0,
+    "content": "In addition, the neural network \\( x_{\\theta} \\) can also be parameterized to predict clean data \\( x_0 \\).",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.668,
+      0.544,
+      0.684
+    ],
+    "angle": 0,
+    "content": "2.3 Physics-informed Neural Network"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.692,
+      0.789,
+      0.815
+    ],
+    "angle": 0,
+    "content": "Physics-informed Neural Network (PINN) [30, 31] works as a data-driven function approximator, where physical laws are exploited in the training process. Many laws of physics are described by Partial Differential Equations (PDE) or Ordinary Differential Equations (ODE). In Physics-informed Neural Networks, we train a model with the underlying physics knowledge of data by embedding this knowledge into the network's loss function [7, 22, 23, 30]. The overall training objective is a composite loss function, \\(\\mathcal{L}\\), which combines a standard network loss, \\(\\mathcal{L}_{\\mathcal{F}}\\), with a physics-informed loss \\(\\mathcal{L}_{\\mathcal{P}\\mathcal{F}}\\).",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.449,
+      0.827,
+      0.558,
+      0.842
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} = \\mathcal {L} _ {\\mathcal {F}} + \\mathcal {L} _ {\\mathcal {P I}}\n\\]"
+  }
+]

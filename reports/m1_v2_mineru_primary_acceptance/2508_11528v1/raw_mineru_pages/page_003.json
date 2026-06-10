@@ -1,0 +1,186 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.349,
+      0.115,
+      0.733,
+      0.131
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.775,
+      0.117,
+      0.787,
+      0.128
+    ],
+    "angle": 0,
+    "content": "3"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.147,
+      0.788,
+      0.193
+    ],
+    "angle": 0,
+    "content": "on four multivariate time series datasets in terms of F1 score, log-likelihood, and data diversity. To validate our approach, we assessed the statistical significance of the performance gains achieved through physics-informed training.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.24,
+      0.208,
+      0.571,
+      0.223
+    ],
+    "angle": 0,
+    "content": "Our contributions are summarized as follows:",
+    "merge_prev": false
+  },
+  {
+    "type": "list",
+    "bbox": [
+      0.223,
+      0.23,
+      0.787,
+      0.352
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.223,
+      0.23,
+      0.787,
+      0.29
+    ],
+    "angle": 0,
+    "content": "1. We develop a temporal physics-informed diffusion model for anomaly detection that adheres to the underlying physical laws governing the data by incorporating weighted physics-informed loss function during diffusion model training.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.222,
+      0.291,
+      0.787,
+      0.32
+    ],
+    "angle": 0,
+    "content": "2. We define and incorporate a weight schedule into the physics-informed loss function.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.222,
+      0.322,
+      0.787,
+      0.352
+    ],
+    "angle": 0,
+    "content": "3. Assessing the physics-informed and uninformed diffusion model by validating them based on the log-likelihood, data diversity, and F1 score.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.374,
+      0.372,
+      0.391
+    ],
+    "angle": 0,
+    "content": "2 Background"
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.405,
+      0.526,
+      0.421
+    ],
+    "angle": 0,
+    "content": "2.1 Evidence Lower Bound (ELBO)"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.429,
+      0.789,
+      0.581
+    ],
+    "angle": 0,
+    "content": "In unsupervised anomaly detection, we can model the normal behavior of data using a probability distribution by leveraging the Evidence Lower Bound (ELBO) objective, and then define a threshold to distinguish between normal and anomalous data. The ELBO is a lower bound on the marginal likelihood of data z and a good approximation to  \\( \\log p(x) \\) . Within a variational inference scheme, we introduce latent variables, z, sampled from a prior distribution  \\( p(z) \\) . A simpler distribution,  \\( q(z|x) \\) , is then used to approximate the true posterior,  \\( p(z|x) \\)  [4,26]. These posterior approximations enable the model to capture the underlying distribution of normal data, facilitating the more effective identification of deviations or anomalies in the latent space.",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.338,
+      0.59,
+      0.666,
+      0.607
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathbf {E L B O} = \\mathbb {E} [ \\log p (x | z) ] - D _ {K L} (q (z | x) | | p (z | x))\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.617,
+      0.788,
+      0.663
+    ],
+    "angle": 0,
+    "content": "So, by maximizing the ELBO, we ensure the variational distribution  \\( q(z|x) \\)  closely approximates the true posterior  \\( p(z|x) \\)  by minimizing their Kullback-Leibler  \\( D_{KL} \\)  divergence.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.684,
+      0.681,
+      0.699
+    ],
+    "angle": 0,
+    "content": "2.2 Denoising Diffusion Probabilistic Models (DDPM)"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.708,
+      0.789,
+      0.815
+    ],
+    "angle": 0,
+    "content": "A diffusion probabilistic model is a latent variable model parameterized by a Markov chain, which is trained using variational inference techniques to generate samples that closely match the data within a finite time frame [12]. The training of this model consists of two phases: a forward diffusion process and a reverse denoising process. In the forward process, the approximate posterior is fixed to a Markov chain that gradually introduces Gaussian noise to the data following a variance schedule \\(\\sigma_{1},\\ldots ,\\sigma_{T}\\) [12]. The forward process is defined by",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.368,
+      0.825,
+      0.639,
+      0.843
+    ],
+    "angle": 0,
+    "content": "\\[\nq (x _ {t} | x _ {t - 1}) = \\mathcal {N} (x _ {t}; \\sqrt {\\alpha_ {t}} x _ {0}, (1 - \\alpha_ {t}) I)\n\\]"
+  }
+]

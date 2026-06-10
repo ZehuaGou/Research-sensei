@@ -1,0 +1,138 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.349,
+      0.115,
+      0.733,
+      0.131
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.769,
+      0.117,
+      0.786,
+      0.128
+    ],
+    "angle": 0,
+    "content": "15"
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.145,
+      0.669,
+      0.166
+    ],
+    "angle": 0,
+    "content": "B Model architecture and Hyperparameters"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.213,
+      0.178,
+      0.788,
+      0.313
+    ],
+    "angle": 0,
+    "content": "We constructed the diffusion model based on an encoder-decoder architecture. We used Long Short-Term Memory (LSTM) networks and SiLU activation function in the encoder-decoder network. The sliding window stride is 1; the number of LSTM layers and hidden neurons, sliding window size, learning rate, and batch size depend on the data set. All models were trained only on normal data. The data was scaled to the interval [-1, 1], and a 90:10 train-test split was used to evaluate for overfitting. Model training was performed using the Adam optimizer with a learning rate of 0.0001 and L2 regularization of  \\( 1e^{-6} \\) . For model training, diffusion time steps of T=100 are used.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.328,
+      0.788,
+      0.419
+    ],
+    "angle": 0,
+    "content": "The variances of the forward process are set according to a linear schedule [12] from \\(\\sigma_{1} = 10^{-4}\\) to \\(\\sigma_{T} = 0.05\\). The variational autoencoder and autoencoder model constructed with the same architecture as the diffusion model. The hyperparameters of the trained models have been optimized in informal experiments, resulting in the values given in Table 5. The parameters of the PINN weight schedule are specified in Table 4",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.444,
+      0.534,
+      0.55
+    ],
+    "angle": 0,
+    "content": "The physics-informed diffusion model and other physics-informed methods are trained with the same architecture and hyperparameter as the uninformed model for every dataset. The time derivative for the physics-informed neural network is computed using finite-difference approximations.",
+    "merge_prev": false
+  },
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.552,
+      0.447,
+      0.771,
+      0.462
+    ],
+    "angle": 0,
+    "content": "Table 4. PINN weight schedule"
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.574,
+      0.472,
+      0.744,
+      0.529
+    ],
+    "angle": 0,
+    "content": "<table><tr><td>f(t)</td><td>m</td><td>n</td><td>l</td></tr><tr><td>Log-Sigmoid</td><td>0.01</td><td>0.1</td><td>0.1</td></tr><tr><td>Hard-Sigmoid</td><td>0.01</td><td>1</td><td>1</td></tr><tr><td>Sigmoid</td><td>0.01</td><td>1</td><td>1</td></tr><tr><td>ReLU</td><td>0.001</td><td>0.01</td><td>0.9</td></tr></table>"
+  },
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.36,
+      0.575,
+      0.644,
+      0.59
+    ],
+    "angle": 0,
+    "content": "Table 5. Hyperparameters of all datasets"
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.218,
+      0.599,
+      0.83,
+      0.739
+    ],
+    "angle": 0,
+    "content": "<table><tr><td></td><td>EMPS</td><td>Preursor-Prey</td><td>Lenze</td><td>Air Compressor</td></tr><tr><td>Batch size</td><td>128</td><td>128</td><td>256</td><td>128</td></tr><tr><td>Epochs</td><td>350</td><td>500</td><td>500</td><td>200</td></tr><tr><td>Slinging Window</td><td>150</td><td>100</td><td>250</td><td>200</td></tr><tr><td>c of [2]</td><td>10−3</td><td>10−3</td><td>10−3</td><td>10−3</td></tr><tr><td>Encoder Layers</td><td>3</td><td>3</td><td>3</td><td>3</td></tr><tr><td>Decoder Layers</td><td>3</td><td>3</td><td>3</td><td>3</td></tr><tr><td rowspan=\"2\">Encoder Hidden Neurons</td><td>(3, 12) (12, 64)</td><td>(2, 8) (8, 16)</td><td>(8, 32) (32, 64)</td><td>(8, 32) (32, 64)</td></tr><tr><td>(64, 128)</td><td>(16, 32)</td><td>(64, 128)</td><td>(64, 128)</td></tr><tr><td rowspan=\"2\">Decoder Hidden Neurons</td><td>(128, 64) (64, 12)</td><td>(32, 16) (16, 8)</td><td>(128, 64) (64, 32)</td><td>(128, 64) (64, 32)</td></tr><tr><td>(12, 3)</td><td>(8, 2)</td><td>(32, 8)</td><td>(32, 8)</td></tr><tr><td>Neurons in the latent space</td><td>8</td><td>32</td><td>128</td><td>128</td></tr><tr><td>K Means Clusters</td><td>8</td><td>4</td><td>16</td><td>12</td></tr></table>"
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.77,
+      0.569,
+      0.785
+    ],
+    "angle": 0,
+    "content": "B.1 Model Training and Inference Time"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.795,
+      0.788,
+      0.842
+    ],
+    "angle": 0,
+    "content": "The training and inference times of the models are shown in Table 6. Here, inference time refers to the duration required by the model to detect anomalies in 1000 (700 normal and 300 anomalies) data points. The training time of the",
+    "merge_prev": false
+  }
+]

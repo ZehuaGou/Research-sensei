@@ -1,0 +1,153 @@
+[
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.069,
+      0.904,
+      0.185
+    ],
+    "angle": 0,
+    "content": "performance. Chen et al. [40] proposed a semi-supervised anomaly detection method based on variational autozoders. They introduced a parallel multi-head attention mechanism to capture the long-term dependencies in multivariate time series, while using LSTM to capture short-term dependencies. Furthermore, anomaly detection models based on Generative Adversarial Networks (GANs) have also gained attention. Li et al. [13] replaced the generator and discriminator in GANs with the structure of LSTM-RNN. They randomly generated samples in the latent space and trained the generator model to generate realistic samples. Xin et al. [17] investigated a model that combines LSTM, VAE, and GAN for the two proposed models. It is also jointly training the generator model. However, the LSTM structure directly within the GANs is significantly more computational complexity due to the iterative process involved [12], and it is prone to problems such as training instability and mode collapse.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.186,
+      0.906,
+      0.342
+    ],
+    "angle": 0,
+    "content": "Since Vaswani introduced the Transformer for translation [28], many Transformer-based models have been gradually applied in time series research. Chen et al. [48] combined multi-task learning with the Transformer architecture and proposed the MTL-Trans model for time series modeling and multi-dimensional time series prediction. Yan et al. [41] introduced a time series classification approach using the Informer network, which leverage both local and global models. The MTL-Trans model provides a more comprehensive approach to the Transformer-based model, and the Transformer is the most effective for the time series. They employed a multi-scale fusion algorithm for time series data, combining features from multiple time scales to obtain expressive representations of the time series. These studies demonstrate that Transformer-based models can better capture the long-range dependencies in time series. Therefore, we incorporate this model into anomaly detection for time series data. In contrast to the vanilla Transformer, our approach incorporates a simple yet effective masking mechanism called ADMN before performing self-attention computations with the Transformer. ADMN masks are used to identify the models that have been used to generate the data from the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of the model to the source of",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.343,
+      0.906,
+      0.497
+    ],
+    "angle": 0,
+    "content": "Recently, the Denoising Diffusion Model has demonstrated tremendous potential in image generation tasks and has shown remarkable performance in various domains such as computer vision, natural language processing, and audio processing. For example, Brempong et al. [46] proposed a denoising-based decoder pretraining method and connected a denoising automoder with a diffusion probabilistic model for semantic image segmentation. Li et al. [47] developed a differential diffusion model using a single data point for the 2D data point. In addition, a new data point for the 2D data point is also shown for the 2D data point. Kong et al. [48] introduced a universal diffusion probabilistic model called DiffWave for raw audio synthesis that is capable of generating high-quality audio signals for both conditional and unconditional waveform generation tasks. Currently, several methods based on the Denoising Diffusion Model are being used in time series research. For instance, Alcaraz et al. [49] combined the diffusion model with structured state space models and proposed a novel method for time series imputation. Rasm et al. [50] introduced an autoregressive model called TimeGrad for multivariate probabilistic time series methods for the 2D data point. For example, the data point for each time step by estimating gradients and then therefore for the 2D data point. For example, the data point for the 2D data point is also shown for the 2D data point.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.498,
+      0.904,
+      0.563
+    ],
+    "angle": 0,
+    "content": "Despite the gradual application of the Denoising Diffusion Model in time series research, multivariate time series can involve multiple dimensions such as time, space, and attributes. Moreover, time series data often exhibit long-range dependencies. To address these challenges, we propose combining the Denoising Diffusion Model with the Transformer architecture to construct a generative model suitable for time series data. This integration aims to facilitate efficient TSAD, considering the complex nature of multivariate time series and their long-range dependencies.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.091,
+      0.584,
+      0.231,
+      0.601
+    ],
+    "angle": 0,
+    "content": "3 Method"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.611,
+      0.904,
+      0.637
+    ],
+    "angle": 0,
+    "content": "In this section, we provide a brief overview of multivariate TSAD. We then introduce the components of the DDMT and describe the workflow for anomaly detection.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.653,
+      0.353,
+      0.67
+    ],
+    "angle": 0,
+    "content": "3.1 Problem Description"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.676,
+      0.906,
+      0.716
+    ],
+    "angle": 0,
+    "content": "We consider a multivariate time series \\(\\mathcal{T} = \\{x_1, \\ldots, x_T\\}\\), where each element \\(x_i\\) has \\(t\\) timestamps, \\(t \\in [1, T]\\), and \\(C\\) dimensions, \\(c \\in [1, C]\\). Here, a univariate time series is a special case where \\(c = 1\\). The multivariate time series \\(\\mathcal{T}\\) can be represented as a matrix:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.359,
+      0.727,
+      0.637,
+      0.79
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {T} = \\left( \\begin{array}{c c c c} \\mathbf {x} _ {(1, 1 | i)} & \\mathbf {x} _ {(2, 1 | i)} & \\dots & \\mathbf {x} _ {(T, 1 | i)} \\\\ \\mathbf {x} _ {(1, 2 | i)} & \\mathbf {x} _ {(2, 2 | i)} & \\dots & \\mathbf {x} _ {(T, 2 | i)} \\\\ \\vdots & \\vdots & \\ddots & \\vdots \\\\ \\mathbf {x} _ {(1, C | i)} & \\mathbf {x} _ {(2, C | i)} & \\dots & \\mathbf {x} _ {(T, C | i)} \\end{array} \\right)\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.799,
+      0.904,
+      0.85
+    ],
+    "angle": 0,
+    "content": "The task of anomaly detection involves providing a multivariate time series \\(\\mathcal{T}\\) and training it to discover pattern features within the time series. Subsequently, in a test set where the patterns are the same as \\(\\mathcal{T}\\), a label \\(\\hat{y}_t\\) (0 for normal and 1 for anomaly) is assigned to each time point \\(x_t\\). This process enables the detection of abnormal instances that do not conform to the established patterns.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.866,
+      0.24,
+      0.881
+    ],
+    "angle": 0,
+    "content": "3.2 Overview"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.888,
+      0.905,
+      0.929
+    ],
+    "angle": 0,
+    "content": "The overall architecture of DDMT, as shown in Fig. 2, consists of three components: ADNM, DDT, and Anomaly Detection. The ADNM calculates the error between the reconstructed time series and the original time series and dynamically adjusts masks based on this error. DDT comprises the denoising diffusion model and the Transformer,",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.494,
+      0.959,
+      0.504,
+      0.969
+    ],
+    "angle": 0,
+    "content": "4"
+  }
+]

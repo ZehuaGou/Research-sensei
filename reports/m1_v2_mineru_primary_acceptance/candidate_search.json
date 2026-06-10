@@ -1,0 +1,114 @@
+[
+  {
+    "key": "2602_08467v1",
+    "title": "Low Rank Transformer for Multivariate Time Series Anomaly Detection and Localization",
+    "pdf_url": "https://arxiv.org/pdf/2602.08467v1",
+    "published": "2026-02-09T10:15:25+00:00",
+    "pages": 34,
+    "formula_like_lines": 288,
+    "query": "multivariate time series anomaly detection transformer",
+    "authors": [
+      "Charalampos Shimillas",
+      "Kleanthis Malialis",
+      "Konstantinos Fokianos",
+      "Marios M. Polycarpou"
+    ],
+    "local_pdf": "_candidate_downloads/2602_08467v1.pdf"
+  },
+  {
+    "key": "2312_01729v1",
+    "title": "EdgeConvFormer: Dynamic Graph CNN and Transformer based Anomaly Detection in Multivariate Time Series",
+    "pdf_url": "https://arxiv.org/pdf/2312.01729v1",
+    "published": "2023-12-04T08:38:54+00:00",
+    "pages": 32,
+    "formula_like_lines": 125,
+    "query": "multivariate time series anomaly detection transformer",
+    "authors": [
+      "Jie Liu",
+      "Qilin Li",
+      "Senjian An",
+      "Bradley Ezard",
+      "Ling Li"
+    ],
+    "local_pdf": "_candidate_downloads/2312_01729v1.pdf"
+  },
+  {
+    "key": "2312_09478v2",
+    "title": "Entropy Causal Graphs for Multivariate Time Series Anomaly Detection",
+    "pdf_url": "https://arxiv.org/pdf/2312.09478v2",
+    "published": "2023-12-15T01:35:00+00:00",
+    "pages": 25,
+    "formula_like_lines": 106,
+    "query": "multivariate time series anomaly detection transformer",
+    "authors": [
+      "Falih Gozi Febrinanto",
+      "Kristen Moore",
+      "Chandra Thapa",
+      "Mujie Liu",
+      "Vidya Saikrishna"
+    ],
+    "local_pdf": "_candidate_downloads/2312_09478v2.pdf"
+  },
+  {
+    "key": "2510_18998v1",
+    "title": "An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version",
+    "pdf_url": "https://arxiv.org/pdf/2510.18998v1",
+    "published": "2025-10-21T18:23:20+00:00",
+    "pages": 15,
+    "formula_like_lines": 86,
+    "query": "time series anomaly detection transformer",
+    "authors": [
+      "Buang Zhang",
+      "Tung Kieu",
+      "Xiangfei Qiu",
+      "Chenjuan Guo",
+      "Jilin Hu"
+    ],
+    "local_pdf": "_candidate_downloads/2510_18998v1.pdf"
+  },
+  {
+    "key": "2508_11528v1",
+    "title": "Physics-Informed Diffusion Models for Unsupervised Anomaly Detection in Multivariate Time Series",
+    "pdf_url": "https://arxiv.org/pdf/2508.11528v1",
+    "published": "2025-08-15T15:13:32+00:00",
+    "pages": 16,
+    "formula_like_lines": 83,
+    "query": "time series anomaly detection diffusion model",
+    "authors": [
+      "Juhi Soni",
+      "Markus Lange-Hegermann",
+      "Stefan Windmann"
+    ],
+    "local_pdf": "_candidate_downloads/2508_11528v1.pdf"
+  },
+  {
+    "key": "2007_14254v1",
+    "title": "Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection",
+    "pdf_url": "https://arxiv.org/pdf/2007.14254v1",
+    "published": "2020-07-25T01:32:00+00:00",
+    "pages": 7,
+    "formula_like_lines": 70,
+    "query": "multivariate time series anomaly detection transformer",
+    "authors": [
+      "Farzaneh Khoshnevisan",
+      "Zhewen Fan",
+      "Vitor R. Carvalho"
+    ],
+    "local_pdf": "_candidate_downloads/2007_14254v1.pdf"
+  },
+  {
+    "key": "2310_08800v2",
+    "title": "DDMT: Denoising Diffusion Mask Transformer Models for Multivariate Time Series Anomaly Detection",
+    "pdf_url": "https://arxiv.org/pdf/2310.08800v2",
+    "published": "2023-10-13T01:18:41+00:00",
+    "pages": 16,
+    "formula_like_lines": 67,
+    "query": "multivariate time series anomaly detection transformer",
+    "authors": [
+      "Chaocheng Yang",
+      "Tingyin Wang",
+      "Xuanhui Yan"
+    ],
+    "local_pdf": "_candidate_downloads/2310_08800v2.pdf"
+  }
+]

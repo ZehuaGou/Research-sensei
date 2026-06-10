@@ -1,0 +1,155 @@
+[
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.069,
+      0.908,
+      0.095
+    ],
+    "angle": 0,
+    "content": "the original distribution of the time series. However, they are also prone to fitting the anomalous portions of the time series, thus compromising the anomaly detection performance of the models.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.096,
+      0.907,
+      0.265
+    ],
+    "angle": 0,
+    "content": "The Denoising Diffusion Model has recently emerged as a new state-of-the-art generative model, demonstrating impressive sample quality and diversity[17]. Compared to GAN, the Denoising Diffusion Model offers better pattern and quality of the model, and the model provides a more complex, more complex structure, text-to-image translation and resolution, and image synthesis [19, 20, 21], garnering widespread attention. The step-by-step noise removal approach employed in Denoising Diffusion Models enables the generation of high-quality samples. Moreover, its training process is more stable than GAN models, as it is less prone to issues such as training instability and mode collapse. However, in previous image modeling tools, the standard architecture for \\(\\lambda_{2}\\) in diffusion models is more complex than GAN models, and the model is more complex than GAN models, and also by another stack of residual layers and upsampled convolutions. It employed skip connections between layers with the same spatial dimensions, enabling the model to effectively capture local features within image data and obtain spatial positional information for pixels. As a result, it exced in numerous image tasks [20]. Nevertheless, because time series of the model is not necessarily independent, the original model architecture may prove challenges to achieve the desired results in time series research.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.265,
+      0.909,
+      0.421
+    ],
+    "angle": 0,
+    "content": "In recent years, the Transformer model has made significant advancements in various fields, including natural language processing [25], computer vision [26], and time series analysis [27]. Its success stems from its ability to capture dependencies between data elements and its powerful feature extraction capabilities. Compared to the structure of IINN, the Transformer model utilizes self-attention mechanisms, enabling adaptive modeling of both short-term and long-term models. The Transformer model provides a more comprehensive and comprehensive entire sequence in parallel, improving computational efficiency. Therefore, we have combined the Transformer with the Denoising Diffusion Model, replacing U-Net as the internal neural network architecture within the diffusion model. This modification enables our model to better handle global dependencies, complex patterns, and long-term relationships within time series data, consequently enhancing the performance of time series reconstruction. However, when using the Transformer for time series reconstruction, each node's reconstruction relies significantly on its own information and that the model provides a more comprehensive and comprehensive entire sequence. This model provides a more comprehensive understanding of anomalous parts during sequence reconstruction, a phenomenon we refer to as Weak Identity Mapping (WIM).",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.421,
+      0.906,
+      0.537
+    ],
+    "angle": 0,
+    "content": "To address the issue of WIM during time series reconstruction, we propose a novel ADNM approach that leverages the differences between the reconstructed time series and the original time series to set the mask. Currently, popular reconstruction networks [28, 29, 11], while effective at extracting features from the original time series, may encounter difficulties during time series reconstruction if the input data contain anomalies. In such cases, the model might attempt to incorporate these anomalies into the reconstruction, resulting in inaccurate results and exacerbating the problem of WIM during time series reconstruction. Similarly, complex autoencoder structures [30] also possess strong feature extraction capabilities and the corresponding data from the original time series and the reconstructed time series, the errors in the normal and maximal portions of the data may not exhibit noticeable distinctions, which makes it challenging to utilize these errors to establish a dynamic mask.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.538,
+      0.906,
+      0.707
+    ],
+    "angle": 0,
+    "content": "In light of these challenges, we have adopted a simple autoencoder structure. While it may not fully explore deep-level features within the time series, it allows us to better downplay the information related to abnormal data patterns. Consequently, during the time series reconstruction process, the differences in a small portion of normal data might be considered in the time series. Therefore, we have been able to use the same data series to be used. Consequently, we dynamically adjust the mask based on the differences between the reconstructed and original time series. It is essential to note that data points adjacent to anomalies may not exhibit the characteristics of normal data (as shown in Fig. 1). Therefore, when the model extracts local features and long-term dependencies within the time series, we can be used to address the data points in the time series. Therefore, we can be used to utilize the Transformer to compute self-attention within the time series. ADM masks nodes with significant errors in the sequence and their neighboring nodes, preventing them from utilizing their own and neighboring information during data reconstruction. Consequently, the model must rely on information from more distant points to reconstruct the current time point. This approach enhances the model's ability to understand normal patterns and fit normal data.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.12,
+      0.708,
+      0.564,
+      0.72
+    ],
+    "angle": 0,
+    "content": "The principal contributions of this paper are outlined as follows:",
+    "merge_prev": false
+  },
+  {
+    "type": "list",
+    "bbox": [
+      0.116,
+      0.724,
+      0.904,
+      0.861
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.116,
+      0.724,
+      0.904,
+      0.787
+    ],
+    "angle": 0,
+    "content": "- We have designed a novel framework that combines the Transformer and Denoising Diffusion Model for TSAD. To the best of our knowledge, this is the first approach that integrates the Denoising Diffusion Model and Transformer for TSAD. It addresses global dependencies, complex patterns, and long-term relationships within time series data and progressively restores time series data by removing noise, making it easier for the model to capture and identify anomalies.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.116,
+      0.793,
+      0.904,
+      0.831
+    ],
+    "angle": 0,
+    "content": "- We propose a new ADNM mechanism that dynamically adjusts the mask based on the differences between the reconstructed and original time series. This mechanism alleviates the problem of WIM during sequence reconstruction, enhancing the model's generalization capability.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.116,
+      0.836,
+      0.904,
+      0.861
+    ],
+    "angle": 0,
+    "content": "- Conducting extensive experiments on five publicly available multivariate TSAD datasets. The results demonstrate that the proposed DDMT achieves state-of-the-art performance in anomaly detection.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.091,
+      0.881,
+      0.304,
+      0.898
+    ],
+    "angle": 0,
+    "content": "2 Related Work"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.909,
+      0.908,
+      0.935
+    ],
+    "angle": 0,
+    "content": "In this section, a brief overview of methods for TSAD is provided, including machine learning-based methods and deep learning-based methods.",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.493,
+      0.958,
+      0.506,
+      0.969
+    ],
+    "angle": 0,
+    "content": "2"
+  }
+]

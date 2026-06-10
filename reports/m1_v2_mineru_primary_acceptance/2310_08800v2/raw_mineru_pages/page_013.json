@@ -1,0 +1,171 @@
+[
+  {
+    "type": "chart",
+    "bbox": [
+      0.215,
+      0.071,
+      0.773,
+      0.364
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.089,
+      0.381,
+      0.908,
+      0.414
+    ],
+    "angle": 0,
+    "content": "Figure 9: The P, R, F1 and anomaly detection time with diffusion steps S. The P, R, and F1 represent the precision, recall, and F1-score (as %), respectively."
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.435,
+      0.906,
+      0.538
+    ],
+    "angle": 0,
+    "content": "the Transformer as the internal neural network structure to effectively capture both global and local dependencies in time series data. As a state-of-the-art generative model, the Denoising Diffusion Model is employed for time series generation through a forward diffusion process and a learnable reverse process. ADNM dynamically adjusts masks, masking information from anomalous nodes and their neighboring nodes in the time series, alleviating the issue of WIM during sequence reconstruction and enhancing the model's robustness. We conducted extensive experiments on five publicly available datasets, comparing our proposed model with existing anomaly detection models, and demonstrated the effectiveness of our approach. Ablation studies confirmed the effectiveness of each component within DDMT and their ability to handle noise and capture subtle anomalies.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.54,
+      0.906,
+      0.564
+    ],
+    "angle": 0,
+    "content": "Similarly, DDMT also exhibits certain limitations. Our future work will address these shortcomings from two perspectives:",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.565,
+      0.906,
+      0.616
+    ],
+    "angle": 0,
+    "content": "1. Incorporating Prior Knowledge: DDMT currently performs end-to-end training on datasets without incorporating prior knowledge, such as specific holidays or significant events. This limitation may result in false positives or false negatives in certain situations. Introducing domain-specific expert knowledge during the training process often benefits the anomaly detection performance of the model.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.617,
+      0.906,
+      0.67
+    ],
+    "angle": 0,
+    "content": "2. Reducing Computational Resource Requirements: The iterative process of the Denoising Diffusion Model consumes substantial computational resources. In resource-constrained environments, it might be challenging to detect anomalies within a short timeframe. Therefore, we aim to improve the model's architecture to reduce the running time and enhance the utilization of computational resources.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.091,
+      0.689,
+      0.225,
+      0.707
+    ],
+    "angle": 0,
+    "content": "References"
+  },
+  {
+    "type": "list",
+    "bbox": [
+      0.095,
+      0.714,
+      0.908,
+      0.926
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.716,
+      0.906,
+      0.744
+    ],
+    "angle": 0,
+    "content": "[1] Ane Blázquez-García, Angel Conde, Usue Mori, and Jose A Lozano. A review on outlier/anomaly detection in time series data. ACM Computing Surveys (CSUR), 54(3):1–33, 2021."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.747,
+      0.906,
+      0.774
+    ],
+    "angle": 0,
+    "content": "[2] Daniela Brauckhoff, Kave Salamatian, and Martin May. Applying pca for traffic anomaly detection: Problems and solutions. In IEEE INFOCOM 2009, pages 2866–2870. IEEE, 2009."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.778,
+      0.906,
+      0.804
+    ],
+    "angle": 0,
+    "content": "[3] Ashfaq Hussain Farooqi and Ali Munir. Intrusion detection system for ip multimedia subsystem using k-nearest neighbor classifier. In 2008 IEEE International Multitopic Conference, pages 423–428. IEEE, 2008."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.809,
+      0.906,
+      0.849
+    ],
+    "angle": 0,
+    "content": "[4] Tian Huang, Yan Zhu, Qiannan Zhang, Yongxin Zhu, Dongyang Wang, Meikang Qiu, and Lei Liu. An lof-based adaptive anomaly detection scheme for cloud computing. In 2013 IEEE 37th Annual computer software and applications conference workshops, pages 206–211. IEEE, 2013."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.853,
+      0.906,
+      0.892
+    ],
+    "angle": 0,
+    "content": "[5] Meng Jianliang, Shang Haikun, and Bian Ling. The application on intrusion detection based on k-means cluster algorithm. In 2009 International Forum on Information Technology and Applications, volume 1, pages 150–152. IEEE, 2009."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.099,
+      0.896,
+      0.906,
+      0.924
+    ],
+    "angle": 0,
+    "content": "[6] Fei Tony Liu, Kai Ming Ting, and Zhi-Hua Zhou. Isolation forest. In 2008 eighth ieee international conference on data mining, pages 413–422. IEEE, 2008."
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.49,
+      0.958,
+      0.511,
+      0.97
+    ],
+    "angle": 0,
+    "content": "13"
+  }
+]

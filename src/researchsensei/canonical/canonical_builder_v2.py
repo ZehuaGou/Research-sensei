@@ -34,6 +34,7 @@ class CanonicalBuilderV2:
         blocks: list[CanonicalDocumentBlock],
         quality: M1QualityGateResult,
         output_dir: str | Path,
+        formula_slots: list[dict] | None = None,
         parser_name: str = "mineru25pro",
         source_pdf_path: str = "",
         metrics: dict | None = None,
@@ -41,7 +42,7 @@ class CanonicalBuilderV2:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         formula_blocks = self._formula_blocks(blocks)
-        formula_slots = self._formula_slots(blocks)
+        output_formula_slots = self._formula_slots(blocks, formula_slots)
 
         markdown = self._render_markdown(
             paper_id=paper_id,
@@ -50,7 +51,7 @@ class CanonicalBuilderV2:
             quality=quality,
             formula_blocks=formula_blocks,
             parser_name=parser_name,
-            source_pdf_path=source_pdf_path,
+            source_pdf_path=self._display_source_path(source_pdf_path, output_dir),
             metrics=metrics or {},
         )
         canonical_path = output_dir / "canonical_paper.md"
@@ -60,10 +61,10 @@ class CanonicalBuilderV2:
             encoding="utf-8",
         )
         (output_dir / "formula_slots.json").write_text(
-            json.dumps(formula_slots, indent=2, ensure_ascii=False),
+            json.dumps(output_formula_slots, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        (output_dir / "formula_slots.md").write_text(self._render_formula_slots(formula_slots), encoding="utf-8")
+        (output_dir / "formula_slots.md").write_text(self._render_formula_slots(output_formula_slots), encoding="utf-8")
 
         status = self._canonical_status(quality.status)
         m2_ready = self._m2_ready(quality)
@@ -117,15 +118,23 @@ class CanonicalBuilderV2:
             return FormulaOrigin.RAW_FORMULA_TEXT
         return FormulaOrigin.UNRESOLVED
 
-    def _formula_slots(self, blocks: list[CanonicalDocumentBlock]) -> list[dict]:
+    def _formula_slots(self, blocks: list[CanonicalDocumentBlock], reviewed_slots: list[dict] | None = None) -> list[dict]:
         slots: list[dict] = []
+        reviewed_by_block = {str(slot.get("block_id", "")): slot for slot in reviewed_slots or [] if slot.get("block_id")}
+        reviewed_by_formula = {str(slot.get("formula_id", "")): slot for slot in reviewed_slots or [] if slot.get("formula_id")}
         for index, block in enumerate((b for b in blocks if b.block_type == "formula"), start=1):
             origin = self._origin_for_block(block)
+            formula_id = f"formula_{index:03d}"
+            reviewed = reviewed_by_block.get(block.block_id) or reviewed_by_formula.get(formula_id) or {}
             slots.append({
-                "formula_id": f"formula_{index:03d}",
+                "formula_id": formula_id,
                 "block_id": block.block_id,
                 "page": block.page,
                 "bbox": block.bbox,
+                "crop_required": reviewed.get("crop_required", True),
+                "overlay_required": reviewed.get("overlay_required", True),
+                "crop_path": reviewed.get("crop_path", ""),
+                "overlay_path": reviewed.get("overlay_path", ""),
                 "section": block.section,
                 "section_confidence": block.section_confidence,
                 "section_reason": block.section_reason,
@@ -213,7 +222,14 @@ class CanonicalBuilderV2:
                     prefix = "### " if block.block_type == "title" else ""
                     lines += [prefix + block.text, ""]
 
-        return "\n".join(lines)
+        rendered: list[str] = []
+        for line in lines:
+            parts = str(line).splitlines()
+            if parts:
+                rendered.extend(part.rstrip() for part in parts)
+            else:
+                rendered.append("")
+        return "\n".join(rendered)
 
     def _canonical_status(self, quality: CanonicalQualityStatus) -> CanonicalizationStatus:
         if quality == CanonicalQualityStatus.FAIL:
@@ -221,6 +237,15 @@ class CanonicalBuilderV2:
         if quality == CanonicalQualityStatus.DEGRADED:
             return CanonicalizationStatus.DEGRADED
         return CanonicalizationStatus.SUCCESS
+
+    def _display_source_path(self, source_pdf_path: str, output_dir: Path) -> str:
+        if not source_pdf_path:
+            return ""
+        path = Path(source_pdf_path)
+        try:
+            return path.resolve().relative_to(output_dir.resolve()).as_posix()
+        except (OSError, ValueError):
+            return path.as_posix()
 
     def _m2_ready(self, quality: M1QualityGateResult) -> bool:
         return (

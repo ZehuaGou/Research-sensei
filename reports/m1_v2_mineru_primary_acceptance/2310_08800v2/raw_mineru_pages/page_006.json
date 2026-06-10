@@ -1,0 +1,139 @@
+[
+  {
+    "type": "image",
+    "bbox": [
+      0.273,
+      0.076,
+      0.71,
+      0.39
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.089,
+      0.415,
+      0.908,
+      0.458
+    ],
+    "angle": 0,
+    "content": "Figure 3: Adaptive Dynamic Neighbor Mask(ADNM).  \\( m_{i}=1 \\)  indicates that the number of masked neighboring nodes is 1, and this value is adjusted based on the Pearson correlation coefficient threshold. If  \\( m_{i}=0 \\) , no masking operation is performed on neighboring nodes."
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.479,
+      0.471,
+      0.496
+    ],
+    "angle": 0,
+    "content": "3.4 Denoising Diffusion Transformer"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.502,
+      0.906,
+      0.618
+    ],
+    "angle": 0,
+    "content": "Denoising Diffusion Model represents a class of generative models that have demonstrated state-of-the-art performance on a diverse range of domains, including images [21], audio [48], and video data [52], among others. Denoising Diffusion Model treats a stochastic process as a partial differential equation and solves this equation through numerical methods to obtain the probability distribution function of the stochastic process. As the noise gradually diffuses, the probability distribution function of the stochastic process evolves, reflecting the underlying dynamics. Denoising Diffusion Model consists of a forward diffusion process, denoted as \\( q(x_{i+1}, -1) \\), and a learnable inverse process, denoted as \\( p(x_{i}, -1, -1v_{i}) \\). The forward process gradually transforms data from the target distribution \\( p(x_{i}) \\) into a Gaussian distribution by adding noise, while the inverse process generates samples by transforming noise into \\( q(x_{i}) \\), as shown in Fig. 4.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.619,
+      0.906,
+      0.658
+    ],
+    "angle": 0,
+    "content": "The forward process of the Denoising Diffusion Model is a non-homogeneous Markov noise process. In this process, at each time step \\( t \\), Gaussian noise with specific mean and variance is added to the data. This dynamic process can be described as follows:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.373,
+      0.667,
+      0.905,
+      0.702
+    ],
+    "angle": 0,
+    "content": "\\[\nq (x _ {1}, \\dots , x _ {T} \\mid x _ {0}) = \\prod_ {t = 1} ^ {T} q (x _ {t} \\mid x _ {t - 1}) \\tag {1}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.707,
+      0.908,
+      0.761
+    ],
+    "angle": 0,
+    "content": "where \\( q(x_{t} \\mid x_{t-1}) = \\mathcal{N}(x_{t} \\mid x_{t-1} \\sqrt{1 - \\beta_{1}}, \\beta_{1}\\mathbf{I}) \\). The noise added at each step is determined by a variance table \\( \\beta_{t} \\in (0,1), t = 1, \\dots, T \\). It can be defined as a small linear sequence. Based on the updates of \\( \\beta \\) as described in Ho et al. [2], we set \\( \\beta_{1} = 10^{-4} \\) and linearly increase \\( \\beta_{t} \\) up to 0.02. By computing available \\( x_{t} = \\sqrt{1 - \\beta_{1}}(x_{t-1} + \\sqrt{1 - \\beta_{1}}\\epsilon_{t-1} \\), for \\( \\epsilon_{t-1} \\sim \\mathcal{N}(0,\\mathbf{I}) \\). The denoising process \\( p_{0} \\) is learned by optimizing the model parameters \\( \\theta \\) and is defined as follows:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.339,
+      0.768,
+      0.905,
+      0.803
+    ],
+    "angle": 0,
+    "content": "\\[\np _ {0} \\left(x _ {0}, \\dots , x _ {t - 1} \\mid x _ {T}\\right) = p \\left(x _ {T}\\right) \\prod_ {t = 1} ^ {T} p _ {0} \\left(x _ {t - 1} \\mid x _ {t}\\right) \\tag {2}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.808,
+      0.908,
+      0.836
+    ],
+    "angle": 0,
+    "content": "where \\( p_{\\theta}(x_{t-1} \\mid x_t) = \\mathcal{N}(x_{t-1} \\mid \\mu_{\\theta}(x_t, t), \\tilde{\\beta}_t \\mathrm{I}) \\). As demonstrated by Ho et al. [22], it is possible to train the inverse process using the following objective function:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.275,
+      0.844,
+      0.905,
+      0.866
+    ],
+    "angle": 0,
+    "content": "\\[\nL = \\min _ {\\theta} \\mathbb {E} _ {x _ {0} \\sim \\mathrm{D}, \\epsilon \\sim \\mathcal {N} (0, t), t \\sim \\alpha (1, T)} \\| \\epsilon - \\epsilon_ {\\theta} \\left(\\sqrt {\\alpha_ {t}} x _ {0} + (1 - \\alpha_ {t}) \\epsilon , t\\right) \\| ^ {2} \\tag {3}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.868,
+      0.908,
+      0.935
+    ],
+    "angle": 0,
+    "content": "where D refers to the data distribution, and  \\( e_{0}(x_{1},t) \\)  is parameterized using a neural network. For brevity, L refers to the  \\( L_{simple} \\)  in Ho et al. [22]. We have replaced the U-Net with Transformer as the neural network architecture inside the Denoising Diffusion Model to better handle deep local features and long-term dependencies within time series data, replacing the U-Net The original Denoising Diffusion Model used a U-Net as the internal neural network to learn the reverse process. In this paper, the convolutional and pooling layers of the U-Net in the Denoising Diffusion Model have",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.493,
+      0.959,
+      0.506,
+      0.969
+    ],
+    "angle": 0,
+    "content": "6"
+  }
+]

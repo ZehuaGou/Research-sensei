@@ -1,0 +1,150 @@
+[
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.237,
+      0.077,
+      0.759,
+      0.09
+    ],
+    "angle": 0,
+    "content": "Table 3: Ablation study of ADNM and DDT on the different datasets."
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.263,
+      0.091,
+      0.737,
+      0.212
+    ],
+    "angle": 0,
+    "content": "<table><tr><td>Dataset</td><td>Transformer</td><td>W/O ADNM</td><td>W/O DDT</td><td>Our</td></tr><tr><td>SMD</td><td>79.56</td><td>83.16</td><td>76.73</td><td>84.66</td></tr><tr><td>MSL</td><td>78.68</td><td>91.26</td><td>87.26</td><td>95.30</td></tr><tr><td>SMAP</td><td>69.70</td><td>93.02</td><td>90.86</td><td>96.51</td></tr><tr><td>SWaT</td><td>80.37</td><td>90.12</td><td>92.16</td><td>97.24</td></tr><tr><td>PSM</td><td>76.07</td><td>95.36</td><td>90.93</td><td>98.16</td></tr><tr><td>Average</td><td>76.88</td><td>90.58</td><td>87.59</td><td>94.37</td></tr></table>"
+  },
+  {
+    "type": "chart",
+    "bbox": [
+      0.174,
+      0.226,
+      0.816,
+      0.472
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.295,
+      0.491,
+      0.698,
+      0.506
+    ],
+    "angle": 0,
+    "content": "Figure 7: The F1 comparison of different window size."
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.088,
+      0.53,
+      0.904,
+      0.581
+    ],
+    "angle": 0,
+    "content": "detection effectiveness. The proposed ADNM with the adaptive dynamic neighbor mask mechanism outperforms the original self-attention model with an average F1-score improvement of 3.99% (90.38%~+94.37%). The results indicate that avoiding information leakage of each token and its neighbors during sequence reconstruction is crucial, and the masking mechanism in ADNM helps mitigate the identical shortcut problem during sequence reconstruction.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.088,
+      0.582,
+      0.906,
+      0.66
+    ],
+    "angle": 0,
+    "content": "Baseline: To understand the effectiveness of the proposed method, we also compared it with a Transformer model as the baseline. In the Transformer model, the traditional self-attention mechanism was used to capture deep-level features of the time series by computing the attention map between all tokens for sequence reconstruction. The experimental results show that the average F1-score of the DDMT model was improved by 16.95% (77.42%→94.37%) compared to the Transformer model, demonstrating a significant superiority of the DDMT model over the Transformer model. In other words, the ADNM and DDT components in the DDMT model substantially enhance the anomaly detection performance.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.676,
+      0.31,
+      0.692
+    ],
+    "angle": 0,
+    "content": "4.4 Analysis DDMT"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.088,
+      0.699,
+      0.908,
+      0.739
+    ],
+    "angle": 0,
+    "content": "In this section, we investigated the impact of various hyperparameters on the performance of the DDMT model. We primarily analyzed the effects of the window size on the results, as well as the influence of the mask scale in the ADNM module and the diffusion steps \\( S \\) in the DDT denoising process on the experimental outcomes.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.752,
+      0.364,
+      0.767
+    ],
+    "angle": 0,
+    "content": "4.4.1 Analysis of Window Size"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.088,
+      0.774,
+      0.906,
+      0.853
+    ],
+    "angle": 0,
+    "content": "The sliding window size is an important parameter influencing the model's performance. For the given MSL dataset, we conducted experiments with four different models using various window sizes. The graph illustrates the impact of window size on the F1-scores of the different models, where each colored bar represents a specific model in the ablation experiments. As shown in Fig. 7, it can be observed that despite the differences in model architectures, the anomaly detection performance of all models gradually improves as the window size increases. The experiments demonstrate that the window size significantly affects the final results and should not be overlooked.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.866,
+      0.369,
+      0.881
+    ],
+    "angle": 0,
+    "content": "4.4.2 Sensitivity to Mask Scale"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.088,
+      0.888,
+      0.906,
+      0.929
+    ],
+    "angle": 0,
+    "content": "The mask scale primarily reflects the level of attention the model pays to each token and its neighboring information during time series reconstruction. During sequence reconstruction, the model should not overly rely on the information of each token and its neighbors, as subtle anomalies might be directly mapped onto the reconstructed time series, making",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.49,
+      0.958,
+      0.509,
+      0.969
+    ],
+    "angle": 0,
+    "content": "11"
+  }
+]

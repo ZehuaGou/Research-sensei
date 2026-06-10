@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Physics-Informed Diffusion Models for Unsupervised Anomaly Detection in Multivariate Time Series M1 audit</title>
+<style>body{font-family:Arial,sans-serif;margin:24px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px;vertical-align:top}code{white-space:pre-wrap}</style>
+</head><body>
+<h1>M1 Visual Audit: Physics-Informed Diffusion Models for Unsupervised Anomaly Detection in Multivariate Time Series</h1>
+<p>paper_id: 2508_11528v1</p>
+<h2>Metrics</h2>
+<pre>{
+  &quot;formula_count&quot;: 17,
+  &quot;latex_count&quot;: 17,
+  &quot;raw_formula_text_count&quot;: 0,
+  &quot;bbox_count&quot;: 17,
+  &quot;section_distribution&quot;: {
+    &quot;Unknown&quot;: 5,
+    &quot;Introduction&quot;: 17,
+    &quot;Related Work&quot;: 35,
+    &quot;Method&quot;: 35,
+    &quot;Experiments&quot;: 26,
+    &quot;Conclusion&quot;: 5,
+    &quot;References&quot;: 75
+  },
+  &quot;section_contradiction_count&quot;: 0,
+  &quot;all_formulas_in_Abstract_suspicious&quot;: false,
+  &quot;polluted_section_count&quot;: 0,
+  &quot;missing_crop_count&quot;: 0,
+  &quot;missing_overlay_count&quot;: 0,
+  &quot;raw_only_formula_dense&quot;: false,
+  &quot;m2_ready_for_formula_understanding&quot;: true,
+  &quot;formula_understanding_reasons&quot;: [],
+  &quot;high_risk_count&quot;: 0,
+  &quot;medium_risk_count&quot;: 0,
+  &quot;low_risk_count&quot;: 0,
+  &quot;canonical_quality_status&quot;: &quot;PASS&quot;,
+  &quot;primary_parser&quot;: &quot;mineru25pro&quot;,
+  &quot;ollama_enabled&quot;: false,
+  &quot;runtime_seconds&quot;: 0.845,
+  &quot;mineru_available&quot;: true,
+  &quot;formula_slot_count&quot;: 17,
+  &quot;formula_crop_count&quot;: 17,
+  &quot;formula_overlay_count&quot;: 17,
+  &quot;mineru_runtime_seconds&quot;: 0.021,
+  &quot;mineru_raw_payload_pages&quot;: 16,
+  &quot;mineru_raw_payload_total_blocks&quot;: 198,
+  &quot;acceptance_max_pages&quot;: 0,
+  &quot;ollama_json_valid&quot;: 0,
+  &quot;ollama_json_invalid&quot;: 0,
+  &quot;ollama_retry_count&quot;: 0,
+  &quot;ollama_timeout_count&quot;: 0,
+  &quot;ollama_changed_by_count&quot;: 0
+}</pre>
+<h2>Formula Blocks</h2>
+<table><thead><tr><th>block</th><th>page</th><th>section</th><th>bbox</th><th>latex/text</th><th>risk</th></tr></thead>
+<tbody><tr><td>b0026</td><td>3</td><td>Related Work</td><td>[0.338, 0.59, 0.666, 0.607]</td><td><code>\mathbf {E L B O} = \mathbb {E} [ \log p (x | z) ] - D _ {K L} (q (z | x) | | p (z | x))</code></td><td>none</td></tr><tr><td>b0030</td><td>3</td><td>Related Work</td><td>[0.368, 0.825, 0.639, 0.843]</td><td><code>q (x _ {t} | x _ {t - 1}) = \mathcal {N} (x _ {t}; \sqrt {\alpha_ {t}} x _ {0}, (1 - \alpha_ {t}) I)</code></td><td>none</td></tr><tr><td>b0034</td><td>4</td><td>Related Work</td><td>[0.377, 0.173, 0.629, 0.19]</td><td><code>q (x _ {t} | x _ {0}) = \mathcal {N} (x _ {t}; \sqrt {\overline {{\alpha_ {t}}}} x _ {0}, (1 - \overline {{\alpha_ {t}}}) I)</code></td><td>none</td></tr><tr><td>b0036</td><td>4</td><td>Related Work</td><td>[0.349, 0.242, 0.652, 0.259]</td><td><code>p _ {\theta} (x _ {t - 1} | x _ {t}) = \mathcal {N} (x _ {t - 1}; \mu_ {\theta} (x _ {t}, t), \Sigma_ {\theta} (x _ {t}, t))</code></td><td>none</td></tr><tr><td>b0038</td><td>4</td><td>Related Work</td><td>[0.253, 0.355, 0.756, 0.455]</td><td><code>\mathcal {L} _ {\mathcal {D M}} = \underbrace {D _ {K L} (q (x _ {T} | x _ {0}) | | p (x _ {T}))} _ {L _ {T}} \underbrace {+ \sum_ {t = 2} ^ {T} D _ {K L} (q (x _ {t - 1} | x _ {t} , x _ {0}) | | p _ {\theta} (x _ {t - 1} | x _ {t}))} _ {L _ {t - 1}} - \underbrace {\log p _ {\theta} (x _ {0} | x _ {1})} _ {L _ {0}}</code></td><td>none</td></tr><tr><td>b0040</td><td>4</td><td>Related Work</td><td>[0.341, 0.505, 0.667, 0.54]</td><td><code>L _ {t - 1} = \mathbb {E} _ {q} \left[ \frac {1}{2 \sigma^ {2}} | | \tilde {\mu} (x _ {t}, x _ {0}) - \mu_ {\theta} (x _ {t}, t) | | ^ {2} \right] + C</code></td><td>none</td></tr><tr><td>b0042</td><td>4</td><td>Related Work</td><td>[0.331, 0.589, 0.675, 0.608]</td><td><code>\mathcal {L} _ {\mathcal {D M}} = \mathbb {E} _ {t, x _ {0}, \epsilon} \left[ | | \epsilon - \epsilon_ {\theta} (\sqrt {\overline {{{\alpha}}} _ {t}} x _ {0} + \sqrt {1 - \overline {{{\alpha}}} _ {t}} \epsilon , t) | | ^ {2} \right]</code></td><td>none</td></tr><tr><td>b0046</td><td>4</td><td>Related Work</td><td>[0.449, 0.827, 0.558, 0.842]</td><td><code>\mathcal {L} = \mathcal {L} _ {\mathcal {F}} + \mathcal {L} _ {\mathcal {P I}}</code></td><td>none</td></tr><tr><td>b0050</td><td>5</td><td>Related Work</td><td>[0.395, 0.174, 0.606, 0.215]</td><td><code>\mathcal {L} _ {\mathcal {P I}} = \frac {1}{N} \sum_ {i = 1} ^ {N} \mathcal {E} (\mathcal {D}, F (x _ {i}; \theta)) ^ {2}</code></td><td>none</td></tr><tr><td>b0065</td><td>7</td><td>Method</td><td>[0.396, 0.189, 0.606, 0.23]</td><td><code>\mathcal {L} _ {\mathcal {P I}} = \overline {{\lambda_ {P I _ {t}}}} \frac {1}{N} \sum_ {i = 1} ^ {N} \mathcal {E} (\mathcal {D}, \widehat {x _ {i _ {0}}}) ^ {2}</code></td><td>none</td></tr><tr><td>b0067</td><td>7</td><td>Method</td><td>[0.41, 0.394, 0.591, 0.409]</td><td><code>\mathcal {L} _ {T P I D, M} = \mathcal {L} _ {D M} + \mathcal {L} _ {P I}</code></td><td>none</td></tr><tr><td>b0076</td><td>8</td><td>Method</td><td>[0.425, 0.171, 0.581, 0.186]</td><td><code>\mathcal {A} _ {t h r} = \mu_ {t r i m} + k \cdot \mathrm{iqr}</code></td><td>none</td></tr><tr><td>b0168</td><td>14</td><td>References</td><td>[0.299, 0.173, 0.416, 0.202]</td><td><code>\frac {\mathrm{d} x}{\mathrm{d} t} = \alpha x - \beta x y</code></td><td>none</td></tr><tr><td>b0170</td><td>14</td><td>References</td><td>[0.593, 0.173, 0.703, 0.202]</td><td><code>\frac {\mathrm{d} y}{\mathrm{d} t} = \delta x y - \gamma y</code></td><td>none</td></tr><tr><td>b0174</td><td>14</td><td>References</td><td>[0.452, 0.446, 0.537, 0.476]</td><td><code>\frac {\mathrm{d} V}{\mathrm{d} t} = R \frac {\mathrm{d} I}{\mathrm{d} t}</code></td><td>none</td></tr><tr><td>b0177</td><td>14</td><td>References</td><td>[0.344, 0.617, 0.644, 0.648]</td><td><code>\tau = M \frac {\mathrm{d} ^ {2} q}{\mathrm{d} t ^ {2}} + F _ {v} \frac {\mathrm{d} q}{\mathrm{d} t} + F _ {c} \mathrm{sign} (\frac {\mathrm{d} q}{\mathrm{d} t}) + \mathrm{offset}</code></td><td>none</td></tr><tr><td>b0180</td><td>14</td><td>References</td><td>[0.427, 0.773, 0.577, 0.803]</td><td><code>P \frac {\mathrm{d} v}{\mathrm{d} t} + v \frac {\mathrm{d} P}{\mathrm{d} t} = R \frac {\mathrm{d} T}{\mathrm{d} t}</code></td><td>none</td></tr></tbody></table>
+</body></html>

@@ -1,0 +1,179 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.349,
+      0.115,
+      0.733,
+      0.13
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.769,
+      0.117,
+      0.785,
+      0.127
+    ],
+    "angle": 0,
+    "content": "11"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.213,
+      0.147,
+      0.788,
+      0.389
+    ],
+    "angle": 0,
+    "content": "Training. In particular, we developed a PINN weighting schedule and embedded it within the physics-informed loss formulation. We demonstrated the effectiveness of the proposed method in terms of unsupervised anomaly detection, log-likelihood, and data diversity. Our experimental results indicate that physics-informed training results in an improved F1 score for anomaly detection. Our findings further confirm that with physics-informed training, we achieve better performance than the performance of the proposed method in training with the noise prediction objective enhances the diversity of generated samples compared to the purely data-driven model and prior physics-informed work. It shows that our approach performs better than the previous methods by using a novel weighted physics-informed loss scheduled across diffusion steps. Our approach broadly applies to time series governed by physical principles and can be extended to domains such as fluid dynamics and medical imaging, where physics-informed data and the model limitation of the model is its longer inference time compared to methods such as AE and VAE, due to its dependence on the number of diffusion time steps.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.216,
+      0.41,
+      0.325,
+      0.426
+    ],
+    "angle": 0,
+    "content": "References"
+  },
+  {
+    "type": "list",
+    "bbox": [
+      0.213,
+      0.436,
+      0.792,
+      0.844
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.223,
+      0.441,
+      0.786,
+      0.469
+    ],
+    "angle": 0,
+    "content": "1. A. Janot, M.G., Brunot, M.: Data set and reference models of emps. In: Nonlinear System Identification Benchmarks (2019)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.225,
+      0.47,
+      0.787,
+      0.497
+    ],
+    "angle": 0,
+    "content": "2. Bastek, J.H., Sun, W., Kochmann, D.M.: Physics-informed diffusion models. arXiv preprint arXiv:2403.14404 (2024)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.225,
+      0.498,
+      0.787,
+      0.537
+    ],
+    "angle": 0,
+    "content": "3. Besginow, A., Lange-Hegermann, M.: Constraining gaussian processes to systems of linear ordinary differential equations. Advances in Neural Information Processing Systems 35, 29386–29399 (2022)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.538,
+      0.787,
+      0.579
+    ],
+    "angle": 0,
+    "content": "4. Blei, D.M., Kucukelbir, A., McAuliffe, J.D.: Variational inference: A review for statisticians. Journal of the American statistical Association 112(518), 859–877 (2017)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.58,
+      0.787,
+      0.621
+    ],
+    "angle": 0,
+    "content": "5. Chen, Y., Zhang, C., Ma, M., Liu, Y., Ding, R., Li, B., He, S., Rajmohan, S., Lin, Q., Zhang, D.: Indiffusion: Imputed diffusion models for multivariate time series anomaly detection. arXiv preprint arXiv:2307.00754 (2023)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.621,
+      0.787,
+      0.648
+    ],
+    "angle": 0,
+    "content": "6. Christopher, J.K., Baek, S., Fioretto, F.: Projected generative diffusion models for constraint satisfaction. arXiv preprint arXiv:2402.03559 (2024)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.648,
+      0.787,
+      0.689
+    ],
+    "angle": 0,
+    "content": "7. Cuomo, S., di Cola, V.S., Giampaolo, F., Rozza, G., Raissi, M., Piccialli, F.: Scientific machine learning through physics-informed neural networks: Where we are and what's next (2022)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.69,
+      0.787,
+      0.718
+    ],
+    "angle": 0,
+    "content": "8. Desai, A., Freeman, C., Wang, Z., Beaver, I.: Timevae: A variational auto-encoder for multivariate time series generation. arXiv preprint arXiv:2111.08095 (2021)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.226,
+      0.718,
+      0.787,
+      0.744
+    ],
+    "angle": 0,
+    "content": "9. Goodfellow, I.J., Pouget-Abadie, J., Mirza, M., Xu, B., Warde-Farley, D., Ozair, S., Courville, A., Bengio, Y.: Generative adversarial networks (2014)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.219,
+      0.744,
+      0.786,
+      0.785
+    ],
+    "angle": 0,
+    "content": "10. Guo, Y., Liao, W., Wang, Q., Yu, L., Ji, T., Li, P.: Multidimensional time series anomaly detection: A gru-based gaussian mixture variational autoencoder approach. In: Asian Conference on Machine Learning. pp. 97–112. PMLR (2018)"
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.219,
+      0.785,
+      0.787,
+      0.841
+    ],
+    "angle": 0,
+    "content": "11. Hammerbacher, T., Lange-Hegermann, M., Platz, G.: Including sparse production knowledge into variational autoencoders to increase anomaly detection reliability. In: 2021 IEEE 17th International Conference on Automation Science and Engineering (CASE). pp. 1262–1267. IEEE (2021)"
+  }
+]

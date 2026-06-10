@@ -1,0 +1,174 @@
+[
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.089,
+      0.076,
+      0.908,
+      0.117
+    ],
+    "angle": 0,
+    "content": "Table 2: Performance comparison of different models. The P, R, and F1 represent the precision, recall, and F1-score (as %), respectively. The F1-score is the harmonic mean of precision and recall. Higher values for these three metrics indicate better performance."
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.092,
+      0.118,
+      0.907,
+      0.38
+    ],
+    "angle": 0,
+    "content": "<table><tr><td rowspan=\"2\">Model</td><td colspan=\"2\">SMD</td><td colspan=\"2\">MSL</td><td colspan=\"2\">SMAP</td><td colspan=\"2\">SWaT</td><td colspan=\"2\">PSM</td></tr><tr><td>P</td><td>R</td><td>F1</td><td>P</td><td>R</td><td>F1</td><td>P</td><td>R</td><td>F1</td><td>P</td></tr><tr><td>IsolationForest</td><td>40.58</td><td>78.92</td><td>53.60</td><td>58.18</td><td>82.15</td><td>68.12</td><td>58.12</td><td>62.36</td><td>60.17</td><td>48.69</td></tr><tr><td>LOF</td><td>49.45</td><td>36.62</td><td>45.32</td><td>53.25</td><td>84.25</td><td>64.69</td><td>58.62</td><td>59.89</td><td>59.25</td><td>76.67</td></tr><tr><td>OC-SVM</td><td>48.12</td><td>78.15</td><td>59.56</td><td>56.37</td><td>89.12</td><td>69.06</td><td>56.34</td><td>62.36</td><td>59.20</td><td>48.65</td></tr><tr><td>DAGMM</td><td>65.15</td><td>52.64</td><td>58.23</td><td>83.78</td><td>66.46</td><td>74.12</td><td>89.35</td><td>53.26</td><td>66.74</td><td>86.45</td></tr><tr><td>THOC</td><td>81.45</td><td>88.26</td><td>84.72</td><td>85.12</td><td>86.69</td><td>85.90</td><td>90.18</td><td>88.65</td><td>89.41</td><td>86.87</td></tr><tr><td>LSTM-VAE</td><td>78.12</td><td>85.62</td><td>81.70</td><td>86.25</td><td>78.61</td><td>82.24</td><td>90.12</td><td>70.25</td><td>78.95</td><td>79.23</td></tr><tr><td>Onion-Internal</td><td>80.12</td><td>85.62</td><td>81.70</td><td>86.25</td><td>86.69</td><td>85.90</td><td>90.12</td><td>70.25</td><td>86.95</td><td>79.23</td></tr><tr><td>USAD</td><td>90.35</td><td>96.17</td><td>93.17</td><td>83.26</td><td>93.28</td><td>87.99</td><td>75.68</td><td>96.25</td><td>84.73</td><td>95.32</td></tr><tr><td>InterFusion</td><td>85.18</td><td>80.45</td><td>82.75</td><td>85.38</td><td>90.78</td><td>88.00</td><td>90.89</td><td>86.28</td><td>88.53</td><td>82.39</td></tr><tr><td>AT</td><td>89.92</td><td>94.67</td><td>92.23</td><td>93.76</td><td>95.08</td><td>94.41</td><td>92.45</td><td>98.64</td><td>95.44</td><td>92.38</td></tr><tr><td>TransAD</td><td>90.36</td><td>97.85</td><td>92.98</td><td>90.38</td><td>99.99</td><td>94.94</td><td>85.12</td><td>95.63</td><td>90.07</td><td>96.39</td></tr><tr><td>TimesNet</td><td>86.25</td><td>88.12</td><td>85.12</td><td>82.97</td><td>87.18</td><td>84.18</td><td>91.50</td><td>96.85</td><td>88.31</td><td>94.10</td></tr><tr><td>DCFF-MTAD</td><td>86.28</td><td>95.10</td><td>90.48</td><td>90.16</td><td>92.64</td><td>91.38</td><td>98.36</td><td>83.96</td><td>90.59</td><td>95.68</td></tr><tr><td>DCT-GAN</td><td>73.53</td><td>81.25</td><td>77.20</td><td>80.36</td><td>70.23</td><td>74.95</td><td>89.28</td><td>76.67</td><td>82.50</td><td>80.68</td></tr><tr><td>MEGA</td><td>96.58</td><td>96.28</td><td>96.43</td><td>93.65</td><td>91.64</td><td>92.63</td><td>88.36</td><td>83.64</td><td>85.94</td><td>90.16</td></tr><tr><td>OURS</td><td>88.07</td><td>81.50</td><td>84.66</td><td>92.67</td><td>98.07</td><td>95.30</td><td>94.08</td><td>99.08</td><td>96.51</td><td>96.56</td></tr></table>"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.403,
+      0.904,
+      0.43
+    ],
+    "angle": 0,
+    "content": "the denoising process. The training batch size was 256, and the training process was stopped early within 10 epochs. All experiments were conducted using a single NVIDIA RTX 3090 24 GB GPU with implementation in PyTorch 1.13.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.091,
+      0.445,
+      0.317,
+      0.458
+    ],
+    "angle": 0,
+    "content": "4.1.3 Evaluation Metrics"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.466,
+      0.908,
+      0.493
+    ],
+    "angle": 0,
+    "content": "In this study, we employ the following formulas to calculate the precision, recall, and F1-score for evaluating the performance of our anomaly detection method. Precision is defined as:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.415,
+      0.501,
+      0.905,
+      0.526
+    ],
+    "angle": 0,
+    "content": "\\[\nP r e c i s i o n = \\frac {T P}{T P + F P} \\tag {4}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.529,
+      0.908,
+      0.556
+    ],
+    "angle": 0,
+    "content": "where TP represents true positives (the number of samples correctly predicted as anomalies) and FP represents false positives (the number of samples incorrectly predicted as anomalies). Recall is defined as:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.426,
+      0.564,
+      0.905,
+      0.589
+    ],
+    "angle": 0,
+    "content": "\\[\n\\text { Recall } = \\frac {T P}{T P + F N} \\tag {5}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.09,
+      0.593,
+      0.85,
+      0.607
+    ],
+    "angle": 0,
+    "content": "where \\(FN\\) represents false negatives (the number of samples incorrectly predicted as normal). \\(F_{1}\\) is defined as:",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.4,
+      0.615,
+      0.905,
+      0.64
+    ],
+    "angle": 0,
+    "content": "\\[\nF _ {1} = \\frac {2 * \\text { Precision } * \\text { Recall }}{\\text { Precision } + \\text { Recall }} \\tag {6}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.643,
+      0.908,
+      0.721
+    ],
+    "angle": 0,
+    "content": "Precision measures the model's accuracy in predicting samples as anomalies, while recall assesses the model's ability to cover actual anomalies. The F1-score balances precision and recall. By computing precision, recall, and F1-score, we can comprehensively evaluate the performance of anomaly detection methods, quantifying the model's accuracy, coverage, and overall performance in anomaly detection tasks. Finally, we employed statistical methods to assess performance differences among various models. We used the Independent Samples t-test to calculate the F1-score differences across multiple datasets for different models and obtained corresponding p values.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.09,
+      0.737,
+      0.273,
+      0.751
+    ],
+    "angle": 0,
+    "content": "4.2 Performance"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.759,
+      0.908,
+      0.875
+    ],
+    "angle": 0,
+    "content": "To evaluate the performance of DDMT, we conducted extensive comparisons with 15 well-performing baseline models, including machine learning-based TSAD models: Isolation Forest [6], LOF [32], One-class Support Vector Machines (OC-SVM) [36], Deep Autoencoding Gaussian Mixture Model (DAGMM) [57], and Temporal Hierarchical One-Class (THOC) [56]. Deep learning-based anomaly detection models: Long Short-Term-Model-based Variational AutoEncoder (LSTM-VAE) [38], OmniAnomaly [53], UniSupervised Anomaly Detection (USAD) [56], InterFusion [59], Anomaly Transformer(AT) [7], Transformer-based Anomaly Detection model (TRAN-AD) [60], TimesNet [61], Dual-Channel Feature (DA-MA) [62], Multi-Channel Feature (M-MA) [63], Multi-Channel Feature (M-MA) [64], Multi-Channel Feature (M-MA) [65], Multi-Channel Feature (M-MA) [66], Multi-Channel Feature (M-MA) [67], Multi-Channel Feature (M-MA) [68], Multi-Channel Feature (M-MA) [69], Multi-Channel Feature (M-MA) [70], Multi-Channel Feature (M-MA) [71], Multi-Channel Feature (M-MA) [72], Multi-Channel Feature (M-MA) [73], Multi-Channel Feature (M-MA) [74], Multi-Channel Feature (M-MA) [75], Multi-Channel Feature (M-MA) [76], Multi-Channel Feature (M-MA) [77], Multi-Channel Feature (M-MA) [78], Multi-Channel Feature (M-MA) [79], Multi-Channel Feature (M-MA) [80], Multi-Channel Feature (M-MA) [81], Multi-Channel Feature (M-MA) [82], Multi-Channel Feature (M-MA) [83], Multi-Channel Feature (M-MA) [84], Multi-Channel Feature (M-MA) [85], Multi-Channel Feature (M-MA) [86], Multi-Channel Feature (M-MA) [87], Multi-Channel Feature (M-MA) [88], Multi-Channel Feature (M-MA) [89], Multi-Channel Feature (M-MA) [90], Multi-Channel Feature (M-MA) [91], Multi-Channel Feature (M-MA) [92], Multi-Channel Feature (M-MA) [93], Multi-Channel Feature (M-MA) [94], Multi-Channel Feature (M-MA) [95], Multi-Channel Feature (M-MA) [96], Multi-Channel Feature (M-MA) [97], Multi-Channel Feature (M-MA) [98], Multi-Channel Feature (M-MA) [99], Multi-Channel Feature (M-MA) [100], Multi-Channel Feature (M-MA) [101], Multi-Channel Feature (M-MA) [102], Multi-Channel Feature (M-MA) [103], Multi-Channel Feature (M-MA) [104], Multi-Channel Feature (M-MA) [105], Multi-Channel Feature (M-MA) [106], Multi-Channel Feature (M-MA) [107], Multi-Channel Feature (M-MA) [108], Multi-Channel Feature (M-MA) [109], Multi-Channel Feature (M-MA) [110], Multi-Channel Feature (M-MA) [111], Multi-Channel Feature (M-MA) [112], Multi-Channel Feature (M-MA) [113], Multi-Channel Feature (M-MA) [114], Multi-Channel Feature (M-MA) [115], Multi-Channel Feature (M-MA) [116], Multi-Channel Feature (M-MA) [117], Multi-Channel Feature (M-MA) [118], Multi-Channel Feature (M-MA) [119], Multi-Channel Feature (M-MA) [120], Multi-Channel Feature (M-MA) [121], Multi-Channel Feature (M-MA) [122], Multi-Channel Feature (M-MA) [123], Multi-Channel Feature (M-MA) [124], Multi-Channel Feature (M-MA) [125], Multi-Channel Feature (M-MA) [126], Multi-Channel Feature (M-MA) [127], Multi-Channel Feature (M-MA) [128], Multi-Channel Feature (M-MA) [129], Multi-Channel Feature (M-MA) [130], Multi-Channel Feature (M-MA) [131], Multi-Channel Feature (M-MA) [132], Multi-Channel Feature (M-MA) [133], Multi-Channel Feature (M-MA) [134], Multi-Channel Feature (M-MA) [135], Multi-Channel Feature (M-MA) [136], Multi-Channel Feature (M-MA) [137], Multi-Channel Feature (M-MA) [138], Multi-Channel Feature (M-MA) [139], Multi-Channel Feature (M-MA) [140], Multi-Channel Feature (M-MA) [141], Multi-Channel Feature (M-MA) [142], Multi-Channel Feature (M-MA) [143], Multi-Channel Feature (M-MA) [144], Multi-Channel Feature (M-MA) [145], Multi-Channel Feature (M-MA) [146], Multi-Channel Feature (M-MA) [147], Multi-Channel Feature (M-MA) [148], Multi-Channel Feature (M-MA) [149], Multi-Channel Feature (M-MA) [150], Multi-Channel Feature (M-MA) [151], Multi-Channel Feature (M-MA) [152], Multi-Channel Feature (M-MA) [153], Multi-Channel Feature (M-MA) [154], Multi-Channel Feature (M-MA) [155], Multi-Channel Feature (M-MA) [156], Multi-Channel Feature (M-MA) [157], Multi-Channel Feature (M-MA) [158], Multi-Channel Feature (M-MA) [159], Multi-Channel Feature (M-MA) [160], Multi-Channel Feature (M-MA) [161], Multi-Channel Feature (M-MA) [162], Multi-Channel Feature (M-MA) [163], Multi-Channel Feature (M-MA) [164], Multi-Channel Feature (M-MA) [165], Multi-Channel Feature (M-MA) [166], Multi-Channel Feature (M-MA) [167], Multi-Channel Feature (M-MA) [168], Multi-Channel Feature (M-MA) [169], Multi-Channel Feature (M-MA) [170], Multi-Channel Feature (M-MA) [171], Multi-Channel Feature (M-MA) [172], Multi-Channel Feature (M-MA) [173], Multi-Channel Feature (M-MA) [174], Multi-Channel Feature (M-MA) [175], Multi-Channel Feature (M-MA) [176], Multi-Channel Feature (M-MA) [177], Multi-Channel Feature (M-MA) [178], Multi-Channel Feature (M-MA) [179], Multi-Channel Feature (M-MA) [180], Multi-Channel Feature (M-MA) [181], Multi-Channel Feature (M-MA) [182], Multi-Channel Feature (M-MA) [183], Multi-Channel Feature (M-MA) [184], Multi-Channel Feature (M-MA) [185], Multi-Channel Feature (M-MA) [186], Multi-Channel Feature (M-MA) [187], Multi-Channel Feature (M-MA) [188], Multi-Channel Feature (M-MA) [189], Multi-Channel Feature (M-MA) [190], Multi-Channel Feature (M-MA) [191], Multi-Channel Feature (M-MA) [192], Multi-Channel Feature (M-MA) [193], Multi-Channel Feature (M-MA) [194], Multi-Channel Feature (M-MA) [195], Multi-Channel Feature (M-MA) [196], Multi-Channel Feature (M-MA) [197], Multi-Channel Feature (M-MA) [198], Multi-Channel Feature (M-MA) [199], Multi-Channel Feature (M-MA) [200], Multi-Channel Feature (M-MA) [201], Multi-Channel Feature (M-MA) [202], Multi-Channel Feature (M-MA) [203], Multi-Channel Feature (M-MA) [204], Multi-Channel Feature (M-MA) [205], Multi-Channel Feature (M-MA) [206], Multi-Channel Feature (M-MA) [207], Multi-Channel Feature (M-MA) [208], Multi-Channel Feature (M-MA) [209], Multi-Channel Feature (M-MA) [210], Multi-Channel Feature (M-MA) [211], Multi-Channel Feature (M-MA) [212], Multi-Channel Feature (M-MA) [213], Multi-Channel Feature (M-MA) [214], Multi-Channel Feature (M-MA) [215], Multi-Channel Feature (M-MA) [216], Multi-Channel Feature (M-MA) [217], Multi-Channel Feature (M-MA) [218], Multi-Channel Feature (M-MA) [219], Multi-Channel Feature (M-MA) [220], Multi-Channel Feature (M-MA) [221], Multi-Channel Feature (M-MA) [222], Multi-Channel Feature (M-MA) [223], Multi-Channel Feature (M-MA) [224], Multi-Channel Feature (M-MA) [225], Multi-Channel Feature (M-MA) [226], Multi-Channel Feature (M-MA) [227], Multi-Channel Feature (M-MA) [228], Multi-Channel Feature (M-MA) [229], Multi-Channel Feature (M-MA) [230], Multi-Channel Feature (M-MA) [231], Multi-Channel Feature (M-MA) [232], Multi-Channel Feature (M-MA) [233], Multi-Channel Feature (M-MA) [234], Multi-Channel Feature (M-MA) [235], Multi-Channel Feature (M-MA) [236], Multi-Channel Feature (M-MA) [237], Multi-Channel Feature (M-MA) [238], Multi-Channel Feature (M-MA) [239], Multi-Channel Feature (M-MA) [240], Multi-Channel Feature (M-MA) [241], Multi-Channel Feature (M-MA) [242], Multi-Channel Feature (M-MA) [243], Multi-Channel Feature (M-MA) [244], Multi-Channel Feature (M-MA) [245], Multi-Channel Feature (M-MA) [246], Multi-Channel Feature (M-MA) [247], Multi-Channel Feature (M-MA) [248], Multi-Channel Feature (M-MA) [249], Multi-Channel Feature (M-MA) [250], Multi-Channel Feature (M-MA) [251], Multi-Channel Feature (M-MA) [252], Multi-Channel Feature (M-MA) [253], Multi-Channel Feature (M-MA) [254], Multi-Channel Feature (M-MA) [255], Multi-Channel Feature (M-MA) [256], Multi-Channel Feature (M-MA) [257], Multi-Channel Feature (M-MA) [258], Multi-Channel Feature (M-MA) [259], Multi-Channel Feature (M-MA) [260], Multi-Channel Feature (M-MA) [261], Multi-Channel Feature (M-MA) [262], Multi-Channel Feature (M-MA) [263], Multi-Channel Feature (M-MA) [264], Multi-Channel Feature (M-MA) [265], Multi-Channel Feature (M-MA) [266], Multi-Channel Feature (M-MA) [267], Multi-Channel Feature (M-MA) [268], Multi-Channel Feature (M-MA) [269], Multi-Channel Feature (M-MA) [270], Multi-Channel Feature (M-MA) [271], Multi-Channel Feature (M-MA) [272], Multi-Channel Feature (M-MA) [273], Multi-Channel Feature (M-MA) [274], Multi-Channel Feature (M-MA) [275], Multi-Channel Feature (M-MA) [276], Multi-Channel Feature (M-MA) [277], Multi-Channel Feature (M-MA) [278], Multi-Channel Feature (M-MA) [279], Multi-Channel Feature (M-MA) [280], Multi-Channel Feature (M-MA) [281], Multi-Channel Feature (M-MA) [282], Multi-Channel Feature (M-MA) [283], Multi-Channel Feature (M-MA) [284], Multi-Channel Feature (M-MA) [285], Multi-Channel Feature (M-MA) [286], Multi-Channel Feature (M-MA) [287], Multi-Channel Feature (M-MA) [288], Multi-Channel Feature (M-MA) [289], Multi-Channel Feature (M-MA) [290], Multi-Channel Feature (M-MA) [291], Multi-Channel Feature (M-MA) [292], Multi-Channel Feature (M-MA) [293], Multi-Channel Feature (M-MA) [294], Multi-Channel Feature (M-MA) [295], Multi-Channel Feature (M-MA) [296], Multi-Channel Feature (M-MA) [297], Multi-Channel Feature (M-MA) [298], Multi-Channel Feature (M-MA) [299], Multi-Channel Feature (M-MA) [300], Multi-Channel Feature (M-MA) [301], Multi-Channel Feature (M-MA) [302], Multi-Channel Feature (M-MA) [303], Multi-Channel Feature (M-MA) [304], Multi-Channel Feature (M-MA) [305], Multi-Channel Feature (M-MA) [306], Multi-Channel Feature (M-MA) [307], Multi-Channel Feature (M-MA) [308], Multi-Channel Feature (M-MA) [309], Multi-Channel Feature (M-MA) [310], Multi-Channel Feature (M-MA) [311], Multi-Channel Feature (M-MA) [312], Multi-Channel Feature (M-MA) [313], Multi-Channel Feature (M-MA) [314], Multi-Channel Feature (M-MA) [315], Multi-Channel Feature (M-MA) [316], Multi-Channel Feature (M-MA) [317], Multi-Channel Feature (M-MA) [318], Multi-Channel Feature (M-MA) [319], Multi-Channel Feature (M-MA) [320], Multi-Channel Feature (M-MA) [321], Multi-Channel Feature (M-MA) [322], Multi-Channel Feature (M-MA) [323], Multi-Channel Feature (M-MA) [324], Multi-Channel Feature (M-MA) [325], Multi-Channel Feature (M-MA) [326], Multi-Channel Feature (M-MA) [327], Multi-Channel Feature (M-MA) [328], Multi-Channel Feature (M-MA) [329], Multi-Channel Feature (M-MA) [330], Multi-Channel Feature (M-MA) [331], Multi-Channel Feature (M-MA) [332], Multi-Channel Feature (M-MA) [333], Multi-Channel Feature (M-MA) [334], Multi-Channel Feature (M-MA) [335], Multi-Channel Feature (M-MA) [336], Multi-Channel Feature (M-MA) [337], Multi-Channel Feature (M-MA) [338], Multi-Channel Feature (M-MA) [339], Multi-Channel Feature (M-MA) [340], Multi-Channel Feature (M-MA) [341], Multi-Channel Feature (M-MA) [342], Multi-Channel Feature (M-MA) [343], Multi-Channel Feature (M-MA) [344], Multi-Channel Feature (M-MA) [345], Multi-Channel Feature (M-MA) [346], Multi-Channel Feature (M-MA) [347], Multi-Channel Feature (M-MA) [348], Multi-Channel Feature (M-MA) [349], Multi-Channel Feature (M-MA) [350], Multi-Channel Feature (M-MA) [351], Multi-Channel Feature (M-MA) [352], Multi-Channel Feature (M-MA) [353], Multi-Channel Feature (M-MA) [354], Multi-Channel Feature (M-MA) [355], Multi-Channel Feature (M-MA) [356], Multi-Channel Feature (M-MA) [357], Multi-Channel Feature (M-MA) [358], Multi-Channel Feature (M-MA) [359], Multi-Channel Feature (M-MA) [360], Multi-Channel Feature (M-MA) [361], Multi-Channel Feature (M-MA) [362], Multi-Channel Feature (M-MA) [363], Multi-Channel Feature (M-MA) [364], Multi-Channel Feature (M-MA) [365], Multi-Channel Feature (M-MA) [366], Multi-Channel Feature (M-MA) [367], Multi-Channel Feature (M-MA) [368], Multi-Channel Feature (M-MA) [369], Multi-Channel Feature (M-MA) [370], Multi-Channel Feature (M-MA) [371], Multi-Channel Feature (M-MA) [372], Multi-Channel Feature (M-MA) [373], Multi-Channel Feature (M-MA) [374], Multi-Channel Feature (M-MA) [375], Multi-Channel Feature (M-MA) [376], Multi-Channel Feature (M-MA) [377], Multi-Channel Feature (M-MA) [378], Multi-Channel Feature (M-MA) [379], Multi-Channel Feature (M-MA) [380], Multi-Channel Feature (M-MA) [381], Multi-Channel Feature (M-MA) [382], Multi-Channel Feature (M-MA) [383], Multi-Channel Feature (M-MA) [384], Multi-Channel Feature (M-MA) [385], Multi-Channel Feature (M-MA) [386], Multi-Channel Feature (M-MA) [387], Multi-Channel Feature (M-MA) [388], Multi-Channel Feature (M-MA) [389], Multi-Channel Feature (M-MA) [390], Multi-Channel Feature (M-MA) [391], Multi-Channel Feature (M-MA) [392], Multi-Channel Feature (M-MA) [393], Multi-Channel Feature (M-MA) [394], Multi-Channel Feature (M-MA) [395], Multi-Channel Feature (M-MA) [396], Multi-Channel Feature (M-MA) [397], Multi-Channel Feature (M-MA) [398], Multi-Channel Feature (M-MA) [399], Multi-Channel Feature (M-MA) [400], Multi-Channel Feature (M-MA) [401], Multi-Channel Feature (M-MA) [402], Multi-Channel Feature (M-MA) [403], Multi-Channel Feature (M-MA) [404], Multi-Channel Feature (M-MA) [405], Multi-Channel Feature (M-MA) [406], Multi-Channel Feature (M-MA) [407], Multi-Channel Feature (M-MA) [408], Multi-Channel Feature (M-MA) [409], Multi-Channel Feature (M-MA) [410], Multi-Channel Feature (M-MA) [411], Multi-Channel Feature (M-MA) [412], Multi-Channel Feature (M-MA) [413], Multi-Channel Feature (M-MA) [414], Multi-Channel Feature (M-MA) [415], Multi-Channel Feature (M-MA) [416], Multi-Channel Feature (M-MA) [417], Multi-Channel Feature (M-MA) [418], Multi-Channel Feature (M-MA) [419], Multi-Channel Feature (M-MA) [420], Multi-Channel Feature (M-MA) [421], Multi-Channel Feature (M-MA) [422], Multi-Channel Feature (M-MA) [423], Multi-Channel Feature (M-MA) [424], Multi-Channel Feature (M-MA) [425], Multi-Channel Feature (M-MA) [426], Multi-Channel Feature (M-MA) [427], Multi-Channel Feature (M-MA) [428], Multi-Channel Feature (M-MA) [429], Multi-Channel Feature (M-MA) [430], Multi-Channel Feature (M-MA) [431], Multi-Channel Feature (M-MA) [432], Multi-Channel Feature (M-MA) [433], Multi-Channel Feature (M-MA) [434], Multi-Channel Feature (M-MA) [435], Multi-Channel Feature (M-MA) [436], Multi-Channel Feature (M-MA) [437], Multi-Channel Feature (M-MA) [438], Multi-Channel Feature (M-MA) [439], Multi-Channel Feature (M-MA) [440], Multi-Channel Feature (M-MA) [441], Multi-Channel Feature (M-MA) [442], Multi-Channel Feature (M-MA) [443], Multi-Channel Feature (M-MA) [444], Multi-Channel Feature (M-MA) [445], Multi-Channel Feature (M-MA) [446], Multi-Channel Feature (M-MA) [447], Multi-Channel Feature (M-MA) [448], Multi-Channel Feature (M-MA) [449], Multi-Channel Feature (M-MA) [450], Multi-Channel Feature (M-MA) [451], Multi-Channel Feature (M-MA) [452], Multi-Channel Feature (M-MA) [453], Multi-Channel Feature (M-MA) [454], Multi-Channel Feature (M-MA) [455], Multi-Channel Feature (M-MA) [456], Multi-Channel Feature (M-MA) [457], Multi-Channel Feature (M-MA) [458], Multi-Channel Feature (M-MA) [459], Multi-Channel Feature (M-MA) [460], Multi-Channel Feature (M-MA) [461], Multi-Channel Feature (M-MA) [462], Multi-Channel Feature (M-MA) [463], Multi-Channel Feature (M-MA) [464], Multi-Channel Feature (M-MA) [465], Multi-Channel Feature (M-MA) [466], Multi-Channel Feature (M-MA) [467], Multi-Channel Feature (M-MA) [468], Multi-Channel Feature (M-MA) [469], Multi-Channel Feature (M-MA) [470], Multi-Channel Feature (M-MA) [471], Multi-Channel Feature (M-MA) [472], Multi-Channel Feature (M-MA) [473], Multi-Channel Feature (M-MA) [474], Multi-Channel Feature (M-MA) [475], Multi-Channel Feature (M-MA) [476], Multi-Channel Feature (M-MA) [477], Multi-Channel Feature (M-MA) [478], Multi-Channel Feature (M-MA) [479], Multi-Channel Feature (M-MA) [480], Multi-Channel Feature (M-MA) [481], Multi-Channel Feature (M-MA) [482], Multi-Channel Feature (M-MA) [483], Multi-Channel Feature (M-MA) [484], Multi-Channel Feature (M-MA) [485], Multi-Channel Feature (M-MA) [486], Multi-Channel Feature (M-MA) [487], Multi-Channel Feature (M-MA) [488], Multi-Channel Feature (M-MA) [489], Multi-Channel Feature (M-MA) [490], Multi-Channel Feature (M-MA) [491], Multi-Channel Feature (M-MA) [492], Multi-Channel Feature (M-MA) [493], Multi-Channel Feature (M-MA) [494], Multi-Channel Feature (M-MA) [495], Multi-Channel Feature (M-MA) [496], Multi-Channel Feature (M-MA) [497], Multi-Channel Feature (M-MA) [498], Multi-Channel Feature (M-MA) [499], Multi-Channel Feature (M-MA) [500], Multi-Channel Feature (M-MA) [501], Multi-Channel Feature (M-MA) [502], Multi-Channel Feature (M-MA) [503], Multi-Channel Feature (M-MA) [504], Multi-Channel Feature (M-MA) [505], Multi-Channel Feature (M-MA) [506], Multi-Channel Feature (M-MA) [507], Multi-Channel Feature (M-MA) [508], Multi-Channel Feature (M-MA) [509], Multi-Channel Feature (M-MA) [510], Multi-Channel Feature (M-MA) [511], Multi-Channel Feature (M-MA) [512], Multi-Channel Feature (M-MA) [513], Multi-Channel Feature (M-MA) [514], Multi-Channel Feature (M-MA) [515], Multi-Channel Feature (M-MA) [516], Multi-Channel Feature (M-MA) [517], Multi-Channel Feature (M-MA) [518], Multi-Channel Feature (M-MA) [519], Multi-Channel Feature (M-MA) [520], Multi-Channel Feature (M-MA) [521], Multi-Channel Feature (M-MA) [522], Multi-Channel Feature (M-MA) [523], Multi-Channel Feature (M-MA) [524], Multi-Channel Feature (M-MA) [525], Multi-Channel Feature (M-MA) [526], Multi-Channel Feature (M-MA) [527], Multi-Channel Feature (M-MA) [528], Multi-Channel Feature (M-MA) [529], Multi-Channel Feature (M-MA) [530], Multi-Channel Feature (M-MA) [531], Multi-Channel Feature (M-MA) [532], Multi-Channel Feature (M-MA) [533], Multi-Channel Feature (M-MA) [534], Multi-Channel Feature (M-MA) [535], Multi-Channel Feature (M-MA) [536], Multi-Channel Feature (M-MA) [537], Multi-Channel Feature (M-MA) [538], Multi-Channel Feature (M-MA) [539], Multi-Channel Feature (M-MA) [540], Multi-Channel Feature (M-MA) [541], Multi-Channel Feature (M-MA) [542], Multi-Channel Feature (M-MA) [543], Multi-Channel Feature (M-MA) [544], Multi-Channel Feature (M-MA) [545], Multi-Channel Feature (M-MA) [546], Multi-Channel Feature (M-MA) [547], Multi-Channel Feature (M-MA) [548], Multi-Channel Feature (M-MA) [549], Multi-Channel Feature (M-MA) [550], Multi-Channel Feature (M-MA) [551], Multi-Channel Feature (M-MA) [552], Multi-Channel Feature (M-MA) [553], Multi-Channel Feature (M-MA) [554], Multi-Channel Feature (M-MA) [555], Multi-Channel Feature (M-MA) [556], Multi-Channel Feature (M-MA) [557], Multi-Channel Feature (M-MA) [558], Multi-Channel Feature (M-MA) [559], Multi-Channel Feature (M-MA) [560], Multi-Channel Feature (M-MA) [561], Multi-Channel Feature (M-MA) [562], Multi-Channel Feature (M-MA) [563], Multi-Channel Feature (M-MA) [564], Multi-Channel Feature (M-MA) [565], Multi-Channel Feature (M-MA) [566], Multi-Channel Feature (M-MA) [567], Multi-Channel Feature (M-MA) [568], Multi-Channel Feature (M-MA) [569], Multi-Channel Feature (M-MA) [570], Multi-Channel Feature (M-MA) [571], Multi-Channel Feature (M-MA) [572], Multi-Channel Feature (M-MA) [573], Multi-Channel Feature (M-MA) [574], Multi-Channel Feature (M-MA) [575], Multi-Channel Feature (M-MA) [576], Multi-Channel Feature (M-MA) [577], Multi-Channel Feature (M-MA) [578], Multi-Channel Feature (M-MA) [579], Multi-Channel Feature (M-MA) [580], Multi-Channel Feature (M-MA) [581], Multi-Channel Feature (M-MA) [582], Multi-Channel Feature (M-MA) [583], Multi-Channel Feature (M-MA) [584], Multi-Channel Feature (M-MA) [585], Multi-Channel Feature (M-MA) [586], Multi-Channel Feature (M-MA) [587], Multi-Channel Feature (M-MA) [588], Multi-Channel Feature (M-MA) [589], Multi-Channel Feature (M-MA) [590], Multi-Channel Feature (M-MA) [591], Multi-Channel Feature (M-MA) [592], Multi-Channel Feature (M-MA) [593], Multi-Channel Feature (M-MA) [594], Multi-Channel Feature (M-MA) [595], Multi-Channel Feature (M-MA) [596], Multi-Channel Feature (M-MA) [597], Multi-Channel Feature (M-MA) [598], Multi-Channel Feature (M-MA) [599], Multi-Channel Feature (M-MA) [600], Multi-Channel Feature (M-MA) [601], Multi-Channel Feature (M-MA) [602], Multi-Channel Feature (M-MA) [603], Multi-Channel Feature (M-MA) [604], Multi-Channel Feature (M-MA) [605], Multi-Channel Feature (M-MA) [606], Multi-Channel Feature (M-MA) [607], Multi-Channel Feature (M-MA) [608], Multi-Channel Feature (M-MA) [609], Multi-Channel Feature (M-MA) [610], Multi-Channel Feature (M-MA) [611], Multi-Channel Feature (M-MA) [612], Multi-Channel Feature (M-MA) [613], Multi-Channel Feature (M-MA) [614], Multi-Channel Feature (M-MA) [615], Multi-Channel Feature (M-MA) [616], Multi-Channel Feature (M-MA) [617], Multi-Channel Feature (M-MA) [618], Multi-Channel Feature (M-MA) [619], Multi-Channel Feature (M-MA) [620], Multi-Channel Feature (M-MA) [621], Multi-Channel Feature (M-MA) [622], Multi-Channel Feature (M-MA) [623], Multi-Channel Feature (M-MA) [624], Multi-Channel Feature (M-MA) [625], Multi-Channel Feature (M-MA) [626], Multi-Channel Feature (M-MA) [627], Multi-Channel Feature (M-MA) [628], Multi-Channel Feature (M-MA) [629], Multi-Channel Feature (M-MA) [63",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.089,
+      0.876,
+      0.908,
+      0.929
+    ],
+    "angle": 0,
+    "content": "Table 2 presents the accuracy, recall, and F1-score of all datasets on the DDMT and baseline models. From the table, it can be observed that in the machine learning-based anomaly detection models, THOC achieved superior results, attributed to its use of dilated recursive neural networks with skip connections to capture temporal dynamics at multiple scales and the incorporation of a self-supervised task in the time domain [56]. On the other hand, the performance of",
+    "merge_prev": false
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.493,
+      0.959,
+      0.506,
+      0.969
+    ],
+    "angle": 0,
+    "content": "9"
+  }
+]

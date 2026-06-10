@@ -1,0 +1,25 @@
+# 2508_11528v1 MinerU Primary Acceptance
+
+- title: Physics-Informed Diffusion Models for Unsupervised Anomaly Detection in Multivariate Time Series
+- pdf_url: https://arxiv.org/pdf/2508.11528v1
+- primary_parser: mineru25pro
+- fallback_used: False
+- title_ok: True
+- status: PASS
+- quality_status: PASS
+- m2_ready: True
+- formula_m2_ready: True
+- formula_count: 17
+- body_formula_count: 12
+- reference_formula_count: 5
+- latex_count: 17
+- bbox_count: 17
+- crop_count: 17
+- overlay_count: 17
+- canonical_match_count: 17
+- high_risk_count: 0
+- blocking_reasons: []
+- warning_reasons: []
+- acceptance_reasons: []
+- runtime_seconds: 0.882
+- max_pages: 0

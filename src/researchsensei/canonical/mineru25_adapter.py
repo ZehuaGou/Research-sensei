@@ -151,7 +151,7 @@ class MinerU25ProAdapter:
             return "figure"
         if "caption" in raw:
             return "caption"
-        if "reference" in raw or raw == "ref":
+        if "reference" in raw or raw in {"ref", "ref_text"} or raw.startswith("ref_"):
             return "reference"
         return "text" if content else "unknown"
 

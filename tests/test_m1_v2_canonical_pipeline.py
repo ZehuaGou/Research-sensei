@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import json
 from pathlib import Path
 
 from researchsensei.schemas.enums import CanonicalQualityStatus, FormulaOrigin
@@ -46,6 +47,17 @@ def _reviewed_slots(blocks) -> list[dict]:
             "source_mismatch": False,
         })
     return slots
+
+
+def _make_test_pdf(path: Path) -> None:
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page(width=200, height=200)
+    page.insert_text((24, 35), "3 Method", fontsize=12)
+    page.insert_text((24, 60), "x_t = f(h_t)", fontsize=12)
+    doc.save(path)
+    doc.close()
 
 
 def test_document_block_normalizes_type_bbox_and_identity() -> None:
@@ -113,6 +125,33 @@ def test_mineru25_adapter_normalizes_mocked_output() -> None:
     assert blocks[1].page == 4
 
 
+def test_mineru25_adapter_normalizes_official_content_block_shape() -> None:
+    from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+
+    adapter = MinerU25ProAdapter()
+    blocks = adapter.normalize_page_result(
+        [
+            {
+                "type": "equation_block",
+                "bbox": [0.10, 0.20, 0.80, 0.30],
+                "angle": None,
+                "content": "\\[x_t = f(h_t)\\]",
+            },
+            {
+                "type": "ref_text",
+                "bbox": [0.10, 0.70, 0.80, 0.80],
+                "content": "[1] A reference.",
+            },
+        ],
+        page=2,
+    )
+
+    assert [b.block_type for b in blocks] == ["formula", "reference"]
+    assert blocks[0].bbox == [0.10, 0.20, 0.80, 0.30]
+    assert blocks[0].latex == "x_t = f(h_t)"
+    assert blocks[0].text == ""
+
+
 def test_rule_based_refiner_assigns_formula_sections_from_timeline() -> None:
     from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
 
@@ -132,6 +171,41 @@ def test_rule_based_refiner_assigns_formula_sections_from_timeline() -> None:
     assert by_id["b004"].section_confidence in {"high", "medium"}
     assert by_id["b006"].section == "Experiments"
     assert "ALL_FORMULAS_IN_ABSTRACT_SUSPICIOUS" not in by_id["b004"].risk_flags
+
+
+def test_rule_based_refiner_treats_hyphenated_model_heading_as_method() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="1 Introduction"),
+        _block("b002", page=3, block_type="title", text="2 Background"),
+        _block("b003", page=5, block_type="title", text="4 Temporal Physics-informed Diffusion Model (TPIDM)"),
+        _block("b004", page=5, block_type="formula", latex="L=L_{DM}+L_{PI}"),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert by_id["b003"].section == "Method"
+    assert by_id["b004"].section == "Method"
+
+
+def test_rule_based_refiner_uses_reading_order_not_final_page_heading() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=8, block_type="title", text="5 Experiments"),
+        _block("b002", page=10, block_type="title", text="5.2.1 Ablations"),
+        _block("b003", page=10, block_type="formula", latex="F_1=2PR/(P+R)"),
+        _block("b004", page=10, block_type="title", text="6 Conclusion"),
+        _block("b005", page=10, text="We conclude the paper."),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert by_id["b003"].section == "Experiments"
+    assert by_id["b005"].section == "Conclusion"
 
 
 def test_quality_gate_blocks_all_formulas_in_abstract() -> None:
@@ -223,6 +297,41 @@ def test_ollama_client_uses_native_chat_json_schema(monkeypatch) -> None:
     assert captured["url"] == "http://localhost:11434/api/chat"
     assert captured["json"]["temperature"] == 0
     assert captured["json"]["format"]["type"] == "object"
+
+
+def test_ollama_client_retries_invalid_json_once(monkeypatch) -> None:
+    from researchsensei.canonical.ollama_refiner import OllamaStructuredClient
+
+    calls = {"count": 0}
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, content: str) -> None:
+            self.content = content
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {"message": {"content": self.content}}
+
+    def fake_post(url, json, timeout):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return FakeResponse("not-json")
+        return FakeResponse('{"assignments": []}')
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = OllamaStructuredClient(model="qwen2.5:0.5b", timeout_seconds=3, max_retries=1)
+    payload = client.chat_json("assign sections", schema={"type": "object"})
+
+    assert payload == {"assignments": []}
+    assert calls["count"] == 2
+    assert client.retry_count == 1
+    assert client.json_invalid_count == 1
+    assert client.json_valid_count == 1
 
 
 def test_ollama_invalid_json_is_noop_with_warning(monkeypatch) -> None:
@@ -407,6 +516,37 @@ def test_m1_v2_pipeline_default_formula_slots_require_crop_overlay(tmp_path) -> 
     assert result.canonicalization.m2_ready is False
 
 
+def test_m1_v2_pipeline_generates_crop_overlay_for_pdf_backed_formula_slots(tmp_path) -> None:
+    from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
+
+    pdf_path = tmp_path / "source.pdf"
+    _make_test_pdf(pdf_path)
+    blocks = [
+        _block("b001", page=1, block_type="title", text="3 Method", bbox=[0.10, 0.10, 0.50, 0.15]),
+        _block("b002", page=1, block_type="formula", latex="x_t=f(h_t)", bbox=[0.10, 0.25, 0.60, 0.38]),
+    ]
+
+    result = M1V2CanonicalPipeline().run_from_blocks(
+        paper_id="p-reviewed",
+        title="Reviewed Pipeline Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+        source_pdf_path=str(pdf_path),
+    )
+
+    slots = json.loads((tmp_path / "formula_slots.json").read_text(encoding="utf-8"))
+    canonical = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+    assert result.quality.status == CanonicalQualityStatus.PASS
+    assert result.metrics["formula_crop_count"] == 1
+    assert result.metrics["formula_overlay_count"] == 1
+    assert 'source_pdf_path: "source.pdf"' in canonical
+    assert str(tmp_path) not in canonical
+    assert slots[0]["crop_path"].startswith("formula_crops/")
+    assert slots[0]["overlay_path"].startswith("formula_overlays/")
+    assert (tmp_path / slots[0]["crop_path"]).exists()
+    assert (tmp_path / slots[0]["overlay_path"]).exists()
+
+
 def test_m1_v2_pipeline_run_pdf_unpacks_mineru_payload_and_records_stats(tmp_path) -> None:
     from researchsensei.canonical.pipeline_v2 import M1V2CanonicalPipeline
 
@@ -439,6 +579,10 @@ def test_m1_v2_pipeline_run_pdf_unpacks_mineru_payload_and_records_stats(tmp_pat
     assert result.metrics["mineru_raw_payload_pages"] == 2
     assert result.metrics["mineru_raw_payload_total_blocks"] == len(blocks)
     assert result.report.metrics["mineru_raw_payload_total_blocks"] == len(blocks)
+    raw_path = tmp_path / "raw_mineru_output.json"
+    assert raw_path.exists()
+    raw = json.loads(raw_path.read_text(encoding="utf-8"))
+    assert raw["stats"]["parser"] == "mineru25pro"
 
 
 def test_m1_v2_pipeline_keeps_failed_gate_out_of_m2(tmp_path) -> None:

@@ -1,0 +1,104 @@
+[
+  {
+    "type": "page_number",
+    "bbox": [
+      0.218,
+      0.116,
+      0.237,
+      0.127
+    ],
+    "angle": 0,
+    "content": "10"
+  },
+  {
+    "type": "header",
+    "bbox": [
+      0.272,
+      0.115,
+      0.573,
+      0.129
+    ],
+    "angle": 0,
+    "content": "J. Soni, M. Lange-Hegermann, S. Windmann"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.147,
+      0.788,
+      0.254
+    ],
+    "angle": 0,
+    "content": "throughout the training process, thereby limiting its impact. These results indicate that physics-informed training leads to more accurate models for anomaly detection. Furthermore, these results show that the diffusion model performs better in anomaly detection compared to the other models. Our results demonstrate a statistically significant effect of the physics-informed training in anomaly detection, with a \\( p \\)-value less than 0.01 with the Wilcoxon test when compared with prior work and a purely data-driven approach with ten repetitions.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.272,
+      0.357,
+      0.286
+    ],
+    "angle": 0,
+    "content": "5.2.1 Ablations"
+  },
+  {
+    "type": "table_caption",
+    "bbox": [
+      0.214,
+      0.311,
+      0.789,
+      0.355
+    ],
+    "angle": 0,
+    "content": "Table 3. F1 score for different physics-informed schedules: The rows correspond to the F1 score of different PINN weight schedules. These numbers show the superior and competitive performance of physics-informed training in anomaly detection."
+  },
+  {
+    "type": "table",
+    "bbox": [
+      0.222,
+      0.364,
+      0.779,
+      0.493
+    ],
+    "angle": 0,
+    "content": "<table><tr><td></td><td colspan=\"4\">F1 Score</td></tr><tr><td></td><td>EMPS</td><td>Predator-Prey</td><td>Lenze</td><td>Air Compressor</td></tr><tr><td>DM (σ0)</td><td>0.9627 ± 0.0031</td><td>0.9712 ± 0.0017</td><td>0.9923 ± 0.0003</td><td>1.0 ± 0.0000</td></tr><tr><td>Log-Sigmoid (σ0)</td><td>0.9699 ± 0.0028</td><td>0.9738 ± 0.0017</td><td>0.9622 ± 0.0116</td><td>1.0 ± 0.0000</td></tr><tr><td>Hard-Sigmoid (σ0)</td><td>0.9457 ± 0.0027</td><td>0.9355 ± 0.0017</td><td>0.9355 ± 0.0172</td><td>1.0 ± 0.0000</td></tr><tr><td>Sigmoid (σ0)</td><td>0.9447 ± 0.0082</td><td>0.9830 ± 0.0000</td><td>0.9104 ± 0.0115</td><td>1.0 ± 0.0000</td></tr><tr><td>ReLU (σ0)</td><td>0.9015 ± 0.0000</td><td>0.9749 ± 0.0017</td><td>0.9678 ± 0.0089</td><td>1.0 ± 0.0000</td></tr><tr><td>DM (σ0)</td><td>1.0 ± 0.0000</td><td>0.9537 ± 0.0000</td><td>0.9993 ± 0.0000</td><td>1.0 ± 0.0000</td></tr><tr><td>Log-Sigmoid (σ0)</td><td>1.0 ± 0.0000</td><td>0.9887 ± 0.0000</td><td>0.9985 ± 4.71e-33</td><td>1.0 ± 0.0000</td></tr><tr><td>Hard-Sigmoid (σ0)</td><td>1.0 ± 0.0000</td><td>0.9971 ± 0.0000</td><td>0.9979 ± 0.0000</td><td>1.0 ± 0.0000</td></tr><tr><td>Sigmoid (σ0)</td><td>1.0 ± 0.0000</td><td>1.0 ± 0.0000</td><td>0.9996 ± 0.0000</td><td>1.0 ± 0.0000</td></tr><tr><td>ReLU (σ0)</td><td>1.0 ± 0.0000</td><td>0.9971 ± 0.0000</td><td>0.9993 ± 0.0000</td><td>1.0 ± 0.0000</td></tr></table>"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.521,
+      0.789,
+      0.764
+    ],
+    "angle": 0,
+    "content": "We investigated the effect of various physics-informed weight schedules on model performance. The anomaly detection results for different schedules are shown in Table 3. The results shown in the table demonstrate that the physics-informed model trained with a logarithmic sigmoid schedule exhibits superior overall performance in comparison to other PINN weight schedules for a \\(x_0\\) diffusion model. The model is designed to be a standard model, and the model is designed to be in the context of the anomaly detection with \\((\\tau_{0})\\) model. We also explored a few other PINN weight schedules to improve the results for Lenze datasets but did not find them useful. We tried sine and tanshrink functions in building the PINN weight schedule and trained the diffusion model with these schedules, which improved the F1 score to 0.98. However, these functions did not outperform the other PINN schedules and, in fact, led to a deterioration in performance, and we were achieving the F1 score of 0.94 on the EMPS dataset. On the other hand, the RelU model, overall performance, and comparison to other schedules for a \\(x_0\\) model, and a sigmoid schedule improved the model's performance in identifying anomalies for the Predator-Prey dataset.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.782,
+      0.36,
+      0.798
+    ],
+    "angle": 0,
+    "content": "6 Conclusion"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.81,
+      0.787,
+      0.842
+    ],
+    "angle": 0,
+    "content": "We introduced a novel approach to learn the physics-dependent temporal relationship of data using a weighted physics-informed loss in diffusion model",
+    "merge_prev": false
+  }
+]

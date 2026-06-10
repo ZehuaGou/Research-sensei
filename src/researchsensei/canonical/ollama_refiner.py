@@ -58,10 +58,12 @@ class OllamaStructuredClient:
         base_url: str = "http://localhost:11434",
         model: str = "qwen2.5:0.5b",
         timeout_seconds: float = 30.0,
+        max_retries: int = 1,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
+        self.max_retries = max(0, max_retries)
         self.json_valid_count = 0
         self.json_invalid_count = 0
         self.retry_count = 0
@@ -84,22 +86,29 @@ class OllamaStructuredClient:
             "temperature": 0,
             "options": {"temperature": 0},
         }
-        try:
-            response = httpx.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout_seconds)
-            response.raise_for_status()
-            content = response.json().get("message", {}).get("content", "")
-            parsed = json.loads(content)
-            self.json_valid_count += 1
-            return parsed
-        except httpx.TimeoutException:
-            self.timeout_count += 1
-            self.json_invalid_count += 1
-            self.warnings.append("ollama_timeout")
-            return None
-        except Exception as exc:
-            self.json_invalid_count += 1
-            self.warnings.append(f"invalid_json: {type(exc).__name__}")
-            return None
+        last_warning = ""
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = httpx.post(f"{self.base_url}/api/chat", json=payload, timeout=self.timeout_seconds)
+                response.raise_for_status()
+                content = response.json().get("message", {}).get("content", "")
+                parsed = json.loads(content)
+                self.json_valid_count += 1
+                return parsed
+            except httpx.TimeoutException:
+                self.timeout_count += 1
+                self.json_invalid_count += 1
+                self.warnings.append("ollama_timeout")
+                return None
+            except Exception as exc:
+                self.json_invalid_count += 1
+                last_warning = f"invalid_json: {type(exc).__name__}"
+                if attempt < self.max_retries:
+                    self.retry_count += 1
+                    continue
+                self.warnings.append(last_warning)
+                return None
+        return None
 
 
 class OllamaSectionRefiner:

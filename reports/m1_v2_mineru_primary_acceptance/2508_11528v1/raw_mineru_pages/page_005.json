@@ -1,0 +1,94 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.35,
+      0.115,
+      0.733,
+      0.131
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.775,
+      0.117,
+      0.787,
+      0.128
+    ],
+    "angle": 0,
+    "content": "5"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.216,
+      0.147,
+      0.542,
+      0.163
+    ],
+    "angle": 0,
+    "content": "The physics-informed loss,  \\( L_{P1} \\)  is defined by",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.395,
+      0.174,
+      0.606,
+      0.215
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} _ {\\mathcal {P I}} = \\frac {1}{N} \\sum_ {i = 1} ^ {N} \\mathcal {E} (\\mathcal {D}, F (x _ {i}; \\theta)) ^ {2}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.225,
+      0.788,
+      0.318
+    ],
+    "angle": 0,
+    "content": "where \\(\\mathcal{E}\\) denotes the residual of the governing physical equations, \\(\\mathcal{D}\\) denotes the physics prior, and \\(F(x;\\theta)\\) represents the output of neural network. The physics-informed loss term works as a regularizer that limits model parameters to applied physics law. Encoding physics information into a learning algorithm enhances the informational content of the data, leading to a boost in neural network model performance [30].",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.216,
+      0.34,
+      0.388,
+      0.357
+    ],
+    "angle": 0,
+    "content": "3 Related Work"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.372,
+      0.789,
+      0.616
+    ],
+    "angle": 0,
+    "content": "The physics-aware diffusion model was introduced in [15] to generate samples constrained by partial differential equations (PDE) by minimizing the residue during model sampling. Christopher et al. [6], augmented diffusion-based synthesis with constraints during sampling to generate high-fidelity content. A physics-guided motion diffusion model (PhysDiff) [44] incorporates physical constraints to generate a high-fidelity model. The PDE is a dynamic model to generate a high-fidelity flow field reconstruction in [33], physics residual is included as conditioning information during model training and inference. Similar to our approach, [2] introduces a physics-informed residual based on partial differential equations (PDEs) and the scaled variance of the diffusion process. This residual is incorporated into the training of a diffusion model to generate samples that satisfy the underlying PDE. These studies focus on incorporating physics-based constraints into model training or sampling to produce physically consistent samples. Apart from [44] and [54] the PDEs are the differences in the diffusion process. Our weighting schedule mitigates the impact of noise during physics-informed training, resulting in a closer fit to the data distribution.",
+    "merge_prev": false
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.629,
+      0.789,
+      0.844
+    ],
+    "angle": 0,
+    "content": "In time series anomaly detection in [29] the autoencoder model is used with the diffusion model to identify anomalies using a reconstruction signal. A Denoising Diffusion Time Series Anomaly Detection (DDTAD) [37] also utilizes the reconstruction error for detecting abnormalities. Xiao et al. [42] have used a genotypic model to generate applications in [43] and [44] using multi-level recognition of diffusion models for unperfused anomalies detection for multivariant time series. The ImDiffusion [5] method reduces the uncertainty of data and enhances anomaly detection by employing imputation to integrate information from neighboring time points, effectively capturing temporal and correlated patterns. Analogous to our approach in [45] normal data distribution features are learned during training and abnormal data are detected using the model to generate the data. The data points in the utilization of ELBO for the detection of anomalous patterns, and the integration of a weighted physics law during model training yields a physically",
+    "merge_prev": false
+  }
+]

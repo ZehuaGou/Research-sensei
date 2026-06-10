@@ -1,0 +1,127 @@
+[
+  {
+    "type": "header",
+    "bbox": [
+      0.349,
+      0.115,
+      0.733,
+      0.131
+    ],
+    "angle": 0,
+    "content": "Physics-informed Diffusion Model for Anomaly Detection"
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.775,
+      0.117,
+      0.787,
+      0.127
+    ],
+    "angle": 0,
+    "content": "7"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.147,
+      0.784,
+      0.178
+    ],
+    "angle": 0,
+    "content": "diffusion steps by assigning them greater weight in the loss computation, while subsequent steps approaching the final step \\( T \\) are assigned zero weight.",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.396,
+      0.189,
+      0.606,
+      0.23
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} _ {\\mathcal {P I}} = \\overline {{\\lambda_ {P I _ {t}}}} \\frac {1}{N} \\sum_ {i = 1} ^ {N} \\mathcal {E} (\\mathcal {D}, \\widehat {x _ {i _ {0}}}) ^ {2}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.243,
+      0.788,
+      0.379
+    ],
+    "angle": 0,
+    "content": "Here \\(\\lambda P_{iL} = \\prod_{m=1}^{n} \\lambda P_{iL}\\), and \\(\\lambda P_{iL}\\) is defined by \\(f(s) \\cdot (m - n) + l\\), where \\(f(s)\\) is a nonlinear function, \\(m\\) and \\(n\\) determine the amplitude bounds, \\(l\\) is offset. Here \\(\\lambda P_{iL}\\) eliminates the noise in the reconstructed signal, \\(\\widehat{x}_{iL}\\). This noise which is inherited from signal \\(x_{i}\\), at an arbitrary diffusion step \\(t\\), and its removal ultimately enhances the reliability of the \\(\\mathcal{L}_{\\mathcal{P}Z}\\) computation. This weight schedule is bounded between 0 and 1, and it saturates at 0. Its shape and saturation points depend on the \\(f(s)\\). This weighting schedule ensures that the constructed physics loss is more precise than one computed using all diffusion steps. The Diffusion Model loss function with physics-informed loss is as follows",
+    "merge_prev": false
+  },
+  {
+    "type": "equation",
+    "bbox": [
+      0.41,
+      0.394,
+      0.591,
+      0.409
+    ],
+    "angle": 0,
+    "content": "\\[\n\\mathcal {L} _ {T P I D, M} = \\mathcal {L} _ {D M} + \\mathcal {L} _ {P I}\n\\]"
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.215,
+      0.421,
+      0.613,
+      0.436
+    ],
+    "angle": 0,
+    "content": "where \\(\\mathcal{L}_{DM}\\) indicates the diffusion model loss function.",
+    "merge_prev": false
+  },
+  {
+    "type": "title",
+    "bbox": [
+      0.215,
+      0.46,
+      0.424,
+      0.475
+    ],
+    "angle": 0,
+    "content": "4.1 Anomaly Detection"
+  },
+  {
+    "type": "image",
+    "bbox": [
+      0.241,
+      0.511,
+      0.765,
+      0.665
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "image_caption",
+    "bbox": [
+      0.214,
+      0.693,
+      0.788,
+      0.737
+    ],
+    "angle": 0,
+    "content": "Fig. 2. Physics-informed training influences the model's ability to learn and generalize the underlying data distribution, resulting in the correct identification of normal and anomaly data compared to an uninformed diffusion model."
+  },
+  {
+    "type": "text",
+    "bbox": [
+      0.214,
+      0.764,
+      0.788,
+      0.841
+    ],
+    "angle": 0,
+    "content": "The diffusion model learns to approximate the underlying probability distribution of the data. After training the model exclusively on normal data, anomaly detection is performed based on its Evidence Lower Bound (ELBO), which serves as the diffusion model's loss function \\(\\mathcal{L}_{DM}\\). As shown in Figure 2, a testing sample is labeled as an anomaly if the computed ELBO of the sample exceeds the",
+    "merge_prev": false
+  }
+]

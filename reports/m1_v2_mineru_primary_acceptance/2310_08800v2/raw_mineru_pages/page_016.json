@@ -1,0 +1,145 @@
+[
+  {
+    "type": "list",
+    "bbox": [
+      0.088,
+      0.064,
+      0.911,
+      0.484
+    ],
+    "angle": 0,
+    "content": null
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.091,
+      0.069,
+      0.908,
+      0.109
+    ],
+    "angle": 0,
+    "content": "[54] Ahmed Abdulaal, Zhuanghua Liu, and Tomer Lancewicki. Practical approach to asynchronous multivariate time series anomaly detection and localization. In Proceedings of the 27th ACM SIGKDD conference on knowledge discovery & data mining, pages 2485–2494, 2021."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.093,
+      0.112,
+      0.906,
+      0.151
+    ],
+    "angle": 0,
+    "content": "[55] Aditya P Mathur and Nils Ole Tippenhauer. Swat: A water treatment testbed for research and training on ics security. In 2016 international workshop on cyber-physical systems for smart water networks (CySWater), pages 31–36. IEEE, 2016."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.155,
+      0.905,
+      0.183
+    ],
+    "angle": 0,
+    "content": "[56] Lifeng Shen, Zhuocong Li, and James Kwok. Timeseries anomaly detection using temporal hierarchical one-class network. Advances in Neural Information Processing Systems, 33:13016–13026, 2020."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.187,
+      0.905,
+      0.227
+    ],
+    "angle": 0,
+    "content": "[57] Bo Zong, Qi Song, Martin Renqiang Min, Wei Cheng, Cristian Lumezanu, Daeki Cho, and Haifeng Chen. Deep autoencoding gaussian mixture model for unsupervised anomaly detection. In International conference on learning representations, 2018."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.23,
+      0.905,
+      0.271
+    ],
+    "angle": 0,
+    "content": "[58] Julien Audibert, Pietro Michiardi, Frédéric Guyard, Sébastien Marti, and Maria A Zuluaga. Usad: Unsupervised anomaly detection on multivariate time series. In Proceedings of the 26th ACM SIGKDD international conference on knowledge discovery & data mining, pages 3395–3404, 2020."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.274,
+      0.905,
+      0.315
+    ],
+    "angle": 0,
+    "content": "[59] Zhihan Li, Youjian Zhao, Jiaqi Han, Ya Su, Rui Jiao, Xidao Wen, and Dan Pei. Multivariate time series anomaly detection and interpretation using hierarchical inter-metric and temporal embedding. In Proceedings of the 27th ACM SIGKDD conference on knowledge discovery & data mining, pages 3220–3230, 2021."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.318,
+      0.905,
+      0.346
+    ],
+    "angle": 0,
+    "content": "[60] Shreshth Tuli, Giuliano Casale, and Nicholas R Jennings. Tranad: Deep transformer networks for anomaly detection in multivariate time series data. arXiv preprint arXiv:2201.07284, 2022."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.349,
+      0.905,
+      0.377
+    ],
+    "angle": 0,
+    "content": "[61] Haixu Wu, Tengge Hu, Yong Liu, Hang Zhou, Jianmin Wang, and Mingsheng Long. Timesnet: Temporal 2d-variation modeling for general time series analysis. arXiv preprint arXiv:2210.02186, 2022."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.38,
+      0.905,
+      0.407
+    ],
+    "angle": 0,
+    "content": "[62] Zheng Xu, Yumeng Yang, Xinwen Gao, and Min Hu. Dcff-mtad: A multivariate time-series anomaly detection model based on dual-channel feature fusion. Sensors, 23(8):3910, 2023."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.411,
+      0.905,
+      0.439
+    ],
+    "angle": 0,
+    "content": "[63] Yifan Li, Xiaoyan Peng, Jia Zhang, Zhiyong Li, and Ming Wen. Dct-gan: Dilated convolutional transformer-based gan for time series anomaly detection. IEEE Transactions on Knowledge and Data Engineering, 2021."
+  },
+  {
+    "type": "ref_text",
+    "bbox": [
+      0.094,
+      0.441,
+      0.905,
+      0.48
+    ],
+    "angle": 0,
+    "content": "[64] Jing Wang, Shikuan Shao, Yunfei Bai, Jiaoxue Deng, and Youfang Lin. Multiscale wavelet graph autoencoder for multivariate time-series anomaly detection. IEEE Transactions on Instrumentation and Measurement, 72:1–11, 2022."
+  },
+  {
+    "type": "page_number",
+    "bbox": [
+      0.49,
+      0.958,
+      0.509,
+      0.969
+    ],
+    "angle": 0,
+    "content": "16"
+  }
+]
