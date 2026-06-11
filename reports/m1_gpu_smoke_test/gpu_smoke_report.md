@@ -1,6 +1,6 @@
 # M1 MinerU GPU Smoke Test Report
 
-Generated: 2026-06-11T13:59:33.361971
+Generated: 2026-06-11T14:35:16.227688
 
 ## Result: PASS
 
@@ -26,8 +26,8 @@ Generated: 2026-06-11T13:59:33.361971
 - Pages: 1
 - Model: opendatalab/MinerU2.5-Pro-2604-1.2B
 - Backend: transformers
-- Model load: 6.924s
-- Parse elapsed: 13.858s
+- Model load: 7.368s
+- Parse elapsed: 13.777s
 - Blocks: 4
 - Formulas: 1
 

@@ -1,6 +1,6 @@
 # M1 Device Diagnosis Report
 
-Generated: 2026-06-11T13:37:03.671901
+Generated: 2026-06-11T14:34:46.633313
 
 ## System
 
@@ -20,7 +20,7 @@ Generated: 2026-06-11T13:37:03.671901
 ## nvidia-smi
 
 - Available: True
-- NVIDIA GeForce RTX 4060 Laptop GPU: 8188MB total, 6878MB free, 60C, 0% util
+- NVIDIA GeForce RTX 4060 Laptop GPU: 8188MB total, 6877MB free, 59C, 0% util
 
 ## Dependencies
 

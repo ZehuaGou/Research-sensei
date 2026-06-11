@@ -1,6 +1,6 @@
 # M1 Environment Version Matrix
 
-Generated: 2026-06-11T13:36:54.065463
+Generated: 2026-06-11T14:34:37.001725
 
 ## GPU Status Verdict
 
@@ -20,7 +20,7 @@ Generated: 2026-06-11T13:36:54.065463
 - Is project .venv: **True**
 - Virtualenv: `D:\Code\Python\Research-sensei\.venv`
 - Project version: 0.5.0
-- Git commit: 455771e
+- Git commit: ecd4dee
 
 ## PyTorch / CUDA
 

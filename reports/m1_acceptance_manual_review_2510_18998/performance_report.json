@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-06-11T15:21:52.673130",
+  "paper_id": "2510_18998",
+  "arxiv_id": "2510.18998",
+  "page_count": 15,
+  "pdf_size_bytes": 1643999,
+  "pdf_size_mb": 1.57,
+  "device_mode_requested": "auto",
+  "device_mode_actual": "cuda",
+  "gpu_used": true,
+  "cuda_available": true,
+  "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_memory_total_mb": 8188,
+  "fallback_reason": null,
+  "backend": "transformers",
+  "model_load_seconds": 0,
+  "parse_elapsed_seconds": 2683.486,
+  "seconds_per_page": 178.9,
+  "pages_per_second": 0.006,
+  "block_count": 361,
+  "formula_count": 26,
+  "quality_status": "PASS",
+  "audit_elapsed_seconds": 0.0,
+  "pipeline_total_seconds": 2694.0,
+  "warnings": [
+    "seconds_per_page=179 > 120s threshold",
+    "seconds_per_page=179 > 120s threshold"
+  ],
+  "perf_pass": false
+}
