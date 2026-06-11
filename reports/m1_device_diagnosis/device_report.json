@@ -1,0 +1,51 @@
+{
+  "timestamp": "2026-06-11T09:05:36.859197",
+  "python_version": "3.13.9 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 19:09:58) [MSC v.1929 64 bit (AMD64)]",
+  "os": "Windows 11 (AMD64)",
+  "torch": {
+    "installed": true,
+    "version": "2.12.0+cpu",
+    "cuda_available": false,
+    "cuda_version": null,
+    "gpu_name": null,
+    "gpu_memory_total_mb": null,
+    "gpu_memory_allocated_mb": null,
+    "gpu_memory_reserved_mb": null
+  },
+  "nvidia_smi": {
+    "available": true,
+    "output": "NVIDIA GeForce RTX 4060 Laptop GPU, 8188, 1079, 6878, 58, 0",
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "memory_total_mb": 8188,
+        "memory_used_mb": 1079,
+        "memory_free_mb": 6878,
+        "temperature_c": 58,
+        "utilization_pct": 0
+      }
+    ]
+  },
+  "transformers": {
+    "installed": true,
+    "version": "4.57.6"
+  },
+  "accelerate": {
+    "installed": true,
+    "version": "1.13.0"
+  },
+  "mineru_vl_utils": {
+    "installed": true,
+    "version": "1.0.4",
+    "backend": null
+  },
+  "cuda_issues": [
+    "PyTorch installed but CUDA version is None (CPU-only build)"
+  ],
+  "summary": {
+    "gpu_available": false,
+    "gpu_name": null,
+    "gpu_memory_total_mb": null,
+    "recommendation": "CUDA not available. MinerU will run on CPU (very slow). Check NVIDIA driver and PyTorch CUDA build."
+  }
+}

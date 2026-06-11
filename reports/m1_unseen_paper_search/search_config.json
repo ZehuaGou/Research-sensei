@@ -1,5 +1,15 @@
 {
-  "search_date": "2026-06-10T20:46:24.182257",
+  "search_date": "2026-06-11T09:07:53.323886",
+  "cli_args": {
+    "max_results_per_query": 5,
+    "max_metadata_candidates": 30,
+    "max_pdf_downloads": 3,
+    "min_formula_prescreen_count": 5,
+    "full_parse_limit": 1,
+    "reuse_cache": true,
+    "force_redownload": false,
+    "dry_run": false
+  },
   "queries": [
     "time series anomaly detection transformer",
     "multivariate time series anomaly detection deep learning",
@@ -15,39 +25,36 @@
   "excluded_ids": [
     "2012.09149",
     "2106.02775",
-    "2205.05tried",
     "2209.07142",
     "2310.08800",
     "2312.02530",
+    "2407.06849",
     "2508.11528"
   ],
-  "filters": {
-    "reject_title_pattern": "survey|review|forecast\\b|forecasting|classification|taxonomy|benchmarking|benchmark\\b",
-    "theme_pattern": "transformer|diffusion|graph.*(neural|attention)|attention.*(mechanism|network)|autoencoder|vae|variational|generative|contrastive|self-supervised|imputation|interpolation|missing.*(data|value)",
-    "min_formula_count": 5
+  "stage_a_stats": {
+    "stage": "A",
+    "description": "Metadata-only search, no PDF downloads",
+    "raw_candidate_count": 31,
+    "valid_candidate_count": 14,
+    "excluded_count": 17,
+    "elapsed_seconds": 30.0,
+    "pdf_downloaded_count": 0
   },
-  "scoring": {
-    "topic_score_weight": 0.6,
-    "formula_count_weight": 0.4,
-    "topic_keywords": [
-      "(=",
-      "\\\\frac",
-      "\\\\sum",
-      "\\\\prod",
-      "\\\\arg",
-      "softmax",
-      "attention",
-      "\\bL\\s*=",
-      "\\bx_\\{",
-      "\\bx_t",
-      "\\bz_t",
-      "\\bscore\\b",
-      "\\banomaly\\s*score\\b",
-      "\\bloss\\b",
-      "\\bmin\\b",
-      "\\bmax\\b",
-      "\\b\\\\mathbb\\b",
-      "\\b\\\\mathrm\\b)"
-    ]
+  "stage_b_stats": {
+    "stage": "B",
+    "description": "Limited PDF prescreen, max 3 downloads",
+    "pdf_downloaded_count": 0,
+    "cached_count": 3,
+    "prescreened_count": 3,
+    "valid_after_prescreen": 14,
+    "elapsed_seconds": 1.9
+  },
+  "search_cost_summary": {
+    "total_candidates": 31,
+    "valid_after_metadata": 14,
+    "pdfs_downloaded": 0,
+    "prescreened": 3,
+    "selected_for_full_parse": 1,
+    "note": "formula_prescreen_count is PyMuPDF text-line heuristic, NOT MinerU final formula count"
   }
 }

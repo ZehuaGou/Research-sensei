@@ -1,21 +1,19 @@
 {
-  "paper_id": "2407_06849",
-  "title": "TeVAE: A Variational Autoencoder Approach for Discrete Online Anomaly Detection in Variable-state Multivariate Time-series Data",
-  "arxiv_id": "2407.06849",
-  "pdf_url": "https://arxiv.org/pdf/2407.06849v2",
-  "abstract": "As attention to recorded data grows in the realm of automotive testing and manual evaluation reaches its limits, there is a growing need for automatic online anomaly detection. This real-world data is complex in many ways and requires the modelling of testee behaviour. To address this, we propose a temporal variational autoencoder (TeVAE) that can detect anomalies with minimal false positives when trained on unlabelled data. Our approach also avoids the bypass phenomenon and introduces a new met",
+  "paper_id": "2502_14293",
+  "title": "Cross-Domain Graph Anomaly Detection via Test-Time Training with Homophily-Guided Self-Supervision",
+  "arxiv_id": "2502.14293",
+  "pdf_url": "https://arxiv.org/pdf/2502.14293v2",
+  "abstract": "Graph Anomaly Detection (GAD) has demonstrated great effectiveness in identifying unusual patterns within graph-structured data. However, while labeled anomalies are often scarce in emerging applications, existing supervised GAD approaches are either ineffective or not applicable when moved across graph domains due to distribution shifts and heterogeneous feature spaces. To address these challenges, we present GADT3, a novel test-time training framework for cross-domain GAD. GADT3 combines super",
   "authors": [
-    "Lucas Correia",
-    "Jan-Christoph Goos",
-    "Philipp Klein",
-    "Thomas Bäck",
-    "Anna V. Kononova"
+    "Delaram Pirhayati",
+    "Arlei Silva"
   ],
-  "published": "2024-07-09",
-  "selected_reason": "Highest combined score (topic=0.68, formula_lines=162). Query: 'variational autoencoder time series anomaly'. Not previously used in M1 acceptance.",
-  "search_query_that_found_it": "variational autoencoder time series anomaly",
-  "formula_prescreen_count": 162,
-  "downloaded_pdf_sha256": "c99b28a541f5baaabcfdb5c7ae72a52f5617a204e86d0b17eed8320d8940797b",
-  "downloaded_pdf_path": "D:\\Code\\Python\\Research-sensei\\reports\\m1_unseen_paper_search\\_downloads\\2407_06849.pdf",
-  "timestamp": "2026-06-10T20:46:24.188296"
+  "published": "2025-02-20",
+  "selected_reason": "Highest combined score (topic=0.49, prescreen_formula_lines=169). Query: 'self-supervised time series anomaly detection'. Not previously used in M1 acceptance.",
+  "search_query_that_found_it": "self-supervised time series anomaly detection",
+  "formula_prescreen_count": 169,
+  "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
+  "downloaded_pdf_sha256": "89a7948350053679b301efc52caca17bd63d5b1faa6395692f696ada6cb1984e",
+  "downloaded_pdf_path": "D:\\Code\\Python\\Research-sensei\\reports\\m1_unseen_paper_search\\_downloads\\2502_14293.pdf",
+  "timestamp": "2026-06-11T09:07:53.329833"
 }
