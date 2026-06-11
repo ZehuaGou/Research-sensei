@@ -17,11 +17,11 @@
     "formula_prescreen_count": 88,
     "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
     "pdf_downloaded": true,
-    "prescreen_elapsed_seconds": 0.2,
+    "prescreen_elapsed_seconds": 0.1,
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "candidate",
     "exclusion_reason": "",
-    "selected_candidate": false
+    "selected_candidate": true
   },
   {
     "arxiv_id": "2112.14436",
@@ -58,54 +58,6 @@
     ],
     "query": "time series anomaly detection transformer",
     "topic_score": 0.2,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "excluded",
-    "exclusion_reason": "unrelated_topic",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2412.19286",
-    "title": "Time Series Foundational Models: Their Role in Anomaly Detection and Prediction",
-    "abstract": "Time series foundational models (TSFM) have gained prominence in time series forecasting, promising state-of-the-art performance across various applications. However, their application in anomaly detection and prediction remains underexplored, with growing concerns regarding their black-box nature, lack of interpretability and applicability. This paper critically evaluates the efficacy of TSFM in anomaly detection and prediction tasks. We systematically analyze TSFM across multiple datasets, inc",
-    "pdf_url": "https://arxiv.org/pdf/2412.19286v1",
-    "published": "2024-12-26",
-    "authors": [
-      "Chathurangi Shyalika",
-      "Harleen Kaur Bagga",
-      "Ahan Bhatt",
-      "Renjith Prasad",
-      "Alaa Al Ghazo"
-    ],
-    "query": "time series anomaly detection transformer",
-    "topic_score": 0.55,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "excluded",
-    "exclusion_reason": "unrelated_topic",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "1610.06761",
-    "title": "Maximally Divergent Intervals for Anomaly Detection",
-    "abstract": "We present new methods for batch anomaly detection in multivariate time series. Our methods are based on maximizing the Kullback-Leibler divergence between the data distribution within and outside an interval of the time series. An empirical analysis shows the benefits of our algorithms compared to methods that treat each time step independently from each other without optimizing with respect to all possible intervals.",
-    "pdf_url": "https://arxiv.org/pdf/1610.06761v1",
-    "published": "2016-10-21",
-    "authors": [
-      "Erik Rodner",
-      "Björn Barz",
-      "Yanira Guanche",
-      "Milan Flach",
-      "Miguel Mahecha"
-    ],
-    "query": "time series anomaly detection transformer",
-    "topic_score": 0.45,
     "formula_prescreen_count": 0,
     "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
     "pdf_downloaded": false,
@@ -185,27 +137,27 @@
     "selected_candidate": false
   },
   {
-    "arxiv_id": "2307.11494",
-    "title": "Predict, Refine, Synthesize: Self-Guiding Diffusion Models for Probabilistic Time Series Forecasting",
-    "abstract": "Diffusion models have achieved state-of-the-art performance in generative modeling tasks across various domains. Prior works on time series diffusion models have primarily focused on developing conditional models tailored to specific forecasting or imputation tasks. In this work, we explore the potential of task-agnostic, unconditional diffusion models for several time series applications. We propose TSDiff, an unconditionally-trained diffusion model for time series. Our proposed self-guidance m",
-    "pdf_url": "https://arxiv.org/pdf/2307.11494v3",
-    "published": "2023-07-21",
+    "arxiv_id": "2412.19286",
+    "title": "Time Series Foundational Models: Their Role in Anomaly Detection and Prediction",
+    "abstract": "Time series foundational models (TSFM) have gained prominence in time series forecasting, promising state-of-the-art performance across various applications. However, their application in anomaly detection and prediction remains underexplored, with growing concerns regarding their black-box nature, lack of interpretability and applicability. This paper critically evaluates the efficacy of TSFM in anomaly detection and prediction tasks. We systematically analyze TSFM across multiple datasets, inc",
+    "pdf_url": "https://arxiv.org/pdf/2412.19286v1",
+    "published": "2024-12-26",
     "authors": [
-      "Marcel Kollovieh",
-      "Abdul Fatir Ansari",
-      "Michael Bohlke-Schneider",
-      "Jasper Zschiegner",
-      "Hao Wang"
+      "Chathurangi Shyalika",
+      "Harleen Kaur Bagga",
+      "Ahan Bhatt",
+      "Renjith Prasad",
+      "Alaa Al Ghazo"
     ],
     "query": "time series anomaly detection diffusion model",
-    "topic_score": 0.33999999999999997,
+    "topic_score": 0.55,
     "formula_prescreen_count": 0,
     "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
     "pdf_downloaded": false,
     "prescreen_elapsed_seconds": 0.0,
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "excluded",
-    "exclusion_reason": "survey_or_review",
+    "exclusion_reason": "unrelated_topic",
     "selected_candidate": false
   },
   {
@@ -249,53 +201,6 @@
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "excluded",
     "exclusion_reason": "unrelated_topic",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2202.07125",
-    "title": "Transformers in Time Series: A Survey",
-    "abstract": "Transformers have achieved superior performances in many tasks in natural language processing and computer vision, which also triggered great interest in the time series community. Among multiple advantages of Transformers, the ability to capture long-range dependencies and interactions is especially attractive for time series modeling, leading to exciting progress in various time series applications. In this paper, we systematically review Transformer schemes for time series modeling by highlig",
-    "pdf_url": "https://arxiv.org/pdf/2202.07125v5",
-    "published": "2022-02-15",
-    "authors": [
-      "Qingsong Wen",
-      "Tian Zhou",
-      "Chaoli Zhang",
-      "Weiqi Chen",
-      "Ziqing Ma"
-    ],
-    "query": "time series imputation transformer",
-    "topic_score": 0.5,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "excluded",
-    "exclusion_reason": "survey_or_review",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2603.06605",
-    "title": "Structure-Aware Set Transformers: Temporal and Variable-Type Attention Biases for Asynchronous Clinical Time Series",
-    "abstract": "Electronic health records (EHR) are irregular, asynchronous multivariate time series. As time-series foundation models increasingly tokenize events rather than discretizing time, the input layout becomes a key design choice. Grids expose time$\\times$variable structure but require imputation or missingness masks, risking error or sampling-policy shortcuts. Point-set tokenization avoids discretization but loses within-variable trajectories and time-local cross-variable context (Fig.1). We restore ",
-    "pdf_url": "https://arxiv.org/pdf/2603.06605v2",
-    "published": "2026-02-18",
-    "authors": [
-      "Joohyung Lee",
-      "Kwanhyung Lee",
-      "Changhun Kim",
-      "Eunho Yang"
-    ],
-    "query": "time series imputation transformer",
-    "topic_score": 0.4600000000000001,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
     "selected_candidate": false
   },
   {
@@ -361,51 +266,6 @@
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "excluded",
     "exclusion_reason": "unrelated_topic",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2312.01294",
-    "title": "Deep sub-ensembles meets quantile regression: uncertainty-aware imputation for time series",
-    "abstract": "Real-world time series data often exhibits substantial missing values, posing challenges for advanced analysis. A common approach to addressing this issue is imputation, where the primary challenge lies in determining the appropriate values to fill in. While previous deep learning methods have proven effective for time series imputation, they often produce overconfident imputations, which poses a potentially overlooked risk to the reliability of the intelligent system. Diffusion methods are prof",
-    "pdf_url": "https://arxiv.org/pdf/2312.01294v4",
-    "published": "2023-12-03",
-    "authors": [
-      "Ying Liu",
-      "Peng Cui",
-      "Wenbo Hu",
-      "Richang Hong"
-    ],
-    "query": "time series imputation deep learning missing data",
-    "topic_score": 0.42000000000000004,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2601.01259",
-    "title": "A Novel Multiple Imputation Approach For Parameter Estimation in Observation-Driven Time Series Models With Missing Data",
-    "abstract": "Handling missing data in time series is a complex problem due to the presence of temporal dependence. General-purpose imputation methods, while widely used, often distort key statistical properties of the data, such as variance and dependence structure, leading to biased estimation and misleading inference. These issues become more pronounced in models that explicitly rely on capturing serial dependence, as standard imputation techniques fail to preserve the underlying dynamics. This paper propo",
-    "pdf_url": "https://arxiv.org/pdf/2601.01259v3",
-    "published": "2026-01-03",
-    "authors": [
-      "Guilherme Pumi",
-      "Taiane Schaedler Prass",
-      "Douglas Krauthein Verdum"
-    ],
-    "query": "time series imputation deep learning missing data",
-    "topic_score": 0.26,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
     "selected_candidate": false
   },
   {
@@ -475,51 +335,6 @@
     "selected_candidate": false
   },
   {
-    "arxiv_id": "2002.09545",
-    "title": "RobustTAD: Robust Time Series Anomaly Detection via Decomposition and Convolutional Neural Networks",
-    "abstract": "The monitoring and management of numerous and diverse time series data at Alibaba Group calls for an effective and scalable time series anomaly detection service. In this paper, we propose RobustTAD, a Robust Time series Anomaly Detection framework by integrating robust seasonal-trend decomposition and convolutional neural network for time series data. The seasonal-trend decomposition can effectively handle complicated patterns in time series, and meanwhile significantly simplifies the architect",
-    "pdf_url": "https://arxiv.org/pdf/2002.09545v2",
-    "published": "2020-02-21",
-    "authors": [
-      "Jingkun Gao",
-      "Xiaomin Song",
-      "Qingsong Wen",
-      "Pichao Wang",
-      "Liang Sun"
-    ],
-    "query": "graph neural network time series anomaly",
-    "topic_score": 0.53,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "excluded",
-    "exclusion_reason": "unrelated_topic",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "1909.10086",
-    "title": "Learning Universal Graph Neural Network Embeddings With Aid Of Transfer Learning",
-    "abstract": "Learning powerful data embeddings has become a center piece in machine learning, especially in natural language processing and computer vision domains. The crux of these embeddings is that they are pretrained on huge corpus of data in a unsupervised fashion, sometimes aided with transfer learning. However currently in the graph learning domain, embeddings learned through existing graph neural networks (GNNs) are task dependent and thus cannot be shared across different datasets. In this paper, w",
-    "pdf_url": "https://arxiv.org/pdf/1909.10086v3",
-    "published": "2019-09-22",
-    "authors": [
-      "Saurabh Verma",
-      "Zhi-Li Zhang"
-    ],
-    "query": "graph neural network time series anomaly",
-    "topic_score": 0.08,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
-    "selected_candidate": false
-  },
-  {
     "arxiv_id": "2506.09781",
     "title": "On the Similarities of Embeddings in Contrastive Learning",
     "abstract": "Contrastive learning operates on a simple yet effective principle: Embeddings of positive pairs are pulled together, while those of negative pairs are pushed apart. In this paper, we propose a unified framework for understanding contrastive learning through the lens of cosine similarity, and present two key theoretical insights derived from this framework. First, in full-batch settings, we show that perfect alignment of positive pairs is unattainable when negative-pair similarities fall below a ",
@@ -556,34 +371,10 @@
     ],
     "query": "contrastive learning time series anomaly detection",
     "topic_score": 0.47,
-    "formula_prescreen_count": 0,
+    "formula_prescreen_count": 79,
     "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2303.05000",
-    "title": "Learning Representation for Anomaly Detection of Vehicle Trajectories",
-    "abstract": "Predicting the future trajectories of surrounding vehicles based on their history trajectories is a critical task in autonomous driving. However, when small crafted perturbations are introduced to those history trajectories, the resulting anomalous (or adversarial) trajectories can significantly mislead the future trajectory prediction module of the ego vehicle, which may result in unsafe planning and even fatal accidents. Therefore, it is of great importance to detect such anomalous trajectorie",
-    "pdf_url": "https://arxiv.org/pdf/2303.05000v1",
-    "published": "2023-03-09",
-    "authors": [
-      "Ruochen Jiao",
-      "Juyang Bai",
-      "Xiangguo Liu",
-      "Takami Sato",
-      "Xiaowei Yuan"
-    ],
-    "query": "contrastive learning time series anomaly detection",
-    "topic_score": 0.3,
-    "formula_prescreen_count": 0,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": false,
-    "prescreen_elapsed_seconds": 0.0,
+    "pdf_downloaded": true,
+    "prescreen_elapsed_seconds": 0.1,
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "candidate",
     "exclusion_reason": "",
@@ -608,29 +399,6 @@
     "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
     "pdf_downloaded": false,
     "prescreen_elapsed_seconds": 0.0,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
-    "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2205.09924",
-    "title": "Anomaly Detection for Multivariate Time Series on Large-scale Fluid Handling Plant Using Two-stage Autoencoder",
-    "abstract": "This paper focuses on anomaly detection for multivariate time series data in large-scale fluid handling plants with dynamic components, such as power generation, water treatment, and chemical plants, where signals from various physical phenomena are observed simultaneously. In these plants, the need for anomaly detection techniques is increasing in order to reduce the cost of operation and maintenance, in view of a decline in the number of skilled engineers and a shortage of manpower. However, c",
-    "pdf_url": "https://arxiv.org/pdf/2205.09924v1",
-    "published": "2022-05-20",
-    "authors": [
-      "Susumu Naito",
-      "Yasunori Taguchi",
-      "Kouta Nakata",
-      "Yuichi Kato"
-    ],
-    "query": "variational autoencoder time series anomaly",
-    "topic_score": 0.6,
-    "formula_prescreen_count": 73,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": true,
-    "prescreen_elapsed_seconds": 0.1,
     "download_elapsed_seconds": 0.0,
     "exclusion_status": "candidate",
     "exclusion_reason": "",
@@ -683,26 +451,5 @@
     "exclusion_status": "candidate",
     "exclusion_reason": "",
     "selected_candidate": false
-  },
-  {
-    "arxiv_id": "2502.14293",
-    "title": "Cross-Domain Graph Anomaly Detection via Test-Time Training with Homophily-Guided Self-Supervision",
-    "abstract": "Graph Anomaly Detection (GAD) has demonstrated great effectiveness in identifying unusual patterns within graph-structured data. However, while labeled anomalies are often scarce in emerging applications, existing supervised GAD approaches are either ineffective or not applicable when moved across graph domains due to distribution shifts and heterogeneous feature spaces. To address these challenges, we present GADT3, a novel test-time training framework for cross-domain GAD. GADT3 combines super",
-    "pdf_url": "https://arxiv.org/pdf/2502.14293v2",
-    "published": "2025-02-20",
-    "authors": [
-      "Delaram Pirhayati",
-      "Arlei Silva"
-    ],
-    "query": "self-supervised time series anomaly detection",
-    "topic_score": 0.49,
-    "formula_prescreen_count": 169,
-    "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-    "pdf_downloaded": true,
-    "prescreen_elapsed_seconds": 1.5,
-    "download_elapsed_seconds": 0.0,
-    "exclusion_status": "candidate",
-    "exclusion_reason": "",
-    "selected_candidate": true
   }
 ]

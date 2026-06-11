@@ -5,7 +5,7 @@ Stage B: limited PDF prescreen (top N candidates only)
 Stage C: selected paper output (1 paper for full MinerU parse)
 
 Default limits:
-  --max-pdf-downloads 5   (Stage B)
+  --max-pdf-downloads 3   (Stage B)
   --full-parse-limit 1    (Stage C, used by acceptance runner)
 """
 from __future__ import annotations
@@ -318,7 +318,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="M1 Unseen Paper Search (3-stage)")
     p.add_argument("--max-results-per-query", type=int, default=10)
     p.add_argument("--max-metadata-candidates", type=int, default=30)
-    p.add_argument("--max-pdf-downloads", type=int, default=5)
+    p.add_argument("--max-pdf-downloads", type=int, default=3)
     p.add_argument("--min-formula-prescreen-count", type=int, default=5)
     p.add_argument("--reuse-cache", action="store_true", default=True)
     p.add_argument("--force-redownload", action="store_true", default=False)

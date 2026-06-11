@@ -204,7 +204,11 @@ def _recommendation(torch_info: dict, nvidia_info: dict, tf_info: dict, acc_info
             return f"GPU available but only {gpu_mem}MB. MinerU may need to fall back to CPU for large models."
     else:
         if not torch_info["installed"]:
-            return "PyTorch not installed. Install with: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121"
+            return (
+                "PyTorch not installed. Visit https://pytorch.org/get-started/locally/ "
+                "to find the correct install command for your OS, Python version, and CUDA version. "
+                "Example: pip install torch torchvision --index-url https://download.pytorch.org/whl/cu124"
+            )
         if not tf_info["installed"]:
             return "transformers not installed. Install with: pip install transformers accelerate"
         return "CUDA not available. MinerU will run on CPU (very slow). Check NVIDIA driver and PyTorch CUDA build."
