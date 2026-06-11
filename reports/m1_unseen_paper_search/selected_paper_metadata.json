@@ -1,22 +1,19 @@
 {
-  "paper_id": "2510_18998",
-  "title": "An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version",
-  "arxiv_id": "2510.18998",
-  "pdf_url": "https://arxiv.org/pdf/2510.18998v1",
-  "abstract": "Time series anomaly detection is important in modern large-scale systems and is applied in a variety of domains to analyze and monitor the operation of diverse systems. Unsupervised approaches have received widespread interest, as they do not require anomaly labels during training, thus avoiding potentially high costs and having wider applications. Among these, autoencoders have received extensive attention. They use reconstruction errors from compressed representations to define anomaly scores.",
+  "paper_id": "2502_14293",
+  "title": "Cross-Domain Graph Anomaly Detection via Test-Time Training with Homophily-Guided Self-Supervision",
+  "arxiv_id": "2502.14293",
+  "pdf_url": "https://arxiv.org/pdf/2502.14293v2",
+  "abstract": "Graph Anomaly Detection (GAD) has demonstrated great effectiveness in identifying unusual patterns within graph-structured data. However, while labeled anomalies are often scarce in emerging applications, existing supervised GAD approaches are either ineffective or not applicable when moved across graph domains due to distribution shifts and heterogeneous feature spaces. To address these challenges, we present GADT3, a novel test-time training framework for cross-domain GAD. GADT3 combines super",
   "authors": [
-    "Buang Zhang",
-    "Tung Kieu",
-    "Xiangfei Qiu",
-    "Chenjuan Guo",
-    "Jilin Hu"
+    "Delaram Pirhayati",
+    "Arlei Silva"
   ],
-  "published": "2025-10-21",
-  "selected_reason": "Highest combined score (topic=0.60, prescreen_formula_lines=88). Query: 'time series anomaly detection transformer'. Not previously used in M1 acceptance.",
-  "search_query_that_found_it": "time series anomaly detection transformer",
-  "formula_prescreen_count": 88,
+  "published": "2025-02-20",
+  "selected_reason": "Highest combined score (topic=0.49, prescreen_formula_lines=169). Query: 'self-supervised time series anomaly detection'. Not previously used in M1 acceptance.",
+  "search_query_that_found_it": "self-supervised time series anomaly detection",
+  "formula_prescreen_count": 169,
   "formula_prescreen_note": "PyMuPDF text-line heuristic, NOT MinerU final count",
-  "downloaded_pdf_sha256": "3c33ca8ef778dd04791177bb79e215a91119074caa15af6c85d92d92ee1ca502",
-  "downloaded_pdf_path": "D:\\Code\\Python\\Research-sensei\\reports\\m1_unseen_paper_search\\_downloads\\2510_18998.pdf",
-  "timestamp": "2026-06-11T10:56:36.704589"
+  "downloaded_pdf_sha256": "89a7948350053679b301efc52caca17bd63d5b1faa6395692f696ada6cb1984e",
+  "downloaded_pdf_path": "reports\\m1_unseen_paper_search\\_downloads\\2502_14293.pdf",
+  "timestamp": "2026-06-11T11:05:24.969565"
 }
