@@ -1,6 +1,15 @@
 # M1 Quality Report
 
-Generated: 2026-06-11 15:21
+Generated: 2026-06-11 16:02
+
+## Status Summary
+
+| Gate | Status |
+|------|--------|
+| Machine quality gate | **PASS** |
+| GPU path | **PASS** |
+| Performance gate | **WARNING** |
+| Manual visual verification | **PENDING** |
 
 ## Paper
 
@@ -13,14 +22,11 @@ Generated: 2026-06-11 15:21
 
 - Quality: **PASS**
 - M2 ready: **True**
-- Blocking: none
-- Warnings: none
 
 ## Device
 
 - Device: cuda
 - Seconds/page: 178.9
-- Warnings: seconds_per_page=179 > 120s threshold
 
 ## Manual Verification
 
@@ -29,5 +35,3 @@ Generated: 2026-06-11 15:21
 ## Exclusions
 
 - Reference formulas: 0
-- Section contradiction: 0
-- All-formulas-in-Abstract: False

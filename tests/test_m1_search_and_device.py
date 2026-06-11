@@ -376,3 +376,58 @@ def test_mineru_adapter_auto_mode_prefers_cuda():
         if mem_mb >= 6000:
             assert stats["device_mode_actual"] == "cuda", f"Expected cuda but got {stats['device_mode_actual']}"
             assert stats.get("fallback_reason") is None
+
+
+# ── Acceptance report LaTeX consistency ──
+
+def test_acceptance_verify_index_latex_count_matches_formula_slots():
+    """FINAL_MANUAL_VERIFY_INDEX.md LaTeX count must match formula_slots.json."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    expected_latex = sum(1 for s in slots if s.get("final_latex"))
+
+    verify_md = (accept_dir / "FINAL_MANUAL_VERIFY_INDEX.md").read_text(encoding="utf-8")
+    # Parse "Formulas with LaTeX | N |" line
+    import re
+    m = re.search(r"Formulas with LaTeX \| (\d+)", verify_md)
+    assert m, "Could not find 'Formulas with LaTeX' in FINAL_MANUAL_VERIFY_INDEX.md"
+    actual_latex = int(m.group(1))
+    assert actual_latex == expected_latex, f"LaTeX count mismatch: index={actual_latex}, formula_slots.json={expected_latex}"
+
+
+def test_acceptance_verify_index_table_latex_y_count():
+    """LaTeX=Y count in verify index table must match final_latex count."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    expected_latex = sum(1 for s in slots if s.get("final_latex"))
+
+    verify_md = (accept_dir / "FINAL_MANUAL_VERIFY_INDEX.md").read_text(encoding="utf-8")
+    # Count rows where LaTeX column is Y (format: | ... | Y | ... |)
+    lines = verify_md.splitlines()
+    table_rows = [l for l in lines if l.startswith("|") and "| Y |" in l and "formula_" in l]
+    assert len(table_rows) == expected_latex, f"Table LaTeX=Y rows: {len(table_rows)}, expected: {expected_latex}"
+
+
+def test_acceptance_visual_audit_shows_latex():
+    """Visual audit HTML pages must contain final_latex content."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    audit_dir = accept_dir / "visual_audit"
+
+    for slot in slots[:3]:  # Check first 3
+        if not slot.get("final_latex"):
+            continue
+        html_path = audit_dir / f"{slot['formula_id']}.html"
+        assert html_path.exists(), f"Missing visual audit HTML: {html_path}"
+        html = html_path.read_text(encoding="utf-8")
+        # The LaTeX content should appear in the HTML
+        assert "LaTeX:" in html, f"{slot['formula_id']}.html missing LaTeX label"

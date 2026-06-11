@@ -104,6 +104,16 @@ def main() -> int:
     print(f"  Blocks: {len(result.blocks)}")
     print(f"  Device: {parse_stats.get('device_mode_actual', 'unknown')}")
 
+    # Enrich result.formula_slots with data from formula_slots.json
+    # (CanonicalBuilder writes enriched slots with final_latex, mineru_latex, section, etc.
+    #  but result.formula_slots only has raw slots from the pipeline)
+    enriched_slots_path = accept_dir / "formula_slots.json"
+    if enriched_slots_path.exists():
+        enriched = json.loads(enriched_slots_path.read_text(encoding="utf-8"))
+        if len(enriched) == len(result.formula_slots):
+            result.formula_slots = enriched
+            print(f"  Enriched formula_slots from formula_slots.json (final_latex: {sum(1 for s in enriched if s.get('final_latex'))})")
+
     # Copy search artifacts
     print("\n[2/7] Copying search artifacts...")
     for name in [
@@ -238,10 +248,24 @@ def generate_performance_report(
         json.dumps(report_json, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
+    perf_pass = len(warnings) == 0
+    quality_pass = result.quality.status.value == "PASS"
+
     md_lines = [
         "# M1 Performance Report",
         "",
         f"Generated: {datetime.datetime.now():%Y-%m-%d %H:%M}",
+        "",
+        "## Status Summary",
+        "",
+        "| Gate | Status |",
+        "|------|--------|",
+        f"| Machine quality gate | **{'PASS' if quality_pass else 'FAIL'}** |",
+        f"| GPU path | **{'PASS' if gpu_used else 'FAIL'}** |",
+        f"| Performance gate | **{'PASS' if perf_pass else 'WARNING'}** |",
+        f"| Manual visual verification | **PENDING** |",
+        "",
+        "**Note**: M1 is NOT fully verified until all gates pass AND manual visual verification is complete.",
         "",
         "## Paper",
         "",
@@ -289,12 +313,14 @@ def generate_performance_report(
         "## Conclusion",
         "",
     ]
-    if not warnings:
-        md_lines.append("All performance thresholds met.")
-    elif gpu_used:
-        md_lines.append("GPU used but some warnings detected.")
+    if perf_pass and quality_pass:
+        md_lines.append("All automated gates passed. Manual visual verification still required.")
+    elif quality_pass and not perf_pass:
+        md_lines.append("Machine quality gate passed, but performance gate has warnings. M1 can be used for manual review but not recommended for batch processing.")
+    elif not quality_pass:
+        md_lines.append("Machine quality gate failed. Review blocking reasons before proceeding.")
     else:
-        md_lines.append("CPU path used. Consider enabling GPU for faster processing.")
+        md_lines.append("GPU path used but some warnings detected.")
     (accept_dir / "performance_report.md").write_text("\n".join(md_lines), encoding="utf-8")
 
 
@@ -574,10 +600,24 @@ def generate_quality_report(accept_dir: Path, result, meta: dict, parse_stats: d
     body_slots = [s for s in slots if s.get("formula_m2_ready", True)]
     ref_slots = [s for s in slots if not s.get("formula_m2_ready", True)]
 
+    quality_pass = result.quality.status.value == "PASS"
+    gpu_used = parse_stats.get("device_mode_actual") == "cuda"
+    seconds_per_page = parse_stats.get("seconds_per_page", 0)
+    perf_pass = seconds_per_page <= 120
+
     lines = [
         "# M1 Quality Report",
         "",
         f"Generated: {datetime.datetime.now():%Y-%m-%d %H:%M}",
+        "",
+        "## Status Summary",
+        "",
+        "| Gate | Status |",
+        "|------|--------|",
+        f"| Machine quality gate | **{'PASS' if quality_pass else 'FAIL'}** |",
+        f"| GPU path | **{'PASS' if gpu_used else 'FAIL'}** |",
+        f"| Performance gate | **{'PASS' if perf_pass else 'WARNING'}** |",
+        f"| Manual visual verification | **PENDING** |",
         "",
         "## Paper",
         "",
@@ -596,7 +636,7 @@ def generate_quality_report(accept_dir: Path, result, meta: dict, parse_stats: d
         "## Device",
         "",
         f"- Device: {parse_stats.get('device_mode_actual', 'unknown')}",
-        f"- Seconds/page: {parse_stats.get('seconds_per_page', 0):.1f}",
+        f"- Seconds/page: {seconds_per_page:.1f}",
         f"- Warnings: {'; '.join(parse_stats.get('perf_warnings', [])) or 'none'}",
         "",
         "## Manual Verification",
