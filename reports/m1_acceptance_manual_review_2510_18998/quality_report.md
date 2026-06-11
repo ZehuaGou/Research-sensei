@@ -1,6 +1,6 @@
 # M1 Quality Report
 
-Generated: 2026-06-11 16:02
+Generated: 2026-06-11 18:56
 
 ## Status Summary
 
@@ -14,8 +14,6 @@ Generated: 2026-06-11 16:02
 ## Paper
 
 - Title: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version (arXiv 2510.18998)
-- Search query: `time series anomaly detection transformer`
-- Prescreen formula lines: 88 (PyMuPDF heuristic)
 - Final formula slots: 26 (MinerU full parse)
 
 ## Machine Gate
@@ -27,6 +25,12 @@ Generated: 2026-06-11 16:02
 
 - Device: cuda
 - Seconds/page: 178.9
+
+## Known Risks
+
+- Multi-line equation groups identified: 25
+- Formulas with edge contamination risk: 15
+- Formulas with nearby_text: 26
 
 ## Manual Verification
 

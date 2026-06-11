@@ -1,6 +1,6 @@
 # M1 Compare Report: Artifact Traceability
 
-Generated: 2026-06-11 16:02
+Generated: 2026-06-11 18:56
 
 ## Artifact Cross-Reference
 
@@ -12,6 +12,7 @@ Generated: 2026-06-11 16:02
 - Overlays: 26/26
 - Formulas in canonical: 26/26
 - Visual audit index: True
+- Total blocks: 361
 
 Machine gate: PASS
 

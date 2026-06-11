@@ -6,11 +6,12 @@
 body { font-family: 'SF Mono', 'Consolas', monospace; background: #0d1117; color: #c9d1d9; padding: 20px; max-width: 900px; margin: 0 auto; }
 h1 { color: #58a6ff; font-size: 18px; margin-bottom: 16px; }
 .field { margin: 4px 0; font-size: 13px; }
-.field-label { font-weight: 600; color: #8b949e; display: inline-block; min-width: 160px; }
+.field-label { font-weight: 600; color: #8b949e; display: inline-block; min-width: 180px; }
 .images { display: flex; gap: 16px; margin: 16px 0; flex-wrap: wrap; }
 .images img { max-height: 300px; border: 1px solid #30363d; border-radius: 4px; background: #fff; }
 .images .caption { font-size: 11px; color: #8b949e; text-align: center; margin-top: 4px; }
 pre { background: #161b22; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; border: 1px solid #30363d; margin: 8px 0; }
+.nearby { background: #161b22; padding: 8px; border-radius: 4px; font-size: 11px; color: #8b949e; border: 1px solid #30363d; margin: 6px 0; font-style: italic; max-height: 80px; overflow: hidden; }
 .risk-none { color: #3fb950; }
 .risk-excluded { color: #d29922; }
 .nav { margin: 16px 0; font-size: 13px; }
@@ -20,15 +21,18 @@ pre { background: #161b22; padding: 10px; border-radius: 4px; overflow-x: auto; 
 <h1>formula_024 — Page 6</h1>
 
 <div class="field"><span class="field-label">Section:</span> Method (conf=medium)</div>
-<div class="field"><span class="field-label">Section Reason:</span> reading_order_context: page 6</div>
-<div class="field"><span class="field-label">Block Source:</span> mineru25pro</div>
 <div class="field"><span class="field-label">Final Origin:</span> mineru_latex</div>
-<div class="field"><span class="field-label">Risk Flags:</span> <span class="risk-none">NONE</span></div>
+<div class="field"><span class="field-label">Equation Group:</span> group_p6_4 (order 7)</div>
+<div class="field"><span class="field-label">Crop Padding:</span> 1%px</div>
+<div class="field"><span class="field-label">Edge Ink (top/bottom):</span> 0.000 / 0.352</div>
+<div class="field"><span class="field-label">Risk Flags:</span> <span class="risk-excluded">CROP_BOTTOM_EDGE_CONTAMINATION</span></div>
 <div class="field"><span class="field-label">Formula M2 Ready:</span> <span class="risk-none">YES</span></div>
 
 <div class="images">
-  <div><img src="../formula_crops/formula_024_p6.png" alt="crop"><div class="caption">Crop</div></div>
-  <div><img src="../formula_overlays/formula_024_page_6.png" alt="overlay"><div class="caption">Overlay (page 6)</div></div>
+  <div><img src="../formula_crops/formula_024_p6.png" alt="crop"><div class="caption">Crop (padded 1%px)</div></div>
+  <div><img src="../formula_overlays/formula_024_page_6.png" alt="overlay"><div class="caption">Overlay (red=original, blue=padded)</div></div>
 </div>
+<div class="field"><span class="field-label">Nearby Text Before:</span></div><div class="nearby">) \)  is the mutual information estimator parameterized by  \( \theta \) . We can choose a specific estimator among many existing ones. We choose InfoNCE as defined in Equati Here,  \( f_{\theta}(\mathbf{Y}, \mathbf{Y}_{\mathrm{sta}}) \)  is separable critic function defined as shown in Equation 15.</div>
+<div class="field"><span class="field-label">Nearby Text After:</span></div><div class="nearby">where \(\phi_{\theta}(\cdot)\) is a non-linear transformation function such as a feed-forward neural network.</div>
 <div class="field"><span class="field-label">LaTeX:</span></div><pre>\mathcal {L} _ {\text { reg }} = \| \mathbf {Y} _ {\omega} ^ {\prime} \cdot \mathbf {W} _ {p} - \mathbf {Y} _ {\psi} ^ {\prime} \cdot \mathbf {W} _ {p} \| _ {\mathcal {F}} ^ {2} \tag {16}</pre>
 </body></html>

@@ -1,30 +1,37 @@
 # Formula Slots
 
-| id | page | section | origin | bbox | risk_flags |
-| -- | ---: | ------- | ------ | ---- | ---------- |
-| formula_001 | 3 | Related Work | mineru_latex | [0.13, 0.666, 0.491, 0.705] | none |
-| formula_002 | 3 | Related Work | mineru_latex | [0.504, 0.37, 0.927, 0.439] | none |
-| formula_003 | 3 | Related Work | mineru_latex | [0.637, 0.498, 0.921, 0.531] | none |
-| formula_004 | 4 | Method | mineru_latex | [0.148, 0.836, 0.492, 0.872] | none |
-| formula_005 | 4 | Method | mineru_latex | [0.649, 0.259, 0.921, 0.275] | none |
-| formula_006 | 4 | Method | mineru_latex | [0.626, 0.338, 0.746, 0.355] | none |
-| formula_007 | 4 | Method | mineru_latex | [0.629, 0.358, 0.746, 0.373] | none |
-| formula_008 | 4 | Method | mineru_latex | [0.629, 0.377, 0.921, 0.399] | none |
-| formula_009 | 4 | Method | mineru_latex | [0.633, 0.394, 0.804, 0.429] | none |
-| formula_010 | 4 | Method | mineru_latex | [0.622, 0.431, 0.705, 0.445] | none |
-| formula_011 | 4 | Method | mineru_latex | [0.609, 0.596, 0.921, 0.615] | none |
-| formula_012 | 4 | Method | mineru_latex | [0.584, 0.706, 0.921, 0.743] | none |
-| formula_013 | 4 | Method | mineru_latex | [0.613, 0.853, 0.921, 0.871] | none |
-| formula_014 | 5 | Method | mineru_latex | [0.606, 0.653, 0.755, 0.67] | none |
-| formula_015 | 5 | Method | mineru_latex | [0.605, 0.673, 0.921, 0.69] | none |
-| formula_016 | 5 | Method | mineru_latex | [0.605, 0.692, 0.824, 0.711] | none |
-| formula_017 | 5 | Method | mineru_latex | [0.61, 0.761, 0.921, 0.78] | none |
-| formula_018 | 6 | Method | mineru_latex | [0.174, 0.118, 0.316, 0.136] | none |
-| formula_019 | 6 | Method | mineru_latex | [0.174, 0.138, 0.49, 0.155] | none |
-| formula_020 | 6 | Method | mineru_latex | [0.179, 0.158, 0.395, 0.177] | none |
-| formula_021 | 6 | Method | mineru_latex | [0.165, 0.423, 0.49, 0.442] | none |
-| formula_022 | 6 | Method | mineru_latex | [0.076, 0.562, 0.5, 0.594] | none |
-| formula_023 | 6 | Method | mineru_latex | [0.172, 0.64, 0.49, 0.658] | none |
-| formula_024 | 6 | Method | mineru_latex | [0.6, 0.643, 0.921, 0.663] | none |
-| formula_025 | 6 | Method | mineru_latex | [0.591, 0.841, 0.921, 0.858] | none |
-| formula_026 | 7 | Method | mineru_latex | [0.198, 0.589, 0.49, 0.607] | none |
+Generated: 2026-06-11 18:56
+
+Total: 26
+With LaTeX: 26
+In groups: 25
+With nearby_text: 26
+
+| # | ID | Page | Section | Origin | LaTeX | Group | Nearby | Risk |
+|---|-----|------|---------|--------|:-----:|:-----:|:------:|------|
+| 1 | formula_001 | 3 | Related Work | mineru_latex | Y | group_p3_1 | Y | NONE |
+| 2 | formula_002 | 3 | Related Work | mineru_latex | Y | group_p3_1 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 3 | formula_003 | 3 | Related Work | mineru_latex | Y | group_p3_1 | Y | NONE |
+| 4 | formula_004 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | NONE |
+| 5 | formula_005 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | NONE |
+| 6 | formula_006 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 7 | formula_007 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 8 | formula_008 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | CROP_TOP_EDGE_CONTAMINATION |
+| 9 | formula_009 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 10 | formula_010 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | NONE |
+| 11 | formula_011 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | NONE |
+| 12 | formula_012 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 13 | formula_013 | 4 | Method | mineru_latex | Y | group_p4_2 | Y | NONE |
+| 14 | formula_014 | 5 | Method | mineru_latex | Y | group_p5_3 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 15 | formula_015 | 5 | Method | mineru_latex | Y | group_p5_3 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 16 | formula_016 | 5 | Method | mineru_latex | Y | group_p5_3 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 17 | formula_017 | 5 | Method | mineru_latex | Y | group_p5_3 | Y | NONE |
+| 18 | formula_018 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 19 | formula_019 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 20 | formula_020 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_TOP_EDGE_CONTAMINATION, CROP_BOTTOM_EDGE_CONTAMINATION |
+| 21 | formula_021 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | NONE |
+| 22 | formula_022 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 23 | formula_023 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | NONE |
+| 24 | formula_024 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 25 | formula_025 | 6 | Method | mineru_latex | Y | group_p6_4 | Y | CROP_BOTTOM_EDGE_CONTAMINATION |
+| 26 | formula_026 | 7 | Method | mineru_latex | Y | - | Y | NONE |
