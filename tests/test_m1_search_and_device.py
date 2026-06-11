@@ -431,3 +431,90 @@ def test_acceptance_visual_audit_shows_latex():
         html = html_path.read_text(encoding="utf-8")
         # The LaTeX content should appear in the HTML
         assert "LaTeX:" in html, f"{slot['formula_id']}.html missing LaTeX label"
+
+
+# ── Equation group membership tests ──
+
+def _get_group_members(group_id: str) -> list[str]:
+    """Get formula IDs for a given equation group."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    return [s["formula_id"] for s in slots if s.get("equation_group_id") == group_id]
+
+
+def test_eq_6_members():
+    """Equation (6) must contain formula_006..formula_010 (Q,K,V,S,Y1)."""
+    members = _get_group_members("eq_6")
+    assert members == ["formula_006", "formula_007", "formula_008", "formula_009", "formula_010"]
+
+
+def test_eq_7_members():
+    """Equation (7) must contain only formula_011 (not S/Y1 from eq 6)."""
+    members = _get_group_members("eq_7")
+    assert members == ["formula_011"]
+
+
+def test_eq_10_members():
+    """Equation (10) must contain formula_014, formula_015, formula_016."""
+    members = _get_group_members("eq_10")
+    assert members == ["formula_014", "formula_015", "formula_016"]
+
+
+def test_eq_11_members():
+    """Equation (11) must contain only formula_017."""
+    members = _get_group_members("eq_11")
+    assert members == ["formula_017"]
+
+
+def test_eq_12_members():
+    """Equation (12) must contain formula_018, formula_019, formula_020."""
+    members = _get_group_members("eq_12")
+    assert members == ["formula_018", "formula_019", "formula_020"]
+
+
+def test_eq_13_members():
+    """Equation (13) must contain only formula_021."""
+    members = _get_group_members("eq_13")
+    assert members == ["formula_021"]
+
+
+def test_group_crops_exist():
+    """Group crop files must exist for all multi-member groups."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    groups_seen = set()
+    for s in slots:
+        gid = s.get("equation_group_id", "")
+        if gid and gid not in groups_seen:
+            groups_seen.add(gid)
+            crop_path = s.get("group_crop_path", "")
+            assert crop_path and (accept_dir / crop_path).exists(), f"Missing group crop for {gid}"
+
+
+def test_group_visual_audit_index_exists():
+    """visual_audit/groups/index.html must exist."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+    index_path = accept_dir / "visual_audit" / "groups" / "index.html"
+    assert index_path.exists(), "visual_audit/groups/index.html missing"
+
+
+def test_no_cross_equation_merging():
+    """Different equation numbers must not appear in the same group."""
+    accept_dir = Path(__file__).resolve().parents[1] / "reports" / "m1_acceptance_manual_review_2510_18998"
+    if not accept_dir.exists():
+        pytest.skip("Acceptance directory not found")
+    slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
+    groups: dict[str, set] = {}
+    for s in slots:
+        gid = s.get("equation_group_id", "")
+        eq = s.get("equation_number")
+        if gid and eq is not None:
+            groups.setdefault(gid, set()).add(eq)
+    for gid, eq_nums in groups.items():
+        assert len(eq_nums) <= 1, f"Group {gid} has multiple equation numbers: {eq_nums}"

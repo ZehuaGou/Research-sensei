@@ -1,6 +1,6 @@
 # M1 Quality Report
 
-Generated: 2026-06-11 19:45
+Generated: 2026-06-11 20:36
 
 ## Status Summary
 
@@ -19,8 +19,8 @@ Generated: 2026-06-11 19:45
 ## Equation Groups
 
 - Total groups: 18
-- Group members: 15
-- Standalone formulas: 11
+- Group members: 11
+- Standalone formulas: 15
 - Group crop contamination: 1
 
 ## Machine Gate

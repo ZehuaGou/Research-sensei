@@ -269,7 +269,7 @@
     ],
     "equation_group_id": "eq_5",
     "group_order": 1,
-    "is_multiline_group_member": true,
+    "is_multiline_group_member": false,
     "original_bbox": [
       0.649,
       0.259,
@@ -347,10 +347,10 @@
     "edge_ink_ratio_bottom": 0.1353,
     "equation_number": null,
     "group_crop_bbox": [
-      380.1,
+      377.6,
       263.7,
       566.7,
-      320.0
+      356.4
     ],
     "group_crop_path": "formula_group_crops/eq_6_p4.png",
     "group_overlay_path": "formula_group_overlays/eq_6_page_4.png"
@@ -408,10 +408,10 @@
     "edge_ink_ratio_bottom": 0.1182,
     "equation_number": null,
     "group_crop_bbox": [
-      380.1,
+      377.6,
       263.7,
       566.7,
-      320.0
+      356.4
     ],
     "group_crop_path": "formula_group_crops/eq_6_p4.png",
     "group_overlay_path": "formula_group_overlays/eq_6_page_4.png"
@@ -468,10 +468,10 @@
     "edge_ink_ratio_bottom": 0.0465,
     "equation_number": 6,
     "group_crop_bbox": [
-      380.1,
+      377.6,
       263.7,
       566.7,
-      320.0
+      356.4
     ],
     "group_crop_path": "formula_group_crops/eq_6_p4.png",
     "group_overlay_path": "formula_group_overlays/eq_6_page_4.png"
@@ -509,8 +509,8 @@
       "b0056",
       "b0058"
     ],
-    "equation_group_id": "eq_7",
-    "group_order": 1,
+    "equation_group_id": "eq_6",
+    "group_order": 4,
     "is_multiline_group_member": true,
     "original_bbox": [
       0.633,
@@ -529,13 +529,13 @@
     "edge_ink_ratio_bottom": 0.0964,
     "equation_number": null,
     "group_crop_bbox": [
-      369.6,
-      308.1,
+      377.6,
+      263.7,
       566.7,
-      491.0
+      356.4
     ],
-    "group_crop_path": "formula_group_crops/eq_7_p4.png",
-    "group_overlay_path": "formula_group_overlays/eq_7_page_4.png"
+    "group_crop_path": "formula_group_crops/eq_6_p4.png",
+    "group_overlay_path": "formula_group_overlays/eq_6_page_4.png"
   },
   {
     "formula_id": "formula_010",
@@ -567,8 +567,8 @@
       "b0056",
       "b0058"
     ],
-    "equation_group_id": "eq_7",
-    "group_order": 2,
+    "equation_group_id": "eq_6",
+    "group_order": 5,
     "is_multiline_group_member": true,
     "original_bbox": [
       0.622,
@@ -587,13 +587,13 @@
     "edge_ink_ratio_bottom": 0.0,
     "equation_number": null,
     "group_crop_bbox": [
-      369.6,
-      308.1,
+      377.6,
+      263.7,
       566.7,
-      491.0
+      356.4
     ],
-    "group_crop_path": "formula_group_crops/eq_7_p4.png",
-    "group_overlay_path": "formula_group_overlays/eq_7_page_4.png"
+    "group_crop_path": "formula_group_crops/eq_6_p4.png",
+    "group_overlay_path": "formula_group_overlays/eq_6_page_4.png"
   },
   {
     "formula_id": "formula_011",
@@ -626,8 +626,8 @@
       "b0058"
     ],
     "equation_group_id": "eq_7",
-    "group_order": 3,
-    "is_multiline_group_member": true,
+    "group_order": 1,
+    "is_multiline_group_member": false,
     "original_bbox": [
       0.609,
       0.596,
@@ -646,7 +646,7 @@
     "equation_number": 7,
     "group_crop_bbox": [
       369.6,
-      308.1,
+      468.1,
       566.7,
       491.0
     ],
@@ -829,7 +829,7 @@
       367.2,
       513.2,
       566.7,
-      550.4
+      567.1
     ],
     "group_crop_path": "formula_group_crops/eq_10_p5.png",
     "group_overlay_path": "formula_group_overlays/eq_10_page_5.png"
@@ -891,7 +891,7 @@
       367.2,
       513.2,
       566.7,
-      550.4
+      567.1
     ],
     "group_crop_path": "formula_group_crops/eq_10_p5.png",
     "group_overlay_path": "formula_group_overlays/eq_10_page_5.png"
@@ -930,8 +930,8 @@
       "b0089",
       "b0090"
     ],
-    "equation_group_id": "eq_11",
-    "group_order": 1,
+    "equation_group_id": "eq_10",
+    "group_order": 3,
     "is_multiline_group_member": true,
     "original_bbox": [
       0.605,
@@ -951,12 +951,12 @@
     "equation_number": null,
     "group_crop_bbox": [
       367.2,
-      544.1,
+      513.2,
       566.7,
-      621.7
+      567.1
     ],
-    "group_crop_path": "formula_group_crops/eq_11_p5.png",
-    "group_overlay_path": "formula_group_overlays/eq_11_page_5.png"
+    "group_crop_path": "formula_group_crops/eq_10_p5.png",
+    "group_overlay_path": "formula_group_overlays/eq_10_page_5.png"
   },
   {
     "formula_id": "formula_017",
@@ -990,8 +990,8 @@
       "b0090"
     ],
     "equation_group_id": "eq_11",
-    "group_order": 2,
-    "is_multiline_group_member": true,
+    "group_order": 1,
+    "is_multiline_group_member": false,
     "original_bbox": [
       0.61,
       0.761,
@@ -1009,8 +1009,8 @@
     "edge_ink_ratio_bottom": 0.0,
     "equation_number": 11,
     "group_crop_bbox": [
-      367.2,
-      544.1,
+      370.3,
+      598.8,
       566.7,
       621.7
     ],
@@ -1071,7 +1071,7 @@
       103.4,
       89.5,
       302.9,
-      126.7
+      144.1
     ],
     "group_crop_path": "formula_group_crops/eq_12_p6.png",
     "group_overlay_path": "formula_group_overlays/eq_12_page_6.png"
@@ -1131,7 +1131,7 @@
       103.4,
       89.5,
       302.9,
-      126.7
+      144.1
     ],
     "group_crop_path": "formula_group_crops/eq_12_p6.png",
     "group_overlay_path": "formula_group_overlays/eq_12_page_6.png"
@@ -1168,8 +1168,8 @@
       "b0102",
       "b0106"
     ],
-    "equation_group_id": "eq_13",
-    "group_order": 1,
+    "equation_group_id": "eq_12",
+    "group_order": 3,
     "is_multiline_group_member": true,
     "original_bbox": [
       0.179,
@@ -1188,13 +1188,13 @@
     "edge_ink_ratio_bottom": 0.0755,
     "equation_number": null,
     "group_crop_bbox": [
-      97.9,
-      121.2,
+      103.4,
+      89.5,
       302.9,
-      354.0
+      144.1
     ],
-    "group_crop_path": "formula_group_crops/eq_13_p6.png",
-    "group_overlay_path": "formula_group_overlays/eq_13_page_6.png"
+    "group_crop_path": "formula_group_crops/eq_12_p6.png",
+    "group_overlay_path": "formula_group_overlays/eq_12_page_6.png"
   },
   {
     "formula_id": "formula_021",
@@ -1227,8 +1227,8 @@
       "b0108"
     ],
     "equation_group_id": "eq_13",
-    "group_order": 2,
-    "is_multiline_group_member": true,
+    "group_order": 1,
+    "is_multiline_group_member": false,
     "original_bbox": [
       0.165,
       0.423,
@@ -1247,7 +1247,7 @@
     "equation_number": 13,
     "group_crop_bbox": [
       97.9,
-      121.2,
+      331.1,
       302.9,
       354.0
     ],

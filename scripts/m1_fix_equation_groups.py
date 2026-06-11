@@ -54,8 +54,8 @@ def fix_equation_groups(accept_dir: Path) -> None:
     print(f"  Found equation numbers in {tagged}/{len(slots)} formulas")
 
     # ── Step 2: Group by equation number ──
-    print("\n[2/6] Grouping by equation number...")
-    _group_by_equation_number(slots)
+    print("\n[2/6] Grouping by equation number (display cluster method)...")
+    _group_by_equation_number(slots, blocks)
 
     # ── Step 3: Generate group-level crops ──
     print("\n[3/6] Generating group-level crops...")
@@ -87,69 +87,87 @@ def fix_equation_groups(accept_dir: Path) -> None:
     print("=" * 60)
 
 
-def _group_by_equation_number(slots: list[dict]) -> None:
-    """Group formulas by equation number, with proximity-based grouping for untagged."""
-    # First pass: identify formulas with explicit equation numbers
-    eq_groups: dict[int, list[dict]] = {}
-    for s in slots:
-        eq_num = s.get("equation_number")
-        if eq_num is not None:
-            eq_groups.setdefault(eq_num, []).append(s)
+def _group_by_equation_number(slots: list[dict], blocks: list[dict]) -> None:
+    """Group formulas by display formula clusters and equation tags.
 
-    # Second pass: for formulas without equation numbers, check if they're
-    # part of a multi-line equation (adjacent to a tagged formula on same page)
-    # Strategy: look for sequences of untagged formulas between tagged ones
+    Algorithm:
+    1. Identify display_formula_clusters: consecutive formulas on same page
+       with no text blocks (with content) between them in reading order.
+    2. If any member of a cluster has \\tag{N}, the whole cluster is eq_N.
+    3. Standalone formulas (not in a multi-formula cluster) get no group.
+    """
+    # Build reading-order index of all blocks per page
+    blocks_by_page: dict[int, list[dict]] = {}
+    for b in blocks:
+        page = b.get("page", 0)
+        blocks_by_page.setdefault(page, []).append(b)
+    for page in blocks_by_page:
+        blocks_by_page[page].sort(key=lambda b: b.get("reading_order", 999))
+
+    # Get formula slots per page, sorted by reading order
     pages = sorted(set(s.get("page", 0) for s in slots))
+
+    # Step 1: Find display formula clusters
+    clusters: list[list[dict]] = []  # Each cluster is a list of formula slots
 
     for page in pages:
         page_slots = [s for s in slots if s.get("page") == page]
-        page_slots.sort(key=lambda s: s.get("bbox", [0, 0, 0, 0])[1] if len(s.get("bbox", [])) >= 2 else 0)
+        page_slots.sort(key=lambda s: s.get("reading_order", 999))
+        if not page_slots:
+            continue
 
-        # Find tagged formulas on this page
-        tagged_indices = []
-        for i, s in enumerate(page_slots):
-            if s.get("equation_number") is not None:
-                tagged_indices.append(i)
+        page_blocks = blocks_by_page.get(page, [])
+        # Build a map from block_id to reading_order
+        block_ro = {b.get("block_id", ""): b.get("reading_order", 999) for b in page_blocks}
 
-        # For each pair of consecutive tagged formulas, check if untagged ones between them
-        # belong to the earlier tagged formula (multi-line equation)
-        for idx in range(len(tagged_indices)):
-            curr_i = tagged_indices[idx]
-            curr_slot = page_slots[curr_i]
-            curr_eq = curr_slot["equation_number"]
+        # Find clusters of consecutive formula blocks
+        current_cluster = [page_slots[0]]
 
-            # Look backward from current tagged formula
-            prev_i = tagged_indices[idx - 1] if idx > 0 else -1
-            prev_eq = page_slots[prev_i]["equation_number"] if prev_i >= 0 else None
+        for i in range(1, len(page_slots)):
+            prev_slot = page_slots[i - 1]
+            curr_slot = page_slots[i]
 
-            # Find untagged formulas between prev tagged and current tagged
-            start = prev_i + 1 if prev_i >= 0 else 0
-            for j in range(start, curr_i):
-                candidate = page_slots[j]
-                if candidate.get("equation_number") is None:
-                    # Check if this is likely part of the current multi-line equation
-                    # by checking vertical proximity
-                    curr_bbox = curr_slot.get("bbox", [0, 0, 0, 0])
-                    cand_bbox = candidate.get("bbox", [0, 0, 0, 0])
-                    if len(curr_bbox) >= 4 and len(cand_bbox) >= 4:
-                        # If within 30% of page height, likely same equation
-                        distance = abs(curr_bbox[1] - cand_bbox[3])
-                        if distance < 0.3:
-                            eq_groups.setdefault(curr_eq, []).append(candidate)
+            # Check if there's a text block with content between these two formulas
+            prev_ro = block_ro.get(prev_slot.get("block_id", ""), 999)
+            curr_ro = block_ro.get(curr_slot.get("block_id", ""), 999)
 
-            # Look forward from current tagged formula
-            next_i = tagged_indices[idx + 1] if idx + 1 < len(tagged_indices) else len(page_slots)
-            for j in range(curr_i + 1, next_i):
-                candidate = page_slots[j]
-                if candidate.get("equation_number") is None:
-                    curr_bbox = curr_slot.get("bbox", [0, 0, 0, 0])
-                    cand_bbox = candidate.get("bbox", [0, 0, 0, 0])
-                    if len(curr_bbox) >= 4 and len(cand_bbox) >= 4:
-                        distance = abs(cand_bbox[1] - curr_bbox[3])
-                        if distance < 0.3:
-                            eq_groups.setdefault(curr_eq, []).append(candidate)
+            has_text_between = False
+            for b in page_blocks:
+                b_ro = b.get("reading_order", 999)
+                b_type = b.get("block_type", "")
+                b_text = (b.get("text") or "").strip()
+                if prev_ro < b_ro < curr_ro and b_type == "text" and len(b_text) > 10:
+                    has_text_between = True
+                    break
 
-    # Assign group IDs
+            if has_text_between:
+                # Text block found between formulas - end current cluster, start new one
+                if len(current_cluster) > 0:
+                    clusters.append(current_cluster)
+                current_cluster = [curr_slot]
+            else:
+                # No text between - continue cluster
+                current_cluster.append(curr_slot)
+
+        if current_cluster:
+            clusters.append(current_cluster)
+
+    # Step 2: Assign equation numbers to clusters
+    eq_groups: dict[int, list[dict]] = {}
+
+    for cluster in clusters:
+        # Find the equation number for this cluster
+        cluster_eq_num = None
+        for s in cluster:
+            eq_num = s.get("equation_number")
+            if eq_num is not None:
+                cluster_eq_num = eq_num
+                break  # Use the first (or only) tag found
+
+        if cluster_eq_num is not None:
+            eq_groups.setdefault(cluster_eq_num, []).extend(cluster)
+
+    # Step 3: Assign group IDs
     for eq_num, members in sorted(eq_groups.items()):
         group_id = f"eq_{eq_num}"
         # Sort members by page then by bbox top
@@ -179,7 +197,7 @@ def _group_by_equation_number(slots: list[dict]) -> None:
         for s in slots:
             if s.get("equation_group_id") == gid and s.get("equation_number"):
                 eq_nums.add(s["equation_number"])
-        print(f"    {gid}: {len(members)} members, equation numbers: {sorted(eq_nums)}")
+        print(f"    {gid}: {len(members)} members ({', '.join(members)}), equation numbers: {sorted(eq_nums)}")
 
 
 def _generate_group_crops(accept_dir: Path, slots: list[dict]) -> None:
