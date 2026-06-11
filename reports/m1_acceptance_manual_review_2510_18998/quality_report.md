@@ -1,6 +1,6 @@
 # M1 Quality Report
 
-Generated: 2026-06-11 18:56
+Generated: 2026-06-11 19:45
 
 ## Status Summary
 
@@ -16,6 +16,13 @@ Generated: 2026-06-11 18:56
 - Title: An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version (arXiv 2510.18998)
 - Final formula slots: 26 (MinerU full parse)
 
+## Equation Groups
+
+- Total groups: 18
+- Group members: 15
+- Standalone formulas: 11
+- Group crop contamination: 1
+
 ## Machine Gate
 
 - Quality: **PASS**
@@ -28,14 +35,9 @@ Generated: 2026-06-11 18:56
 
 ## Known Risks
 
-- Multi-line equation groups identified: 25
-- Formulas with edge contamination risk: 15
-- Formulas with nearby_text: 26
+- Individual crop edge contamination: 15
+- Group crop contamination: 1
 
 ## Manual Verification
 
 **Status: PENDING**
-
-## Exclusions
-
-- Reference formulas: 0
