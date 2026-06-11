@@ -66,7 +66,8 @@ class MinerU25ProAdapter:
             stats["cuda_available"] = torch.cuda.is_available()
             if stats["cuda_available"]:
                 stats["gpu_name"] = torch.cuda.get_device_name(0)
-                stats["gpu_memory_total_mb"] = round(torch.cuda.get_device_properties(0).total_mem / 1024 / 1024)
+                _props = torch.cuda.get_device_properties(0)
+                stats["gpu_memory_total_mb"] = round(getattr(_props, "total_memory", getattr(_props, "total_mem", 0)) / 1024 / 1024)
         except ImportError:
             pass
 

@@ -1,0 +1,58 @@
+{
+  "timestamp": "2026-06-11T13:36:54.065463",
+  "os": "Windows 11 (AMD64)",
+  "python_executable": "D:\\Code\\Python\\Research-sensei\\.venv\\Scripts\\python.exe",
+  "python_version": "3.13.9 | packaged by Anaconda, Inc. | (main, Oct 21 2025, 19:09:58) [MSC v.1929 64 bit (AMD64)]",
+  "is_project_venv": true,
+  "virtualenv_path": "D:\\Code\\Python\\Research-sensei\\.venv",
+  "project_version": "0.5.0",
+  "git_commit": "455771e",
+  "torch": {
+    "installed": true,
+    "version": "2.12.0+cu126",
+    "cuda_version": "12.6",
+    "cuda_available": true
+  },
+  "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "gpu_memory_mb": 8188,
+  "nvidia": {
+    "available": true,
+    "driver_version": "610.47",
+    "cuda_version": null,
+    "gpus": [
+      {
+        "name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+        "memory_total": "8188 MiB",
+        "driver_version": "610.47"
+      }
+    ]
+  },
+  "transformers": {
+    "installed": true,
+    "version": "4.57.6"
+  },
+  "accelerate": {
+    "installed": true,
+    "version": "1.13.0"
+  },
+  "mineru_vl_utils": {
+    "installed": true,
+    "version": "1.0.4"
+  },
+  "pymupdf": {
+    "installed": true,
+    "version": "1.27.2.3"
+  },
+  "pillow": {
+    "installed": true,
+    "version": "12.2.0"
+  },
+  "m1_parser_model": "opendatalab/MinerU2.5-Pro-2604-1.2B",
+  "m1_primary_parser": "mineru25pro",
+  "gpu_status_summary": {
+    "hardware_gpu_detected": true,
+    "torch_cuda_available": true,
+    "is_cpu_only_build": false,
+    "verdict": "PASS: GPU available and PyTorch CUDA enabled"
+  }
+}

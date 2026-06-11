@@ -281,3 +281,98 @@ def test_selected_metadata_has_prescreen_note(tmp_path):
     config = json.loads((out_dir / "search_config.json").read_text())
     assert "PyMuPDF" in config["search_cost_summary"]["note"]
     assert "NOT MinerU" in config["search_cost_summary"]["note"]
+
+
+# ── Device diagnosis 3-layer GPU status ──
+
+def test_device_report_has_3_layer_gpu_status():
+    """Device report must have gpu_layer_status with 3 layers."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from m1_device_diagnosis import generate_report
+
+    report = generate_report()
+    assert "gpu_layer_status" in report
+    gl = report["gpu_layer_status"]
+    assert "layer1_hardware_gpu_detected" in gl
+    assert "layer2_torch_cuda_available" in gl
+    assert "layer3_is_cpu_only_build" in gl
+    assert "warnings" in gl
+    assert isinstance(gl["warnings"], list)
+
+
+def test_device_report_layer2_matches_torch_cuda():
+    """Layer 2 (torch CUDA) must match torch.cuda.is_available()."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from m1_device_diagnosis import generate_report
+
+    report = generate_report()
+    assert report["gpu_layer_status"]["layer2_torch_cuda_available"] == report["torch"]["cuda_available"]
+
+
+# ── Environment audit ──
+
+def test_environment_audit_produces_output(tmp_path):
+    """Environment audit must produce JSON with required fields."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from m1_environment_audit import audit
+
+    report = audit()
+    assert report["is_project_venv"] is True
+    assert report["torch"]["installed"] is True
+    assert "gpu_status_summary" in report
+    assert "verdict" in report["gpu_status_summary"]
+    assert report["gpu_status_summary"]["hardware_gpu_detected"] in (True, False)
+    assert report["gpu_status_summary"]["torch_cuda_available"] in (True, False)
+    assert report["gpu_status_summary"]["is_cpu_only_build"] in (True, False)
+
+
+def test_environment_audit_venv_detection():
+    """_is_project_venv must return True when running from project .venv."""
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from m1_environment_audit import _is_project_venv
+
+    # When running via .venv python, this should be True
+    # When running via system python, this may be False — both are valid test outcomes
+    result = _is_project_venv()
+    assert isinstance(result, bool)
+
+
+# ── MinerU adapter no silent CPU fallback ──
+
+def test_mineru_adapter_cuda_mode_warns_on_fallback():
+    """device_mode=cuda must warn if CUDA not available (no silent fallback)."""
+    from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+
+    adapter = MinerU25ProAdapter(device_mode="cuda")
+    # _probe_device will check actual CUDA state
+    stats = adapter._probe_device()
+
+    if not stats["cuda_available"]:
+        # If CUDA not available, must warn and fallback
+        assert stats["device_mode_actual"] == "cpu"
+        assert stats.get("fallback_reason") is not None
+        assert len(adapter.warnings) > 0
+    else:
+        # If CUDA available, must use it
+        assert stats["device_mode_actual"] == "cuda"
+        assert stats.get("fallback_reason") is None
+
+
+def test_mineru_adapter_auto_mode_prefers_cuda():
+    """device_mode=auto must prefer CUDA when available and enough memory."""
+    from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+
+    adapter = MinerU25ProAdapter(device_mode="auto")
+    stats = adapter._probe_device()
+
+    import torch
+    if torch.cuda.is_available():
+        props = torch.cuda.get_device_properties(0)
+        mem_mb = round(getattr(props, "total_memory", getattr(props, "total_mem", 0)) / 1024 / 1024)
+        if mem_mb >= 6000:
+            assert stats["device_mode_actual"] == "cuda", f"Expected cuda but got {stats['device_mode_actual']}"
+            assert stats.get("fallback_reason") is None

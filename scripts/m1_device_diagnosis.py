@@ -38,7 +38,8 @@ def check_torch() -> dict:
         if result["cuda_available"]:
             result["cuda_version"] = torch.version.cuda
             result["gpu_name"] = torch.cuda.get_device_name(0)
-            result["gpu_memory_total_mb"] = round(torch.cuda.get_device_properties(0).total_mem / 1024 / 1024)
+            _props = torch.cuda.get_device_properties(0)
+            result["gpu_memory_total_mb"] = round(getattr(_props, "total_memory", getattr(_props, "total_mem", 0)) / 1024 / 1024)
             result["gpu_memory_allocated_mb"] = round(torch.cuda.memory_allocated(0) / 1024 / 1024)
             result["gpu_memory_reserved_mb"] = round(torch.cuda.memory_reserved(0) / 1024 / 1024)
     except ImportError:
@@ -174,6 +175,32 @@ def generate_report() -> dict:
         for issue in cuda_issues:
             print(f"    - {issue}")
 
+    # 3-layer GPU status
+    hardware_gpu = nvidia_info["available"] and len(nvidia_info["gpus"]) > 0
+    torch_cuda = torch_info["cuda_available"]
+    is_cpu_only = torch_info["installed"] and not torch_info.get("cuda_version")
+    gpu_layer_warnings: list[str] = []
+
+    if hardware_gpu and not torch_cuda:
+        if is_cpu_only:
+            gpu_layer_warnings.append(
+                "GPU detected by nvidia-smi but PyTorch is CPU-only build. "
+                "Install CUDA-enabled PyTorch: https://pytorch.org/get-started/locally/"
+            )
+        else:
+            gpu_layer_warnings.append("GPU detected by nvidia-smi but torch.cuda.is_available() is False")
+
+    if not hardware_gpu:
+        gpu_layer_warnings.append("No GPU detected by nvidia-smi")
+
+    print(f"\n  3-Layer GPU Status:")
+    print(f"    1. Hardware GPU (nvidia-smi): {hardware_gpu}")
+    print(f"    2. PyTorch CUDA available:    {torch_cuda}")
+    print(f"    3. CPU-only build:            {is_cpu_only}")
+    if gpu_layer_warnings:
+        for w in gpu_layer_warnings:
+            print(f"    WARNING: {w}")
+
     # Build report
     report = {
         "timestamp": datetime.datetime.now().isoformat(),
@@ -185,6 +212,12 @@ def generate_report() -> dict:
         "accelerate": acc_info,
         "mineru_vl_utils": mineru_info,
         "cuda_issues": cuda_issues,
+        "gpu_layer_status": {
+            "layer1_hardware_gpu_detected": hardware_gpu,
+            "layer2_torch_cuda_available": torch_cuda,
+            "layer3_is_cpu_only_build": is_cpu_only,
+            "warnings": gpu_layer_warnings,
+        },
         "summary": {
             "gpu_available": torch_info["cuda_available"],
             "gpu_name": torch_info.get("gpu_name"),
@@ -258,6 +291,30 @@ def write_markdown(report: dict, path: Path) -> None:
             lines.append(f"- {issue}")
     else:
         lines.append("- None")
+
+    # 3-layer GPU status
+    gl = report.get("gpu_layer_status", {})
+    layer1 = gl.get("layer1_hardware_gpu_detected", report["nvidia_smi"]["available"])
+    layer2 = gl.get("layer2_torch_cuda_available", report["torch"]["cuda_available"])
+    layer3 = gl.get("layer3_is_cpu_only_build", not report["torch"].get("cuda_version"))
+    lines += [
+        "",
+        "## 3-Layer GPU Status",
+        "",
+        "| Layer | Description | Status |",
+        "|-------|-------------|--------|",
+        f"| 1 | Hardware GPU (nvidia-smi) | {'YES' if layer1 else 'NO'} |",
+        f"| 2 | PyTorch CUDA available | {'YES' if layer2 else 'NO'} |",
+        f"| 3 | CPU-only build | {'YES' if layer3 else 'NO'} |",
+    ]
+    warnings = gl.get("warnings", [])
+    if warnings:
+        lines.append("")
+        lines.append("### Warnings")
+        lines.append("")
+        for w in warnings:
+            lines.append(f"- {w}")
+
     lines += [
         "",
         "## Recommendation",

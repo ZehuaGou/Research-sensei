@@ -1,6 +1,6 @@
 # M1 Device Diagnosis Report
 
-Generated: 2026-06-11T10:42:31.479512
+Generated: 2026-06-11T13:37:03.671901
 
 ## System
 
@@ -10,17 +10,17 @@ Generated: 2026-06-11T10:42:31.479512
 ## GPU / CUDA
 
 - torch installed: True
-- torch version: 2.12.0+cpu
-- CUDA available: **False**
-- CUDA version: None
-- GPU name: None
-- GPU memory total: None MB
-- GPU memory allocated: None MB
+- torch version: 2.12.0+cu126
+- CUDA available: **True**
+- CUDA version: 12.6
+- GPU name: NVIDIA GeForce RTX 4060 Laptop GPU
+- GPU memory total: 8188 MB
+- GPU memory allocated: 0 MB
 
 ## nvidia-smi
 
 - Available: True
-- NVIDIA GeForce RTX 4060 Laptop GPU: 8188MB total, 6878MB free, 58C, 0% util
+- NVIDIA GeForce RTX 4060 Laptop GPU: 8188MB total, 6878MB free, 60C, 0% util
 
 ## Dependencies
 
@@ -30,8 +30,16 @@ Generated: 2026-06-11T10:42:31.479512
 
 ## CUDA Issues
 
-- PyTorch installed but CUDA version is None (CPU-only build)
+- None
+
+## 3-Layer GPU Status
+
+| Layer | Description | Status |
+|-------|-------------|--------|
+| 1 | Hardware GPU (nvidia-smi) | YES |
+| 2 | PyTorch CUDA available | YES |
+| 3 | CPU-only build | NO |
 
 ## Recommendation
 
-CUDA not available. MinerU will run on CPU (very slow). Check NVIDIA driver and PyTorch CUDA build.
+GPU available (NVIDIA GeForce RTX 4060 Laptop GPU, 8188MB). MinerU should use GPU. Use --device-mode=auto or cuda.
