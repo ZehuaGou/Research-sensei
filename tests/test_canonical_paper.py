@@ -94,6 +94,10 @@ class TestSourcePriority:
 
 
 class TestCanonicalPaperGeneration:
+    def test_formula_detection_disabled_by_default_to_avoid_marker_model_download(self):
+        normalizer = MaterialNormalizer()
+        assert normalizer.formula_detection_enabled is False
+
     def test_canonical_paper_has_front_matter(self, tmp_path):
         normalizer = MaterialNormalizer()
         paper = _make_paper(pdf_downloaded=True, pdf_available=True)

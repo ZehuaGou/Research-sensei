@@ -3,7 +3,9 @@ from researchsensei.canonical.formula_region_detector import FormulaRegionDetect
 from researchsensei.canonical.formula_ocr_adapter import FormulaOCRAdapter
 from researchsensei.canonical.canonical_builder import CanonicalBuilder
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
+from researchsensei.canonical.latex_postprocessor import postprocess_latex
 from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
 from researchsensei.canonical.ollama_refiner import OllamaSectionRefiner, OllamaStructuredClient
 from researchsensei.canonical.pipeline import M1CanonicalPipeline, M1PipelineResult
 from researchsensei.canonical.quality_gate import M1QualityGate
@@ -17,6 +19,7 @@ __all__ = [
     "CanonicalBuilder",
     "CanonicalDocumentBlock",
     "MinerU25ProAdapter",
+    "OllamaLatexValidator",
     "OllamaSectionRefiner",
     "OllamaStructuredClient",
     "M1CanonicalPipeline",
@@ -24,4 +27,5 @@ __all__ = [
     "M1QualityGate",
     "RuleBasedStructureRefiner",
     "M1VisualAuditReportGenerator",
+    "postprocess_latex",
 ]

@@ -65,6 +65,8 @@ canonical_paper.md
 
 ## 6. 当前代码位置
 
+- `src/researchsensei/m2/` — current M2 rule-based understanding path from M1 artifacts
+- `scripts/m2_run_understanding.py` — CLI entry point that reads an M1 artifact bundle and writes `reports/m2_understanding_<paper_id>/`
 - `src/researchsensei/paper_card.py` — `build_paper_card()` (rule-based baseline)
 - `src/researchsensei/paper_card_v2.py` — v2 LLM builder (fail-closed)
 - `src/researchsensei/formula_card.py` — `build_formula_card()` (rule-based baseline)
@@ -76,6 +78,18 @@ canonical_paper.md
 - `src/researchsensei/schemas/llm_output.py` — PaperCardLLMOutput, FormulaCardLLMOutput, TeachingCardLLMOutput
 - `src/researchsensei/schemas/status.py` — UnderstandingStatus, DownstreamGates, EvidencePackSummary
 - `src/researchsensei/ingestion/pipeline.py` — SinglePaperIngestionRunner (v2 path integration)
+
+Current M2 rule-based output is not a replacement for the future real-LLM/evidence-pack card pipeline. It establishes the M1 artifact contract, formula grouping behavior, source trace preservation, and risk handling. It writes:
+
+- `m2_paper_understanding.md`
+- `m2_formula_understanding.json`
+- `m2_formula_understanding.md`
+- `m2_method_graph.json`
+- `m2_source_trace.json`
+- `m2_risk_report.md`
+- `m2_run_summary.json`
+
+It reads only M1 artifacts and must not mutate M1 latex, bbox, page, parser source, source identity, crop path, or overlay path.
 
 ## 7. 输入输出
 

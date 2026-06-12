@@ -143,6 +143,24 @@ Primary MinerU acceptance summary:
 
 Ollama remains optional/off by default. Cached paper_4_unseen eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0.
 
+### 2026-06-11 target-mode generalization check
+
+`scripts/m1_target_mode_eval.py` runs a lightweight target-mode evaluation to reduce overfit risk. The default run does metadata search plus static M1 artifact contract checks and does not run full MinerU. Output lives in `reports/m1_target_mode_eval/`.
+
+Current checks:
+
+- excludes tuned/old samples (`2510.18998`, DDMT, TPIDM, MEMTO, TeVAE, and earlier parser review samples)
+- finds at least two unseen time-series candidates
+- checks formula_slots schema, `final_latex`, equation group fields, nearby text, crop/overlay paths, reference formula exclusion, and performance gate wording
+- scans production code for target-specific hardcodes while allowing tests and the evaluator's own exclusion/detection configuration
+
+Current run found:
+
+- `2312.01729` EdgeConvFormer: Dynamic Graph CNN and Transformer based Anomaly Detection in Multivariate Time Series
+- `1610.06761` Maximally Divergent Intervals for Anomaly Detection
+
+This target-mode report is not full parser acceptance and does not prove M1 perfect generalization. Live page-level eval was not run in the default report. Performance remains WARNING when `seconds_per_page` exceeds the threshold.
+
 ## Reused Components
 
 ## External Projects / Adapter Candidates

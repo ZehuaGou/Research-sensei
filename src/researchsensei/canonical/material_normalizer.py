@@ -98,7 +98,7 @@ class MaterialNormalizer:
         marker_enabled: bool = False,
         marker_trigger_mode: str = "never",
         marker_timeout_seconds: float = 90.0,
-        formula_detection_enabled: bool = True,
+        formula_detection_enabled: bool = False,
         formula_crop_enabled: bool = True,
     ) -> None:
         self.formula_region_detector = formula_region_detector

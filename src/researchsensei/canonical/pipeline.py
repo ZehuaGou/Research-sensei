@@ -10,11 +10,13 @@ from pydantic import Field
 
 from researchsensei.canonical.canonical_builder import CanonicalBuilder
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
+from researchsensei.canonical.latex_postprocessor import postprocess_latex
 from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
 from researchsensei.canonical.ollama_refiner import OllamaSectionRefiner
 from researchsensei.canonical.quality_gate import M1QualityGate, M1QualityGateResult
 from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
-from researchsensei.canonical.visual_audit import M1VisualAuditReport, M1VisualAuditReportGenerator
+from researchsensei.canonical.visual_audit import M1VisualAuditReportGenerator, M1VisualAuditReport
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.canonical import CanonicalizationResult
 
@@ -37,6 +39,7 @@ class M1CanonicalPipeline:
         mineru_adapter: MinerU25ProAdapter | None = None,
         rule_refiner: RuleBasedStructureRefiner | None = None,
         ollama_refiner: OllamaSectionRefiner | None = None,
+        latex_validator: OllamaLatexValidator | None = None,
         quality_gate: M1QualityGate | None = None,
         builder: CanonicalBuilder | None = None,
         report_generator: M1VisualAuditReportGenerator | None = None,
@@ -44,6 +47,7 @@ class M1CanonicalPipeline:
         self.mineru_adapter = mineru_adapter or MinerU25ProAdapter()
         self.rule_refiner = rule_refiner or RuleBasedStructureRefiner()
         self.ollama_refiner = ollama_refiner
+        self.latex_validator = latex_validator
         self.quality_gate = quality_gate or M1QualityGate()
         self.builder = builder or CanonicalBuilder()
         self.report_generator = report_generator or M1VisualAuditReportGenerator()
@@ -110,16 +114,29 @@ class M1CanonicalPipeline:
                 output_dir=output_dir_path,
                 slots=slots,
             )
+
+        # Apply regex-based LaTeX post-processing to all formula slots
+        slots = self._postprocess_latex_slots(slots)
+
+        # Optionally validate/correct LaTeX with Ollama
+        latex_validated = False
+        if apply_ollama and self.latex_validator is not None and self.latex_validator.is_available():
+            slots = self.latex_validator.validate_formulas(slots, output_dir_path)
+            latex_validated = True
+
         quality = self.quality_gate.evaluate(working_blocks, slots)
         elapsed = time.perf_counter() - start
         metrics = {
             "primary_parser": "mineru25pro",
             "ollama_enabled": ollama_enabled,
+            "latex_postprocessed": True,
+            "latex_validated": latex_validated,
             "runtime_seconds": round(elapsed, 3),
             "mineru_available": True,
             "formula_slot_count": len(slots),
             "formula_crop_count": sum(1 for slot in slots if slot.get("crop_path")),
             "formula_overlay_count": sum(1 for slot in slots if slot.get("overlay_path")),
+            "latex_corrected_count": sum(1 for slot in slots if slot.get("latex_corrected_by")),
         }
         metrics.update(initial_metrics or {})
         if self.ollama_refiner is not None:
@@ -137,6 +154,15 @@ class M1CanonicalPipeline:
                 "ollama_retry_count": 0,
                 "ollama_timeout_count": 0,
                 "ollama_changed_by_count": 0,
+            })
+
+        if self.latex_validator is not None:
+            metrics.update({
+                "latex_validator_checked": self.latex_validator.metrics.formulas_checked,
+                "latex_validator_corrected": self.latex_validator.metrics.formulas_corrected,
+                "latex_validator_json_valid": self.latex_validator.metrics.json_valid_count,
+                "latex_validator_json_invalid": self.latex_validator.metrics.json_invalid_count,
+                "latex_validator_timeout": self.latex_validator.metrics.timeout_count,
             })
 
         canonicalization = self.builder.build(
@@ -182,6 +208,18 @@ class M1CanonicalPipeline:
                 "source_mismatch": False,
                 "review_disabled": False,
             })
+        return slots
+
+    def _postprocess_latex_slots(self, slots: list[dict]) -> list[dict]:
+        """Apply regex-based LaTeX cleanup to all formula slots."""
+        for slot in slots:
+            for key in ("mineru_latex", "marker_latex", "final_latex"):
+                original = slot.get(key, "")
+                if original and isinstance(original, str) and original.strip():
+                    cleaned = postprocess_latex(original)
+                    if cleaned != original:
+                        slot[f"{key}_raw"] = original
+                        slot[key] = cleaned
         return slots
 
     def _generate_formula_review_artifacts(

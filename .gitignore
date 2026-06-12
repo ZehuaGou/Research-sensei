@@ -20,6 +20,9 @@ config/local.toml
 /reports/m1_parser_review/
 /artifacts/
 /tmp/
+.tmp_pytest*/
+.tmp_debug_m1/
+reports/m1_acceptance_manual_review_2510_18998.zip
 *.ckpt
 *.pt
 *.pth

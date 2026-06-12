@@ -12,6 +12,7 @@ Does NOT re-run MinerU parse. Reads existing artifacts and regenerates:
 from __future__ import annotations
 
 import datetime
+import argparse
 import json
 import sys
 import zipfile
@@ -517,12 +518,11 @@ def _create_zip(source_dir: Path, zip_path: Path) -> None:
                 zf.write(file, arcname)
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        accept_dir = ROOT / "reports" / "m1_acceptance_manual_review_2510_18998"
-    else:
-        accept_dir = Path(sys.argv[1])
-    regenerate(accept_dir)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Regenerate reports for an explicit M1 acceptance directory.")
+    parser.add_argument("accept_dir", type=Path, help="M1 acceptance artifact directory.")
+    args = parser.parse_args(argv)
+    regenerate(args.accept_dir)
     return 0
 
 

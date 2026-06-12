@@ -1203,3 +1203,47 @@ This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 **Current status**: PARTIAL_INFRA / NOT_PRODUCTION_READY
 
 **Test policy**: `python -m pytest -q` runs stable small real chain. Manual / nightly live validation runs network, LLM, OCR/parser heavy cases. Missing env/key/network in live validation = failure, not skip. mock/fake/skip are not valid module completion evidence.
+
+---
+
+## 2026-06-11 M2 Rule-Based Understanding Addendum
+
+Implemented path:
+
+- `src/researchsensei/m2/artifact_reader.py`
+- `src/researchsensei/m2/runner.py`
+- `src/researchsensei/m2/schemas.py`
+- `scripts/m2_run_understanding.py`
+
+M2 now has a deterministic, evidence-bounded starting path. It reads only M1 artifacts:
+
+- `canonical_paper.md`
+- `document_blocks.json`
+- `formula_slots.json`
+- `formula_slots.md`
+- `paper_metadata.json`
+- `quality_report.md`
+- `performance_report.json`
+- `visual_audit/`
+
+M2 must not modify M1-owned immutable fields: `bbox`, `page`, latex/final_latex, parser source, source identity, crop path, or overlay path.
+
+M2 outputs:
+
+- `m2_paper_understanding.md`
+- `m2_formula_understanding.json`
+- `m2_formula_understanding.md`
+- `m2_method_graph.json`
+- `m2_source_trace.json`
+- `m2_risk_report.md`
+- `m2_run_summary.json`
+
+Each formula understanding record includes `formula_id`, `equation_group_id`, `equation_number`, `page`, `section`, `final_latex`, `nearby_text_used`, `group_context_used`, `role_guess`, `plain_language_explanation`, `upstream_downstream_context`, `confidence`, `risk_flags`, and `source_trace`.
+
+Behavior:
+
+- `m2_ready=false` or missing `final_latex` causes a skipped deep explanation with an explicit reason.
+- Formula groups are interpreted with `equation_group_id`, `group_order`, `group_crop_path`, and group member latex.
+- Crop/group/source risks lower confidence and remain visible in output.
+- Missing nearby text is `unknown`; M2 does not invent context.
+- Explanations are rule-based role guesses from M1 evidence, not source-level proof.

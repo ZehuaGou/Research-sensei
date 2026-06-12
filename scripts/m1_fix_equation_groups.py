@@ -11,6 +11,7 @@ Does NOT re-run MinerU parse.
 from __future__ import annotations
 
 import datetime
+import argparse
 import json
 import re
 import sys
@@ -817,12 +818,11 @@ def _create_zip(source_dir: Path, zip_path: Path) -> None:
     print(f"  Zip: {zip_path} ({zip_path.stat().st_size / 1024:.0f} KB)")
 
 
-def main() -> int:
-    if len(sys.argv) < 2:
-        accept_dir = ROOT / "reports" / "m1_acceptance_manual_review_2510_18998"
-    else:
-        accept_dir = Path(sys.argv[1])
-    fix_equation_groups(accept_dir)
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Fix equation groups for an explicit M1 acceptance directory.")
+    parser.add_argument("accept_dir", type=Path, help="M1 acceptance artifact directory to repair.")
+    args = parser.parse_args(argv)
+    fix_equation_groups(args.accept_dir)
     return 0
 
 

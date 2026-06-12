@@ -98,6 +98,44 @@ Both papers: primary_parser=mineru25pro, fallback=false, title_ok=true, all crit
 
 Old Marker/MarkItDown/PyMuPDF fallback experiments have been cleaned. Only the primary MinerU2.5-Pro acceptance above is the formal M1 acceptance evidence.
 
+## M2 Rule-Based Understanding Start (2026-06-11)
+
+Implemented M2 artifact path:
+
+- code: `src/researchsensei/m2/`
+- CLI: `scripts/m2_run_understanding.py`
+- report: `reports/m2_understanding_2510_18998/`
+
+Current M2 mode is deterministic/rule-based and evidence-bounded. It reads only M1 artifacts (`canonical_paper.md`, `document_blocks.json`, `formula_slots.json`, `formula_slots.md`, `paper_metadata.json`, `quality_report.md`, `performance_report.json`, `visual_audit/`) and writes M2 artifacts to a separate report directory. It does not read raw PDF, does not run a parser, and does not modify M1 latex/bbox/page/source/crop/overlay identity.
+
+Generated outputs:
+
+- `m2_paper_understanding.md`
+- `m2_formula_understanding.json`
+- `m2_formula_understanding.md`
+- `m2_method_graph.json`
+- `m2_source_trace.json`
+- `m2_risk_report.md`
+- `m2_run_summary.json`
+
+M2 formula understanding uses `equation_group_id`, `group_order`, `group_crop_path`, `final_latex`, `nearby_text_before`, `nearby_text_after`, `risk_flags`, `final_origin`, and `block_source`. If a formula has `m2_ready=false` or no `final_latex`, M2 skips deep explanation and records the reason. Crop/group/source risk flags lower confidence; nearby_text gaps are reported as `unknown`.
+
+## M1 Target-Mode Eval (2026-06-11)
+
+Implemented target-mode generalization check:
+
+- script: `scripts/m1_target_mode_eval.py`
+- report: `reports/m1_target_mode_eval/`
+- default: metadata/static checks only; full MinerU is disabled
+- live eval: not run by default; page-level parse limitation is recorded instead of being treated as tested
+
+Current run found two new unseen candidates:
+
+- `2312.01729` EdgeConvFormer: Dynamic Graph CNN and Transformer based Anomaly Detection in Multivariate Time Series
+- `1610.06761` Maximally Divergent Intervals for Anomaly Detection
+
+Static checks cover candidate exclusion, formula_slots schema, final_latex, equation group fields, nearby_text, crop/overlay path existence, reference formula exclusion, performance WARNING wording, and production hardcode detection. This target-mode run reduces overfit risk, but it is not proof that M1 perfectly generalizes and it does not promote the performance gate from WARNING to PASS.
+
 ## Current verified PDF-only A_READ Gate
 
 当前已真实验证的 Focused Acquisition gate 是 PDF-only gate。它证明系统能完成窄 query 的多源检索、候选验证、LLM 相关性判断和 PDF 下载校验；它不是目标态 M1→M2 `canonical_paper.md` 契约。

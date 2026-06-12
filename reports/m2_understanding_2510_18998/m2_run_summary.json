@@ -1,0 +1,60 @@
+{
+  "paper_id": "2510_18998",
+  "title": "An Encode-then-Decompose Approach to Unsupervised Time Series Anomaly Detection on Contaminated Training Data--Extended Version",
+  "input_dir": "reports\\m1_acceptance_manual_review_2510_18998",
+  "output_dir": "reports\\m2_understanding_2510_18998",
+  "input_contract": {
+    "status": "PASS",
+    "checks": {
+      "candidate_consistency": "PASS",
+      "document_blocks_schema": "PASS",
+      "formula_slots_schema": "PASS",
+      "reference_formula_exclusion": "PASS",
+      "final_latex": "PASS",
+      "equation_group_fields": "PASS",
+      "nearby_text": "PASS",
+      "crop_overlay_path": "PASS",
+      "performance_gate_not_promoted": "PASS"
+    },
+    "reasons": [],
+    "formula_count": 26,
+    "body_formula_count": 26,
+    "reference_formula_count": 0,
+    "required_artifacts": [
+      "canonical_paper.md",
+      "document_blocks.json",
+      "formula_slots.json",
+      "formula_slots.md",
+      "paper_metadata.json",
+      "quality_report.md",
+      "performance_report.json",
+      "visual_audit/"
+    ],
+    "missing_slot_fields": []
+  },
+  "formula_count": 26,
+  "skipped_formula_count": 0,
+  "used_group_info": true,
+  "m1_artifacts_modified": false,
+  "input_artifacts_read": [
+    "canonical_paper.md",
+    "document_blocks.json",
+    "formula_slots.json",
+    "formula_slots.md",
+    "paper_metadata.json",
+    "quality_report.md",
+    "performance_report.json",
+    "visual_audit/"
+  ],
+  "output_artifacts": [
+    "m2_paper_understanding.md",
+    "m2_formula_understanding.json",
+    "m2_formula_understanding.md",
+    "m2_method_graph.json",
+    "m2_source_trace.json",
+    "m2_risk_report.md",
+    "m2_run_summary.json"
+  ],
+  "m2_ready": true,
+  "m2_ready_for_formula_understanding": true
+}
