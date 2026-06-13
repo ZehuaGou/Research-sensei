@@ -41,6 +41,26 @@ _DOUBLE_SPACE = re.compile(r"  +")
 # Plain text letter spacing (not in commands): "P r e c i s i o n" at start
 _PLAIN_TEXT_SPACED = re.compile(r"^([A-Z]) ((?:[A-Z] )*[A-Z]) = ", re.MULTILINE)
 
+_CIRCLED_COMPONENT_SEQUENCE = re.compile(
+    r"(?:①|\\text\{\(1\)\})\s*\+\s*(?:Ⓐ|ⓐ|\\text\{\(A\)\})"
+    r"\s*-\s*(?:ⓘ|ⓙ|\\text\{\(i\)\})\s*-\s*(?:ⓘⓘ|ⓘ\s*ⓘ|ⓙ|ⓑ|Ⓤ|\\text\{\(ii\)\})"
+)
+
+_CIRCLED_LABELS = {
+    "①": r"\text{(1)}",
+    "②": r"\text{(2)}",
+    "③": r"\text{(3)}",
+    "④": r"\text{(4)}",
+    "⑤": r"\text{(5)}",
+    "⑥": r"\text{(6)}",
+    "⑦": r"\text{(7)}",
+    "⑧": r"\text{(8)}",
+    "⑨": r"\text{(9)}",
+    "Ⓐ": r"\text{(A)}",
+    "ⓐ": r"\text{(A)}",
+    "ⓘ": r"\text{(i)}",
+}
+
 
 def _fix_letter_spaced_command(match: re.Match) -> str:
     """Remove spaces between letters in \\mathbf{E L B O} -> \\mathbf{ELBO}."""
@@ -87,12 +107,28 @@ def _fix_command_space_brace(match: re.Match) -> str:
     return match.group(1) + "{"
 
 
+def _fix_circled_component_sequence(match: re.Match) -> str:
+    """Normalize component labels such as ① + A - i - ii."""
+    return r"\text{(1)} + \text{(A)} - \text{(i)} - \text{(ii)}"
+
+
+def _normalize_circled_labels(latex: str) -> str:
+    """Convert non-LaTeX circled labels into explicit text labels."""
+    latex = _CIRCLED_COMPONENT_SEQUENCE.sub(_fix_circled_component_sequence, latex)
+    for raw, replacement in _CIRCLED_LABELS.items():
+        latex = latex.replace(raw, replacement)
+    return latex
+
+
 def postprocess_latex(latex: str) -> str:
     """Apply all regex-based fixes to a LaTeX formula string."""
     if not latex or not latex.strip():
         return latex
 
     result = latex
+
+    # Normalize OCR'd circled component labels into portable LaTeX text.
+    result = _normalize_circled_labels(result)
 
     # Fix letter-spaced mathbf/text/mathrm
     result = _MATHBF_SPACED.sub(_fix_letter_spaced_command, result)

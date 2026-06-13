@@ -96,3 +96,15 @@ class TestLatexPostProcessor:
         assert "_{t-1}" in result or "_{t - 1}" not in result
         assert "_{T}" in result
         assert "_{t=1}" in result
+
+    def test_normalizes_circled_underbrace_label(self):
+        input_latex = r"\underbrace{x+y}_{②}"
+        result = postprocess_latex(input_latex)
+        assert result == r"\underbrace{x+y}_{\text{(2)}}"
+
+    def test_normalizes_component_label_sequence(self):
+        input_latex = r"\mathcal{L}_{\mathrm{AVAE}} = ① + Ⓐ - ⓙ - ⓙ \tag{8}"
+        result = postprocess_latex(input_latex)
+        assert r"\text{(1)} + \text{(A)} - \text{(i)} - \text{(ii)}" in result
+        assert "①" not in result
+        assert "ⓙ" not in result

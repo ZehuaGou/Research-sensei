@@ -23,6 +23,14 @@ SECTION_ORDER = [
     "Unknown",
 ]
 
+SUPPRESSED_CANONICAL_RISK_FLAGS = {
+    "PAGE_HEADER_REPEATED",
+    "PAGE_NUMBER_FOOTER",
+    "AUTHOR_FOOTER",
+    "FUNDING_NOTE",
+    "FRONT_MATTER_AFFILIATION",
+}
+
 
 class CanonicalBuilder:
     """Build M2-readable canonical artifacts from document blocks."""
@@ -186,6 +194,7 @@ class CanonicalBuilder:
                 "latex_correction_confidence",
                 "latex_correction_issues",
                 "latex_tag_restored",
+                "group_overlay_path",
                 "nearby_block_ids",
             ):
                 if optional_key in reviewed:
@@ -251,8 +260,8 @@ class CanonicalBuilder:
             lines += [f"## {section}", ""]
             rendered_sections.add(section)
             for block in sorted(section_blocks, key=lambda b: (b.page, b.reading_order, b.bbox[1] if b.bbox else 0)):
-                # Skip page header/footer blocks (marked by RuleBasedStructureRefiner)
-                if "PAGE_HEADER_REPEATED" in block.risk_flags or "PAGE_NUMBER_FOOTER" in block.risk_flags or "AUTHOR_FOOTER" in block.risk_flags:
+                # Skip layout/front-matter blocks marked by RuleBasedStructureRefiner.
+                if any(flag in SUPPRESSED_CANONICAL_RISK_FLAGS for flag in block.risk_flags):
                     continue
                 if block.block_type == "title" and block.text.strip().lower().endswith(section.lower()):
                     continue

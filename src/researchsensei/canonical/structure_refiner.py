@@ -106,6 +106,16 @@ def extract_section_from_heading(text: str) -> str | None:
     return None
 
 
+def _starts_abstract_block(text: str) -> bool:
+    value = re.sub(r"\s+", " ", (text or "").strip())
+    return bool(re.match(r"^abstract\s*(?:[—\-:.\u2013]\s*)?", value, flags=re.I))
+
+
+def _is_index_terms_block(text: str) -> bool:
+    value = re.sub(r"\s+", " ", (text or "").strip())
+    return bool(re.match(r"^index\s+terms\s*(?:[—\-:.\u2013]\s*)?", value, flags=re.I))
+
+
 class RuleBasedStructureRefiner:
     """Assign sections from parser headings, reading order, and page timeline."""
 
@@ -121,6 +131,14 @@ class RuleBasedStructureRefiner:
         current = "Unknown"
         numbered_top_level: dict[str, str] = {}
         for block in blocks:
+            if block.page <= 2 and block.block_type in {"text", "title"} and (
+                _starts_abstract_block(block.text) or _is_index_terms_block(block.text)
+            ):
+                current = "Abstract"
+                block.section = "Abstract"
+                block.section_confidence = "high"
+                block.section_reason = f"abstract_front_matter_match: {block.text[:80]}"
+                continue
             if block.block_type == "title":
                 heading = _heading_parts(block.text)
                 section = None
@@ -183,11 +201,18 @@ class RuleBasedStructureRefiner:
 
                 continue
 
-            # Bare page-number footer emitted by parsers as ordinary text.
+            # Bare page-number emitted by parsers as ordinary text.  Some
+            # arXiv/IEEE PDFs place page numbers at the top-right edge rather
+            # than the footer, so treat page-edge numerals as layout noise.
             if normalized.isdigit() and int(normalized) == block.page:
+                x1 = block.bbox[0] if len(block.bbox) >= 1 else 0.0
+                x2 = block.bbox[2] if len(block.bbox) >= 3 else 0.0
                 y1 = block.bbox[1] if len(block.bbox) >= 2 else 0.0
                 y2 = block.bbox[3] if len(block.bbox) >= 4 else 0.0
-                if y1 >= 0.85 or y2 >= 0.90:
+                near_top_right = x1 >= 0.85 and y1 <= 0.08
+                near_footer = y1 >= 0.85 or y2 >= 0.90
+                near_outer_edge = (x1 <= 0.05 or x2 >= 0.95) and (y1 <= 0.08 or y2 >= 0.90)
+                if near_top_right or near_footer or near_outer_edge:
                     if "PAGE_NUMBER_FOOTER" not in block.risk_flags:
                         block.risk_flags.append("PAGE_NUMBER_FOOTER")
                     continue
@@ -197,6 +222,28 @@ class RuleBasedStructureRefiner:
                 if "AUTHOR_FOOTER" not in block.risk_flags:
                     block.risk_flags.append("AUTHOR_FOOTER")
 
+                continue
+
+            # First-page front matter should not become research-problem text
+            # for M2. Keep it in document_blocks as traceable material, but
+            # mark it so canonical/M2 summaries can suppress it.
+            if block.page <= 1 and (
+                "partially sponsored" in normalized
+                or "fellowship grant" in normalized
+                or "discovery and future fellowship" in normalized
+            ):
+                if "FUNDING_NOTE" not in block.risk_flags:
+                    block.risk_flags.append("FUNDING_NOTE")
+                continue
+
+            if block.page <= 1 and (
+                "e-mail:" in normalized
+                or "email:" in normalized
+                or re.search(r"\b(is|are)\s+with\s+the\b", normalized)
+                or re.search(r"\bwith\s+the\s+(school|department|datax|faculty|college|university)\b", normalized)
+            ):
+                if "FRONT_MATTER_AFFILIATION" not in block.risk_flags:
+                    block.risk_flags.append("FRONT_MATTER_AFFILIATION")
                 continue
 
             # Very short orphan title blocks that repeat on multiple pages

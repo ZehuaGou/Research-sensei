@@ -14,6 +14,14 @@ from researchsensei.m2.schemas import (
     RoleGuess,
 )
 
+SUPPRESSED_M1_RISK_FLAGS = {
+    "PAGE_HEADER_REPEATED",
+    "PAGE_NUMBER_FOOTER",
+    "AUTHOR_FOOTER",
+    "FUNDING_NOTE",
+    "FRONT_MATTER_AFFILIATION",
+}
+
 
 def run_m2_understanding(
     *,
@@ -290,7 +298,14 @@ def _source_trace(slot: dict[str, Any], block: dict[str, Any], canonical_ids: se
 
 
 def build_method_graph(bundle: M1ArtifactBundle, formulas: list[M2FormulaUnderstanding]) -> dict[str, Any]:
-    sections = sorted({str(block.get("section") or "Unknown") for block in bundle.document_blocks})
+    sections = sorted(
+        {
+            str(block.get("section") or "Unknown")
+            for block in bundle.document_blocks
+            if not _has_suppressed_m1_risk(block)
+            and str(block.get("section") or "Unknown") != "Unknown"
+        }
+    )
     nodes = [{"id": f"section:{section}", "type": "section", "label": section} for section in sections]
     edges: list[dict[str, str]] = []
     for formula in formulas:
@@ -431,8 +446,14 @@ def _section_excerpt(blocks: list[dict[str, Any]], section: str) -> str:
         if str(block.get("section") or "").lower() == section.lower()
         and str(block.get("block_type") or "") in {"text", "caption", "title"}
         and str(block.get("text") or "").strip()
+        and not _has_suppressed_m1_risk(block)
     ]
     return " ".join(pieces).strip()[:1200].rstrip()
+
+
+def _has_suppressed_m1_risk(block: dict[str, Any]) -> bool:
+    risks = {str(item) for item in block.get("risk_flags", [])}
+    return bool(risks.intersection(SUPPRESSED_M1_RISK_FLAGS))
 
 
 def _formula_ids_in_canonical(markdown: str) -> set[str]:

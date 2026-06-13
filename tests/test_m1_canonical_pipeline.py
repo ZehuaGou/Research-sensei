@@ -238,6 +238,8 @@ def test_rule_based_refiner_marks_bare_page_number_footer() -> None:
         _block("b001", page=15, block_type="title", text="3 Method"),
         _block("b002", page=15, text="15", bbox=[0.49, 0.936, 0.51, 0.95]),
         _block("b003", page=15, text="15 classes are used.", bbox=[0.10, 0.30, 0.80, 0.34]),
+        _block("b004", page=16, text="16", bbox=[0.91, 0.03, 0.93, 0.04]),
+        _block("b005", page=16, text="16 channels are used.", bbox=[0.10, 0.30, 0.80, 0.34]),
     ]
 
     refined = RuleBasedStructureRefiner().refine(blocks)
@@ -245,6 +247,31 @@ def test_rule_based_refiner_marks_bare_page_number_footer() -> None:
     by_id = {b.block_id: b for b in refined}
     assert "PAGE_NUMBER_FOOTER" in by_id["b002"].risk_flags
     assert "PAGE_NUMBER_FOOTER" not in by_id["b003"].risk_flags
+    assert "PAGE_NUMBER_FOOTER" in by_id["b004"].risk_flags
+    assert "PAGE_NUMBER_FOOTER" not in by_id["b005"].risk_flags
+
+
+def test_rule_based_refiner_assigns_front_matter_abstract_blocks() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="Weakly Augmented Variational Autoencoder"),
+        _block("b002", page=1, text="Abstract—This paper studies VAE-based anomaly detection."),
+        _block("b003", page=1, text="The proposed model uses self-supervised augmentation."),
+        _block("b004", page=1, text="Index Terms—Variational Autoencoder, Time Series Anomaly Detection."),
+        _block("b005", page=1, block_type="title", text="I. Introduction"),
+        _block("b006", page=1, text="Deep generative models are effective."),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert by_id["b001"].section == "Unknown"
+    assert by_id["b002"].section == "Abstract"
+    assert by_id["b003"].section == "Abstract"
+    assert by_id["b004"].section == "Abstract"
+    assert by_id["b005"].section == "Introduction"
+    assert by_id["b006"].section == "Introduction"
 
 
 def test_rule_based_refiner_uses_reading_order_not_final_page_heading() -> None:
@@ -1113,8 +1140,12 @@ def test_m1_pipeline_generates_crop_overlay_for_pdf_backed_formula_slots(tmp_pat
     assert str(tmp_path) not in canonical
     assert slots[0]["crop_path"].startswith("formula_crops/")
     assert slots[0]["overlay_path"].startswith("formula_overlays/")
+    assert slots[0]["group_crop_path"].startswith("formula_group_crops/")
+    assert slots[0]["group_overlay_path"].startswith("formula_group_overlays/")
     assert (tmp_path / slots[0]["crop_path"]).exists()
     assert (tmp_path / slots[0]["overlay_path"]).exists()
+    assert (tmp_path / slots[0]["group_crop_path"]).exists()
+    assert (tmp_path / slots[0]["group_overlay_path"]).exists()
 
 
 def test_m1_pipeline_run_pdf_unpacks_mineru_payload_and_records_stats(tmp_path) -> None:
@@ -1261,6 +1292,34 @@ def test_page_header_footer_blocks_suppressed_from_canonical(tmp_path) -> None:
 
     # Author footer should not appear
     assert "Preprint submitted to Elsevier" not in markdown
+
+
+def test_front_matter_affiliation_and_funding_suppressed_from_canonical(tmp_path) -> None:
+    """First-page funding/affiliation notes must not pollute Introduction."""
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="I. Introduction"),
+        _block("b002", page=1, text="The work is partially sponsored by Australian Research Council Discovery grants."),
+        _block("b003", page=1, text="Zhangkai Wu is with the School of Computer Science, Example University. (E-mail: a@example.edu)"),
+        _block("b004", page=1, text="DEEP probabilistic generative models have revolutionized unsupervised data generation."),
+    ]
+
+    result = M1CanonicalPipeline().run_from_blocks(
+        paper_id="p-front-matter-test",
+        title="Front Matter Test Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+    )
+    markdown = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+    document_blocks = json.loads((tmp_path / "document_blocks.json").read_text(encoding="utf-8"))
+    by_id = {block["block_id"]: block for block in document_blocks}
+
+    assert "partially sponsored" not in markdown
+    assert "E-mail" not in markdown
+    assert "DEEP probabilistic generative models" in markdown
+    assert "FUNDING_NOTE" in by_id["b002"]["risk_flags"]
+    assert "FRONT_MATTER_AFFILIATION" in by_id["b003"]["risk_flags"]
 
 
 def test_quality_gate_raw_only_formula_dense_blocks_m2_formula_understanding() -> None:

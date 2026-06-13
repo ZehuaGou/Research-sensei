@@ -407,8 +407,12 @@ class M1CanonicalPipeline:
 
         crop_dir = output_dir / "formula_crops"
         overlay_dir = output_dir / "formula_overlays"
+        group_crop_dir = output_dir / "formula_group_crops"
+        group_overlay_dir = output_dir / "formula_group_overlays"
         crop_dir.mkdir(parents=True, exist_ok=True)
         overlay_dir.mkdir(parents=True, exist_ok=True)
+        group_crop_dir.mkdir(parents=True, exist_ok=True)
+        group_overlay_dir.mkdir(parents=True, exist_ok=True)
 
         doc = fitz.open(str(pdf_path))
         try:
@@ -443,9 +447,84 @@ class M1CanonicalPipeline:
                 )
                 image.save(overlay_path)
                 slot["overlay_path"] = str(overlay_path.relative_to(output_dir)).replace("\\", "/")
+
+            self._generate_formula_group_review_artifacts(
+                doc=doc,
+                output_dir=output_dir,
+                group_crop_dir=group_crop_dir,
+                group_overlay_dir=group_overlay_dir,
+                slots=slots,
+            )
         finally:
             doc.close()
         return slots
+
+    def _generate_formula_group_review_artifacts(
+        self,
+        *,
+        doc: Any,
+        output_dir: Path,
+        group_crop_dir: Path,
+        group_overlay_dir: Path,
+        slots: list[dict],
+    ) -> None:
+        """Create one review crop/overlay per equation group for M2."""
+        import fitz
+        from PIL import Image, ImageDraw
+
+        grouped: dict[str, list[dict]] = {}
+        for slot in slots:
+            group_id = str(slot.get("equation_group_id") or "").strip()
+            if not group_id:
+                continue
+            grouped.setdefault(group_id, []).append(slot)
+
+        for group_id, group_slots in grouped.items():
+            page_indices = {int(slot.get("page") or 1) - 1 for slot in group_slots}
+            if len(page_indices) != 1:
+                continue
+            page_index = next(iter(page_indices))
+            if page_index < 0 or page_index >= len(doc):
+                continue
+            page = doc[page_index]
+
+            rects = [self._slot_rect(doc, slot) for slot in group_slots]
+            rects = [rect for rect in rects if rect is not None]
+            if not rects:
+                continue
+
+            union = fitz.Rect(rects[0])
+            for rect in rects[1:]:
+                union.include_rect(rect)
+            padded = self._pad_rect(union, page.rect, padding=8.0)
+
+            safe_group_id = "".join(ch if ch.isalnum() or ch in {"_", "-"} else "_" for ch in group_id)
+            group_crop_path = group_crop_dir / f"{safe_group_id}_p{page_index + 1}.png"
+            page.get_pixmap(clip=padded, dpi=200, alpha=False).save(str(group_crop_path))
+
+            group_overlay_path = group_overlay_dir / f"{safe_group_id}_page_{page_index + 1}.png"
+            pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5), alpha=False)
+            image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            draw = ImageDraw.Draw(image)
+            scale_x = pix.width / page.rect.width
+            scale_y = pix.height / page.rect.height
+            draw.rectangle(
+                [
+                    padded.x0 * scale_x,
+                    padded.y0 * scale_y,
+                    padded.x1 * scale_x,
+                    padded.y1 * scale_y,
+                ],
+                outline="blue",
+                width=4,
+            )
+            image.save(group_overlay_path)
+
+            rel_group_crop = str(group_crop_path.relative_to(output_dir)).replace("\\", "/")
+            rel_group_overlay = str(group_overlay_path.relative_to(output_dir)).replace("\\", "/")
+            for slot in group_slots:
+                slot["group_crop_path"] = rel_group_crop
+                slot["group_overlay_path"] = rel_group_overlay
 
     def _slot_rect(self, doc: Any, slot: dict) -> Any | None:
         import fitz

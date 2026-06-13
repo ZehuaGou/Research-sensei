@@ -54,6 +54,78 @@ def _write_m1_bundle(root: Path, *, formula_ready: bool = True) -> Path:
         json.dumps(
             [
                 {
+                    "block_id": "b_title",
+                    "page": 1,
+                    "bbox": [0.1, 0.05, 0.8, 0.09],
+                    "block_type": "title",
+                    "text": "Demo Time Series Paper",
+                    "latex": "",
+                    "html": "",
+                    "reading_order": 0,
+                    "source": "mineru25pro",
+                    "confidence": 0.95,
+                    "parent_section": "",
+                    "raw_payload_ref": "page_001.json",
+                    "section": "Unknown",
+                    "section_confidence": "low",
+                    "section_reason": "front_matter",
+                    "risk_flags": [],
+                },
+                {
+                    "block_id": "b_front",
+                    "page": 1,
+                    "bbox": [0.1, 0.1, 0.8, 0.13],
+                    "block_type": "text",
+                    "text": "Author A is with the School of Computer Science, Example University. (E-mail: a@example.edu)",
+                    "latex": "",
+                    "html": "",
+                    "reading_order": 1,
+                    "source": "mineru25pro",
+                    "confidence": 0.95,
+                    "parent_section": "",
+                    "raw_payload_ref": "page_001.json",
+                    "section": "Introduction",
+                    "section_confidence": "medium",
+                    "section_reason": "reading_order_context",
+                    "risk_flags": ["FRONT_MATTER_AFFILIATION"],
+                },
+                {
+                    "block_id": "b_intro",
+                    "page": 1,
+                    "bbox": [0.1, 0.14, 0.8, 0.20],
+                    "block_type": "text",
+                    "text": "This paper studies robust time series anomaly detection from scarce normal data.",
+                    "latex": "",
+                    "html": "",
+                    "reading_order": 2,
+                    "source": "mineru25pro",
+                    "confidence": 0.95,
+                    "parent_section": "",
+                    "raw_payload_ref": "page_001.json",
+                    "section": "Introduction",
+                    "section_confidence": "medium",
+                    "section_reason": "reading_order_context",
+                    "risk_flags": [],
+                },
+                {
+                    "block_id": "b_page",
+                    "page": 3,
+                    "bbox": [0.91, 0.03, 0.93, 0.04],
+                    "block_type": "text",
+                    "text": "3",
+                    "latex": "",
+                    "html": "",
+                    "reading_order": 0,
+                    "source": "mineru25pro",
+                    "confidence": 0.95,
+                    "parent_section": "",
+                    "raw_payload_ref": "page_003.json",
+                    "section": "Unknown",
+                    "section_confidence": "low",
+                    "section_reason": "reading_order_context",
+                    "risk_flags": ["PAGE_NUMBER_FOOTER"],
+                },
+                {
                     "block_id": "b_text",
                     "page": 3,
                     "bbox": [0.1, 0.1, 0.8, 0.18],
@@ -211,6 +283,23 @@ def test_m2_runner_writes_required_outputs_and_does_not_modify_m1_inputs(tmp_pat
         "m2_run_summary.json",
     ]:
         assert (output_dir / name).exists(), name
+
+
+def test_m2_paper_understanding_skips_m1_front_matter_and_layout_risks(tmp_path: Path) -> None:
+    from researchsensei.m2.runner import run_m2_understanding
+
+    input_dir = _write_m1_bundle(tmp_path / "m1")
+    output_dir = tmp_path / "m2"
+
+    run_m2_understanding(input_dir=input_dir, output_dir=output_dir)
+
+    paper = (output_dir / "m2_paper_understanding.md").read_text(encoding="utf-8")
+    graph = json.loads((output_dir / "m2_method_graph.json").read_text(encoding="utf-8"))
+    node_ids = {node["id"] for node in graph["nodes"]}
+
+    assert "scarce normal data" in paper
+    assert "E-mail" not in paper
+    assert "section:Unknown" not in node_ids
 
 
 def test_m2_formula_understanding_uses_group_context_and_source_trace(tmp_path: Path) -> None:

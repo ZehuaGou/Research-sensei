@@ -16,13 +16,11 @@ config/local.toml
 /workspace/
 /runs/
 /outputs/
-/reports/live_eval/
-/reports/m1_parser_review/
+/reports/
 /artifacts/
 /tmp/
 .tmp_pytest*/
 .tmp_debug_m1/
-reports/m1_acceptance_manual_review_2510_18998.zip
 *.ckpt
 *.pt
 *.pth
