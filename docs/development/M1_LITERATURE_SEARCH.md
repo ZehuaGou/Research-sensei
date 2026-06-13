@@ -141,7 +141,7 @@ M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M
 
 ### 2026-06-10 acceptance result
 
-`reports/m1_canonical_acceptance/` contains the formal M1 primary-route acceptance artifacts (DDMT, TPIDM). The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only.
+`reports/m1_canonical_acceptance/` contains historical acceptance/debug artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner, but the primary MinerU route is verified on paper_4 only; multi-paper MinerU acceptance remains pending. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only. Fallback reports are allowed for review/debugging, but they cannot prove primary-route stability.
 
 Five-paper acceptance summary:
 - paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
@@ -151,8 +151,8 @@ Five-paper acceptance summary:
 - paper_5_unseen TranAD: DEGRADED, m2_ready=false, formula_m2_ready=false, live_eval auto-downloaded unseen PDF, formulas=129, latex=0, raw_formula_text=129, high_risk=3.
 
 Primary MinerU acceptance summary:
-- 2310_08800v2 DDMT: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=7, body_formulas=7, latex=7, bbox/crop/overlay/canonical_match=7, high_risk=0, m2_ready=true, formula_m2_ready=true.
-- 2508_11528v1 TPIDM: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=17, body_formulas=12, reference_formulas=5, latex=17, bbox/crop/overlay/canonical_match=17, high_risk=0, m2_ready=true, formula_m2_ready=true.
+- paper_4_unseen MEMTO: verified primary MinerU route sample.
+- 2310_08800v2 DDMT and 2508_11528v1 TPIDM: historical reports exist, but current M2 contract audit shows stale artifacts; they cannot be used as multi-paper primary MinerU acceptance evidence until regenerated with current `paper_metadata.json`, `quality_report.md`, `performance_report.json`, `visual_audit/`, and complete formula slot fields.
 
 Ollama section refinement remains optional/off by default. Cached paper_4_unseen section eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b section compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0. The formula LaTeX polish path is separate and should be enabled explicitly when producing M2 handoff artifacts.
 

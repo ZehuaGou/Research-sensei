@@ -28,10 +28,10 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
-| M1 | canonical_paper.md pipeline | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | MinerU2.5-Pro primary route verified with two unseen papers; Marker fallback retained for audit |
+| M1 | canonical_paper.md pipeline | implemented | unit tested + M1/M2 contract tested | PARTIAL_REAL_E2E_VERIFIED | M1 canonical artifacts are M2-readable; MinerU route is verified on paper_4 only, multi-paper MinerU acceptance remains pending; fallback reports are audit/debug only |
 | M1 | MarkItDownAdapter (fallback) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，fallback/debug only，不是主线 |
 | M1 | MarkerPdfAdapter (fallback) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，fallback/audit baseline |
-| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + real two-paper acceptance | REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser; two unseen papers (DDMT, TPIDM) passed in `reports/m1_canonical_acceptance/` |
+| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + paper_4 real acceptance | PARTIAL_REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser candidate; verified on paper_4 only, multi-paper MinerU acceptance remains pending |
 | M1 | OllamaSectionRefiner | implemented | unit tested + local compare | OPTIONAL_REFINER_NOT_DEFAULT | Ollama is an optional structured refiner, default OFF; must not modify latex/bbox/page/source |
 | M1 | RuleBasedStructureRefiner | implemented | unit tested | IMPLEMENTED | Always runs; assigns sections, normalizes headings, detects risks |
 | M1 | M1 Quality Gate | implemented | unit tested + acceptance enforced | IMPLEMENTED, REAL_E2E_VERIFIED | Blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas |
@@ -77,14 +77,16 @@ Report path: `reports/m1_canonical_acceptance/`
 
 Pipeline: MinerU2.5-Pro via mineru-vl-utils → CanonicalDocumentBlock → RuleBasedStructureRefiner → optional OllamaSectionRefiner → CanonicalBuilder → M1QualityGate → visual audit.
 
-### Acceptance Samples
+### Historical Acceptance Samples
 
 | Paper | arXiv | Status | Formulas | Body | Ref | LaTeX | Crops | Overlays | High Risk | M2 Ready |
 |-------|-------|--------|----------|------|-----|-------|-------|----------|-----------|----------|
 | DDMT | 2310.08800 | PASS | 7 | 7 | 0 | 7 | 7 | 7 | 0 | true |
 | TPIDM | 2508.11528 | PASS | 17 | 12 | 5 | 17 | 17 | 17 | 0 | true |
 
-Both papers: primary_parser=mineru25pro, fallback=false, title_ok=true, all criteria PASS.
+These rows are historical report snapshots. Current audit shows the stored DDMT/TPIDM artifacts are stale for the M2 contract (missing current metadata/performance/quality files and formula slot fields), so they must not be used as formal multi-paper MinerU acceptance evidence until regenerated with current M1.
+
+Current formal statement: M1 canonical artifacts are M2-readable when generated with the current pipeline, crop/overlay review is enforced, dense raw-only formula outputs are blocked/degraded for formula understanding, and the primary MinerU route remains verified on paper_4 only. Multi-paper MinerU acceptance remains pending.
 
 ### Ollama Status
 
@@ -96,7 +98,7 @@ Both papers: primary_parser=mineru25pro, fallback=false, title_ok=true, all crit
 
 ### Historical Notes
 
-Old Marker/MarkItDown/PyMuPDF fallback experiments have been cleaned. Only the primary MinerU2.5-Pro acceptance above is the formal M1 acceptance evidence.
+Marker/MarkItDown/PyMuPDF fallback experiments are allowed as review/debug artifacts only. They do not prove the primary MinerU route is stable.
 
 ## M2 Rule-Based Understanding Start (2026-06-11)
 
