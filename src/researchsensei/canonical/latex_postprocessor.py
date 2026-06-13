@@ -1,4 +1,4 @@
-"""Regex-based LaTeX post-processor for MinerU formula cleanup.
+r"""Regex-based LaTeX post-processor for MinerU formula cleanup.
 
 Fixes common formatting issues from MinerU LaTeX output:
 - Letter spacing in \mathbf, \text, \mathrm commands
@@ -20,6 +20,14 @@ _CMD_CONTENT_SPACES = re.compile(r"\\(mathbf|text|mathrm|mathcal|mathbb)\s*\{\s*
 
 # Subscript/superscript with spaces: _ { x } -> _{x}
 _SUB_SUPER_SPACED = re.compile(r"([_^])\s*\{\s*([^{}]+?)\s*\}")
+
+# Space before subscript/superscript operator: \lambda _{1} -> \lambda_{1}
+_SPACE_BEFORE_SUB_SUPER = re.compile(r"(?<=[A-Za-z0-9}\)])\s+([_^])")
+
+# Subscript/superscript containing one LaTeX command: _ { \mathrm{sta} } -> _{\mathrm{sta}}
+_NESTED_CMD_SUB_SUPER_SPACED = re.compile(
+    r"([_^])\s*\{\s*(\\(?:mathbf|text|mathrm|mathcal|mathbb)\{[^{}]+?\})\s*\}"
+)
 
 # Nested subscript: _ { x _ {0} } -> _{x_0}
 _NESTED_SUB = re.compile(r"_\{([^{}]*?)\s*_\{([^{}]*?)\}")
@@ -62,6 +70,11 @@ def _fix_subscript_spacing(match: re.Match) -> str:
     return f"{prefix}{{{fixed}}}"
 
 
+def _fix_nested_command_subscript_spacing(match: re.Match) -> str:
+    """Remove extra spaces around a command inside subscript/superscript braces."""
+    return f"{match.group(1)}{{{match.group(2)}}}"
+
+
 def _fix_nested_subscript(match: re.Match) -> str:
     """Fix nested subscripts: _{x _{0}} -> _{x_0}."""
     outer = match.group(1).strip()
@@ -92,10 +105,17 @@ def postprocess_latex(latex: str) -> str:
     # Fix command-space-brace: \mathcal { -> \mathcal{
     result = _CMD_SPACE_BRACE.sub(_fix_command_space_brace, result)
 
+    # Remove spaces before _/^ operators.
+    result = _SPACE_BEFORE_SUB_SUPER.sub(r"\1", result)
+
+    # Fix subscript/superscript that wraps one command.
+    result = _NESTED_CMD_SUB_SUPER_SPACED.sub(_fix_nested_command_subscript_spacing, result)
+
     # Fix subscript/superscript spacing (repeated to handle nested)
     for _ in range(3):
         prev = result
         result = _SUB_SUPER_SPACED.sub(_fix_subscript_spacing, result)
+        result = _NESTED_CMD_SUB_SUPER_SPACED.sub(_fix_nested_command_subscript_spacing, result)
         if result == prev:
             break
 

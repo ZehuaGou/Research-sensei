@@ -60,6 +60,7 @@ class M1CanonicalPipeline:
         pdf_path: str | Path,
         output_dir: str | Path,
         apply_ollama: bool = False,
+        apply_ollama_latex: bool = False,
         formula_slots: list[dict] | None = None,
     ) -> M1PipelineResult:
         start = time.perf_counter()
@@ -74,6 +75,7 @@ class M1CanonicalPipeline:
             output_dir=output_dir,
             source_pdf_path=str(pdf_path),
             apply_ollama=apply_ollama,
+            apply_ollama_latex=apply_ollama_latex,
             formula_slots=formula_slots,
             initial_metrics={
                 "primary_parser": "mineru25pro",
@@ -93,6 +95,7 @@ class M1CanonicalPipeline:
         source_pdf_path: str = "",
         apply_rule_refiner: bool = True,
         apply_ollama: bool = False,
+        apply_ollama_latex: bool = False,
         formula_slots: list[dict] | None = None,
         initial_metrics: dict | None = None,
     ) -> M1PipelineResult:
@@ -115,20 +118,29 @@ class M1CanonicalPipeline:
                 slots=slots,
             )
 
+        slots = self._ensure_slot_latex_from_blocks(working_blocks, slots)
+
         # Apply regex-based LaTeX post-processing to all formula slots
         slots = self._postprocess_latex_slots(slots)
 
         # Optionally validate/correct LaTeX with Ollama
         latex_validated = False
-        if apply_ollama and self.latex_validator is not None and self.latex_validator.is_available():
+        latex_requested = bool(apply_ollama or apply_ollama_latex)
+        latex_available = False
+        if latex_requested and self.latex_validator is not None and self.latex_validator.is_available():
+            latex_available = True
             slots = self.latex_validator.validate_formulas(slots, output_dir_path)
             latex_validated = True
+
+        self._sync_formula_latex_from_slots(working_blocks, slots)
 
         quality = self.quality_gate.evaluate(working_blocks, slots)
         elapsed = time.perf_counter() - start
         metrics = {
             "primary_parser": "mineru25pro",
             "ollama_enabled": ollama_enabled,
+            "ollama_latex_requested": latex_requested,
+            "ollama_latex_enabled": latex_available,
             "latex_postprocessed": True,
             "latex_validated": latex_validated,
             "runtime_seconds": round(elapsed, 3),
@@ -160,6 +172,10 @@ class M1CanonicalPipeline:
             metrics.update({
                 "latex_validator_checked": self.latex_validator.metrics.formulas_checked,
                 "latex_validator_corrected": self.latex_validator.metrics.formulas_corrected,
+                "latex_validator_low_confidence": self.latex_validator.metrics.low_confidence_count,
+                "latex_validator_overexpanded": self.latex_validator.metrics.overexpanded_count,
+                "latex_validator_anchor_mismatch": self.latex_validator.metrics.anchor_mismatch_count,
+                "latex_validator_tag_restored": self.latex_validator.metrics.tag_restored_count,
                 "latex_validator_json_valid": self.latex_validator.metrics.json_valid_count,
                 "latex_validator_json_invalid": self.latex_validator.metrics.json_invalid_count,
                 "latex_validator_timeout": self.latex_validator.metrics.timeout_count,
@@ -221,6 +237,47 @@ class M1CanonicalPipeline:
                         slot[f"{key}_raw"] = original
                         slot[key] = cleaned
         return slots
+
+    def _ensure_slot_latex_from_blocks(
+        self,
+        blocks: list[CanonicalDocumentBlock],
+        slots: list[dict],
+    ) -> list[dict]:
+        formulas = [block for block in blocks if block.block_type == "formula"]
+        slots_by_block_id = {str(slot.get("block_id", "")): slot for slot in slots if slot.get("block_id")}
+        slots_by_formula_id = {str(slot.get("formula_id", "")): slot for slot in slots if slot.get("formula_id")}
+        for index, block in enumerate(formulas, start=1):
+            formula_id = f"formula_{index:03d}"
+            slot = slots_by_block_id.get(block.block_id) or slots_by_formula_id.get(formula_id)
+            if not slot:
+                continue
+            if block.source == "mineru25pro" and not slot.get("mineru_latex"):
+                slot["mineru_latex"] = block.latex
+            if block.source == "marker_document" and not slot.get("marker_latex"):
+                slot["marker_latex"] = block.latex
+            if not slot.get("final_latex"):
+                slot["final_latex"] = block.latex
+        return slots
+
+    def _sync_formula_latex_from_slots(
+        self,
+        blocks: list[CanonicalDocumentBlock],
+        slots: list[dict],
+    ) -> None:
+        formulas = [block for block in blocks if block.block_type == "formula"]
+        slots_by_block_id = {str(slot.get("block_id", "")): slot for slot in slots if slot.get("block_id")}
+        slots_by_formula_id = {str(slot.get("formula_id", "")): slot for slot in slots if slot.get("formula_id")}
+        for index, block in enumerate(formulas, start=1):
+            formula_id = f"formula_{index:03d}"
+            slot = slots_by_block_id.get(block.block_id) or slots_by_formula_id.get(formula_id)
+            if not slot:
+                continue
+            final_latex = str(slot.get("final_latex") or slot.get("mineru_latex") or "").strip()
+            if final_latex:
+                block.latex = final_latex
+            for risk in slot.get("risk_flags", []):
+                if risk not in block.risk_flags:
+                    block.risk_flags.append(str(risk))
 
     def _generate_formula_review_artifacts(
         self,

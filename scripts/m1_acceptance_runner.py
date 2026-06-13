@@ -26,6 +26,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--device-mode", choices=["auto", "cuda", "cpu"], default="auto")
     p.add_argument("--search-dir", type=str, default=None)
     p.add_argument("--output-dir", type=str, default=None)
+    p.add_argument("--enable-ollama-latex", action="store_true", help="Run Ollama formula LaTeX polishing after MinerU extraction.")
+    p.add_argument("--ollama-latex-model", default="qwen3.5:4b", help="Vision-capable Ollama model for formula LaTeX polishing.")
+    p.add_argument("--ollama-base-url", default="http://localhost:11434")
+    p.add_argument("--ollama-timeout", type=float, default=30.0)
+    p.add_argument("--ollama-min-confidence", type=float, default=0.8)
     return p.parse_args(argv)
 
 
@@ -55,6 +60,7 @@ def main() -> int:
     print(f"Paper: {paper_id} - {title}")
     print(f"PDF: {pdf_path}")
     print(f"Device mode: {args.device_mode}")
+    print(f"Ollama LaTeX polish: {args.enable_ollama_latex}")
 
     # Create acceptance directory
     accept_dir = Path(args.output_dir) if args.output_dir else ROOT / "reports" / f"m1_acceptance_manual_review_{paper_id}"
@@ -74,10 +80,24 @@ def main() -> int:
     # Run M1 pipeline
     print("\n[1/7] Running MinerU2.5-Pro pipeline...")
     from researchsensei.canonical.mineru25_adapter import MinerU25ProAdapter
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+    from researchsensei.canonical.ollama_refiner import OllamaStructuredClient
     from researchsensei.canonical.pipeline import M1CanonicalPipeline
 
     adapter = MinerU25ProAdapter(device_mode=args.device_mode)
-    pipeline = M1CanonicalPipeline(mineru_adapter=adapter)
+    latex_validator = None
+    if args.enable_ollama_latex:
+        latex_validator = OllamaLatexValidator(
+            client=OllamaStructuredClient(
+                base_url=args.ollama_base_url,
+                model=args.ollama_latex_model,
+                timeout_seconds=args.ollama_timeout,
+                max_retries=0,
+            ),
+            model=args.ollama_latex_model,
+            min_confidence=args.ollama_min_confidence,
+        )
+    pipeline = M1CanonicalPipeline(mineru_adapter=adapter, latex_validator=latex_validator)
 
     t_pipeline_start = time.perf_counter()
     result = pipeline.run_pdf(
@@ -86,6 +106,7 @@ def main() -> int:
         pdf_path=source_pdf,
         output_dir=accept_dir,
         apply_ollama=False,
+        apply_ollama_latex=args.enable_ollama_latex,
     )
     t_pipeline = time.perf_counter() - t_pipeline_start
 

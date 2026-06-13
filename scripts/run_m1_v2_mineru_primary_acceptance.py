@@ -67,6 +67,11 @@ def main() -> int:
     parser.add_argument("--max-pages", type=int, default=0, help="Developer smoke limit. Acceptance must use 0.")
     parser.add_argument("--render-scale", type=float, default=1.0)
     parser.add_argument("--force", action="store_true", help="Ignore cached MinerU page JSON.")
+    parser.add_argument("--enable-ollama-latex", action="store_true", help="Run Ollama formula LaTeX polishing after MinerU extraction.")
+    parser.add_argument("--ollama-latex-model", default="qwen3.5:4b", help="Vision-capable Ollama model for formula LaTeX polishing.")
+    parser.add_argument("--ollama-base-url", default="http://localhost:11434")
+    parser.add_argument("--ollama-timeout", type=float, default=30.0)
+    parser.add_argument("--ollama-min-confidence", type=float, default=0.8)
     args = parser.parse_args()
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -77,7 +82,17 @@ def main() -> int:
     adapter = MinerU25ProAdapter(render_scale=args.render_scale)
     rows = []
     for candidate in selected:
-        rows.append(run_candidate(candidate, adapter, max_pages=args.max_pages, force=args.force))
+        rows.append(run_candidate(
+            candidate,
+            adapter,
+            max_pages=args.max_pages,
+            force=args.force,
+            enable_ollama_latex=args.enable_ollama_latex,
+            ollama_latex_model=args.ollama_latex_model,
+            ollama_base_url=args.ollama_base_url,
+            ollama_timeout=args.ollama_timeout,
+            ollama_min_confidence=args.ollama_min_confidence,
+        ))
     write_top_level(candidates, rows, max_pages=args.max_pages)
     make_bundle()
     print(json.dumps(rows, indent=2, ensure_ascii=False))
@@ -150,6 +165,11 @@ def run_candidate(
     *,
     max_pages: int,
     force: bool,
+    enable_ollama_latex: bool = False,
+    ollama_latex_model: str = "qwen3.5:4b",
+    ollama_base_url: str = "http://localhost:11434",
+    ollama_timeout: float = 30.0,
+    ollama_min_confidence: float = 0.8,
 ) -> dict[str, Any]:
     paper_dir = OUT / candidate.key
     paper_dir.mkdir(parents=True, exist_ok=True)
@@ -168,15 +188,33 @@ def run_candidate(
         json.dumps(raw_payload, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
-    result = M1CanonicalPipeline(mineru_adapter=adapter).run_from_blocks(
+    latex_validator = None
+    if enable_ollama_latex:
+        from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+        from researchsensei.canonical.ollama_refiner import OllamaStructuredClient
+
+        latex_validator = OllamaLatexValidator(
+            client=OllamaStructuredClient(
+                base_url=ollama_base_url,
+                model=ollama_latex_model,
+                timeout_seconds=ollama_timeout,
+                max_retries=0,
+            ),
+            model=ollama_latex_model,
+            min_confidence=ollama_min_confidence,
+        )
+    result = M1CanonicalPipeline(mineru_adapter=adapter, latex_validator=latex_validator).run_from_blocks(
         paper_id=candidate.key,
         title=candidate.title,
         blocks=blocks,
         output_dir=paper_dir,
         source_pdf_path=str(source_pdf),
+        apply_ollama_latex=enable_ollama_latex,
         initial_metrics={
             "primary_parser": "mineru25pro",
             "mineru_available": True,
+            "acceptance_ollama_latex_requested": enable_ollama_latex,
+            "acceptance_ollama_latex_model": ollama_latex_model if enable_ollama_latex else "",
             "mineru_runtime_seconds": round(time.perf_counter() - start, 3),
             "mineru_raw_payload_pages": len(raw_payload["pages"]),
             "mineru_raw_payload_total_blocks": len(blocks),

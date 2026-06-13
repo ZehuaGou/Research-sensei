@@ -386,6 +386,467 @@ def test_ollama_refiner_cannot_modify_latex_bbox_page_or_source() -> None:
     assert block.source == "mineru25pro"
 
 
+def test_pipeline_can_enable_ollama_latex_without_section_refiner(tmp_path) -> None:
+    from researchsensei.canonical.ollama_latex_validator import LatexValidationMetrics
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    blocks = [
+        _block("b001", page=3, block_type="title", text="3 Method", section="Method"),
+        _block("b002", page=3, block_type="formula", latex=r"\mathcal {L} = x", section="Method"),
+    ]
+    slots = _reviewed_slots(blocks)
+
+    class RaisingRefiner:
+        metrics = type("Metrics", (), {
+            "json_valid_count": 0,
+            "json_invalid_count": 0,
+            "retry_count": 0,
+            "timeout_count": 0,
+            "changed_by_count": 0,
+        })()
+
+        def refine(self, blocks):
+            raise AssertionError("section refiner should not run for formula-only Ollama")
+
+    class FakeLatexValidator:
+        metrics = LatexValidationMetrics(
+            available=True,
+            model="fake-vision",
+            formulas_checked=1,
+            formulas_corrected=1,
+            json_valid_count=1,
+        )
+
+        def is_available(self):
+            return True
+
+        def validate_formulas(self, formula_slots, output_dir):
+            updated = []
+            for slot in formula_slots:
+                copy = dict(slot)
+                copy.setdefault("final_latex_raw", copy["final_latex"])
+                copy["final_latex"] = r"\mathcal{L} = x"
+                copy["latex_corrected_by"] = "ollama_latex_validator"
+                copy["latex_correction_confidence"] = 0.97
+                updated.append(copy)
+            return updated
+
+    result = M1CanonicalPipeline(
+        ollama_refiner=RaisingRefiner(),
+        latex_validator=FakeLatexValidator(),
+    ).run_from_blocks(
+        paper_id="p-ollama-latex",
+        title="Ollama Latex Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+        apply_ollama=False,
+        apply_ollama_latex=True,
+        formula_slots=slots,
+    )
+
+    canonical = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+    persisted_slots = json.loads((tmp_path / "formula_slots.json").read_text(encoding="utf-8"))
+    assert result.metrics["ollama_enabled"] is False
+    assert result.metrics["ollama_latex_requested"] is True
+    assert result.metrics["ollama_latex_enabled"] is True
+    assert result.metrics["latex_validated"] is True
+    assert result.metrics["latex_validator_corrected"] == 1
+    assert result.metrics["latex_validator_overexpanded"] == 0
+    assert result.metrics["latex_validator_anchor_mismatch"] == 0
+    assert result.metrics["latex_validator_tag_restored"] == 0
+    assert result.blocks[1].latex == r"\mathcal{L} = x"
+    assert r"\mathcal{L} = x" in canonical
+    assert persisted_slots[0]["final_latex"] == r"\mathcal{L} = x"
+    assert persisted_slots[0]["final_latex_raw"] == r"\mathcal {L} = x"
+    assert persisted_slots[0]["latex_corrected_by"] == "ollama_latex_validator"
+
+
+def test_ollama_latex_validator_rejects_low_confidence_changes(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula.png"
+    crop.write_bytes(b"fake-image")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": 123,
+                        "corrected_latex": "x = z",
+                        "confidence": 0.42,
+                        "issues_found": ["uncertain"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_001",
+        "crop_path": crop.name,
+        "final_latex": "x = y",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == "x = y"
+    assert "OLLAMA_LATEX_LOW_CONFIDENCE" in updated[0]["risk_flags"]
+    assert validator.metrics.formulas_checked == 1
+    assert validator.metrics.formulas_corrected == 0
+    assert validator.metrics.low_confidence_count == 1
+    assert validator.metrics.json_valid_count == 1
+
+
+def test_ollama_latex_validator_prefers_group_crop_for_polish(tmp_path, monkeypatch) -> None:
+    import base64
+
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    single = tmp_path / "single.png"
+    group = tmp_path / "group.png"
+    single.write_bytes(b"single-crop")
+    group.write_bytes(b"group-crop")
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_001",
+                        "corrected_latex": r"\mathbf{Q} = \mathbf{W}_{Q}H",
+                        "confidence": 0.96,
+                        "issues_found": ["spacing"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    def fake_post(url, json, timeout):
+        captured["image_bytes"] = base64.b64decode(json["messages"][0]["images"][0])
+        captured["think"] = json.get("think")
+        captured["options_think"] = json.get("options", {}).get("think")
+        captured["prompt"] = json["messages"][0]["content"]
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_001",
+        "crop_path": single.name,
+        "group_crop_path": group.name,
+        "final_latex": r"\mathbf {Q} = \mathbf {W} _ {Q}H",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert captured["image_bytes"] == b"group-crop"
+    assert captured["think"] is False
+    assert captured["options_think"] is False
+    assert "Return formula_id exactly as: formula_001" in captured["prompt"]
+    assert updated[0]["final_latex"] == r"\mathbf{Q} = \mathbf{W}_{Q}H"
+    assert updated[0]["final_latex_raw"] == r"\mathbf {Q} = \mathbf {W} _ {Q}H"
+    assert updated[0]["latex_corrected_by"] == "ollama_latex_validator"
+    assert validator.metrics.formulas_corrected == 1
+
+
+def test_ollama_latex_validator_rejects_group_crop_overexpansion(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula_group.png"
+    crop.write_bytes(b"group-crop")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_009",
+                        "corrected_latex": (
+                            r"$\mathbf{Q}=\mathbf{W}_{Q}H$" "\n"
+                            r"$\mathbf{K}=\mathbf{W}_{K}H$" "\n"
+                            r"$\mathbf{S}=\operatorname{softmax}(\mathbf{Q}\mathbf{K}^{T}/\sqrt{d_{h}})$"
+                        ),
+                        "confidence": 0.96,
+                        "issues_found": ["expanded group"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_009",
+        "group_crop_path": crop.name,
+        "final_latex": r"\mathbf {S} = \operatorname{softmax}(\mathbf {Q}\mathbf {K}^{T}/\sqrt {d_{h}})",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == slots[0]["final_latex"]
+    assert "OLLAMA_LATEX_OVEREXPANDED_GROUP" in updated[0]["risk_flags"]
+    assert validator.metrics.formulas_corrected == 0
+    assert validator.metrics.overexpanded_count == 1
+
+
+def test_ollama_latex_validator_rejects_group_crop_lhs_mismatch(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula_group.png"
+    crop.write_bytes(b"group-crop")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_009",
+                        "corrected_latex": r"\mathbf {Q} = \mathbf {W}_{\mathbf {Q}} \cdot \mathbf {H}_{\mathrm{emb}}",
+                        "confidence": 1.0,
+                        "issues_found": ["returned first line of group"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_009",
+        "group_crop_path": crop.name,
+        "final_latex": r"\mathbf {S} = \operatorname{softmax}\left(\frac{\mathbf {Q}\cdot\mathbf {K}^{\top}}{\sqrt{d}}\right)",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == slots[0]["final_latex"]
+    assert "OLLAMA_LATEX_LHS_MISMATCH" in updated[0]["risk_flags"]
+    assert validator.metrics.formulas_corrected == 0
+    assert validator.metrics.anchor_mismatch_count == 1
+
+
+def test_ollama_latex_validator_strips_single_formula_math_wrappers(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula.png"
+    crop.write_bytes(b"fake-image")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_001",
+                        "corrected_latex": r"$x=y$",
+                        "confidence": 0.99,
+                        "issues_found": ["spacing"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_001",
+        "crop_path": crop.name,
+        "final_latex": r"x = y",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == r"x=y"
+    assert updated[0]["latex_corrected_by"] == "ollama_latex_validator"
+    assert validator.metrics.formulas_corrected == 1
+
+
+def test_ollama_latex_validator_strips_trailing_single_line_break(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula.png"
+    crop.write_bytes(b"fake-image")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_018",
+                        "corrected_latex": r"\mathbf {Y}_{\mathrm{sta}}^{S} = \text { shuffle }(\mathbf {Y}_{\mathrm{sta}}) \\",
+                        "confidence": 0.93,
+                        "issues_found": ["line break"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_018",
+        "crop_path": crop.name,
+        "final_latex": r"\mathbf {Y}_{\mathrm{sta}}^{S} = \text { shuffle }(\mathbf {Y}_{\mathrm{sta}})",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == r"\mathbf{Y}_{\mathrm{sta}}^{S} = \text{shuffle}(\mathbf{Y}_{\mathrm{sta}})"
+    assert updated[0]["latex_corrected_by"] == "ollama_latex_validator"
+    assert validator.metrics.formulas_corrected == 1
+
+
+def test_ollama_latex_validator_removes_duplicate_parenthetical_tag(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula.png"
+    crop.write_bytes(b"fake-image")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_017",
+                        "corrected_latex": r"$x=y$ (17)",
+                        "confidence": 0.99,
+                        "issues_found": ["spacing"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_017",
+        "crop_path": crop.name,
+        "final_latex": r"x = y \tag {17}",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == r"x=y \tag {17}"
+    assert updated[0]["latex_tag_restored"] is True
+    assert updated[0]["latex_corrected_by"] == "ollama_latex_validator"
+    assert validator.metrics.formulas_corrected == 1
+
+
+def test_ollama_latex_validator_restores_dropped_tag_before_applying(tmp_path, monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    crop = tmp_path / "formula.png"
+    crop.write_bytes(b"fake-image")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "message": {
+                    "content": json.dumps({
+                        "formula_id": "formula_001",
+                        "corrected_latex": r"x=y",
+                        "confidence": 0.99,
+                        "issues_found": ["removed tag"],
+                        "needs_human_check": False,
+                    })
+                }
+            }
+
+    monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+    validator = OllamaLatexValidator(min_confidence=0.8)
+    validator.is_available = lambda: True
+    slots = [{
+        "formula_id": "formula_001",
+        "crop_path": crop.name,
+        "final_latex": r"x = y \tag {4}",
+        "risk_flags": [],
+    }]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == r"x=y \tag {4}"
+    assert updated[0]["latex_tag_restored"] is True
+    assert updated[0]["latex_corrected_by"] == "ollama_latex_validator"
+    assert "OLLAMA_LATEX_DROPPED_TAG" not in updated[0]["risk_flags"]
+    assert validator.metrics.formulas_corrected == 1
+
+
+def test_ollama_latex_validator_requires_configured_vision_model(monkeypatch) -> None:
+    from researchsensei.canonical.ollama_latex_validator import OllamaLatexValidator
+
+    class FakeResponse:
+        status_code = 200
+
+        def json(self):
+            return {
+                "models": [
+                    {
+                        "name": "qwen2.5:0.5b",
+                        "model": "qwen2.5:0.5b",
+                        "capabilities": ["completion"],
+                    }
+                ]
+            }
+
+    monkeypatch.setattr("httpx.get", lambda *args, **kwargs: FakeResponse())
+
+    missing = OllamaLatexValidator(model="missing-vision")
+    non_vision = OllamaLatexValidator(model="qwen2.5:0.5b")
+
+    assert missing.is_available() is False
+    assert "ollama_model_unavailable: missing-vision" in missing.metrics.warnings
+    assert non_vision.is_available() is False
+    assert "ollama_model_not_vision: qwen2.5:0.5b" in non_vision.metrics.warnings
+
+
 def test_canonical_builder_preserves_formula_identity_and_gate_status(tmp_path) -> None:
     from researchsensei.canonical.canonical_builder import CanonicalBuilder
     from researchsensei.canonical.quality_gate import M1QualityGate

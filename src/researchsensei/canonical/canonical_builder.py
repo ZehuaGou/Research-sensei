@@ -126,6 +126,13 @@ class CanonicalBuilder:
             origin = self._origin_for_block(block)
             formula_id = f"formula_{index:03d}"
             reviewed = reviewed_by_block.get(block.block_id) or reviewed_by_formula.get(formula_id) or {}
+            mineru_latex = reviewed.get("mineru_latex", block.latex if block.source == "mineru25pro" else "")
+            marker_latex = reviewed.get("marker_latex", block.latex if block.source == "marker_document" else "")
+            final_latex = reviewed.get("final_latex", block.latex)
+            risk_flags = list(block.risk_flags)
+            for risk in reviewed.get("risk_flags", []):
+                if risk not in risk_flags:
+                    risk_flags.append(risk)
             slots.append({
                 "formula_id": formula_id,
                 "block_id": block.block_id,
@@ -139,12 +146,29 @@ class CanonicalBuilder:
                 "section_confidence": block.section_confidence,
                 "section_reason": block.section_reason,
                 "block_source": block.source,
-                "mineru_latex": block.latex if block.source == "mineru25pro" else "",
-                "marker_latex": block.latex if block.source == "marker_document" else "",
-                "final_latex": block.latex,
+                "mineru_latex": mineru_latex,
+                "marker_latex": marker_latex,
+                "final_latex": final_latex,
                 "final_origin": origin.value,
-                "risk_flags": list(block.risk_flags),
+                "risk_flags": risk_flags,
             })
+            for optional_key in (
+                "mineru_latex_raw",
+                "marker_latex_raw",
+                "final_latex_raw",
+                "latex_corrected_by",
+                "latex_correction_confidence",
+                "latex_correction_issues",
+                "latex_tag_restored",
+                "equation_group_id",
+                "group_order",
+                "group_crop_path",
+                "nearby_text_before",
+                "nearby_text_after",
+                "nearby_block_ids",
+            ):
+                if optional_key in reviewed:
+                    slots[-1][optional_key] = reviewed[optional_key]
         return slots
 
     def _render_markdown(

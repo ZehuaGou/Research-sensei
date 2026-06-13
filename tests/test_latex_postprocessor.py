@@ -33,6 +33,17 @@ class TestLatexPostProcessor:
         assert "_{0}" in result
         assert "^{2}" in result
 
+    def test_fixes_space_before_subscript_operator(self):
+        input_latex = r"\lambda _{1} + \mathcal{L} _{\mathrm{aux}}"
+        result = postprocess_latex(input_latex)
+        assert r"\lambda_{1}" in result
+        assert r"\mathcal{L}_{\mathrm{aux}}" in result
+
+    def test_fixes_nested_command_subscript_spacing(self):
+        input_latex = r"\mathbf{Y} _ { \mathrm{sta} } ^ {S}"
+        result = postprocess_latex(input_latex)
+        assert result == r"\mathbf{Y}_{\mathrm{sta}}^{S}"
+
     def test_preserves_correct_latex(self):
         input_latex = r"\mathcal{L}_{\mathcal{DM}} = \mathbb{E}_{t,x_0,\epsilon}[||\epsilon - \epsilon_\theta(...)||^2]"
         result = postprocess_latex(input_latex)

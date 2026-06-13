@@ -91,7 +91,7 @@ Both papers: primary_parser=mineru25pro, fallback=false, title_ok=true, all crit
 - OllamaSectionRefiner: optional, default OFF.
 - qwen2.5:0.5b: not recommended (timeout/unstable on real FormulaSlot prompts).
 - qwen2.5:7b-instruct: passed native `/api/chat` + JSON Schema real_slot smoke (JSON valid=YES, 3-11s latency).
-- Ollama may only modify section/context/risk fields; must not modify latex/bbox/page/source.
+- OllamaSectionRefiner may only modify section/context/risk fields and must not modify latex/bbox/page/source. Ollama formula polish is a separate explicit path that may update `final_latex` only after crop-based validation and guard checks.
 - Default remains OFF unless user configures a 7B+ model.
 
 ### Historical Notes
@@ -188,7 +188,7 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、M1 canonical pipeline（MinerU25ProAdapter → RuleBasedStructureRefiner → optional OllamaSectionRefiner → CanonicalBuilder → M1QualityGate → visual audit）、MaterialNormalizer（fallback/debug）、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)。
 - 当前未实现能力包含：M2 canonical input reader；M1 MinerU primary route 已有两篇 unseen multi-paper acceptance report，可作为 M2.1 canonical input contract 的上游样本。
 - MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser。Marker is fallback/audit baseline。PyMuPDF/MarkItDown are lightweight fallback/debug。
-- Ollama is an optional structured refiner, default OFF。Ollama must not modify latex, bbox, page, or source identity。
+- OllamaSectionRefiner is optional/default OFF and must not modify latex, bbox, page, or source identity. Ollama formula polish is a separate explicit path for guarded `final_latex` cleanup only.
 - M1 gate blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas from formula understanding.
 - References formulas are excluded from formula understanding (formula_m2_ready=false).
 - FormulaOCRAdapter 接口存在但模型未集成，仅作为 unresolved formula crops 的 fallback。
@@ -211,3 +211,9 @@ ARIS (`wanshuiyin/Auto-claude-code-research-in-sleep`) is one external reference
 Other external projects remain open for evaluation. For example, M2 parser quality may require Docling / Marker / DeepXiv; M4 formula teaching may require a different specialized reference. ARIS must not block evaluation of better-fit projects.
 
 Implementation tasks must read the matching module's External Reference Implementation Notes before coding. External references constrain specific strategies only; they do not replace ResearchSensei-owned schemas, artifacts, gates, tests, or product boundaries.
+
+## 2026-06-13 M1 Ollama Formula Polish
+
+Ollama section refinement and Ollama formula LaTeX polish are separate paths. Section refinement remains optional/default-off and is not part of the formal M1->M2 handoff path. Formula polish is enabled explicitly with `--enable-ollama-latex` and runs after MinerU plus deterministic regex cleanup, before M2 consumes canonical artifacts. The formula path checks that the configured Ollama model exists and advertises vision capability, prefers group crops over individual crops as visual context only, sends `think=false`, requires JSON schema output and confidence >= 0.8 by default, preserves page/bbox/crop/overlay/source identity, restores original equation tags if the model drops them, and rejects low-confidence, malformed, over-expanded, or left-hand-side-mismatched outputs.
+
+Local `qwen3.5:4b` smoke on `reports/m1_acceptance_manual_review_2510_18998` checked five real formula crops. Accepted: `formula_004`, `formula_018`, `formula_025` after deterministic cleanup. Rejected/unchanged: `formula_009` because group context returned the wrong left-hand side (`Q` instead of original `S`), and `formula_016` because the model returned malformed JSON. A full MinerU reparse acceptance with Ollama is a heavy/review run and must not be treated as a default live eval.

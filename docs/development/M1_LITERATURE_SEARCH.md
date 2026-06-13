@@ -122,7 +122,20 @@ The legacy MinerUPdfAdapter (magic_pdf) has been removed from the codebase.
 
 Marker is fallback/audit baseline. It may supply fallback formula bbox/LaTeX and comparison artifacts, but it is no longer the default parser after the paper_4_unseen all-formulas-in-Abstract failure.
 
-Ollama is an optional structured refiner. Ollama must not modify latex, bbox, page, or source identity. It may only return section/context/risk annotations validated by JSON Schema and Pydantic; invalid JSON is a no-op with warnings.
+Ollama has two separate optional paths. The section refiner remains off by default and must not modify latex, bbox, page, or source identity; invalid JSON is a no-op with warnings. The formula LaTeX polish path is enabled only with `--enable-ollama-latex` and runs after MinerU/regex LaTeX extraction, before M2 consumes `canonical_paper.md` / `formula_slots.json`.
+
+Formula LaTeX polish safety rules:
+- use a vision-capable Ollama model, currently `qwen3.5:4b` in the local environment
+- prefer `group_crop_path` over `crop_path` for multi-line equation groups, but treat it as visual context only; a single `formula_id` must still receive only its own formula line
+- require JSON Schema output, `think=false`, confidence >= `--ollama-min-confidence` (default 0.8)
+- preserve M1 immutable evidence: page, bbox, crop path, overlay path, parser source identity
+- preserve equation tags; if the model drops a `\tag{...}`, M1 restores the original tag deterministically and records `latex_tag_restored=true`
+- low-confidence, malformed, over-expanded, or left-hand-side-mismatched Ollama output is not accepted and is reported in metrics/risk flags
+
+Ollama must not rewrite M1 body/section structure in the formal handoff path.
+M1 structure remains rule-based and quality-gated; M2 receives the canonical
+section/block layout plus formula metadata. The optional section refiner is for
+review/heavy diagnostics only.
 
 M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M1 gate blocks source mismatch. M1 gate checks missing crop/overlay for formal acceptance. Dense raw-only formula sets (`formula_count >= 5` and `latex_count == 0`) set `m2_ready_for_formula_understanding=false`; raw_formula_text cannot be treated as derivable LaTeX. A blocked canonical paper cannot enter M2.
 
@@ -141,7 +154,17 @@ Primary MinerU acceptance summary:
 - 2310_08800v2 DDMT: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=7, body_formulas=7, latex=7, bbox/crop/overlay/canonical_match=7, high_risk=0, m2_ready=true, formula_m2_ready=true.
 - 2508_11528v1 TPIDM: PASS, primary_parser=mineru25pro, fallback=false, title_ok=true, formulas=17, body_formulas=12, reference_formulas=5, latex=17, bbox/crop/overlay/canonical_match=17, high_risk=0, m2_ready=true, formula_m2_ready=true.
 
-Ollama remains optional/off by default. Cached paper_4_unseen eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0.
+Ollama section refinement remains optional/off by default. Cached paper_4_unseen section eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b section compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0. The formula LaTeX polish path is separate and should be enabled explicitly when producing M2 handoff artifacts.
+
+Example formula-polish run:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\m1_acceptance_runner.py --enable-ollama-latex --ollama-latex-model qwen3.5:4b --ollama-timeout 120 --ollama-min-confidence 0.8
+```
+
+Local smoke result on `reports/m1_acceptance_manual_review_2510_18998` formula_004: `qwen3.5:4b` returned valid JSON in about 6.6s, M1 accepted the cleaned LaTeX, restored the original equation tag, and did not modify M1 page/bbox/crop/source identity.
+
+Guarded 5-formula smoke on the same report checked `formula_004`, `formula_009`, `formula_016`, `formula_018`, and `formula_025`. `formula_009` was rejected because group context caused a wrong left-hand side (`Q` instead of original `S`); `formula_016` remained unchanged after malformed JSON; `formula_004`, `formula_018`, and `formula_025` were accepted after deterministic cleanup. Full `m1_acceptance_runner.py` with MinerU reparse remains a heavy/review run; regular target-mode smoke should not enable Ollama formula polish unless it is specifically producing M2 handoff artifacts.
 
 ### 2026-06-11 target-mode generalization check
 
