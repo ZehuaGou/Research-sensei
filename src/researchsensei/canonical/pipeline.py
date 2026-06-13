@@ -210,10 +210,26 @@ class M1CanonicalPipeline:
         )
 
     def _slots_from_blocks(self, blocks: list[CanonicalDocumentBlock]) -> list[dict]:
+        """Generate formula slots with M2 contract fields.
+
+        Computes equation_number, equation_group_id, group_order, and
+        nearby_text from block context so M2 can load formula_slots.json
+        without a separate reviewed_slots pass.
+        """
+        formulas = [block for block in blocks if block.block_type == "formula"]
+        text_blocks = [
+            block for block in blocks
+            if block.block_type in {"text", "caption"} and block.text.strip()
+        ]
+        grouped = self._assign_equation_groups(formulas)
         slots: list[dict] = []
-        for index, block in enumerate((b for b in blocks if b.block_type == "formula"), start=1):
+        for index, block in enumerate(formulas, start=1):
+            formula_id = f"formula_{index:03d}"
+            eq_number = self._extract_equation_number(block.text or block.latex)
+            group_id, group_order = grouped.get(block.block_id, ("", 0))
+            nearby_before, nearby_after = self._nearby_text(block, text_blocks)
             slots.append({
-                "formula_id": f"formula_{index:03d}",
+                "formula_id": formula_id,
                 "block_id": block.block_id,
                 "page": block.page,
                 "bbox": block.bbox,
@@ -223,8 +239,101 @@ class M1CanonicalPipeline:
                 "overlay_path": "",
                 "source_mismatch": False,
                 "review_disabled": False,
+                "section": block.section,
+                "section_confidence": block.section_confidence,
+                "section_reason": block.section_reason,
+                "block_source": block.source,
+                "final_origin": "raw_formula_text" if not block.latex else "parser_latex",
+                "risk_flags": list(block.risk_flags),
+                "equation_number": eq_number,
+                "equation_group_id": group_id,
+                "group_order": group_order,
+                "group_crop_path": "",
+                "nearby_text_before": nearby_before,
+                "nearby_text_after": nearby_after,
             })
         return slots
+
+    @staticmethod
+    def _extract_equation_number(text: str) -> str:
+        import re
+        for pattern in (
+            r"\\tag\{?\s*(\d+(?:\.\d+)*)\s*\}?",
+            r"\((\d+(?:\.\d+)*)\)\s*$",
+            r"^\((\d+(?:\.\d+)*)\)\s",
+        ):
+            m = re.search(pattern, text or "")
+            if m:
+                return m.group(1)
+        return ""
+
+    @staticmethod
+    def _assign_equation_groups(
+        formulas: list[CanonicalDocumentBlock],
+    ) -> dict[str, tuple[str, int]]:
+        """Cluster formulas on the same page with matching tags or adjacent positions."""
+        result: dict[str, tuple[str, int]] = {}
+        pages: dict[int, list[CanonicalDocumentBlock]] = {}
+        for block in formulas:
+            pages.setdefault(block.page, []).append(block)
+        group_counter = 0
+        for page_blocks in pages.values():
+            page_blocks.sort(key=lambda b: (b.bbox[1] if len(b.bbox) >= 2 else 0,))
+            current_group: list[CanonicalDocumentBlock] = []
+            for block in page_blocks:
+                if current_group:
+                    prev = current_group[-1]
+                    prev_y2 = prev.bbox[3] if len(prev.bbox) >= 4 else 0
+                    cur_y1 = block.bbox[1] if len(block.bbox) >= 2 else 0
+                    vertical_gap = abs(cur_y1 - prev_y2)
+                    same_section = block.section == prev.section
+                    if same_section and vertical_gap < 0.15:
+                        current_group.append(block)
+                        continue
+                if current_group:
+                    group_counter += 1
+                    gid = f"eq_group_{group_counter:03d}"
+                    for order, member in enumerate(current_group, start=1):
+                        result[member.block_id] = (gid, order)
+                    current_group = []
+                current_group.append(block)
+            if current_group:
+                group_counter += 1
+                gid = f"eq_group_{group_counter:03d}"
+                for order, member in enumerate(current_group, start=1):
+                    result[member.block_id] = (gid, order)
+        return result
+
+    @staticmethod
+    def _nearby_text(
+        formula: CanonicalDocumentBlock,
+        text_blocks: list[CanonicalDocumentBlock],
+    ) -> tuple[str, str]:
+        """Find the nearest text blocks before/after this formula by reading order."""
+        same_page = [
+            b for b in text_blocks
+            if b.page == formula.page
+            and b.block_type in {"text", "caption"}
+            and b.text.strip()
+        ]
+        if not same_page:
+            same_page = [b for b in text_blocks if abs(b.page - formula.page) <= 1 and b.text.strip()]
+        same_page.sort(key=lambda b: (b.page, b.reading_order, b.bbox[1] if len(b.bbox) >= 2 else 0))
+        formula_idx = (
+            formula.reading_order,
+            formula.bbox[1] if len(formula.bbox) >= 2 else 0,
+        )
+        before_texts: list[str] = []
+        after_texts: list[str] = []
+        for b in same_page:
+            b_idx = (b.reading_order, b.bbox[1] if len(b.bbox) >= 2 else 0)
+            if b.page < formula.page or (b.page == formula.page and b_idx < formula_idx):
+                before_texts.append(b.text.strip())
+            elif b.page > formula.page or (b.page == formula.page and b_idx > formula_idx):
+                after_texts.append(b.text.strip())
+        nearby_before = (before_texts[-1] if before_texts else "")[:200]
+        nearby_after = (after_texts[0] if after_texts else "")[:200]
+        return nearby_before, nearby_after
 
     def _postprocess_latex_slots(self, slots: list[dict]) -> list[dict]:
         """Apply regex-based LaTeX cleanup to all formula slots."""

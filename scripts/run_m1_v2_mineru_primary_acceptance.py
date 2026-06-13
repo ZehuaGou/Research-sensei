@@ -258,6 +258,15 @@ def run_candidate(
     metrics["status"] = "PASS" if not metrics["acceptance_reasons"] else "BLOCKED"
     (paper_dir / "acceptance_metrics.json").write_text(json.dumps(metrics, indent=2, ensure_ascii=False), encoding="utf-8")
     (paper_dir / "README.md").write_text(render_paper_readme(candidate, metrics), encoding="utf-8")
+
+    # Generate M2 contract artifacts so M1ArtifactReader can load the bundle
+    _write_m2_bundle_artifacts(
+        paper_dir=paper_dir,
+        candidate=candidate,
+        result=result,
+        metrics=metrics,
+        slots=slots,
+    )
     return metrics
 
 
@@ -413,6 +422,102 @@ def render_paper_readme(candidate: Candidate, metrics: dict[str, Any]) -> str:
         "",
     ])
 
+
+
+def _write_m2_bundle_artifacts(
+    paper_dir: Path,
+    candidate: Candidate,
+    result: Any,
+    metrics: dict[str, Any],
+    slots: list[dict[str, Any]],
+) -> None:
+    """Generate paper_metadata.json, quality_report.md, performance_report.json, visual_audit/."""
+    # paper_metadata.json
+    paper_metadata = {
+        "paper_id": candidate.key,
+        "title": candidate.title,
+        "arxiv_id": candidate.key.replace("_", "/"),
+        "authors": candidate.authors,
+        "pdf_url": candidate.pdf_url,
+        "primary_parser": "mineru25pro",
+        "published": candidate.published,
+        "pages": candidate.pages,
+    }
+    (paper_dir / "paper_metadata.json").write_text(
+        json.dumps(paper_metadata, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+
+    # quality_report.md
+    quality_lines = [
+        f"# Quality Report: {candidate.title}",
+        "",
+        f"- paper_id: {candidate.key}",
+        f"- canonical_quality_status: {result.quality.status.value}",
+        f"- m2_ready: {result.canonicalization.m2_ready}",
+        f"- m2_ready_for_formula_understanding: {result.quality.m2_ready_for_formula_understanding}",
+        f"- formula_count: {result.quality.formula_count}",
+        f"- latex_count: {result.quality.latex_count}",
+        f"- raw_formula_text_count: {result.quality.raw_formula_text_count}",
+        f"- missing_crop_count: {result.quality.missing_crop_count}",
+        f"- missing_overlay_count: {result.quality.missing_overlay_count}",
+        f"- high_risk_count: {result.quality.high_risk_count}",
+        f"- medium_risk_count: {result.quality.medium_risk_count}",
+        "",
+        "## Blocking Reasons",
+        "",
+    ]
+    for reason in result.quality.blocking_reasons:
+        quality_lines.append(f"- {reason}")
+    if not result.quality.blocking_reasons:
+        quality_lines.append("- (none)")
+    quality_lines += ["", "## Warning Reasons", ""]
+    for reason in result.quality.warning_reasons:
+        quality_lines.append(f"- {reason}")
+    if not result.quality.warning_reasons:
+        quality_lines.append("- (none)")
+    if result.quality.formula_understanding_reasons:
+        quality_lines += ["", "## Formula Understanding Reasons", ""]
+        for reason in result.quality.formula_understanding_reasons:
+            quality_lines.append(f"- {reason}")
+    (paper_dir / "quality_report.md").write_text("\n".join(quality_lines), encoding="utf-8")
+
+    # performance_report.json
+    perf_report = {
+        "primary_parser": "mineru25pro",
+        "acceptance_status": metrics.get("status", ""),
+        "quality_status": result.quality.status.value,
+        "m2_ready": result.canonicalization.m2_ready,
+        "formula_count": result.quality.formula_count,
+        "latex_count": result.quality.latex_count,
+        "runtime_seconds": metrics.get("runtime_seconds", 0),
+        "blocking_reasons": result.quality.blocking_reasons,
+        "warning_reasons": result.quality.warning_reasons,
+        "perf_pass": not result.quality.blocking_reasons,
+        "warnings": result.quality.warning_reasons,
+        "acceptance_reasons": metrics.get("acceptance_reasons", []),
+    }
+    (paper_dir / "performance_report.json").write_text(
+        json.dumps(perf_report, indent=2, ensure_ascii=False), encoding="utf-8",
+    )
+
+    # visual_audit/ directory with per-formula HTML pages
+    audit_dir = paper_dir / "visual_audit"
+    audit_dir.mkdir(parents=True, exist_ok=True)
+    for slot in slots:
+        fid = slot.get("formula_id", "unknown")
+        html_lines = [
+            "<!doctype html><html><head><meta charset=\"utf-8\">",
+            f"<title>{fid}</title>",
+            "<style>body{font-family:Arial,sans-serif;margin:24px}pre{white-space:pre-wrap;background:#f5f5f5;padding:12px;border-radius:4px}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px}</style>",
+            "</head><body>",
+            f"<h1>{fid}</h1>",
+            "<table>",
+        ]
+        for key in sorted(slot.keys()):
+            value = slot[key]
+            html_lines.append(f"<tr><th>{key}</th><td><pre>{value}</pre></td></tr>")
+        html_lines += ["</table>", "</body></html>"]
+        (audit_dir / f"{fid}.html").write_text("\n".join(html_lines), encoding="utf-8")
 
 def write_top_level(candidates: list[Candidate], rows: list[dict[str, Any]], *, max_pages: int) -> None:
     lines = [

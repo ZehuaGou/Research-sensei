@@ -69,9 +69,11 @@ class RuleBasedStructureRefiner:
     """Assign sections from parser headings, reading order, and page timeline."""
 
     def refine(self, blocks: list[CanonicalDocumentBlock]) -> list[CanonicalDocumentBlock]:
+        self._mark_page_headers_footers(blocks)
         ordered = sorted(blocks, key=lambda b: (b.page, b.reading_order, b.bbox[1] if b.bbox else 0))
         self._assign_ordered(ordered)
         self._detect_risks(ordered)
+        self._repair_misplaced_references(blocks)
         return blocks
 
     def _assign_ordered(self, blocks: list[CanonicalDocumentBlock]) -> None:
@@ -91,6 +93,65 @@ class RuleBasedStructureRefiner:
             block.section = current
             block.section_confidence = "medium" if current != "Unknown" else "low"
             block.section_reason = f"reading_order_context: page {block.page}"
+
+    def _mark_page_headers_footers(self, blocks: list[CanonicalDocumentBlock]) -> None:
+        """Mark blocks that are repeated page headers, footers, or page numbers."""
+        title_counts: dict[str, int] = {}
+        for block in blocks:
+            if block.block_type == "title":
+                normalized = re.sub(r"\s+", " ", block.text.strip()).lower()
+                title_counts[normalized] = title_counts.get(normalized, 0) + 1
+
+        for block in blocks:
+            text = block.text.strip()
+            normalized = re.sub(r"\s+", " ", text).lower()
+
+            # Repeated title blocks (e.g. "### EdgeConvFormer" on every page)
+            if block.block_type == "title" and title_counts.get(normalized, 0) >= 3:
+                if "PAGE_HEADER_REPEATED" not in block.risk_flags:
+                    block.risk_flags.append("PAGE_HEADER_REPEATED")
+
+                continue
+
+            # Page number lines: "Page N of M"
+            if re.fullmatch(r"page\s+\d+\s+of\s+\d+", normalized, re.I):
+                if "PAGE_NUMBER_FOOTER" not in block.risk_flags:
+                    block.risk_flags.append("PAGE_NUMBER_FOOTER")
+
+                continue
+
+            # Author/footer preprint lines
+            if "preprint submitted to" in normalized or re.fullmatch(r"[a-z].*\bet al\.\s*:\s*preprint.*", normalized, re.I):
+                if "AUTHOR_FOOTER" not in block.risk_flags:
+                    block.risk_flags.append("AUTHOR_FOOTER")
+
+                continue
+
+            # Very short orphan title blocks that repeat on multiple pages
+            if block.block_type == "title" and len(text) < 5 and title_counts.get(normalized, 0) >= 3:
+                if "PAGE_HEADER_REPEATED" not in block.risk_flags:
+                    block.risk_flags.append("PAGE_HEADER_REPEATED")
+
+
+    def _repair_misplaced_references(self, blocks: list[CanonicalDocumentBlock]) -> None:
+        """If the Introduction section contains high ratio of reference-like entries, mark it as contaminated."""
+        for section_name in ("Introduction", "Method", "Experiments"):
+            section_blocks = [
+                b for b in blocks
+                if b.section == section_name and b.block_type in {"text", "reference", "title"}
+            ]
+            if len(section_blocks) < 3:
+                continue
+            ref_like = sum(
+                1 for b in section_blocks
+                if re.match(r"^\[?\d+\]?\s", b.text.strip())
+                or "doi:" in b.text.lower()
+                or re.search(r"\b(19|20)\d{2}[a-z]?\b.*\b(proceedings|journal|conference|trans)\b", b.text.lower())
+            )
+            if ref_like / len(section_blocks) >= 0.35:
+                for b in section_blocks:
+                    if "SECTION_CONTAMINATED_BY_REFERENCES" not in b.risk_flags:
+                        b.risk_flags.append("SECTION_CONTAMINATED_BY_REFERENCES")
 
     def _detect_risks(self, blocks: list[CanonicalDocumentBlock]) -> None:
         formulas = [block for block in blocks if block.block_type == "formula"]

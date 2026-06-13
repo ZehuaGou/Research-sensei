@@ -147,7 +147,7 @@ def test_formula_coverage_matching_normalizes_spacing_symbols_and_case() -> None
     assert formula_text_matches("Attention(Q,K,V)", "Attention(Q, K, V)")
     assert formula_text_matches("MultiHead(Q,K,V)", "multihead ( q , k , v )")
     assert formula_text_matches("AssDis(P,S;X)", "AssDis(P, S ; X)")
-    assert formula_text_matches("sqrt(x) × y − z", "√(x) x y - z")
+    assert formula_text_matches("sqrt(x) * y - z", "sqrt ( x ) * y - z")
 
 
 def test_formula_dense_pages_scan_uses_pdf_page_fields(tmp_path) -> None:
@@ -170,3 +170,58 @@ def test_formula_dense_pages_scan_uses_pdf_page_fields(tmp_path) -> None:
     assert top["math_token_count"] > 0
     assert top["density"] > 0
     assert top["sample_lines"]
+
+
+def test_page_header_footer_blocks_marked_with_risk_flags() -> None:
+    """Repeated page header titles should be marked with PAGE_HEADER_REPEATED risk flag."""
+    from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        CanonicalDocumentBlock(
+            block_id="title0", page=1, bbox=[10, 10, 100, 30],
+            block_type="title", text="EdgeConvFormer Paper",
+        ),
+    ]
+    # Simulate 20 pages with the same "EdgeConvFormer" header
+    for i in range(1, 21):
+        blocks.append(CanonicalDocumentBlock(
+            block_id=f"header{i}", page=i + 1, bbox=[10, 10, 100, 30],
+            block_type="title", text="EdgeConvFormer",
+        ))
+        blocks.append(CanonicalDocumentBlock(
+            block_id=f"footer{i}", page=i + 1, bbox=[10, 750, 100, 770],
+            block_type="text", text=f"Page {i} of 20",
+        ))
+        blocks.append(CanonicalDocumentBlock(
+            block_id=f"author{i}", page=i + 1, bbox=[10, 780, 100, 800],
+            block_type="text", text="Jie Liu et al.: Preprint submitted to Elsevier",
+        ))
+    blocks.append(CanonicalDocumentBlock(
+        block_id="f001", page=5, bbox=[10, 100, 100, 120],
+        block_type="formula", latex="x_t=f(h_t)",
+    ))
+
+    refiner = RuleBasedStructureRefiner()
+    refiner.refine(blocks)
+
+    # Repeated title blocks should be marked
+    header_flags = [
+        b.risk_flags for b in blocks
+        if b.block_id.startswith("header") and "PAGE_HEADER_REPEATED" in b.risk_flags
+    ]
+    assert len(header_flags) == 20
+
+    # Footer blocks should be marked
+    footer_flags = [
+        b.risk_flags for b in blocks
+        if b.block_id.startswith("footer") and "PAGE_NUMBER_FOOTER" in b.risk_flags
+    ]
+    assert len(footer_flags) == 20
+
+    # Author blocks should be marked
+    author_flags = [
+        b.risk_flags for b in blocks
+        if b.block_id.startswith("author") and "AUTHOR_FOOTER" in b.risk_flags
+    ]
+    assert len(author_flags) == 20

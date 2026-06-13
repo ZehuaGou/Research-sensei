@@ -26,7 +26,7 @@ def _block(
         block_type=block_type,
         text=text,
         latex=latex,
-        reading_order=int(block_id.strip("b") or 0),
+        reading_order=int("".join(c for c in block_id if c.isdigit()) or 0),
         source="mineru25pro",
         section=section,
     )
@@ -1066,3 +1066,107 @@ def test_m1_pipeline_keeps_failed_gate_out_of_m2(tmp_path) -> None:
     assert result.canonicalization.m2_ready is False
     assert result.quality.status == CanonicalQualityStatus.FAIL
     assert "m2_ready: false" in markdown
+
+
+def test_slots_from_blocks_includes_m2_contract_fields(tmp_path) -> None:
+    """Pipeline _slots_from_blocks must include all M2 contract fields."""
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="Abstract"),
+        _block("b002", page=1, text="We study anomaly detection.", section="Abstract"),
+        _block("b003", page=3, block_type="title", text="3 Method"),
+        _block("b004", page=3, block_type="formula", latex="x_t=f(h_t)", section="Method"),
+        _block("b005", page=3, block_type="formula", latex="\\tag{2} y_t=g(x_t)", section="Method"),
+    ]
+
+    pipeline = M1CanonicalPipeline()
+    slots = pipeline._slots_from_blocks(blocks)
+
+    contract_fields = [
+        "equation_number", "equation_group_id", "group_order",
+        "group_crop_path", "nearby_text_before", "nearby_text_after",
+        "section", "block_source", "final_origin", "risk_flags",
+    ]
+    for field in contract_fields:
+        assert field in slots[0], f"Missing M2 contract field: {field}"
+    assert slots[0]["section"] == "Method"
+    assert slots[1]["equation_number"] == "2"
+    assert slots[0]["equation_group_id"] != ""  # should be grouped
+
+
+def test_builder_formula_slots_include_contract_fields() -> None:
+    """CanonicalBuilder._formula_slots must produce M2 contract fields."""
+    from researchsensei.canonical.canonical_builder import CanonicalBuilder
+
+    blocks = [
+        _block("b001", page=3, block_type="title", text="3 Method", section="Method"),
+        _block("b002", page=3, block_type="formula", latex="x_t=f(h_t)", section="Method"),
+        _block("b003", page=3, block_type="formula", latex="\\tag{2} y_t=g(x_t)", section="Method"),
+        _block("b004", page=5, block_type="formula", latex="L=E[\\log p(x)]", section="Method"),
+    ]
+
+    builder = CanonicalBuilder()
+    slots = builder._formula_slots(blocks)
+
+    assert len(slots) == 3
+    for slot in slots:
+        assert "equation_number" in slot
+        assert "equation_group_id" in slot
+        assert "group_order" in slot
+        assert "group_crop_path" in slot
+        assert "nearby_text_before" in slot
+        assert "nearby_text_after" in slot
+    assert slots[1]["equation_number"] == "2"
+
+
+def test_page_header_footer_blocks_suppressed_from_canonical(tmp_path) -> None:
+    """Repeated page header titles and footer lines must not appear in canonical markdown."""
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    # Simulate a paper with "EdgeConvFormer" as title on multiple pages
+    blocks = [_block("b000", page=0, block_type="title", text="EdgeConvFormer Paper")]
+    for i in range(1, 33):
+        page = i
+        blocks.append(_block(f"h{i:03d}", page=page, block_type="title", text="EdgeConvFormer"))
+        blocks.append(_block(f"t{i:03d}", page=page, text=f"Content on page {i}."))
+        blocks.append(_block(f"f{i:03d}", page=page, text=f"Page {i} of 32"))
+        blocks.append(_block(f"a{i:03d}", page=page, text="Jie Liu et al.: Preprint submitted to Elsevier"))
+    blocks.append(_block("b100", page=5, block_type="formula", latex="x_t=f(h_t)"))
+
+    result = M1CanonicalPipeline().run_from_blocks(
+        paper_id="p-header-test",
+        title="Header Test Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+    )
+    markdown = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+
+    # Page header "EdgeConvFormer" should not appear as ### headings
+    header_count = len([line for line in markdown.splitlines() if line.strip() == "### EdgeConvFormer"])
+    assert header_count == 0, f"Found {header_count} page-header headings in canonical"
+
+    # Footer "Page N of M" should not appear
+    assert "Page 1 of 32" not in markdown
+    assert "Page 32 of 32" not in markdown
+
+    # Author footer should not appear
+    assert "Preprint submitted to Elsevier" not in markdown
+
+
+def test_quality_gate_raw_only_formula_dense_blocks_m2_formula_understanding() -> None:
+    """When formula_count >= 5 and latex_count == 0, must be DEGRADED, not PASS."""
+    from researchsensei.canonical.quality_gate import M1QualityGate
+
+    blocks = [
+        _block(f"b{i:03d}", page=1, block_type="formula", text=f"raw formula {i}")
+        for i in range(8)
+    ]
+
+    gate = M1QualityGate()
+    result = gate.evaluate(blocks, [])
+
+    assert result.raw_only_formula_dense is True
+    assert result.m2_ready_for_formula_understanding is False
+    assert result.status == CanonicalQualityStatus.DEGRADED or result.status == CanonicalQualityStatus.FAIL
+    assert "RAW_ONLY_FORMULA_DENSE_NO_LATEX" in result.warning_reasons

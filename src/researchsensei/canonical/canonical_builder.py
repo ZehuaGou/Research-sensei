@@ -1,5 +1,6 @@
 """CanonicalBuilder for M1 canonical pipeline."""
 from __future__ import annotations
+import re
 
 import json
 from pathlib import Path
@@ -107,6 +108,18 @@ class CanonicalBuilder:
             )
         return formulas
 
+    @staticmethod
+    def _extract_equation_number(text: str) -> str:
+        for pattern in (
+            r"\\tag\{?\s*(\d+(?:\.\d+)*)\s*\}?",
+            r"\((\d+(?:\.\d+)*)\)\s*$",
+            r"^\((\d+(?:\.\d+)*)\)\s",
+        ):
+            m = re.search(pattern, text or "")
+            if m:
+                return m.group(1)
+        return ""
+
     def _origin_for_block(self, block: CanonicalDocumentBlock) -> FormulaOrigin:
         if block.latex and block.source == "mineru25pro":
             return FormulaOrigin.MINERU_LATEX
@@ -152,6 +165,19 @@ class CanonicalBuilder:
                 "final_origin": origin.value,
                 "risk_flags": risk_flags,
             })
+            # M2 contract fields: use reviewed values if present, else compute defaults
+            eq_number = reviewed.get("equation_number", self._extract_equation_number(block.text or block.latex))
+            group_id = reviewed.get("equation_group_id", "")
+            group_order = reviewed.get("group_order", 0)
+            group_crop = reviewed.get("group_crop_path", "")
+            nearby_before = reviewed.get("nearby_text_before", "")
+            nearby_after = reviewed.get("nearby_text_after", "")
+            slots[-1]["equation_number"] = eq_number
+            slots[-1]["equation_group_id"] = group_id
+            slots[-1]["group_order"] = group_order
+            slots[-1]["group_crop_path"] = group_crop
+            slots[-1]["nearby_text_before"] = nearby_before
+            slots[-1]["nearby_text_after"] = nearby_after
             for optional_key in (
                 "mineru_latex_raw",
                 "marker_latex_raw",
@@ -160,11 +186,6 @@ class CanonicalBuilder:
                 "latex_correction_confidence",
                 "latex_correction_issues",
                 "latex_tag_restored",
-                "equation_group_id",
-                "group_order",
-                "group_crop_path",
-                "nearby_text_before",
-                "nearby_text_after",
                 "nearby_block_ids",
             ):
                 if optional_key in reviewed:
@@ -219,16 +240,26 @@ class CanonicalBuilder:
             block.block_id: formula
             for block, formula in zip([b for b in blocks if b.block_type == "formula"], formula_blocks)
         }
+        rendered_sections: set[str] = set()
         for section in SECTION_ORDER:
             section_blocks = by_section.get(section, [])
             if not section_blocks:
                 continue
+            # Skip Unknown section if it appears after References (front-matter leakage)
+            if section == "Unknown" and rendered_sections.intersection({"References", "Appendix"}):
+                continue
             lines += [f"## {section}", ""]
+            rendered_sections.add(section)
             for block in sorted(section_blocks, key=lambda b: (b.page, b.reading_order, b.bbox[1] if b.bbox else 0)):
+                # Skip page header/footer blocks (marked by RuleBasedStructureRefiner)
+                if "PAGE_HEADER_REPEATED" in block.risk_flags or "PAGE_NUMBER_FOOTER" in block.risk_flags or "AUTHOR_FOOTER" in block.risk_flags:
+                    continue
                 if block.block_type == "title" and block.text.strip().lower().endswith(section.lower()):
                     continue
                 if block.block_type == "formula":
-                    formula = formula_by_block[block.block_id]
+                    formula = formula_by_block.get(block.block_id)
+                    if formula is None:
+                        continue
                     lines.append(
                         "<!-- "
                         f"formula_id: {formula.formula_id} | origin: {formula.origin.value} | "
