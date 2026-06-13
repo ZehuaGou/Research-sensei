@@ -509,7 +509,7 @@ def test_pipeline_can_enable_ollama_latex_without_section_refiner(tmp_path) -> N
             for slot in formula_slots:
                 copy = dict(slot)
                 copy.setdefault("final_latex_raw", copy["final_latex"])
-                copy["final_latex"] = r"\mathcal{L} = x"
+                copy["final_latex"] = r"$\mathcal {L} = \\|x\\|$. \tag{1}"
                 copy["latex_corrected_by"] = "ollama_latex_validator"
                 copy["latex_correction_confidence"] = 0.97
                 updated.append(copy)
@@ -534,14 +534,17 @@ def test_pipeline_can_enable_ollama_latex_without_section_refiner(tmp_path) -> N
     assert result.metrics["ollama_latex_requested"] is True
     assert result.metrics["ollama_latex_enabled"] is True
     assert result.metrics["latex_validated"] is True
+    assert result.metrics["latex_postprocessed_after_validation"] is True
     assert result.metrics["latex_validator_corrected"] == 1
     assert result.metrics["latex_validator_overexpanded"] == 0
     assert result.metrics["latex_validator_anchor_mismatch"] == 0
     assert result.metrics["latex_validator_tag_restored"] == 0
-    assert result.blocks[1].latex == r"\mathcal{L} = x"
-    assert r"\mathcal{L} = x" in canonical
-    assert persisted_slots[0]["final_latex"] == r"\mathcal{L} = x"
-    assert persisted_slots[0]["final_latex_raw"] == r"\mathcal {L} = x"
+    assert result.blocks[1].latex == r"\mathcal{L} = \|x\| \tag{1}"
+    assert r"\mathcal{L} = \|x\| \tag{1}" in canonical
+    assert "$" not in persisted_slots[0]["final_latex"]
+    assert r"\\|" not in persisted_slots[0]["final_latex"]
+    assert persisted_slots[0]["final_latex"] == r"\mathcal{L} = \|x\| \tag{1}"
+    assert persisted_slots[0]["final_latex_raw"] == r"$\mathcal {L} = \\|x\\|$. \tag{1}"
     assert persisted_slots[0]["latex_corrected_by"] == "ollama_latex_validator"
 
 

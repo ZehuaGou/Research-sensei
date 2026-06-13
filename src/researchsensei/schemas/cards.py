@@ -71,6 +71,10 @@ class FormulaCard(SenseiModel):
     formula_id: str
     paper_id: str
     formula_raw: str = ""
+    original_latex: str = ""
+    formula_origin: str = ""
+    formula_ocr_status: str = ""
+    formula_explanation_status: str = ""
     location: str = ""
     purpose: str = "UNKNOWN"
     inputs: list[str] = Field(default_factory=list)

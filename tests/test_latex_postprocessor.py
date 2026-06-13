@@ -39,6 +39,42 @@ class TestLatexPostProcessor:
         assert r"\lambda_{1}" in result
         assert r"\mathcal{L}_{\mathrm{aux}}" in result
 
+    def test_fixes_space_after_subscript_operator_with_nested_content(self):
+        input_latex = r"\mathbb{R}^ {d_{i}} + \sum_{j=0}^ {l_{w} - 1}"
+        result = postprocess_latex(input_latex)
+        assert r"\mathbb{R}^{d_{i}}" in result
+        assert r"\sum_{j=0}^{l_{w} - 1}" in result
+
+    def test_preserves_relation_spacing_inside_subscripts(self):
+        input_latex = r"\max _ {j \in N (i)} x_j"
+        result = postprocess_latex(input_latex)
+        assert r"\max_{j \in N(i)}" in result
+        assert r"\inN" not in result
+
+    def test_fixes_known_ocr_split_formula_tokens(self):
+        input_latex = (
+            r"t 2 v(x) = \left\{a, & i f & x=0 \\ b, & f o r & x>0\right. "
+            r"+ R e L U \left(y\right) + T r + E r_{t}^{i} + F c_{1}"
+        )
+        result = postprocess_latex(input_latex)
+        assert "t2v" in result
+        assert "if" in result
+        assert "for" in result
+        assert "ReLU" in result
+        assert "Tr" in result
+        assert r"Er_{t}^{i}" in result
+        assert r"Fc_{1}" in result
+
+    def test_strips_inline_math_wrappers_from_formula_blocks(self):
+        input_latex = r"$A_{t} = \sum_{i=1}^{N} a_{t}^{i}$. \tag{11}"
+        result = postprocess_latex(input_latex)
+        assert result == r"A_{t} = \sum_{i=1}^{N} a_{t}^{i} \tag{11}"
+
+    def test_fixes_overescaped_norm_delimiters(self):
+        input_latex = r"$L = \\|\hat{x}_t - x_t\\|^2$. \tag{7}"
+        result = postprocess_latex(input_latex)
+        assert result == r"L = \|\hat{x}_t - x_t\|^2 \tag{7}"
+
     def test_fixes_nested_command_subscript_spacing(self):
         input_latex = r"\mathbf{Y} _ { \mathrm{sta} } ^ {S}"
         result = postprocess_latex(input_latex)

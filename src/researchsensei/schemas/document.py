@@ -23,6 +23,25 @@ class DocumentBlock(SenseiModel):
     table_html: str = ""
     figure_caption: str = ""
     reference_entries: list[str] = Field(default_factory=list)
+    formula_id: str = ""
+    formula_latex: str = ""
+    formula_origin: str = ""
+    formula_bbox: tuple[float, float, float, float] | None = None
+    formula_page: int | None = None
+    formula_context_before: str = ""
+    formula_context_after: str = ""
+    formula_ocr_status: str = ""
+    formula_explanation_status: str = ""
+    block_source: str = ""
+    section_confidence: str = ""
+    risk_flags: list[str] = Field(default_factory=list)
+    crop_path: str = ""
+    overlay_path: str = ""
+    parse_quality_status: str = ""
+    fallback_used: bool = False
+    llama_refined: bool = False
+    mineru_available: bool = False
+    structure_audit_status: str = ""
 
 
 class DocumentIngestion(SenseiModel):

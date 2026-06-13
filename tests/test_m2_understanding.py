@@ -361,3 +361,112 @@ def test_m2_front_matter_parser_keeps_underscore_paper_id_as_string() -> None:
 
     assert front_matter["paper_id"] == "2510_18998"
     assert front_matter["formula_slot_count"] == 26
+
+
+def test_m2_full_pipeline_writes_required_artifact_chain_without_llm(tmp_path: Path) -> None:
+    from researchsensei.m2.full_pipeline import run_m2_full_pipeline
+
+    input_dir = _write_m1_bundle(tmp_path / "m1")
+    output_dir = tmp_path / "m2_full"
+
+    result = run_m2_full_pipeline(input_dir=input_dir, output_dir=output_dir)
+
+    assert result.status.status == "BASELINE_ONLY"
+    assert result.status.allowed_for_user_display is False
+    for name in [
+        "source_status.json",
+        "canonical_status.json",
+        "parsed_document.json",
+        "passage_index.json",
+        "claim_evidence.json",
+        "evidence_index.json",
+        "paper_skeleton.json",
+        "evidence_pack.json",
+        "understanding_status.json",
+        "quality_report.json",
+        "m2_run_summary.json",
+    ]:
+        assert (output_dir / name).exists(), name
+
+    parsed = json.loads((output_dir / "parsed_document.json").read_text(encoding="utf-8"))
+    formula_blocks = [block for block in parsed["blocks"] if block["type"] == "formula"]
+    assert formula_blocks
+    assert formula_blocks[0]["formula_id"] == "formula_001"
+    assert formula_blocks[0]["formula_origin"] == "mineru_latex"
+    assert formula_blocks[0]["crop_path"].endswith(".png")
+
+
+class ScriptedM2LLMClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def chat_json(self, messages, *, config=None):
+        self.calls += 1
+        text = "\n".join(message.content for message in messages)
+        if "formula_cards" in text and "Formula evidence:" in text:
+            return {
+                "formula_cards": [
+                    {
+                        "formula_id": "formula_001",
+                        "formula_raw": r"\operatorname{Attention}(Q,K,V)=\operatorname{softmax}(QK^\top/\sqrt{d})V",
+                        "formula_origin": "mineru_latex",
+                        "formula_ocr_status": "not_required",
+                        "formula_explanation_status": "parser_derived",
+                        "purpose": "解释注意力块如何组合 Q/K/V。",
+                        "intuition": "用 Q 和 K 计算权重，再加权 V。",
+                        "numeric_example": "INSUFFICIENT_EVIDENCE",
+                        "plain_summary": "该公式描述注意力计算。",
+                        "evidence_ref": "demo_paper:b_f1",
+                    }
+                ]
+            }
+        if "teaching_cards" in text:
+            return {
+                "teaching_cards": [
+                    {
+                        "target_type": "concept",
+                        "title": "Attention block",
+                        "human_explanation": "该模块用注意力机制处理时间序列表示。",
+                        "analogy_explanation": "像给不同输入片段分配重要性。",
+                        "minimal_formula_explanation": "softmax(QK^T/sqrt(d))V",
+                        "numeric_example": "INSUFFICIENT_EVIDENCE",
+                        "paper_role_explanation": "它是方法部分的核心计算模块。",
+                        "evidence_ref": "demo_paper:b_text",
+                    }
+                ]
+            }
+        return {
+            "one_sentence_summary": "论文研究时间序列异常检测中的注意力和重构损失。",
+            "problem": {"text": "论文研究时间序列异常检测问题。", "evidence_ref": "demo_paper:b_text"},
+            "core_idea": {"text": "方法使用 attention block 并优化重构损失。", "evidence_ref": "demo_paper:b_text"},
+            "method_overview": {"text": "方法部分描述 attention block 和 reconstruction loss。", "evidence_ref": "demo_paper:b_text"},
+            "experiment_summary": {"text": "INSUFFICIENT_EVIDENCE", "evidence_ref": "demo_paper:b_text"},
+            "limitations": {"text": "INSUFFICIENT_EVIDENCE", "evidence_ref": ""},
+        }
+
+
+def test_m2_full_pipeline_llm_path_preserves_formula_origin_and_passes_audit(tmp_path: Path) -> None:
+    from researchsensei.m2.full_pipeline import run_m2_full_pipeline
+
+    input_dir = _write_m1_bundle(tmp_path / "m1")
+    output_dir = tmp_path / "m2_full"
+    client = ScriptedM2LLMClient()
+
+    result = run_m2_full_pipeline(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        llm_client=client,
+        llm_metadata={"provider": "scripted", "model": "scripted"},
+    )
+
+    assert result.status.status == "SUCCESS"
+    assert client.calls == 3
+    status = json.loads((output_dir / "understanding_status.json").read_text(encoding="utf-8"))
+    assert status["allowed_for_user_display"] is True
+    formulas = json.loads((output_dir / "formula_cards.json").read_text(encoding="utf-8"))
+    first = formulas["formula_cards"][0]
+    assert first["formula_origin"] == "mineru_latex"
+    assert first["formula_explanation_status"] == "parser_derived"
+    assert first["evidence_ref"] == "demo_paper:b_f1"
+    quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
+    assert not [finding for finding in quality["findings"] if finding["effect"] == "BLOCK"]

@@ -130,6 +130,7 @@ class M1CanonicalPipeline:
         if latex_requested and self.latex_validator is not None and self.latex_validator.is_available():
             latex_available = True
             slots = self.latex_validator.validate_formulas(slots, output_dir_path)
+            slots = self._postprocess_latex_slots(slots)
             latex_validated = True
 
         self._sync_formula_latex_from_slots(working_blocks, slots)
@@ -142,6 +143,7 @@ class M1CanonicalPipeline:
             "ollama_latex_requested": latex_requested,
             "ollama_latex_enabled": latex_available,
             "latex_postprocessed": True,
+            "latex_postprocessed_after_validation": latex_available,
             "latex_validated": latex_validated,
             "runtime_seconds": round(elapsed, 3),
             "mineru_available": True,

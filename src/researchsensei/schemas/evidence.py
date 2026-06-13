@@ -51,6 +51,12 @@ class Passage(SenseiModel):
     token_count: int = 0
     evidence_refs: list[str] = Field(default_factory=list)
     source_block_types: list[str] = Field(default_factory=list)
+    formula_ids: list[str] = Field(default_factory=list)
+    formula_origins: list[str] = Field(default_factory=list)
+    formula_pages: list[int] = Field(default_factory=list)
+    formula_ocr_statuses: list[str] = Field(default_factory=list)
+    block_sources: list[str] = Field(default_factory=list)
+    risk_flags: list[str] = Field(default_factory=list)
 
 
 class PassageIndexBuildConfig(SenseiModel):
@@ -91,6 +97,19 @@ class ClaimEvidenceV2(SenseiModel):
     quote_or_summary: str = ""
     confidence: float = Field(ge=0.0, le=1.0)
     generated_by: str = "rule"
+    formula_origin: str = ""
+    formula_id: str = ""
+    formula_page: int | None = None
+    formula_bbox: tuple[float, float, float, float] | None = None
+    formula_ocr_status: str = ""
+    canonical_source_path: str = "canonical_paper.md"
+    source_location: dict = Field(default_factory=dict)
+    block_source: str = ""
+    section_confidence: str = ""
+    risk_flags: list[str] = Field(default_factory=list)
+    parse_quality_status: str = ""
+    fallback_used: bool = False
+    llama_refined: bool = False
 
 
 class ClaimEvidenceBundle(SenseiModel):
@@ -119,6 +138,13 @@ class EvidencePackItem(SenseiModel):
     retrieval_score: float = 0.0
     token_count: int = 0
     source_artifact: str = "claim_evidence"
+    formula_origin: str = ""
+    formula_id: str = ""
+    formula_page: int | None = None
+    formula_bbox: tuple[float, float, float, float] | None = None
+    formula_ocr_status: str = ""
+    block_source: str = ""
+    risk_flags: list[str] = Field(default_factory=list)
 
 
 class EvidencePack(SenseiModel):

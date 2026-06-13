@@ -67,7 +67,7 @@ def build_evidence_pack(
             evidence_ref = claim.evidence_ref
             passage_id = claim.passage_id
 
-            if retriever is not None:
+            if retriever is not None and claim.claim_type != "FORMULA_CONTEXT":
                 results = retriever.retrieve(claim.claim_text, passage_index)
                 if results:
                     top = results[0]
@@ -123,6 +123,13 @@ def build_evidence_pack(
                 retrieval_score=retrieval_score,
                 token_count=token_count,
                 source_artifact="claim_evidence",
+                formula_origin=claim.formula_origin,
+                formula_id=claim.formula_id,
+                formula_page=claim.formula_page,
+                formula_bbox=claim.formula_bbox,
+                formula_ocr_status=claim.formula_ocr_status,
+                block_source=claim.block_source,
+                risk_flags=list(claim.risk_flags),
             ))
             count += 1
         if budget_exceeded:

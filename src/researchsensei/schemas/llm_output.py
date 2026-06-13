@@ -22,6 +22,9 @@ class PaperCardLLMOutput(SenseiModel):
 class FormulaCardLLMOutput(SenseiModel):
     formula_id: str = ""
     formula_raw: str = ""
+    formula_origin: str = ""
+    formula_ocr_status: str = ""
+    formula_explanation_status: str = ""
     purpose: str
     intuition: str = ""
     numeric_example: str = ""

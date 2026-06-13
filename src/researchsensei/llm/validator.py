@@ -52,6 +52,14 @@ def validate_formula_cards_llm_output(
         raise ValueError("EvidencePack is empty, cannot validate FormulaCardsLLMOutput")
 
     valid_refs = evidence_refs_from_pack(evidence_pack)
+    formula_refs = {
+        item.evidence_ref
+        for item in evidence_pack.items
+        if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
+    }
+
+    if formula_refs and not output.formula_cards:
+        raise ValueError("Formula evidence is present but LLM returned no formula_cards")
 
     for i, card in enumerate(output.formula_cards):
         if card.evidence_ref:

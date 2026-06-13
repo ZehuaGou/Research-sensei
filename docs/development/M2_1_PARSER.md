@@ -214,6 +214,16 @@ Blocked input:
 - M2.1 cannot silently repair missing formula origin.
 - Invalid canonical input must produce `BLOCKED_UNDERSTANDING`.
 
+### 2026-06-14 implementation update
+
+- Implemented canonical bundle ingestion in `src/researchsensei/m2/full_pipeline.py`.
+- CLI entry: `python scripts/m2_run_understanding.py --mode full --input-dir <m1_dir> --output-dir <m2_dir>`.
+- The full path reads only M1 artifacts through `M1ArtifactReader`; it does not read or mutate raw PDF.
+- M1 formula slot fields propagated into `DocumentBlock`: `formula_id`, `formula_latex`, `formula_origin`, `formula_bbox`, `formula_page`, `formula_context_before`, `formula_context_after`, `formula_ocr_status`, `formula_explanation_status`, crop path, overlay path, source, and risk flags.
+- Suppressed M1 layout noise before evidence construction: repeated page headers, page-number footers, author footers, funding/front-matter affiliation blocks.
+- Current real verification: `2312_01729v1` M1 PASS -> M2 full SUCCESS with real Mimo LLM and QualityAuditor.
+- Remaining limitation: this is verified on one current clean paper; multi-paper MinerU acceptance and survey-paper behavior remain pending.
+
 ## 9. Schema / 数据结构
 
 ### ParseMetadata / ParserResult

@@ -20,10 +20,10 @@ async def build_teaching_cards_v2(
     skeleton: PaperSkeleton,
     llm_client: LLMClient,
 ) -> TeachingCardBundle:
-    """Build teaching cards using LLM with evidence constraints (fail-closed).
+    """Build teaching cards using an evidence-constrained LLM path.
 
-    LLM failure / invalid JSON / schema validation / evidence_ref validation
-    all raise directly — no fallback to rule-based.
+    LLM failure, invalid JSON, schema validation failure, or invalid
+    evidence_ref raises directly. There is no rule-based fallback here.
     """
     prompt_builder = PromptBuilder()
     evidence_text = _format_evidence_for_prompt(evidence_pack)
@@ -31,24 +31,24 @@ async def build_teaching_cards_v2(
 
     concepts = []
     if paper_card.core_idea.text != "UNKNOWN":
-        concepts.append(f"核心创新点: {paper_card.core_idea.text[:200]}")
+        concepts.append(f"Core idea: {paper_card.core_idea.text[:200]}")
     if paper_card.problem.text != "UNKNOWN":
-        concepts.append(f"研究问题: {paper_card.problem.text[:200]}")
+        concepts.append(f"Research problem: {paper_card.problem.text[:200]}")
     if paper_card.method_overview.text != "UNKNOWN":
-        concepts.append(f"方法概述: {paper_card.method_overview.text[:200]}")
+        concepts.append(f"Method overview: {paper_card.method_overview.text[:200]}")
 
     messages = prompt_builder.build_simple(
         system=(
-            "你是 ResearchSensei 的教学引擎。\n"
-            "根据论文内容生成五层讲解，面向数学基础较弱的用户。\n"
-            "只能根据 evidence pack 讲解。不得编造。\n"
-            "每个讲解必须绑定 evidence_ref。\n"
-            "先直觉，再公式，再数字例子。\n"
-            "输出 JSON 格式。"
+            "You are the ResearchSensei teaching-card builder.\n"
+            "Teach from intuition to minimal formula to small example.\n"
+            "Use only the supplied evidence pack and paper card.\n"
+            "Every teaching card must cite exactly one allowed evidence_ref.\n"
+            "Return only valid compact JSON with no markdown and no literal newlines inside string values."
         ),
-        user=f"""论文标题: {skeleton.title}
-需要讲解的概念:
-{chr(10).join(concepts) if concepts else '无'}
+        user=f"""Paper title: {skeleton.title}
+
+Concepts to teach:
+{chr(10).join(concepts) if concepts else 'None'}
 
 Evidence Pack:
 {evidence_text}
@@ -56,23 +56,27 @@ Evidence Pack:
 Allowed evidence_ref values:
 {allowed_refs}
 
-重要约束：
-- evidence_ref 必须从上面的 Allowed evidence_ref values 中精确选择一个。
-- 不要把多个 evidence_ref 用逗号、空格或列表拼在一起。
-- 如果证据不足，不要生成该 teaching_card。
+Constraints:
+- Choose evidence_ref exactly from Allowed evidence_ref values.
+- Generate at most 2 teaching_cards.
+- Keep each text field concise: title <= 30 Chinese characters, each explanation <= 90 Chinese characters.
+- Do not concatenate multiple evidence refs.
+- Do not invent background not present in evidence.
+- Use concise Chinese explanations with necessary English/math terms preserved.
+- If evidence is insufficient, do not generate that teaching_card.
 
-要求输出 JSON:
+Return JSON with this schema:
 {{
   "teaching_cards": [
     {{
       "target_type": "concept",
-      "title": "讲解标题",
-      "human_explanation": "用大白话解释",
-      "analogy_explanation": "生活中的类比",
-      "minimal_formula_explanation": "最简公式形式",
-      "numeric_example": "小数字例子",
-      "paper_role_explanation": "在论文中的作用",
-      "evidence_ref": "对应证据引用"
+      "title": "teaching title",
+      "human_explanation": "plain-language explanation",
+      "analogy_explanation": "simple analogy grounded in the evidence",
+      "minimal_formula_explanation": "minimal math explanation if supported, otherwise INSUFFICIENT_EVIDENCE",
+      "numeric_example": "small numeric example if supported, otherwise INSUFFICIENT_EVIDENCE",
+      "paper_role_explanation": "why this concept matters in the paper",
+      "evidence_ref": "allowed ref"
     }}
   ]
 }}""",
@@ -158,7 +162,7 @@ def _format_evidence_for_prompt(evidence_pack: EvidencePack) -> str:
     lines: list[str] = []
     for item in evidence_pack.items[:20]:
         lines.append(
-            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:200]}"
+            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:300]}"
         )
     return "\n".join(lines)
 

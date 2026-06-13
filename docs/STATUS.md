@@ -219,3 +219,21 @@ Implementation tasks must read the matching module's External Reference Implemen
 Ollama section refinement and Ollama formula LaTeX polish are separate paths. Section refinement remains optional/default-off and is not part of the formal M1->M2 handoff path. Formula polish is enabled explicitly with `--enable-ollama-latex` and runs after MinerU plus deterministic regex cleanup, before M2 consumes canonical artifacts. The formula path checks that the configured Ollama model exists and advertises vision capability, prefers group crops over individual crops as visual context only, sends `think=false`, requires JSON schema output and confidence >= 0.8 by default, preserves page/bbox/crop/overlay/source identity, restores original equation tags if the model drops them, and rejects low-confidence, malformed, over-expanded, or left-hand-side-mismatched outputs.
 
 Local `qwen3.5:4b` smoke on `reports/m1_acceptance_manual_review_2510_18998` checked five real formula crops. Accepted: `formula_004`, `formula_018`, `formula_025` after deterministic cleanup. Rejected/unchanged: `formula_009` because group context returned the wrong left-hand side (`Q` instead of original `S`), and `formula_016` because the model returned malformed JSON. A full MinerU reparse acceptance with Ollama is a heavy/review run and must not be treated as a default live eval.
+
+## 2026-06-14 M1 -> M2 Canonical Verification
+
+Current clean verification used `2312_01729v1` (`EdgeConvFormer: Dynamic Graph CNN and Transformer based Anomaly Detection in Multivariate Time Series`).
+
+- M1 command: `python scripts/run_m1_v2_mineru_primary_acceptance.py --limit 1 --keys 2312_01729v1 --force --enable-ollama-latex --ollama-latex-model qwen3.5:4b --ollama-timeout 30`.
+- M1 output: `reports/m1_canonical_acceptance/2312_01729v1`.
+- M1 status: PASS, `m2_ready=true`, `m2_ready_for_formula_understanding=true`, primary parser `mineru25pro`, fallback `false`.
+- M1 formula status: 19 formula blocks, 19 parser LaTeX, 0 raw-only formulas, 19 bbox/crop/overlay/canonical matches, 0 high-risk formulas.
+- M1 structural status: no page header/footer contamination in canonical output, no `## Unknown`, no reference pollution in Introduction/Method/Experiments, PDF-token presence check about 0.95 against PyMuPDF text extraction.
+- M1 visual audit: sampled PDF pages and formula overlays/crops for Time2Vec, EdgeConv, attention, anomaly score, and metric formulas; sampled crop/overlay boxes matched the original PDF.
+- M1 LaTeX cleanup: deterministic postprocessing now runs both before and after guarded Ollama formula validation, so Ollama cannot reintroduce `$...$` wrappers or over-escaped norm delimiters into final formula slots.
+- M2 command: `python scripts/m2_run_understanding.py --mode full --enable-llm --provider mimo --input-dir reports/m1_canonical_acceptance/2312_01729v1 --output-dir reports/m2_full_2312_01729v1_mimo --llm-timeout 90`.
+- M2 output: `reports/m2_full_2312_01729v1_mimo`.
+- M2 status: SUCCESS, audit findings empty, M1 artifacts unmodified, real Mimo provider `mimo-v2.5-pro`, 3 LLM calls, 7223 total tokens.
+- M2 artifacts generated: `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`.
+- Limitation: M2 formula explanation currently generates top-K formula cards, not full derivations for all 19 formulas. This is sufficient for canonical M1->M2 handoff validation but not final "all formulas advanced math reasoning" completion.
+- Scope not proven by this run: multi-paper MinerU acceptance, survey-paper M2 behavior, and frontend/M3/M4/M5 integration.

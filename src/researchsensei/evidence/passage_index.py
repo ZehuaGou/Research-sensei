@@ -144,6 +144,12 @@ def _make_passage(
     text: str,
 ) -> Passage:
     pages = [b.page for b in blocks if b.page is not None]
+    formula_pages = [b.formula_page for b in blocks if b.formula_page is not None]
+    risk_flags: list[str] = []
+    for block in blocks:
+        for flag in block.risk_flags:
+            if flag not in risk_flags:
+                risk_flags.append(flag)
     return Passage(
         passage_id=passage_id,
         paper_id=paper_id,
@@ -156,6 +162,12 @@ def _make_passage(
         token_count=len(text.split()),
         evidence_refs=[b.evidence_ref for b in blocks if b.evidence_ref],
         source_block_types=[b.type.value for b in blocks],
+        formula_ids=[b.formula_id for b in blocks if b.formula_id],
+        formula_origins=[b.formula_origin for b in blocks if b.formula_origin],
+        formula_pages=formula_pages,
+        formula_ocr_statuses=[b.formula_ocr_status for b in blocks if b.formula_ocr_status],
+        block_sources=[b.block_source for b in blocks if b.block_source],
+        risk_flags=risk_flags,
     )
 
 

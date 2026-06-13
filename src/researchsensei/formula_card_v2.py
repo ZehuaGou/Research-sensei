@@ -9,7 +9,7 @@ from researchsensei.schemas import (
     FormulaCardBundle,
     PaperSkeleton,
 )
-from researchsensei.schemas.evidence import EvidencePack
+from researchsensei.schemas.evidence import EvidencePack, EvidencePackItem
 from researchsensei.schemas.llm_output import FormulaCardsLLMOutput
 
 
@@ -18,45 +18,64 @@ async def build_formula_cards_v2(
     skeleton: PaperSkeleton,
     llm_client: LLMClient,
 ) -> FormulaCardBundle:
-    """Build formula cards using LLM with evidence constraints (fail-closed).
+    """Build formula cards using an evidence-constrained LLM path.
 
-    LLM failure / invalid JSON / schema validation / evidence_ref validation
-    all raise directly — no fallback to rule-based.
+    LLM failure, invalid JSON, schema validation failure, or invalid
+    evidence_ref raises directly. There is no rule-based fallback here.
     """
     prompt_builder = PromptBuilder()
-    evidence_text = _format_evidence_for_prompt(evidence_pack)
-    allowed_refs = _format_allowed_refs(evidence_pack)
+    formula_items = _formula_items(evidence_pack)
+    if not formula_items:
+        return FormulaCardBundle(
+            paper_id=skeleton.paper_id,
+            formula_cards=[],
+            confidence=0.0,
+            warnings=["NO_FORMULA_EVIDENCE_IN_PACK"],
+            evidence_status=EvidenceType.INSUFFICIENT_EVIDENCE,
+        )
+
+    evidence_text = _format_evidence_for_prompt(formula_items)
+    allowed_refs = "\n".join(f"- {item.evidence_ref}" for item in formula_items if item.evidence_ref) or "- NONE"
 
     messages = prompt_builder.build_simple(
         system=(
-            "你是 ResearchSensei 的公式讲解引擎。\n"
-            "只能根据 evidence pack 解释公式。不得编造。\n"
-            "每个公式必须给出 evidence_ref。\n"
-            "输出 JSON 格式。"
+            "You are the ResearchSensei formula-understanding builder.\n"
+            "Use only the supplied formula evidence. Do not infer from outside knowledge.\n"
+            "Each formula_card must cite exactly one allowed evidence_ref.\n"
+            "Preserve formula_id, formula_raw, formula_origin, and formula_ocr_status from evidence.\n"
+            "Never claim parser/OCR/raw formulas are source-level LaTeX.\n"
+            "Return only valid JSON."
         ),
-        user=f"""论文标题: {skeleton.title}
-公式列表: {', '.join(skeleton.formulas[:5])}
+        user=f"""Paper title: {skeleton.title}
 
-Evidence Pack:
+Formula evidence:
 {evidence_text}
 
 Allowed evidence_ref values:
 {allowed_refs}
 
-重要约束：
-- evidence_ref 必须从上面的 Allowed evidence_ref values 中精确选择一个。
-- 不要把多个 evidence_ref 用逗号、空格或列表拼在一起。
-- 如果证据不足，不要生成该 formula_card。
+Constraints:
+- Generate at most {min(5, len(formula_items))} formula_cards.
+- Choose evidence_ref exactly from the allowed list.
+- Use formula_id/formula_raw/formula_origin/formula_ocr_status exactly as shown in evidence.
+- For parser_latex or mineru_latex, say the explanation is parser-derived.
+- For raw_formula_text, unknown, or unresolved origins, do not provide detailed derivation.
+- Use concise Chinese explanations with necessary English/math terms preserved.
 
-要求输出 JSON:
+Return JSON with this schema:
 {{
   "formula_cards": [
     {{
-      "purpose": "公式在论文中的作用",
-      "intuition": "直觉解释",
-      "numeric_example": "小数字例子",
-      "plain_summary": "一句话人话总结",
-      "evidence_ref": "对应证据引用"
+      "formula_id": "formula id from evidence",
+      "formula_raw": "formula text from evidence",
+      "formula_origin": "origin from evidence",
+      "formula_ocr_status": "ocr status from evidence",
+      "formula_explanation_status": "parser_derived | source_exact | degraded",
+      "purpose": "what this formula does in the paper",
+      "intuition": "plain-language intuition",
+      "numeric_example": "small example if evidence supports it, otherwise INSUFFICIENT_EVIDENCE",
+      "plain_summary": "one sentence summary",
+      "evidence_ref": "allowed ref"
     }}
   ]
 }}""",
@@ -75,17 +94,28 @@ def _convert_to_bundle(
     skeleton: PaperSkeleton,
 ) -> FormulaCardBundle:
     """Convert LLM output to FormulaCardBundle."""
-    valid_refs = {item.evidence_ref for item in evidence_pack.items if item.evidence_ref}
+    evidence_by_ref = {item.evidence_ref: item for item in evidence_pack.items if item.evidence_ref}
+    valid_refs = set(evidence_by_ref)
     avg_confidence = _avg_confidence(evidence_pack)
     paper_id = skeleton.paper_id
 
     cards: list[FormulaCard] = []
     for i, llm_card in enumerate(output.formula_cards):
         ref = llm_card.evidence_ref if llm_card.evidence_ref in valid_refs else ""
+        evidence = evidence_by_ref.get(ref)
+        formula_raw = llm_card.formula_raw or _formula_raw_from_evidence(evidence)
+        formula_origin = llm_card.formula_origin or (evidence.formula_origin if evidence else "")
+        formula_ocr_status = llm_card.formula_ocr_status or (evidence.formula_ocr_status if evidence else "")
+        formula_id = llm_card.formula_id or (evidence.formula_id if evidence else f"{paper_id}:eq:v2:{i:03d}")
+        explanation_status = llm_card.formula_explanation_status or _explanation_status(formula_origin)
         cards.append(FormulaCard(
-            formula_id=llm_card.formula_id or f"{paper_id}:eq:v2:{i:03d}",
+            formula_id=formula_id,
             paper_id=paper_id,
-            formula_raw=llm_card.formula_raw,
+            formula_raw=formula_raw,
+            original_latex=formula_raw if formula_origin == "source_latex" else "",
+            formula_origin=formula_origin,
+            formula_ocr_status=formula_ocr_status,
+            formula_explanation_status=explanation_status,
             purpose=llm_card.purpose or "UNKNOWN",
             intuition=llm_card.intuition or "UNKNOWN",
             numeric_example=llm_card.numeric_example or "UNKNOWN",
@@ -93,7 +123,7 @@ def _convert_to_bundle(
             evidence_ref=ref,
             evidence_status=EvidenceType.SUPPORTED_BY_FORMULA if ref else EvidenceType.UNVERIFIED,
             confidence=avg_confidence if ref else 0.0,
-            warnings=[],
+            warnings=list(evidence.risk_flags) if evidence else [],
         ))
 
     evidence_refs = sorted({c.evidence_ref for c in cards if c.evidence_ref})
@@ -111,21 +141,50 @@ def _convert_to_bundle(
     )
 
 
+def _formula_items(evidence_pack: EvidencePack) -> list[EvidencePackItem]:
+    return [
+        item for item in evidence_pack.items
+        if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
+    ]
+
+
+def _formula_raw_from_evidence(evidence: EvidencePackItem | None) -> str:
+    if evidence is None:
+        return ""
+    text = evidence.passage_text
+    marker = "Formula:"
+    if marker in text:
+        return text.split(marker, 1)[1].split("Context before:", 1)[0].strip()
+    return text[:300].strip()
+
+
+def _explanation_status(formula_origin: str) -> str:
+    if formula_origin == "source_latex":
+        return "source_exact"
+    if formula_origin in {"raw_formula_text", "unknown", "unresolved"}:
+        return "degraded"
+    return "parser_derived"
+
+
 def _avg_confidence(evidence_pack: EvidencePack) -> float:
     if not evidence_pack.items:
         return 0.0
     return round(sum(i.confidence for i in evidence_pack.items) / len(evidence_pack.items), 2)
 
 
-def _format_evidence_for_prompt(evidence_pack: EvidencePack) -> str:
+def _format_evidence_for_prompt(items: list[EvidencePackItem]) -> str:
     lines: list[str] = []
-    for item in evidence_pack.items[:20]:
+    for item in items[:8]:
         lines.append(
-            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:200]}"
+            "\n".join(
+                [
+                    f"- evidence_ref: {item.evidence_ref}",
+                    f"  formula_id: {item.formula_id}",
+                    f"  formula_origin: {item.formula_origin or 'unknown'}",
+                    f"  formula_ocr_status: {item.formula_ocr_status or 'not_required'}",
+                    f"  page: {item.formula_page if item.formula_page is not None else 'unknown'}",
+                    f"  text: {item.passage_text[:500]}",
+                ]
+            )
         )
     return "\n".join(lines)
-
-
-def _format_allowed_refs(evidence_pack: EvidencePack) -> str:
-    refs = [item.evidence_ref for item in evidence_pack.items[:20] if item.evidence_ref]
-    return "\n".join(f"- {ref}" for ref in refs) or "- NONE"

@@ -18,10 +18,10 @@ async def build_paper_card_v2(
     skeleton: PaperSkeleton,
     llm_client: LLMClient,
 ) -> PaperCard:
-    """Build a paper card using LLM with evidence constraints (fail-closed).
+    """Build a paper card using an evidence-constrained LLM path.
 
-    LLM failure / invalid JSON / schema validation / evidence_ref validation
-    all raise directly — no fallback to rule-based.
+    LLM failure, invalid JSON, schema validation failure, or invalid
+    evidence_ref raises directly. There is no rule-based fallback here.
     """
     prompt_builder = PromptBuilder()
     evidence_text = _format_evidence_for_prompt(evidence_pack)
@@ -29,14 +29,14 @@ async def build_paper_card_v2(
 
     messages = prompt_builder.build_simple(
         system=(
-            "你是 ResearchSensei 的论文研读导师。\n"
-            "只能根据 evidence pack 解释论文。不得使用 evidence pack 外的信息。\n"
-            "不确定就返回 INSUFFICIENT_EVIDENCE。\n"
-            "每个核心 claim 必须给出 evidence_ref。\n"
-            "输出 JSON 格式。"
+            "You are the ResearchSensei paper-understanding builder.\n"
+            "Use only the supplied evidence pack. Do not use outside knowledge.\n"
+            "Every core claim must cite exactly one allowed evidence_ref.\n"
+            "If evidence is insufficient, write INSUFFICIENT_EVIDENCE and leave evidence_ref empty.\n"
+            "Return only valid JSON."
         ),
-        user=f"""论文标题: {skeleton.title}
-摘要: {skeleton.abstract_summary[:500]}
+        user=f"""Paper title: {skeleton.title}
+Abstract summary: {skeleton.abstract_summary[:500]}
 
 Evidence Pack:
 {evidence_text}
@@ -44,19 +44,21 @@ Evidence Pack:
 Allowed evidence_ref values:
 {allowed_refs}
 
-重要约束：
-- evidence_ref 必须从上面的 Allowed evidence_ref values 中精确选择一个。
-- 不要把多个 evidence_ref 用逗号、空格或列表拼在一起。
-- 如果证据不足，text 写 INSUFFICIENT_EVIDENCE，evidence_ref 写空字符串。
+Constraints:
+- Choose evidence_ref exactly from Allowed evidence_ref values.
+- Do not concatenate multiple evidence refs.
+- Do not invent datasets, methods, results, or limitations.
+- Use concise Chinese explanations with necessary English terms preserved.
+- If evidence is insufficient, set text to "INSUFFICIENT_EVIDENCE" and evidence_ref to "".
 
-要求输出 JSON:
+Return JSON with this schema:
 {{
-  "one_sentence_summary": "一句话说清论文在做什么",
-  "problem": {{"text": "论文要解决什么问题", "evidence_ref": "对应证据引用"}},
-  "core_idea": {{"text": "核心创新点", "evidence_ref": "对应证据引用"}},
-  "method_overview": {{"text": "方法概述", "evidence_ref": "对应证据引用"}},
-  "experiment_summary": {{"text": "实验结果概述", "evidence_ref": "对应证据引用"}},
-  "limitations": {{"text": "局限性", "evidence_ref": "对应证据引用或空字符串"}}
+  "one_sentence_summary": "one evidence-grounded sentence",
+  "problem": {{"text": "problem addressed by the paper", "evidence_ref": "allowed ref"}},
+  "core_idea": {{"text": "core contribution or idea", "evidence_ref": "allowed ref"}},
+  "method_overview": {{"text": "method overview", "evidence_ref": "allowed ref"}},
+  "experiment_summary": {{"text": "experiment or result summary", "evidence_ref": "allowed ref"}},
+  "limitations": {{"text": "limitations if supported, otherwise INSUFFICIENT_EVIDENCE", "evidence_ref": "allowed ref or empty"}}
 }}""",
     )
 
@@ -121,7 +123,7 @@ def _format_evidence_for_prompt(evidence_pack: EvidencePack) -> str:
     lines: list[str] = []
     for item in evidence_pack.items[:20]:
         lines.append(
-            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:200]}"
+            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:300]}"
         )
     return "\n".join(lines)
 

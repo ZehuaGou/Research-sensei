@@ -22,7 +22,10 @@ _CMD_CONTENT_SPACES = re.compile(r"\\(mathbf|text|mathrm|mathcal|mathbb)\s*\{\s*
 _SUB_SUPER_SPACED = re.compile(r"([_^])\s*\{\s*([^{}]+?)\s*\}")
 
 # Space before subscript/superscript operator: \lambda _{1} -> \lambda_{1}
-_SPACE_BEFORE_SUB_SUPER = re.compile(r"(?<=[A-Za-z0-9}\)])\s+([_^])")
+_SPACE_BEFORE_SUB_SUPER = re.compile(r"(?<=[A-Za-z0-9}\)\|])\s+([_^])")
+
+# Space between subscript/superscript and opening brace: ^ {x} -> ^{x}
+_SPACE_AFTER_SUB_SUPER = re.compile(r"([_^])\s+\{")
 
 # Subscript/superscript containing one LaTeX command: _ { \mathrm{sta} } -> _{\mathrm{sta}}
 _NESTED_CMD_SUB_SUPER_SPACED = re.compile(
@@ -38,8 +41,24 @@ _CMD_SPACE_BRACE = re.compile(r"(\\[a-zA-Z]+)\s+\{")
 # Double spaces
 _DOUBLE_SPACE = re.compile(r"  +")
 
+_INLINE_MATH_WITH_TAG = re.compile(r"^\$(?P<body>.+?)\$\s*[.,;:]?\s*(?P<tag>\\tag\{[^}]+\})\s*$", re.DOTALL)
+_INLINE_MATH_WRAPPER = re.compile(r"^\$(?P<body>.+?)\$\s*$", re.DOTALL)
+_DOUBLE_ESCAPED_NORM = re.compile(r"\\\\\|")
+
 # Plain text letter spacing (not in commands): "P r e c i s i o n" at start
 _PLAIN_TEXT_SPACED = re.compile(r"^([A-Z]) ((?:[A-Z] )*[A-Z]) = ", re.MULTILINE)
+
+_RELATION_IN_SUBSCRIPT = re.compile(r"\\(?:in|notin|leq|geq|lt|gt|mid|subset|subseteq|supset|supseteq)\b")
+
+_KNOWN_OCR_TOKEN_REPLACEMENTS = (
+    (re.compile(r"(?<![A-Za-z])t\s+2\s+v(?![A-Za-z])"), "t2v"),
+    (re.compile(r"(?<![A-Za-z])i\s+f(?![A-Za-z])"), "if"),
+    (re.compile(r"(?<![A-Za-z])f\s+o\s+r(?![A-Za-z])"), "for"),
+    (re.compile(r"(?<![A-Za-z])R\s+e\s+L\s+U(?=\s*(?:\\left|\())"), "ReLU"),
+    (re.compile(r"(?<![A-Za-z])T\s+r(?=\s*(?:=|[+\-),.]|\\left|\\right|\())"), "Tr"),
+    (re.compile(r"(?<![A-Za-z])E\s+r(?=\s*(?:[_{]|[A-Za-z]*_))"), "Er"),
+    (re.compile(r"(?<![A-Za-z])F\s+c(?=\s*_)"), "Fc"),
+)
 
 _CIRCLED_COMPONENT_SEQUENCE = re.compile(
     r"(?:①|\\text\{\(1\)\})\s*\+\s*(?:Ⓐ|ⓐ|\\text\{\(A\)\})"
@@ -85,8 +104,12 @@ def _fix_subscript_spacing(match: re.Match) -> str:
     """Remove extra spaces in subscripts: _ { x } -> _{x}."""
     prefix = match.group(1)
     content = match.group(2)
-    # Remove spaces within the content for simple subscripts
-    fixed = content.replace(" ", "")
+    if _RELATION_IN_SUBSCRIPT.search(content):
+        fixed = re.sub(r"\s+", " ", content.strip())
+        fixed = re.sub(r"(?<=[A-Za-z0-9}])\s+\(", "(", fixed)
+    else:
+        # Remove spaces within simple variable/index subscripts.
+        fixed = content.replace(" ", "")
     return f"{prefix}{{{fixed}}}"
 
 
@@ -120,6 +143,25 @@ def _normalize_circled_labels(latex: str) -> str:
     return latex
 
 
+def _fix_known_ocr_token_spacing(latex: str) -> str:
+    """Join high-confidence OCR-split math tokens without rewriting semantics."""
+    for pattern, replacement in _KNOWN_OCR_TOKEN_REPLACEMENTS:
+        latex = pattern.sub(replacement, latex)
+    return latex
+
+
+def _strip_inline_math_wrappers(latex: str) -> str:
+    """Remove redundant inline math delimiters around formula-block LaTeX."""
+    stripped = latex.strip()
+    match = _INLINE_MATH_WITH_TAG.match(stripped)
+    if match:
+        return f"{match.group('body').strip()} {match.group('tag')}"
+    match = _INLINE_MATH_WRAPPER.match(stripped)
+    if match:
+        return match.group("body").strip()
+    return latex
+
+
 def postprocess_latex(latex: str) -> str:
     """Apply all regex-based fixes to a LaTeX formula string."""
     if not latex or not latex.strip():
@@ -127,8 +169,17 @@ def postprocess_latex(latex: str) -> str:
 
     result = latex
 
+    # Formula blocks should contain LaTeX content, not nested inline-$ wrappers.
+    result = _strip_inline_math_wrappers(result)
+
     # Normalize OCR'd circled component labels into portable LaTeX text.
     result = _normalize_circled_labels(result)
+
+    # Guarded Ollama output can over-escape norm delimiters as \\|.
+    result = _DOUBLE_ESCAPED_NORM.sub(lambda _: r"\|", result)
+
+    # Join a small set of known OCR-split math tokens.
+    result = _fix_known_ocr_token_spacing(result)
 
     # Fix letter-spaced mathbf/text/mathrm
     result = _MATHBF_SPACED.sub(_fix_letter_spaced_command, result)
@@ -143,6 +194,7 @@ def postprocess_latex(latex: str) -> str:
 
     # Remove spaces before _/^ operators.
     result = _SPACE_BEFORE_SUB_SUPER.sub(r"\1", result)
+    result = _SPACE_AFTER_SUB_SUPER.sub(r"\1{", result)
 
     # Fix subscript/superscript that wraps one command.
     result = _NESTED_CMD_SUB_SUPER_SPACED.sub(_fix_nested_command_subscript_spacing, result)

@@ -283,3 +283,14 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - formula_is_core 的具体判断算法
 - DownstreamGates 的最终字段是否足够
 - passage_index.json 和 claim_evidence.json 的生成顺序细节
+
+## 2026-06-14 Implementation Update
+
+- Full M2 orchestration from an M1 canonical bundle is implemented in `src/researchsensei/m2/full_pipeline.py`.
+- CLI: `python scripts/m2_run_understanding.py --mode full --enable-llm --provider mimo --input-dir <m1_dir> --output-dir <m2_dir>`.
+- The full pipeline writes `source_status.json`, `canonical_status.json`, `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`, `m2_run_summary.json`, and `m2_full_report.md`.
+- M2 no-LLM mode remains `BASELINE_ONLY`; real completion requires `--enable-llm`.
+- M2 LLM default `--llm-max-tokens` is 2400 after real Mimo teaching-card JSON truncation was observed at lower limits.
+- Real verification on `2312_01729v1`: M1 PASS input -> M2 SUCCESS, QualityAuditor findings empty, real Mimo `mimo-v2.5-pro`, 3 calls, 7223 total tokens, M1 artifacts unmodified.
+- Downstream gates were all enabled for this run: reading display, pattern/drill flows, and advisor questions.
+- Limitations: current M2 formula cards explain selected top-K formulas only; full all-formula derivation, survey-paper path, and multi-paper acceptance remain pending.

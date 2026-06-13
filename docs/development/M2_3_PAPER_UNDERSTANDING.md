@@ -460,6 +460,16 @@ For survey/review papers, M2.3 additionally outputs:
 
 Status: NOT_IMPLEMENTED
 
+## 2026-06-14 Implementation Update
+
+- Implemented real evidence-constrained M2 card generation through `src/researchsensei/m2/full_pipeline.py`.
+- Real LLM path uses `build_paper_card_v2`, `build_formula_cards_v2`, and `build_teaching_cards_v2`; all outputs must validate against the exact EvidencePack `evidence_ref` set.
+- Formula evidence now carries M1 provenance into the LLM/card layer: `formula_raw`, `original_latex`, `formula_origin`, `formula_ocr_status`, and `formula_explanation_status`.
+- `validate_formula_cards_llm_output` fails if formula evidence exists but the LLM returns no formula cards.
+- Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.
+- Current real verification: `reports/m2_full_2312_01729v1_mimo` has paper/formula/teaching cards, legal evidence refs, no audit findings, and `understanding_status.status=SUCCESS`.
+- Limitation: advanced formula reasoning currently covers selected top-K formulas. Full-paper all-formula derivation remains future work and should not be claimed complete.
+
 ## 19. 当前未解决问题
 
 - formula_is_core 的具体判断算法

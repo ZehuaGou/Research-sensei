@@ -38,6 +38,7 @@ def build_claim_evidence(
     passage_index: PassageIndex,
 ) -> ClaimEvidenceBundle:
     paper_id = document.paper_id
+    blocks_by_id = {block.block_id: block for block in document.blocks}
     claims: list[ClaimEvidenceV2] = []
     warnings: list[WarningItem] = []
     counter = 0
@@ -51,6 +52,7 @@ def build_claim_evidence(
             counter += 1
             claims.append(_make_claim(
                 paper_id, counter, passage,
+                blocks_by_id=blocks_by_id,
                 claim_type="FORMULA_CONTEXT",
                 semantic_support="DIRECT_QUOTE",
                 source_sentence=passage.text[:300],
@@ -63,6 +65,7 @@ def build_claim_evidence(
             sentence = _find_sentence_with_keywords(passage.text, METHOD_KEYWORDS)
             claims.append(_make_claim(
                 paper_id, counter, passage,
+                blocks_by_id=blocks_by_id,
                 claim_type="METHOD",
                 semantic_support="DIRECT_QUOTE" if sentence else "PARAPHRASE",
                 source_sentence=sentence or passage.text[:300],
@@ -75,6 +78,7 @@ def build_claim_evidence(
             sentence = _find_sentence_with_keywords(passage.text, RESULT_KEYWORDS)
             claims.append(_make_claim(
                 paper_id, counter, passage,
+                blocks_by_id=blocks_by_id,
                 claim_type="RESULT",
                 semantic_support="DIRECT_QUOTE" if sentence else "PARAPHRASE",
                 source_sentence=sentence or passage.text[:300],
@@ -86,6 +90,7 @@ def build_claim_evidence(
             counter += 1
             claims.append(_make_claim(
                 paper_id, counter, passage,
+                blocks_by_id=blocks_by_id,
                 claim_type="LIMITATION",
                 semantic_support="PARAPHRASE",
                 source_sentence=passage.text[:300],
@@ -99,6 +104,7 @@ def build_claim_evidence(
                 counter += 1
                 claims.append(_make_claim(
                     paper_id, counter, passage,
+                    blocks_by_id=blocks_by_id,
                     claim_text=sentence,
                     claim_type="CONTRIBUTION",
                     semantic_support="DIRECT_QUOTE",
@@ -113,6 +119,7 @@ def build_claim_evidence(
                     counter += 1
                     claims.append(_make_claim(
                         paper_id, counter, passage,
+                        blocks_by_id=blocks_by_id,
                         claim_text=sentence,
                         claim_type="PROBLEM",
                         semantic_support="DIRECT_QUOTE",
@@ -126,6 +133,7 @@ def build_claim_evidence(
             counter += 1
             claims.append(_make_claim(
                 paper_id, counter, passage,
+                blocks_by_id=blocks_by_id,
                 claim_type="DEFINITION",
                 semantic_support="DIRECT_QUOTE",
                 source_sentence=sentence,
@@ -150,6 +158,7 @@ def _make_claim(
     counter: int,
     passage: Passage,
     *,
+    blocks_by_id: dict,
     claim_type: str,
     semantic_support: str,
     source_sentence: str,
@@ -157,6 +166,7 @@ def _make_claim(
 ) -> ClaimEvidenceV2:
     evidence_ref = passage.evidence_refs[0] if passage.evidence_refs else ""
     block_id = passage.block_ids[0] if passage.block_ids else ""
+    block = blocks_by_id.get(block_id)
     return ClaimEvidenceV2(
         claim_id=f"{paper_id}:claim:c{counter:03d}",
         claim_text=claim_text or source_sentence[:300],
@@ -170,6 +180,21 @@ def _make_claim(
         quote_or_summary=source_sentence[:240],
         confidence=0.6,
         generated_by="rule",
+        formula_origin=block.formula_origin if block is not None else "",
+        formula_id=block.formula_id if block is not None else "",
+        formula_page=block.formula_page if block is not None else None,
+        formula_bbox=block.formula_bbox if block is not None else None,
+        formula_ocr_status=block.formula_ocr_status if block is not None else "",
+        source_location={
+            "pdf_page": block.page if block is not None else None,
+            "pdf_bbox": block.bbox if block is not None else None,
+        },
+        block_source=block.block_source if block is not None else "",
+        section_confidence=block.section_confidence if block is not None else "",
+        risk_flags=list(block.risk_flags) if block is not None else [],
+        parse_quality_status=block.parse_quality_status if block is not None else "",
+        fallback_used=block.fallback_used if block is not None else False,
+        llama_refined=block.llama_refined if block is not None else False,
     )
 
 
