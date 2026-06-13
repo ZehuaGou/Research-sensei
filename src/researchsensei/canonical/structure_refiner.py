@@ -48,6 +48,47 @@ def _looks_like_formula(text: str) -> bool:
     )
 
 
+def _heading_parts(text: str) -> tuple[str, str] | None:
+    """Return numbered heading prefix and title body when present."""
+    value = re.sub(r"<[^>]+>", " ", (text or "").strip())
+    value = re.sub(r"\s+", " ", value).strip()
+    if not value or _looks_like_formula(value):
+        return None
+    match = re.match(
+        r"^\s*(?:section\s+)?(?P<number>\d+(?:\.\d+)*)[\.\)]?\s+(?P<title>.+?)\s*$",
+        value,
+        flags=re.I,
+    )
+    if not match:
+        return None
+    return match.group("number"), match.group("title")
+
+
+def _infer_unknown_top_level_section(
+    *,
+    heading_number: str,
+    heading_title: str,
+    current_section: str,
+) -> str | None:
+    """Infer a standard section for top-level numbered headings with paper-specific names."""
+    if "." in heading_number:
+        return None
+    try:
+        numeric = int(heading_number)
+    except ValueError:
+        return None
+    title = heading_title.strip().lower()
+    if not title or title in TRUSTED_SECTIONS:
+        return None
+
+    # Many ML papers name the method section after the system/model acronym
+    # (e.g. "3. CARLA") instead of "Method". If it follows intro/background
+    # and precedes experiments/results, M2 should see it as Method.
+    if numeric >= 3 and current_section in {"Introduction", "Related Work"}:
+        return "Method"
+    return None
+
+
 def extract_section_from_heading(text: str) -> str | None:
     """Extract a trusted section name from a heading-like block."""
     value = re.sub(r"<[^>]+>", " ", (text or "").strip())
@@ -78,9 +119,31 @@ class RuleBasedStructureRefiner:
 
     def _assign_ordered(self, blocks: list[CanonicalDocumentBlock]) -> None:
         current = "Unknown"
+        numbered_top_level: dict[str, str] = {}
         for block in blocks:
             if block.block_type == "title":
-                section = extract_section_from_heading(block.text)
+                heading = _heading_parts(block.text)
+                section = None
+                if heading:
+                    number, title = heading
+                    parent_number = number.split(".", 1)[0]
+                    # Subsections inherit their top-level numbered parent before
+                    # keyword matching; this keeps "4.2 Benchmark Methods" under
+                    # "4 Experiments" rather than moving it to Method.
+                    if "." in number and parent_number in numbered_top_level:
+                        section = numbered_top_level[parent_number]
+                    else:
+                        section = extract_section_from_heading(block.text)
+                        if "." not in number and section is None:
+                            section = _infer_unknown_top_level_section(
+                                heading_number=number,
+                                heading_title=title,
+                                current_section=current,
+                            )
+                    if section and "." not in number:
+                        numbered_top_level[parent_number] = section
+                else:
+                    section = extract_section_from_heading(block.text)
                 if section:
                     current = section
                     block.section = section
@@ -119,6 +182,15 @@ class RuleBasedStructureRefiner:
                     block.risk_flags.append("PAGE_NUMBER_FOOTER")
 
                 continue
+
+            # Bare page-number footer emitted by parsers as ordinary text.
+            if normalized.isdigit() and int(normalized) == block.page:
+                y1 = block.bbox[1] if len(block.bbox) >= 2 else 0.0
+                y2 = block.bbox[3] if len(block.bbox) >= 4 else 0.0
+                if y1 >= 0.85 or y2 >= 0.90:
+                    if "PAGE_NUMBER_FOOTER" not in block.risk_flags:
+                        block.risk_flags.append("PAGE_NUMBER_FOOTER")
+                    continue
 
             # Author/footer preprint lines
             if "preprint submitted to" in normalized or re.fullmatch(r"[a-z].*\bet al\.\s*:\s*preprint.*", normalized, re.I):

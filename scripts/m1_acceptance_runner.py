@@ -181,7 +181,14 @@ def main() -> int:
         "formula_slot_count": len(result.formula_slots),
         "block_count": len(result.blocks),
         "primary_parser": "mineru25pro",
-        "ollama_enabled": False,
+        "ollama_enabled": bool(result.metrics.get("ollama_enabled", False)),
+        "ollama_latex_requested": bool(result.metrics.get("ollama_latex_requested", False)),
+        "ollama_latex_enabled": bool(result.metrics.get("ollama_latex_enabled", False)),
+        "latex_corrected_count": result.metrics.get("latex_corrected_count", 0),
+        "latex_validator_checked": result.metrics.get("latex_validator_checked", 0),
+        "latex_validator_corrected": result.metrics.get("latex_validator_corrected", 0),
+        "latex_validator_low_confidence": result.metrics.get("latex_validator_low_confidence", 0),
+        "latex_validator_timeout": result.metrics.get("latex_validator_timeout", 0),
         "device_mode_requested": parse_stats.get("device_mode_requested", args.device_mode),
         "device_mode_actual": parse_stats.get("device_mode_actual", "unknown"),
         "cuda_available": parse_stats.get("cuda_available", False),
@@ -485,6 +492,9 @@ def generate_verify_index(accept_dir: Path, result, meta: dict, parse_stats: dic
     slots = result.formula_slots
     body_slots = [s for s in slots if s.get("formula_m2_ready", True)]
     ref_slots = [s for s in slots if not s.get("formula_m2_ready", True)]
+    ollama_latex_state = "enabled" if result.metrics.get("ollama_latex_enabled") else (
+        "requested_but_unavailable" if result.metrics.get("ollama_latex_requested") else "disabled"
+    )
 
     lines = [
         "# M1 Final Manual Verify Index",
@@ -517,7 +527,9 @@ def generate_verify_index(accept_dir: Path, result, meta: dict, parse_stats: dic
         f"- Quality status: **{result.quality.status.value}**",
         f"- M2 ready: **{result.canonicalization.m2_ready}**",
         f"- Primary parser: MinerU2.5-Pro",
-        f"- Ollama: disabled",
+        f"- Ollama section refiner: {'enabled' if result.metrics.get('ollama_enabled') else 'disabled'}",
+        f"- Ollama LaTeX validator: {ollama_latex_state}",
+        f"- Ollama LaTeX corrections: {result.metrics.get('latex_corrected_count', 0)}",
         "",
         "## Formula Summary",
         "",

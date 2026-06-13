@@ -322,6 +322,14 @@ def render_paper_understanding(
         f"- {formula.formula_id} -> {formula.section or 'Unknown'} / {formula.role_guess}"
         for formula in formulas.formulas
     ]
+    uncertainties = [
+        "- Rule-based M2 does not infer claims that are absent from M1 nearby_text.",
+        "- Crop/group risk flags lower confidence instead of being hidden.",
+    ]
+    if bundle.performance_report.get("perf_pass", True):
+        uncertainties.append("- M1 performance gate passed for this input.")
+    else:
+        uncertainties.append("- Performance gate WARNING from M1 remains a known risk, not a PASS.")
     return "\n".join(
         [
             "# M2 Paper Understanding",
@@ -358,9 +366,7 @@ def render_paper_understanding(
             "",
             "## Main Uncertainties",
             "",
-            "- Rule-based M2 does not infer claims that are absent from M1 nearby_text.",
-            "- Crop/group risk flags lower confidence instead of being hidden.",
-            "- Performance gate WARNING from M1 remains a known risk, not a PASS.",
+            "\n".join(uncertainties),
             "",
             "## M1 Evidence And M2 Inference Boundary",
             "",

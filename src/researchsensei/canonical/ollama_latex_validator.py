@@ -185,6 +185,13 @@ class OllamaLatexValidator:
                     self.metrics.warnings.append(f"lhs_mismatch: {formula_id}")
                     updated_slots.append(updated_slot)
                     continue
+                if self._relation_operands_changed(current_latex, candidate_latex):
+                    self.metrics.anchor_mismatch_count += 1
+                    if "OLLAMA_LATEX_RELATION_OPERAND_MISMATCH" not in risk_flags:
+                        risk_flags.append("OLLAMA_LATEX_RELATION_OPERAND_MISMATCH")
+                    self.metrics.warnings.append(f"relation_operand_mismatch: {formula_id}")
+                    updated_slots.append(updated_slot)
+                    continue
                 if result.needs_human_check:
                     if "LATEX_NEEDS_HUMAN_CHECK" not in risk_flags:
                         risk_flags.append("LATEX_NEEDS_HUMAN_CHECK")
@@ -340,6 +347,104 @@ class OllamaLatexValidator:
         candidate_lhs = self._normalize_formula_anchor(candidate_latex.split("=", 1)[0])
         return bool(original_lhs and candidate_lhs and original_lhs != candidate_lhs)
 
+    def _relation_operands_changed(self, original_latex: str, candidate_latex: str) -> bool:
+        """Reject LLM corrections that alter operands around inequalities.
+
+        The vision model may clean up formatting, but it must not swap or rewrite
+        the mathematical objects around relations such as ``\\geq``. This catches
+        cases where a piecewise condition changes from ``phi_s^{C_m} >= phi_s^c``
+        to ``phi_s^c >= phi_s^{C_m}``.
+        """
+        original_relations = self._relation_anchors(original_latex)
+        candidate_relations = self._relation_anchors(candidate_latex)
+        if not original_relations or not candidate_relations:
+            return False
+        if len(original_relations) != len(candidate_relations):
+            return True
+        for original, candidate in zip(original_relations, candidate_relations):
+            if original != candidate:
+                return True
+        return False
+
+    def _relation_anchors(self, latex: str) -> list[tuple[str, str, str]]:
+        relation_re = re.compile(r"(\\geq|\\leq|\\gt|\\lt|>=|<=|>|<)")
+        anchors: list[tuple[str, str, str]] = []
+        for match in relation_re.finditer(latex):
+            left = self._math_object_anchor(latex[: match.start()], last=True)
+            right = self._math_object_anchor(latex[match.end() :], last=False)
+            if left and right:
+                anchors.append((self._normalize_relation_operator(match.group(1)), left, right))
+        return anchors
+
+    def _math_object_anchor(self, latex: str, *, last: bool) -> str:
+        matches = list(re.finditer(r"\\phi", latex))
+        if not matches:
+            return ""
+        match = matches[-1] if last else matches[0]
+        token = self._consume_symbol_token(latex[match.start() :])
+        return self._normalize_symbol_token(token)
+
+    def _consume_symbol_token(self, latex: str) -> str:
+        compact = re.sub(r"\s+", "", latex)
+        end = compact.find(")")
+        if end >= 0:
+            return compact[: end + 1]
+        stop = re.search(r"(?:\\\\|&|,|;|\\tag\b|\\text\b)", compact)
+        if stop:
+            return compact[: stop.start()]
+        return compact
+
+    def _normalize_symbol_token(self, token: str) -> str:
+        compact = re.sub(r"\s+", "", token)
+        if not compact.startswith(r"\phi"):
+            return self._normalize_formula_anchor(compact)
+        index = len(r"\phi")
+        subscript = ""
+        superscript = ""
+        while index < len(compact) and compact[index] in "_^":
+            marker = compact[index]
+            index += 1
+            value, index = self._read_script_value(compact, index)
+            if marker == "_":
+                subscript = self._normalize_formula_anchor(value)
+            else:
+                superscript = self._normalize_formula_anchor(value)
+        argument = ""
+        if index < len(compact) and compact[index] == "(":
+            argument, _ = self._read_balanced(compact, index, "(", ")")
+            argument = self._normalize_formula_anchor(argument)
+        return f"phi|sub={subscript}|sup={superscript}|arg={argument}"
+
+    def _read_script_value(self, text: str, index: int) -> tuple[str, int]:
+        if index < len(text) and text[index] == "{":
+            return self._read_balanced(text, index, "{", "}")
+        start = index
+        while index < len(text) and text[index] not in "_^(),;:&<>":
+            index += 1
+        return text[start:index], index
+
+    def _read_balanced(self, text: str, index: int, open_char: str, close_char: str) -> tuple[str, int]:
+        depth = 0
+        start = index
+        while index < len(text):
+            char = text[index]
+            if char == open_char:
+                depth += 1
+            elif char == close_char:
+                depth -= 1
+                if depth == 0:
+                    return text[start + 1 : index], index + 1
+            index += 1
+        return text[start:], len(text)
+
+    def _normalize_relation_operator(self, operator: str) -> str:
+        return {
+            r"\geq": ">=",
+            r"\leq": "<=",
+            r"\gt": ">",
+            r"\lt": "<",
+        }.get(operator, operator)
+
     def _normalize_formula_anchor(self, latex: str) -> str:
         value = _TAG_RE.sub("", latex)
         previous = None
@@ -359,6 +464,7 @@ class OllamaLatexValidator:
             "- Preserve the original LaTeX structure (\\frac, \\sum, \\mathcal, etc.)\n"
             "- Preserve equation number tags such as \\tag{4} exactly if they are present\n"
             "- Do not add or remove mathematical content\n"
+            "- Never swap the left/right operands of =, <, >, \\leq, or \\geq relations\n"
             "- If the image contains a multi-line formula group, correct only the MinerU LaTeX line below; do not return other lines from the group\n"
             "- If unsure, set needs_human_check=true\n\n"
             f"Return formula_id exactly as: {formula_id}\n\n"

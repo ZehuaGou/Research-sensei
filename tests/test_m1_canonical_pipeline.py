@@ -190,6 +190,63 @@ def test_rule_based_refiner_treats_hyphenated_model_heading_as_method() -> None:
     assert by_id["b004"].section == "Method"
 
 
+def test_rule_based_refiner_infers_acronym_method_section() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="1 Introduction"),
+        _block("b002", page=3, block_type="title", text="2 Related Work"),
+        _block("b003", page=7, block_type="title", text="3. CARLA"),
+        _block("b004", page=7, text="CARLA has two training stages."),
+        _block("b005", page=11, block_type="formula", latex="L=L_{pre}+L_{self}"),
+        _block("b006", page=16, block_type="title", text="4. Experiments"),
+        _block("b007", page=16, text="We evaluate CARLA on benchmarks."),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert by_id["b003"].section == "Method"
+    assert by_id["b004"].section == "Method"
+    assert by_id["b005"].section == "Method"
+    assert by_id["b007"].section == "Experiments"
+
+
+def test_rule_based_refiner_subsections_inherit_numbered_parent_section() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=16, block_type="title", text="4. Experiments"),
+        _block("b002", page=16, block_type="title", text="4.1. Benchmark Datasets"),
+        _block("b003", page=17, text="Dataset details."),
+        _block("b004", page=18, block_type="title", text="4.2. Benchmark Methods"),
+        _block("b005", page=18, text="Baselines are compared with the proposed model."),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert by_id["b002"].section == "Experiments"
+    assert by_id["b004"].section == "Experiments"
+    assert by_id["b005"].section == "Experiments"
+
+
+def test_rule_based_refiner_marks_bare_page_number_footer() -> None:
+    from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
+
+    blocks = [
+        _block("b001", page=15, block_type="title", text="3 Method"),
+        _block("b002", page=15, text="15", bbox=[0.49, 0.936, 0.51, 0.95]),
+        _block("b003", page=15, text="15 classes are used.", bbox=[0.10, 0.30, 0.80, 0.34]),
+    ]
+
+    refined = RuleBasedStructureRefiner().refine(blocks)
+
+    by_id = {b.block_id: b for b in refined}
+    assert "PAGE_NUMBER_FOOTER" in by_id["b002"].risk_flags
+    assert "PAGE_NUMBER_FOOTER" not in by_id["b003"].risk_flags
+
+
 def test_rule_based_refiner_uses_reading_order_not_final_page_heading() -> None:
     from researchsensei.canonical.structure_refiner import RuleBasedStructureRefiner
 
@@ -459,6 +516,58 @@ def test_pipeline_can_enable_ollama_latex_without_section_refiner(tmp_path) -> N
     assert persisted_slots[0]["final_latex"] == r"\mathcal{L} = x"
     assert persisted_slots[0]["final_latex_raw"] == r"\mathcal {L} = x"
     assert persisted_slots[0]["latex_corrected_by"] == "ollama_latex_validator"
+
+
+def test_ollama_latex_validator_rejects_relation_operand_swap(tmp_path) -> None:
+    from researchsensei.canonical.ollama_latex_validator import (
+        LatexValidationResult,
+        OllamaLatexValidator,
+    )
+
+    crop_path = tmp_path / "formula.png"
+    crop_path.write_bytes(b"not-used-by-test")
+    original = (
+        r"\text{Anomaly label} (w_{t}): \left\{ \begin{array}{l l} "
+        r"0, & \text{if} \forall c \in \mathcal{C}, "
+        r"\phi_{s}^{C_{m}} (w_{t}) \geq \phi_{s}^{c} (w_{t}) \\ "
+        r"1, & \text{otherwise} \end{array} \right. \tag{7}"
+    )
+    swapped = (
+        r"\text{Anomaly label} \left(w_t\right):\begin{cases} "
+        r"0, & \text{if } \forall c \in \mathcal{C}, "
+        r"\phi^{c}_{s}(w_t) \geq \phi^{C_m}_{s}(w_t) \\ "
+        r"1, & \text{otherwise} \end{cases} \tag{7}"
+    )
+
+    class SwappingValidator(OllamaLatexValidator):
+        def is_available(self) -> bool:
+            return True
+
+        def _validate_single(self, formula_id, crop_path, current_latex):
+            return LatexValidationResult(
+                formula_id=formula_id,
+                corrected_latex=swapped,
+                confidence=0.95,
+                issues_found=["swapped operands"],
+            )
+
+    validator = SwappingValidator()
+    slots = [
+        {
+            "formula_id": "formula_008",
+            "crop_path": crop_path.name,
+            "final_latex": original,
+            "risk_flags": [],
+        }
+    ]
+
+    updated = validator.validate_formulas(slots, tmp_path)
+
+    assert updated[0]["final_latex"] == original
+    assert "latex_corrected_by" not in updated[0]
+    assert "OLLAMA_LATEX_RELATION_OPERAND_MISMATCH" in updated[0]["risk_flags"]
+    assert validator.metrics.formulas_corrected == 0
+    assert validator.metrics.anchor_mismatch_count == 1
 
 
 def test_ollama_latex_validator_rejects_low_confidence_changes(tmp_path, monkeypatch) -> None:
