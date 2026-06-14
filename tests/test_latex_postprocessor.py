@@ -66,6 +66,11 @@ class TestLatexPostProcessor:
         assert r"Er_{t}^{i}" in result
         assert r"Fc_{1}" in result
 
+    def test_fixes_metric_token_spacing(self):
+        input_latex = r"P r e c i s i o n = \frac {T P}{T P + F P} \tag {4}"
+        result = postprocess_latex(input_latex)
+        assert result == r"Precision = \frac{TP}{TP + FP} \tag{4}"
+
     def test_fixes_rolling_error_sensor_superscript_ocr(self):
         input_latex = (
             r"\mu_ {t} ^ {i} = \frac {1}{l _ {w}} \sum_ {j = 0} ^ {l _ {w} - 1} "

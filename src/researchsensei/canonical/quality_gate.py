@@ -1,6 +1,8 @@
 """M1 quality gate."""
 from __future__ import annotations
 
+import re
+
 from pydantic import Field
 
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
@@ -27,6 +29,7 @@ class M1QualityGateResult(SenseiModel):
     missing_crop_count: int = 0
     missing_overlay_count: int = 0
     review_disabled_count: int = 0
+    severe_repetition_count: int = 0
     high_risk_count: int = 0
     medium_risk_count: int = 0
     low_risk_count: int = 0
@@ -58,6 +61,10 @@ class M1QualityGate:
         result.polluted_section_count = self._count_polluted_sections(blocks)
         if result.polluted_section_count:
             result.blocking_reasons.append("POLLUTED_SECTION")
+
+        result.severe_repetition_count = self._count_severe_repetition(blocks)
+        if result.severe_repetition_count:
+            result.blocking_reasons.append("SEVERE_TEXT_REPETITION")
 
         result.missing_latex_count = sum(1 for block in formulas if not block.latex.strip())
         result.missing_bbox_count = sum(1 for block in formulas if len(block.bbox) != 4)
@@ -106,6 +113,39 @@ class M1QualityGate:
         else:
             result.status = CanonicalQualityStatus.PASS
         return result
+
+    def _count_severe_repetition(self, blocks: list[CanonicalDocumentBlock]) -> int:
+        count = 0
+        for block in blocks:
+            if block.block_type not in {"text", "caption", "reference"}:
+                continue
+            text = block.text.strip()
+            if not text or "<table" in text.lower():
+                continue
+            if self._has_repeated_text_noise(text):
+                count += 1
+        return count
+
+    @staticmethod
+    def _has_repeated_text_noise(text: str) -> bool:
+        lowered = text.lower()
+        severe_phrases = (
+            "source of the model to the source",
+            "can be used to be used",
+            "the model provides a more comprehensive and comprehensive",
+        )
+        if any(phrase in lowered for phrase in severe_phrases):
+            return True
+        tokens = re.findall(r"[a-z][a-z0-9_+-]*", lowered)
+        if len(tokens) < 40:
+            return False
+        grams = [" ".join(tokens[index:index + 6]) for index in range(len(tokens) - 5)]
+        seen: dict[str, int] = {}
+        for gram in grams:
+            seen[gram] = seen.get(gram, 0) + 1
+            if seen[gram] >= 4:
+                return True
+        return False
 
     def _count_polluted_sections(self, blocks: list[CanonicalDocumentBlock]) -> int:
         polluted = 0

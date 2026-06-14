@@ -259,6 +259,14 @@ class RuleBasedStructureRefiner:
                     block.risk_flags.append("FRONT_MATTER_AFFILIATION")
                 continue
 
+            # arXiv left-side running metadata is useful for provenance, but
+            # should never be emitted as Introduction/Method body text.
+            if re.match(r"^arxiv:\d{4}\.\d{4,5}(?:v\d+)?\b", normalized):
+                if self._is_side_margin_block(block):
+                    if "ARXIV_SIDEBAR_HEADER" not in block.risk_flags:
+                        block.risk_flags.append("ARXIV_SIDEBAR_HEADER")
+                    continue
+
             # Very short orphan title blocks that repeat on multiple pages
             if block.block_type == "title" and len(text) < 5 and title_counts.get(normalized, 0) >= 3:
                 if "PAGE_HEADER_REPEATED" not in block.risk_flags:
@@ -274,6 +282,17 @@ class RuleBasedStructureRefiner:
         if max_coord <= 1.5:
             return y1 <= 0.08 and y2 <= 0.12
         return y1 <= 100 and y2 <= 140
+
+    @staticmethod
+    def _is_side_margin_block(block: CanonicalDocumentBlock) -> bool:
+        if len(block.bbox) < 4:
+            return False
+        x1 = float(block.bbox[0])
+        x2 = float(block.bbox[2])
+        max_coord = max(abs(float(v)) for v in block.bbox)
+        if max_coord <= 1.5:
+            return x2 <= 0.15 or x1 <= 0.08
+        return x2 <= 120 or x1 <= 80
 
 
     def _repair_misplaced_references(self, blocks: list[CanonicalDocumentBlock]) -> None:

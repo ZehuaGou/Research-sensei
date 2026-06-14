@@ -137,7 +137,9 @@ M1 structure remains rule-based and quality-gated; M2 receives the canonical
 section/block layout plus formula metadata. The optional section refiner is for
 review/heavy diagnostics only.
 
-M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M1 gate blocks source mismatch. M1 gate checks missing crop/overlay for formal acceptance. Dense raw-only formula sets (`formula_count >= 5` and `latex_count == 0`) set `m2_ready_for_formula_understanding=false`; raw_formula_text cannot be treated as derivable LaTeX. A blocked canonical paper cannot enter M2.
+M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M1 gate blocks source mismatch. M1 gate checks missing crop/overlay for formal acceptance. Dense raw-only formula sets (`formula_count >= 5` and `latex_count == 0`) set `m2_ready_for_formula_understanding=false`; raw_formula_text cannot be treated as derivable LaTeX. M1 also blocks severe repeated/hallucinated body text, because a parser can otherwise produce M2-readable artifacts whose prose is not faithful enough for deep reading. A blocked canonical paper cannot enter M2.
+
+When `source_pdf_path` is available, the MinerU-primary pipeline keeps MinerU for layout/formula identity and crop/overlay generation, but repairs suspicious non-formula text blocks from the same PDF bbox using embedded PyMuPDF text. This is only a body-text repair path: it does not modify formula bbox/page/source identity and it records `pdf_text_repair_*` metrics in the canonical front matter/report.
 
 ### 2026-06-10 acceptance result
 
@@ -152,7 +154,8 @@ Five-paper acceptance summary:
 
 Primary MinerU acceptance summary:
 - paper_4_unseen MEMTO: verified primary MinerU route sample.
-- 2310_08800v2 DDMT and 2508_11528v1 TPIDM: historical reports exist, but current M2 contract audit shows stale artifacts; they cannot be used as multi-paper primary MinerU acceptance evidence until regenerated with current `paper_metadata.json`, `quality_report.md`, `performance_report.json`, `visual_audit/`, and complete formula slot fields.
+- 2310_08800v2 DDMT: regenerated 2026-06-14 with current M1, current M2 contract artifacts, PDF-text repair, crop/overlay enforcement, Ollama formula LaTeX polish, and manual PDF-vs-canonical audit. Result: PASS, m2_ready=true, formula_m2_ready=true, formulas=7, latex=7, crop/overlay=7/7, PDF significant-vocab coverage=0.956, canonical significant-vocab-in-PDF=0.963, no repeated hallucinated text, no arXiv/page/CID/Unknown pollution. M2 diagnostic and full real Mimo handoff both succeeded.
+- 2508_11528v1 TPIDM: historical report exists, but current M2 contract audit shows stale artifacts; it cannot be used as multi-paper primary MinerU acceptance evidence until regenerated with current `paper_metadata.json`, `quality_report.md`, `performance_report.json`, `visual_audit/`, and complete formula slot fields.
 
 Ollama section refinement remains optional/off by default. Cached paper_4_unseen section eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b section compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0. The formula LaTeX polish path is separate and should be enabled explicitly when producing M2 handoff artifacts.
 

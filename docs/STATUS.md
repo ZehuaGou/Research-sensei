@@ -28,20 +28,20 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | Direction Exploration | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 宽 query 方向框架文档已设计，代码未实现 |
 | M1 | Seed Paper Expansion | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | seed paper 扩展文档已设计，代码未实现 |
 | M1 | Source-aware acquisition (LaTeX/HTML priority) | implemented | unit tested | IMPLEMENTED | LaTeX/HTML/PDF source priority 已实现，arXiv source 下载已实现，PDF fallback 已实现 |
-| M1 | canonical_paper.md pipeline | implemented | unit tested + M1/M2 contract tested | PARTIAL_REAL_E2E_VERIFIED | M1 canonical artifacts are M2-readable; MinerU route is verified on paper_4 only, multi-paper MinerU acceptance remains pending; fallback reports are audit/debug only |
+| M1 | canonical_paper.md pipeline | implemented | unit tested + M1/M2 contract tested | PARTIAL_REAL_E2E_VERIFIED | M1 canonical artifacts are M2-readable; MinerU route is verified on paper_4 and regenerated DDMT (`2310_08800v2`); multi-paper MinerU acceptance remains pending; fallback reports are audit/debug only |
 | M1 | MarkItDownAdapter (fallback) | implemented | live tested | IMPLEMENTED | markitdown 已安装 (MIT)，fallback/debug only，不是主线 |
 | M1 | MarkerPdfAdapter (fallback) | implemented | live tested | IMPLEMENTED | marker-pdf 已安装 (GPL-3.0)，fallback/audit baseline |
-| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + paper_4 real acceptance | PARTIAL_REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser candidate; verified on paper_4 only, multi-paper MinerU acceptance remains pending |
+| M1 | MinerU25ProAdapter (PRIMARY) | implemented | unit tested + paper_4/DDMT real acceptance | PARTIAL_REAL_E2E_VERIFIED | MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser candidate; verified on paper_4 and `2310_08800v2`, multi-paper MinerU acceptance remains pending |
 | M1 | OllamaSectionRefiner | implemented | unit tested + local compare | OPTIONAL_REFINER_NOT_DEFAULT | Ollama is an optional structured refiner, default OFF; must not modify latex/bbox/page/source |
 | M1 | RuleBasedStructureRefiner | implemented | unit tested | IMPLEMENTED | Always runs; assigns sections, normalizes headings, detects risks |
-| M1 | M1 Quality Gate | implemented | unit tested + acceptance enforced | IMPLEMENTED, REAL_E2E_VERIFIED | Blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas |
+| M1 | M1 Quality Gate | implemented | unit tested + acceptance enforced | IMPLEMENTED, REAL_E2E_VERIFIED | Blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas, severe repeated/hallucinated body text |
 | M1 | MarkerDocumentFormulaDetector | implemented | unit tested | IMPLEMENTED | 使用 Marker build_document() 获取 Equation blocks with bbox，输出 FormulaSlot 列表 |
 | M1 | FormulaCropper | implemented | unit tested | IMPLEMENTED | PyMuPDF crop with padding，bbox in PDF points，输出 cropped formula images |
 | M1 | FormulaRegionDetector | superseded | — | SUPERSEDED | 已被 MinerU25ProAdapter (primary) 和 MarkerDocumentFormulaDetector (fallback) 取代 |
 | M1 | FormulaOCRAdapter / pix2tex | interface exists | — | FALLBACK_ONLY | pix2tex adapter 接口存在但模型未集成；仅作为 unresolved formula crops 的 fallback，不是默认主线 |
 | M1 | DeepXiv | — | — | BLOCKED | pip 包不存在，无确认的公开 API |
 | M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
-| M2 | Paper Deep Reading | implemented | unit tested + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_ONE_PAPER | `2312_01729v1` completed M1 canonical handoff + real Mimo LLM + QualityAuditor with SUCCESS; all-formula derivation remains pending |
+| M2 | Paper Deep Reading | implemented | unit tested + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | `2312_01729v1` and `2310_08800v2` completed M1 canonical handoff + real Mimo LLM + QualityAuditor with SUCCESS; all-formula derivation remains pending |
 | M2 | canonical input reader / validator | implemented | unit tested + real M1/M2 e2e | IMPLEMENTED | M2 reads current M1 canonical bundle and builds parsed document, passages, claims, evidence pack, and status artifacts |
 | M2 | formula_origin full chain | implemented | unit tested + real M1/M2 e2e | IMPLEMENTED_FOR_TOP_K | formula_origin / formula_ocr_status / original_latex are propagated to formula cards; detailed derivation is top-K only |
 | M2 | LaTeXSourceParser | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 职责前移到 M1 material normalization，文档已设计，代码未实现 |
@@ -86,7 +86,9 @@ Pipeline: MinerU2.5-Pro via mineru-vl-utils → CanonicalDocumentBlock → RuleB
 
 These rows are historical report snapshots. Current audit shows the stored DDMT/TPIDM artifacts are stale for the M2 contract (missing current metadata/performance/quality files and formula slot fields), so they must not be used as formal multi-paper MinerU acceptance evidence until regenerated with current M1.
 
-Current formal statement: M1 canonical artifacts are M2-readable when generated with the current pipeline, crop/overlay review is enforced, dense raw-only formula outputs are blocked/degraded for formula understanding, and the primary MinerU route remains verified on paper_4 only. Multi-paper MinerU acceptance remains pending.
+Current formal statement: M1 canonical artifacts are M2-readable when generated with the current pipeline, crop/overlay review is enforced, dense raw-only formula outputs are blocked/degraded for formula understanding, severe repeated/hallucinated body text is blocked, and the primary MinerU route is verified on paper_4 and regenerated DDMT (`2310_08800v2`). Multi-paper MinerU acceptance remains pending.
+
+2026-06-14 DDMT regeneration: full MinerU page parse on `2310_08800v2` completed with current M1. The pipeline repaired 15 noisy MinerU text blocks from bbox-aligned embedded PDF text, suppressed one arXiv sidebar header, produced `canonical_quality_status=PASS`, `m2_ready=true`, formulas=7, latex=7, crop/overlay=7/7, and M2 diagnostic/full Mimo handoff succeeded. Manual PDF-vs-canonical audit: no repeated hallucinated body text, no arXiv/page/CID/Unknown pollution, PDF significant-vocab coverage 0.956, canonical significant-vocab-in-PDF 0.963.
 
 ### Ollama Status
 

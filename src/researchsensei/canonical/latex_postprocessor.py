@@ -61,6 +61,21 @@ _KNOWN_OCR_TOKEN_REPLACEMENTS = (
     (re.compile(r"(?<![A-Za-z])F\s+c(?=\s*_)"), "Fc"),
 )
 
+_METRIC_WORD_REPLACEMENTS = (
+    (re.compile(r"(?<![A-Za-z])P\s+r\s+e\s+c\s+i\s+s\s+i\s+o\s+n(?![A-Za-z])"), "Precision"),
+    (re.compile(r"(?<![A-Za-z])R\s+e\s+c\s+a\s+l\s+l(?![A-Za-z])"), "Recall"),
+)
+_METRIC_ABBR_REPLACEMENTS = (
+    (re.compile(r"(?<![A-Za-z])T\s+P(?![A-Za-z])"), "TP"),
+    (re.compile(r"(?<![A-Za-z])F\s+P(?![A-Za-z])"), "FP"),
+    (re.compile(r"(?<![A-Za-z])F\s+N(?![A-Za-z])"), "FN"),
+    (re.compile(r"(?<![A-Za-z])T\s+N(?![A-Za-z])"), "TN"),
+)
+_METRIC_CONTEXT_RE = re.compile(
+    r"\b(?:Precision|Recall|TP|FP|FN|TN)\b|F_\{?1\}?",
+    re.I,
+)
+
 _SUM_INDEX_RE = re.compile(r"\\sum_\{(?P<idx>[A-Za-z])\s*=\s*0\}")
 _LHS_SENSOR_SUPER_RE = re.compile(r"\^\{(?P<sensor>[A-Za-z])\}")
 
@@ -154,6 +169,16 @@ def _fix_known_ocr_token_spacing(latex: str) -> str:
     return latex
 
 
+def _fix_metric_token_spacing(latex: str) -> str:
+    """Join OCR-split metric words/acronyms in evaluation formulas."""
+    for pattern, replacement in _METRIC_WORD_REPLACEMENTS:
+        latex = pattern.sub(replacement, latex)
+    if _METRIC_CONTEXT_RE.search(latex):
+        for pattern, replacement in _METRIC_ABBR_REPLACEMENTS:
+            latex = pattern.sub(replacement, latex)
+    return latex
+
+
 def _fix_rolling_error_sensor_superscript(latex: str) -> str:
     """Repair a narrow MinerU OCR confusion in rolling error formulas.
 
@@ -211,6 +236,7 @@ def postprocess_latex(latex: str) -> str:
 
     # Join a small set of known OCR-split math tokens.
     result = _fix_known_ocr_token_spacing(result)
+    result = _fix_metric_token_spacing(result)
 
     # Fix letter-spaced mathbf/text/mathrm
     result = _MATHBF_SPACED.sub(_fix_letter_spaced_command, result)

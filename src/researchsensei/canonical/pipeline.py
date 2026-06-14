@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ SUPPRESSED_CONTEXT_RISK_FLAGS = {
     "AUTHOR_FOOTER",
     "FUNDING_NOTE",
     "FRONT_MATTER_AFFILIATION",
+    "ARXIV_SIDEBAR_HEADER",
 }
 
 
@@ -110,6 +112,7 @@ class M1CanonicalPipeline:
     ) -> M1PipelineResult:
         start = time.perf_counter()
         working_blocks = [block.model_copy(deep=True) for block in blocks]
+        pdf_text_repair_metrics = self._repair_blocks_from_pdf_text(working_blocks, source_pdf_path)
 
         if apply_rule_refiner:
             working_blocks = self.rule_refiner.refine(working_blocks)
@@ -162,6 +165,7 @@ class M1CanonicalPipeline:
             "formula_overlay_count": sum(1 for slot in slots if slot.get("overlay_path")),
             "latex_corrected_count": sum(1 for slot in slots if slot.get("latex_corrected_by")),
         }
+        metrics.update(pdf_text_repair_metrics)
         metrics.update(initial_metrics or {})
         if self.ollama_refiner is not None:
             metrics.update({
@@ -455,6 +459,153 @@ class M1CanonicalPipeline:
             for risk in slot.get("risk_flags", []):
                 if risk not in block.risk_flags:
                     block.risk_flags.append(str(risk))
+
+    def _repair_blocks_from_pdf_text(
+        self,
+        blocks: list[CanonicalDocumentBlock],
+        source_pdf_path: str | Path,
+    ) -> dict[str, Any]:
+        """Repair noisy MinerU text blocks using embedded PDF text from the same bbox.
+
+        MinerU is the primary layout/formula route, but on some text-heavy pages
+        it can hallucinate repeated prose. If the source PDF has extractable text,
+        the bbox-aligned PDF text is a safer canonical body for M2.
+        """
+        metrics: dict[str, Any] = {
+            "pdf_text_repair_available": False,
+            "pdf_text_repair_checked": 0,
+            "pdf_text_repair_replaced": 0,
+            "pdf_text_repair_suppressed": 0,
+        }
+        if not source_pdf_path:
+            return metrics
+        pdf_path = Path(source_pdf_path)
+        if not pdf_path.exists():
+            return metrics
+
+        try:
+            import fitz
+        except ImportError:
+            return metrics
+
+        try:
+            doc = fitz.open(str(pdf_path))
+        except Exception:
+            return metrics
+
+        metrics["pdf_text_repair_available"] = True
+        try:
+            for block in blocks:
+                if block.block_type not in {"title", "text", "caption", "reference"}:
+                    continue
+                if not block.text.strip() or len(block.bbox) != 4:
+                    continue
+                metrics["pdf_text_repair_checked"] += 1
+                if self._is_arxiv_sidebar_header(block):
+                    if "ARXIV_SIDEBAR_HEADER" not in block.risk_flags:
+                        block.risk_flags.append("ARXIV_SIDEBAR_HEADER")
+                    metrics["pdf_text_repair_suppressed"] += 1
+                    continue
+                clip_text = self._pdf_clip_text(doc, block)
+                if not clip_text:
+                    continue
+                if self._should_replace_with_pdf_text(block.text, clip_text, block.block_type):
+                    block.text = clip_text
+                    if "PDF_TEXT_REPAIRED" not in block.risk_flags:
+                        block.risk_flags.append("PDF_TEXT_REPAIRED")
+                    metrics["pdf_text_repair_replaced"] += 1
+        finally:
+            doc.close()
+        return metrics
+
+    def _pdf_clip_text(self, doc: Any, block: CanonicalDocumentBlock) -> str:
+        rect = self._block_rect(doc, block)
+        if rect is None:
+            return ""
+        page = doc[int(block.page) - 1]
+        text = page.get_text("text", clip=rect)
+        return self._clean_pdf_text(text)
+
+    def _block_rect(self, doc: Any, block: CanonicalDocumentBlock) -> Any | None:
+        import fitz
+
+        page_index = int(block.page) - 1
+        if page_index < 0 or page_index >= len(doc):
+            return None
+        page_rect = doc[page_index].rect
+        x1, y1, x2, y2 = [float(value) for value in block.bbox]
+        if all(0.0 <= value <= 1.0 for value in (x1, y1, x2, y2)):
+            x1, x2 = x1 * page_rect.width, x2 * page_rect.width
+            y1, y2 = y1 * page_rect.height, y2 * page_rect.height
+        if x2 <= x1 or y2 <= y1:
+            return None
+        return fitz.Rect(x1, y1, x2, y2) & page_rect
+
+    @staticmethod
+    def _clean_pdf_text(text: str) -> str:
+        cleaned = (text or "").replace("\x00", " ")
+        cleaned = re.sub(r"([A-Za-z])-\s+([A-Za-z])", r"\1\2", cleaned)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
+
+    @staticmethod
+    def _is_arxiv_sidebar_header(block: CanonicalDocumentBlock) -> bool:
+        text = re.sub(r"\s+", " ", block.text.strip())
+        if not re.match(r"^arxiv:\d{4}\.\d{4,5}(?:v\d+)?\b", text, re.I):
+            return False
+        if len(block.bbox) != 4:
+            return True
+        x1, _, x2, _ = [float(value) for value in block.bbox]
+        return x2 <= 0.15 or x1 <= 0.08
+
+    @classmethod
+    def _should_replace_with_pdf_text(cls, original: str, clip_text: str, block_type: str) -> bool:
+        original_clean = cls._clean_pdf_text(original)
+        clip_clean = cls._clean_pdf_text(clip_text)
+        if not clip_clean or clip_clean == original_clean:
+            return False
+        if block_type == "title":
+            return 2 <= len(clip_clean) <= 160 and cls._normalized_text(original_clean) != cls._normalized_text(clip_clean)
+        if len(clip_clean.split()) < 5:
+            return False
+        if cls._has_repeated_text_noise(original_clean):
+            return True
+        if len(original_clean) > len(clip_clean) * 1.08 or len(clip_clean) > len(original_clean) * 1.08:
+            return True
+        return cls._token_recall(original_clean, clip_clean) < 0.92
+
+    @staticmethod
+    def _normalized_text(text: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+    @staticmethod
+    def _token_recall(original: str, repaired: str) -> float:
+        original_tokens = set(re.findall(r"[a-z0-9]+", original.lower()))
+        repaired_tokens = set(re.findall(r"[a-z0-9]+", repaired.lower()))
+        if not original_tokens or not repaired_tokens:
+            return 1.0
+        return len(original_tokens & repaired_tokens) / max(1, len(original_tokens))
+
+    @staticmethod
+    def _has_repeated_text_noise(text: str) -> bool:
+        lowered = text.lower()
+        bad_phrases = (
+            "source of the model to the source",
+            "can be used to be used",
+            "the model provides a more comprehensive and comprehensive",
+        )
+        if any(phrase in lowered for phrase in bad_phrases):
+            return True
+        tokens = re.findall(r"[a-z][a-z0-9_+-]*", lowered)
+        if len(tokens) < 40:
+            return False
+        grams = [" ".join(tokens[index:index + 6]) for index in range(len(tokens) - 5)]
+        counts: dict[str, int] = {}
+        for gram in grams:
+            counts[gram] = counts.get(gram, 0) + 1
+            if counts[gram] >= 4:
+                return True
+        return False
 
     def _generate_formula_review_artifacts(
         self,

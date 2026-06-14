@@ -352,6 +352,26 @@ def test_quality_gate_marks_dense_raw_only_formulas_degraded_not_formula_ready()
     assert "RAW_ONLY_FORMULA_DENSE_NO_LATEX" in result.warning_reasons
 
 
+def test_quality_gate_blocks_severe_repeated_body_text() -> None:
+    from researchsensei.canonical.quality_gate import M1QualityGate
+
+    repeated = (
+        "ADNM masks are used to identify normal dependency patterns. "
+        "The decoded sequence then refers to the source of the model to the source of the model "
+        "to the source of the model to the source of the model to the source of the model."
+    )
+    blocks = [
+        _block("b001", page=3, text=repeated, section="Related Work"),
+        _block("b002", page=3, block_type="formula", latex="x=y", section="Method"),
+    ]
+
+    result = M1QualityGate().evaluate(blocks, formula_slots=_reviewed_slots(blocks))
+
+    assert result.status == CanonicalQualityStatus.FAIL
+    assert result.severe_repetition_count == 1
+    assert "SEVERE_TEXT_REPETITION" in result.blocking_reasons
+
+
 def test_ollama_client_uses_native_chat_json_schema(monkeypatch) -> None:
     from researchsensei.canonical.ollama_refiner import OllamaStructuredClient
 
@@ -1149,6 +1169,81 @@ def test_m1_pipeline_generates_crop_overlay_for_pdf_backed_formula_slots(tmp_pat
     assert (tmp_path / slots[0]["overlay_path"]).exists()
     assert (tmp_path / slots[0]["group_crop_path"]).exists()
     assert (tmp_path / slots[0]["group_overlay_path"]).exists()
+
+
+def test_m1_pipeline_repairs_noisy_mineru_text_from_pdf_bbox(tmp_path) -> None:
+    import fitz
+
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    pdf_path = tmp_path / "source.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=200)
+    page.insert_textbox(
+        fitz.Rect(40, 40, 360, 120),
+        "Transformer methods capture local and global dependency features in time series.",
+        fontsize=10,
+    )
+    doc.save(pdf_path)
+    doc.close()
+
+    noisy = (
+        "Transformer methods capture local and global models. "
+        "ADNM masks are used to identify the models that have been used to generate the data "
+        "from the source of the model to the source of the model to the source of the model "
+        "to the source of the model to the source of the model."
+    )
+    blocks = [
+        _block("b001", page=1, block_type="title", text="3 Method", bbox=[0.10, 0.05, 0.60, 0.15]),
+        _block("b002", page=1, text=noisy, bbox=[0.10, 0.20, 0.90, 0.60], section="Method"),
+    ]
+
+    result = M1CanonicalPipeline().run_from_blocks(
+        paper_id="p-pdf-repair",
+        title="PDF Repair",
+        blocks=blocks,
+        output_dir=tmp_path,
+        source_pdf_path=str(pdf_path),
+    )
+
+    canonical = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+    assert result.metrics["pdf_text_repair_replaced"] == 1
+    assert result.quality.severe_repetition_count == 0
+    assert "source of the model to the source" not in canonical
+    assert "local and global dependency features" in canonical
+
+
+def test_m1_pipeline_suppresses_arxiv_sidebar_header(tmp_path) -> None:
+    import fitz
+
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    pdf_path = tmp_path / "source.pdf"
+    doc = fitz.open()
+    page = doc.new_page(width=400, height=400)
+    page.insert_textbox(fitz.Rect(8, 100, 50, 300), "arXiv:2310.08800v2 [cs.LG] 30 Oct 2023", fontsize=8, rotate=90)
+    page.insert_text((70, 100), "Readable introduction text.", fontsize=10)
+    doc.save(pdf_path)
+    doc.close()
+
+    blocks = [
+        _block("b001", page=1, block_type="title", text="1 Introduction", bbox=[0.15, 0.10, 0.50, 0.15]),
+        _block("b002", page=1, text="arXiv:2310.08800v2 [cs.LG] 30 Oct 2023", bbox=[0.02, 0.25, 0.12, 0.75]),
+        _block("b003", page=1, text="Readable introduction text.", bbox=[0.15, 0.20, 0.80, 0.30]),
+    ]
+
+    result = M1CanonicalPipeline().run_from_blocks(
+        paper_id="p-arxiv-sidebar",
+        title="Sidebar Paper",
+        blocks=blocks,
+        output_dir=tmp_path,
+        source_pdf_path=str(pdf_path),
+    )
+
+    canonical = Path(result.canonicalization.canonical_paper_path).read_text(encoding="utf-8")
+    assert result.metrics["pdf_text_repair_suppressed"] == 1
+    assert "arXiv:2310.08800v2" not in canonical
+    assert "Readable introduction text." in canonical
 
 
 def test_m1_pipeline_run_pdf_unpacks_mineru_payload_and_records_stats(tmp_path) -> None:
