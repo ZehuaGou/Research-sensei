@@ -1263,6 +1263,148 @@ def test_builder_formula_slots_include_contract_fields() -> None:
     assert slots[1]["equation_number"] == "2"
 
 
+def test_builder_formula_slots_extract_equation_number_from_final_latex() -> None:
+    from researchsensei.canonical.canonical_builder import CanonicalBuilder
+
+    blocks = [
+        _block("b001", page=3, block_type="formula", latex="y_t=g(x_t)", section="Method"),
+    ]
+    reviewed_slots = [
+        {
+            "formula_id": "formula_001",
+            "block_id": "b001",
+            "final_latex": r"y_t = g(x_t) \tag{7}",
+            "equation_number": "",
+        }
+    ]
+
+    slots = CanonicalBuilder()._formula_slots(blocks, reviewed_slots)
+
+    assert slots[0]["equation_number"] == "7"
+
+
+def test_pipeline_refreshes_equation_number_after_latex_validation(tmp_path) -> None:
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    class Validator:
+        class Metrics:
+            formulas_checked = 1
+            formulas_corrected = 1
+            low_confidence_count = 0
+            overexpanded_count = 0
+            anchor_mismatch_count = 0
+            tag_restored_count = 0
+            json_valid_count = 1
+            json_invalid_count = 0
+            timeout_count = 0
+
+        metrics = Metrics()
+
+        def is_available(self) -> bool:
+            return True
+
+        def validate_formulas(self, formula_slots, output_dir):
+            updated = []
+            for slot in formula_slots:
+                copy = dict(slot)
+                copy["final_latex"] = r"y_t = g(x_t) \tag{9}"
+                copy["equation_number"] = ""
+                updated.append(copy)
+            return updated
+
+    blocks = [
+        _block("b001", page=3, text="Method context.", section="Method"),
+        _block("b002", page=3, block_type="formula", latex="y_t=g(x_t)", section="Method"),
+    ]
+
+    result = M1CanonicalPipeline(latex_validator=Validator()).run_from_blocks(
+        paper_id="p-equation-refresh",
+        title="Equation Refresh",
+        blocks=blocks,
+        output_dir=tmp_path,
+        apply_rule_refiner=False,
+        apply_ollama_latex=True,
+    )
+
+    assert result.formula_slots[0]["equation_number"] == "9"
+    persisted = json.loads((tmp_path / "formula_slots.json").read_text(encoding="utf-8"))
+    assert persisted[0]["equation_number"] == "9"
+
+
+def test_formula_nearby_text_filters_running_page_headers() -> None:
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    blocks = [
+        _block(
+            "h001",
+            page=12,
+            text="EdgeConvFormer",
+            bbox=[0.43, 0.044, 0.568, 0.062],
+            section="Method",
+        ),
+        _block(
+            "t001",
+            page=12,
+            text="The attention module computes scaled dot-product attention.",
+            bbox=[0.10, 0.20, 0.80, 0.25],
+            section="Method",
+        ),
+        _block(
+            "f001",
+            page=12,
+            block_type="formula",
+            latex=r"\text{Attention}(Q,K,V)=\text{softmax}(QK^T)V",
+            bbox=[0.10, 0.30, 0.80, 0.36],
+            section="Method",
+        ),
+    ]
+
+    slots = M1CanonicalPipeline()._slots_from_blocks(blocks)
+
+    assert slots[0]["nearby_text_before"] == "The attention module computes scaled dot-product attention."
+
+
+def test_formula_nearby_text_falls_back_across_pages_when_same_page_before_is_header() -> None:
+    from researchsensei.canonical.pipeline import M1CanonicalPipeline
+
+    blocks = [
+        _block(
+            "p001",
+            page=11,
+            text="The Transformer module computes query, key, and value matrices before attention.",
+            bbox=[0.10, 0.80, 0.80, 0.86],
+            section="Method",
+        ),
+        _block(
+            "h001",
+            page=12,
+            text="EdgeConvFormer",
+            bbox=[0.43, 0.044, 0.568, 0.062],
+            section="Method",
+        ),
+        _block(
+            "f001",
+            page=12,
+            block_type="formula",
+            latex=r"\text{Attention}(Q,K,V)=\text{softmax}(QK^T)V",
+            bbox=[0.10, 0.10, 0.80, 0.16],
+            section="Method",
+        ),
+        _block(
+            "n001",
+            page=13,
+            text="The next paragraph explains residual connections.",
+            bbox=[0.10, 0.20, 0.80, 0.25],
+            section="Method",
+        ),
+    ]
+
+    slots = M1CanonicalPipeline()._slots_from_blocks(blocks)
+
+    assert slots[0]["nearby_text_before"].startswith("The Transformer module computes")
+    assert slots[0]["nearby_text_after"].startswith("The next paragraph explains")
+
+
 def test_page_header_footer_blocks_suppressed_from_canonical(tmp_path) -> None:
     """Repeated page header titles and footer lines must not appear in canonical markdown."""
     from researchsensei.canonical.pipeline import M1CanonicalPipeline

@@ -128,6 +128,22 @@ class CanonicalBuilder:
                 return m.group(1)
         return ""
 
+    def _slot_equation_number(self, reviewed: dict, block: CanonicalDocumentBlock) -> str:
+        reviewed_number = str(reviewed.get("equation_number") or "").strip()
+        if reviewed_number:
+            return reviewed_number
+        for candidate in (
+            reviewed.get("final_latex"),
+            reviewed.get("mineru_latex"),
+            reviewed.get("marker_latex"),
+            block.latex,
+            block.text,
+        ):
+            eq_number = self._extract_equation_number(str(candidate or ""))
+            if eq_number:
+                return eq_number
+        return ""
+
     def _origin_for_block(self, block: CanonicalDocumentBlock) -> FormulaOrigin:
         if block.latex and block.source == "mineru25pro":
             return FormulaOrigin.MINERU_LATEX
@@ -174,7 +190,7 @@ class CanonicalBuilder:
                 "risk_flags": risk_flags,
             })
             # M2 contract fields: use reviewed values if present, else compute defaults
-            eq_number = reviewed.get("equation_number", self._extract_equation_number(block.text or block.latex))
+            eq_number = self._slot_equation_number(reviewed, block)
             group_id = reviewed.get("equation_group_id", "")
             group_order = reviewed.get("group_order", 0)
             group_crop = reviewed.get("group_crop_path", "")

@@ -91,6 +91,11 @@ class TestLatexPostProcessor:
         result = postprocess_latex(input_latex)
         assert result == r"A_{t} = \sum_{i=1}^{N} a_{t}^{i} \tag{11}"
 
+    def test_strips_inline_math_wrappers_with_trailing_punctuation(self):
+        input_latex = r"$\quad d_l \in \{65, 256, 512, 1024\}$."
+        result = postprocess_latex(input_latex)
+        assert result == r"\quad d_l \in \{65, 256, 512, 1024\}"
+
     def test_fixes_overescaped_norm_delimiters(self):
         input_latex = r"$L = \\|\hat{x}_t - x_t\\|^2$. \tag{7}"
         result = postprocess_latex(input_latex)

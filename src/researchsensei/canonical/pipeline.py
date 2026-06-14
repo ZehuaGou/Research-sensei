@@ -21,6 +21,15 @@ from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.canonical import CanonicalizationResult
 
 
+SUPPRESSED_CONTEXT_RISK_FLAGS = {
+    "PAGE_HEADER_REPEATED",
+    "PAGE_NUMBER_FOOTER",
+    "AUTHOR_FOOTER",
+    "FUNDING_NOTE",
+    "FRONT_MATTER_AFFILIATION",
+}
+
+
 class M1PipelineResult(SenseiModel):
     canonicalization: CanonicalizationResult
     quality: M1QualityGateResult
@@ -133,6 +142,7 @@ class M1CanonicalPipeline:
             slots = self._postprocess_latex_slots(slots)
             latex_validated = True
 
+        self._refresh_slot_equation_numbers(working_blocks, slots)
         self._sync_formula_latex_from_slots(working_blocks, slots)
 
         quality = self.quality_gate.evaluate(working_blocks, slots)
@@ -221,7 +231,7 @@ class M1CanonicalPipeline:
         formulas = [block for block in blocks if block.block_type == "formula"]
         text_blocks = [
             block for block in blocks
-            if block.block_type in {"text", "caption"} and block.text.strip()
+            if self._is_nearby_context_block(block)
         ]
         grouped = self._assign_equation_groups(formulas)
         slots: list[dict] = []
@@ -307,6 +317,21 @@ class M1CanonicalPipeline:
         return result
 
     @staticmethod
+    def _is_nearby_context_block(block: CanonicalDocumentBlock) -> bool:
+        if block.block_type not in {"text", "caption"} or not block.text.strip():
+            return False
+        if any(flag in SUPPRESSED_CONTEXT_RISK_FLAGS for flag in block.risk_flags):
+            return False
+        # MinerU sometimes emits repeated running headers as caption/text.
+        # They are short, isolated, and pinned to the top margin; keep them out
+        # of formula context even if the structure refiner did not flag them.
+        if len(block.text.strip().split()) <= 4 and len(block.bbox) >= 4:
+            top, bottom = float(block.bbox[1]), float(block.bbox[3])
+            if 0.0 <= top <= 0.08 and 0.0 <= bottom <= 0.12:
+                return False
+        return True
+
+    @staticmethod
     def _nearby_text(
         formula: CanonicalDocumentBlock,
         text_blocks: list[CanonicalDocumentBlock],
@@ -333,9 +358,50 @@ class M1CanonicalPipeline:
                 before_texts.append(b.text.strip())
             elif b.page > formula.page or (b.page == formula.page and b_idx > formula_idx):
                 after_texts.append(b.text.strip())
+        if not before_texts:
+            previous_blocks = [
+                b for b in text_blocks
+                if b.page < formula.page and b.text.strip()
+            ]
+            previous_blocks.sort(key=lambda b: (b.page, b.reading_order, b.bbox[1] if len(b.bbox) >= 2 else 0))
+            if previous_blocks:
+                before_texts.append(previous_blocks[-1].text.strip())
+        if not after_texts:
+            next_blocks = [
+                b for b in text_blocks
+                if b.page > formula.page and b.text.strip()
+            ]
+            next_blocks.sort(key=lambda b: (b.page, b.reading_order, b.bbox[1] if len(b.bbox) >= 2 else 0))
+            if next_blocks:
+                after_texts.append(next_blocks[0].text.strip())
         nearby_before = (before_texts[-1] if before_texts else "")[:200]
         nearby_after = (after_texts[0] if after_texts else "")[:200]
         return nearby_before, nearby_after
+
+    def _refresh_slot_equation_numbers(
+        self,
+        blocks: list[CanonicalDocumentBlock],
+        slots: list[dict],
+    ) -> None:
+        formulas = [block for block in blocks if block.block_type == "formula"]
+        slots_by_block_id = {str(slot.get("block_id", "")): slot for slot in slots if slot.get("block_id")}
+        slots_by_formula_id = {str(slot.get("formula_id", "")): slot for slot in slots if slot.get("formula_id")}
+        for index, block in enumerate(formulas, start=1):
+            formula_id = f"formula_{index:03d}"
+            slot = slots_by_block_id.get(block.block_id) or slots_by_formula_id.get(formula_id)
+            if not slot or str(slot.get("equation_number") or "").strip():
+                continue
+            for candidate in (
+                slot.get("final_latex"),
+                slot.get("mineru_latex"),
+                slot.get("marker_latex"),
+                block.latex,
+                block.text,
+            ):
+                eq_number = self._extract_equation_number(str(candidate or ""))
+                if eq_number:
+                    slot["equation_number"] = eq_number
+                    break
 
     def _postprocess_latex_slots(self, slots: list[dict]) -> list[dict]:
         """Apply regex-based LaTeX cleanup to all formula slots."""

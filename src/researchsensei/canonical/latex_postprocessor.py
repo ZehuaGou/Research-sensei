@@ -42,7 +42,7 @@ _CMD_SPACE_BRACE = re.compile(r"(\\[a-zA-Z]+)\s+\{")
 _DOUBLE_SPACE = re.compile(r"  +")
 
 _INLINE_MATH_WITH_TAG = re.compile(r"^\$(?P<body>.+?)\$\s*[.,;:]?\s*(?P<tag>\\tag\{[^}]+\})\s*$", re.DOTALL)
-_INLINE_MATH_WRAPPER = re.compile(r"^\$(?P<body>.+?)\$\s*$", re.DOTALL)
+_INLINE_MATH_WRAPPER = re.compile(r"^\$(?P<body>.+?)\$\s*[.,;:]?\s*$", re.DOTALL)
 _DOUBLE_ESCAPED_NORM = re.compile(r"\\\\\|")
 
 # Plain text letter spacing (not in commands): "P r e c i s i o n" at start
