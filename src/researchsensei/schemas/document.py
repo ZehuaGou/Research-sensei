@@ -32,6 +32,11 @@ class DocumentBlock(SenseiModel):
     formula_context_after: str = ""
     formula_ocr_status: str = ""
     formula_explanation_status: str = ""
+    equation_number: str = ""
+    equation_group_id: str = ""
+    group_order: int = 0
+    group_crop_path: str = ""
+    group_overlay_path: str = ""
     block_source: str = ""
     section_confidence: str = ""
     risk_flags: list[str] = Field(default_factory=list)

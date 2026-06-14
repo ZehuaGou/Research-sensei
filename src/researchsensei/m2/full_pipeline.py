@@ -84,6 +84,16 @@ def run_m2_full_pipeline(
     evidence_index = build_evidence_index(document)
     paper_skeleton = build_paper_skeleton(document, evidence_index)
     evidence_pack = build_evidence_pack(claim_evidence, passage_index, None)
+    formula_claim_count = sum(1 for claim in claim_evidence.claims if claim.claim_type == "FORMULA_CONTEXT")
+    formula_evidence_pack = build_evidence_pack(
+        claim_evidence,
+        passage_index,
+        None,
+        max_total_tokens=max(4000, formula_claim_count * 900),
+        max_items_per_type=0,
+        max_formula_items=max(formula_claim_count, 0),
+        max_passage_chars=700,
+    )
     evidence_pack_summary = _evidence_pack_summary(evidence_pack, claim_evidence)
     survey_artifacts = build_survey_artifacts(document, passage_index, claim_evidence)
 
@@ -115,6 +125,7 @@ def run_m2_full_pipeline(
                 paper_id=paper_id,
                 bundle=bundle,
                 evidence_pack=evidence_pack,
+                formula_evidence_pack=formula_evidence_pack,
                 paper_skeleton=paper_skeleton,
                 evidence_pack_summary=evidence_pack_summary,
                 llm_client=llm_client,
@@ -141,6 +152,7 @@ def run_m2_full_pipeline(
     _write_json(output / "evidence_index.json", evidence_index)
     _write_json(output / "paper_skeleton.json", paper_skeleton)
     _write_json(output / "evidence_pack.json", evidence_pack)
+    _write_json(output / "formula_evidence_pack.json", formula_evidence_pack)
     _write_json(output / "survey_status.json", survey_artifacts["survey_status"])
     _write_json(output / "survey_landscape.json", survey_artifacts["survey_landscape"])
     _write_json(output / "method_taxonomy.json", survey_artifacts["method_taxonomy"])
@@ -174,10 +186,13 @@ def run_m2_full_pipeline(
         "passage_count": len(passage_index.passages),
         "claim_count": len(claim_evidence.claims),
         "evidence_pack_count": len(evidence_pack.items),
+        "formula_evidence_pack_count": len(formula_evidence_pack.items),
         "survey_status": survey_artifacts["survey_status"]["status"],
         "survey_method_family_count": len(survey_artifacts["method_taxonomy"]["taxonomy"]),
         "survey_key_paper_count": len(survey_artifacts["extracted_key_papers"]["papers"]),
         "formula_count": len([b for b in document.blocks if b.type == BlockType.FORMULA]),
+        "formula_card_count": _formula_card_count(card_artifacts),
+        "formula_card_coverage": _formula_card_coverage(card_artifacts, formula_evidence_pack),
         "llm_enabled": llm_client is not None,
         "llm_metadata": _llm_metadata(llm_client, llm_metadata or {}),
         "runtime_seconds": runtime_seconds,
@@ -279,6 +294,11 @@ def _document_block(
         formula_context_after=str(slot.get("nearby_text_after") or ""),
         formula_ocr_status=str(slot.get("formula_ocr_status") or slot.get("ocr_status") or "not_required"),
         formula_explanation_status=_formula_explanation_status(str(slot.get("final_origin") or "")),
+        equation_number=str(slot.get("equation_number") or ""),
+        equation_group_id=str(slot.get("equation_group_id") or ""),
+        group_order=_int_value(slot.get("group_order")),
+        group_crop_path=str(slot.get("group_crop_path") or ""),
+        group_overlay_path=str(slot.get("group_overlay_path") or ""),
         block_source=str(slot.get("block_source") or raw_block.get("source") or ""),
         section_confidence=str(slot.get("section_confidence") or raw_block.get("section_confidence") or ""),
         risk_flags=risk_flags + [str(item) for item in slot.get("risk_flags", []) if str(item) not in risk_flags],
@@ -388,6 +408,7 @@ def _build_llm_cards(
     paper_id: str,
     bundle: M1ArtifactBundle,
     evidence_pack: EvidencePack,
+    formula_evidence_pack: EvidencePack,
     paper_skeleton,
     evidence_pack_summary: EvidencePackSummary,
     llm_client: LLMClient,
@@ -406,7 +427,7 @@ def _build_llm_cards(
     formula_ready = bool(bundle.front_matter.get("m2_ready_for_formula_understanding", True))
     if formula_ready:
         try:
-            formula_cards = _run_async(build_formula_cards_v2(evidence_pack, paper_skeleton, llm_client))
+            formula_cards = _run_async(build_formula_cards_v2(formula_evidence_pack, paper_skeleton, llm_client))
         except Exception as exc:
             return {}, _blocked_status(
                 paper_id,
@@ -648,6 +669,7 @@ def _checked_artifacts(*, include_cards: bool) -> list[str]:
         "evidence_index",
         "paper_skeleton",
         "evidence_pack",
+        "formula_evidence_pack",
         "survey_status",
         "survey_landscape",
         "method_taxonomy",
@@ -701,6 +723,36 @@ def _to_dict(obj: object | None) -> dict | None:
     return to_plain_data(obj)
 
 
+def _formula_card_count(card_artifacts: dict[str, Any]) -> int:
+    bundle = _to_dict(card_artifacts.get("formula_cards")) or {}
+    cards = bundle.get("formula_cards", [])
+    return len(cards) if isinstance(cards, list) else 0
+
+
+def _formula_card_coverage(card_artifacts: dict[str, Any], formula_evidence_pack: EvidencePack) -> dict[str, Any]:
+    expected_refs = {
+        item.evidence_ref
+        for item in formula_evidence_pack.items
+        if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
+    }
+    bundle = _to_dict(card_artifacts.get("formula_cards")) or {}
+    cards = bundle.get("formula_cards", [])
+    actual_refs = {
+        str(card.get("evidence_ref") or "")
+        for card in cards
+        if isinstance(card, dict) and card.get("evidence_ref")
+    }
+    missing_refs = sorted(expected_refs - actual_refs)
+    extra_refs = sorted(actual_refs - expected_refs)
+    return {
+        "expected_count": len(expected_refs),
+        "covered_count": len(expected_refs) - len(missing_refs),
+        "missing_refs": missing_refs,
+        "extra_refs": extra_refs,
+        "status": "PASS" if not missing_refs and not extra_refs else "DEGRADED",
+    }
+
+
 def _reset_output_dir(output: Path) -> None:
     if output.exists():
         shutil.rmtree(output)
@@ -743,6 +795,10 @@ def _render_report(run_summary: dict[str, Any], quality_report: QualityReport, s
             f"- claims: {run_summary['claim_count']}",
             f"- evidence_pack_items: {run_summary['evidence_pack_count']}",
             f"- formulas: {run_summary['formula_count']}",
+            f"- formula_evidence_pack_items: {run_summary['formula_evidence_pack_count']}",
+            f"- formula_cards: {run_summary['formula_card_count']}",
+            f"- formula_card_coverage: {run_summary['formula_card_coverage'].get('status', 'UNKNOWN')}",
+            f"- m1_artifacts_modified: {run_summary['m1_artifacts_modified']}",
             "",
             "## Quality Findings",
             findings,
@@ -774,3 +830,8 @@ def _int_or_none(value: Any) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _int_value(value: Any) -> int:
+    parsed = _int_or_none(value)
+    return parsed if parsed is not None else 0

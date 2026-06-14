@@ -26,8 +26,12 @@ class FormulaCardLLMOutput(SenseiModel):
     formula_ocr_status: str = ""
     formula_explanation_status: str = ""
     purpose: str
+    symbols: list[dict] = Field(default_factory=list)
+    terms: list[dict] = Field(default_factory=list)
     intuition: str = ""
     numeric_example: str = ""
+    what_if_removed: str = ""
+    weight_sensitivity: str = ""
     plain_summary: str = ""
     evidence_ref: str = ""
 

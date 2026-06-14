@@ -394,6 +394,8 @@ def test_m2_full_pipeline_writes_required_artifact_chain_without_llm(tmp_path: P
     assert formula_blocks[0]["formula_id"] == "formula_001"
     assert formula_blocks[0]["formula_origin"] == "mineru_latex"
     assert formula_blocks[0]["crop_path"].endswith(".png")
+    assert formula_blocks[0]["equation_group_id"] == "eq_method_attention"
+    assert formula_blocks[0]["group_crop_path"] == "formula_group_crops/eq_method_attention_p3.png"
 
 
 class ScriptedM2LLMClient:
@@ -403,7 +405,7 @@ class ScriptedM2LLMClient:
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         text = "\n".join(message.content for message in messages)
-        if "formula_cards" in text and "Formula evidence:" in text:
+        if "formula_cards" in text and "Formula evidence" in text:
             return {
                 "formula_cards": [
                     {
@@ -461,12 +463,139 @@ def test_m2_full_pipeline_llm_path_preserves_formula_origin_and_passes_audit(tmp
 
     assert result.status.status == "SUCCESS"
     assert client.calls == 3
+    assert result.run_summary["formula_evidence_pack_count"] == 2
+    assert result.run_summary["formula_card_count"] == 2
+    assert result.run_summary["formula_card_coverage"]["status"] == "PASS"
     status = json.loads((output_dir / "understanding_status.json").read_text(encoding="utf-8"))
     assert status["allowed_for_user_display"] is True
     formulas = json.loads((output_dir / "formula_cards.json").read_text(encoding="utf-8"))
-    first = formulas["formula_cards"][0]
+    assert len(formulas["formula_cards"]) == 2
+    by_id = {card["formula_id"]: card for card in formulas["formula_cards"]}
+    first = by_id["formula_001"]
     assert first["formula_origin"] == "mineru_latex"
     assert first["formula_explanation_status"] == "parser_derived"
     assert first["evidence_ref"] == "demo_paper:b_f1"
+    assert first["coverage_status"] == "LLM_EXPLAINED"
+    assert first["equation_group_id"] == "eq_method_attention"
+    second = by_id["formula_002"]
+    assert second["evidence_ref"] == "demo_paper:b_f2"
+    assert second["coverage_status"] == "SUMMARY_ONLY"
+    assert second["derivation_status"] == "summary_only"
+    assert "LLM_CARD_MISSING" in second["warnings"]
     quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
     assert not [finding for finding in quality["findings"] if finding["effect"] == "BLOCK"]
+
+
+def test_single_paper_v2_uses_all_formula_evidence_pack_for_formula_cards(tmp_path: Path) -> None:
+    from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
+    from researchsensei.jobs import JobStore
+    from researchsensei.schemas import EvidencePack, EvidencePackItem, EvidencePackSummary, PaperSkeleton
+    from researchsensei.workspace import WorkspaceStore
+
+    class EmptyFormulaBatchLLM:
+        def __init__(self) -> None:
+            self.formula_prompt_refs: list[list[str]] = []
+
+        async def chat_json(self, messages, *, config=None):
+            text = "\n".join(message.content for message in messages)
+            if "Formula evidence batch" in text:
+                refs = [
+                    line.split(":", 1)[1].strip()
+                    for line in text.splitlines()
+                    if line.strip().startswith("- evidence_ref:")
+                ]
+                self.formula_prompt_refs.append(refs)
+                return {"formula_cards": []}
+            if "teaching_cards" in text:
+                return {
+                    "teaching_cards": [{
+                        "target_type": "concept",
+                        "title": "Method evidence",
+                        "human_explanation": "The method evidence explains the model design.",
+                        "analogy_explanation": "It is like a compact recipe for the model.",
+                        "minimal_formula_explanation": "INSUFFICIENT_EVIDENCE",
+                        "numeric_example": "INSUFFICIENT_EVIDENCE",
+                        "paper_role_explanation": "It grounds the M2 teaching card.",
+                        "evidence_ref": "paper:b_method",
+                    }]
+                }
+            return {
+                "one_sentence_summary": "The paper proposes a formula-heavy method.",
+                "problem": {"text": "The paper studies a method problem.", "evidence_ref": "paper:b_method"},
+                "core_idea": {"text": "The method uses multiple equations.", "evidence_ref": "paper:b_method"},
+                "method_overview": {"text": "The method is described by evidence.", "evidence_ref": "paper:b_method"},
+                "experiment_summary": {"text": "The experiment is evidence-bound.", "evidence_ref": "paper:b_method"},
+                "limitations": {"text": "INSUFFICIENT_EVIDENCE", "evidence_ref": ""},
+            }
+
+    def item(index: int, *, claim_type: str = "FORMULA_CONTEXT") -> EvidencePackItem:
+        if claim_type == "METHOD":
+            return EvidencePackItem(
+                claim_id="c_method",
+                claim_type="METHOD",
+                evidence_ref="paper:b_method",
+                passage_id="p_method",
+                passage_text="The method section describes the model and its objective.",
+                confidence=0.8,
+                token_count=9,
+            )
+        return EvidencePackItem(
+            claim_id=f"c_formula_{index:03d}",
+            claim_type="FORMULA_CONTEXT",
+            evidence_ref=f"paper:eq{index:03d}",
+            passage_id=f"p_eq{index:03d}",
+            passage_text=f"Formula: L_{index}=x_{index}+y_{index}. Context before: method. Context after: explanation.",
+            confidence=0.7,
+            token_count=10,
+            formula_origin="mineru_latex",
+            formula_id=f"formula_{index:03d}",
+            formula_ocr_status="not_required",
+        )
+
+    normal_pack = EvidencePack(
+        paper_id="paper",
+        items=[item(0, claim_type="METHOD"), *[item(i) for i in range(1, 6)]],
+        total_tokens=59,
+    )
+    formula_pack = EvidencePack(
+        paper_id="paper",
+        items=[item(i) for i in range(1, 8)],
+        total_tokens=70,
+    )
+    skeleton = PaperSkeleton(
+        paper_id="paper",
+        title="Formula Heavy Paper",
+        abstract_summary="A formula-heavy paper.",
+        problem="A method problem.",
+        method_overview="A method with multiple equations.",
+        experiment_overview="Evidence-bound experiment.",
+    )
+    summary = EvidencePackSummary(
+        included_claim_ids=[entry.claim_id for entry in normal_pack.items],
+        excluded_claim_ids=[],
+        total_tokens=normal_pack.total_tokens,
+        claim_type_counts={"METHOD": 1, "FORMULA_CONTEXT": 5},
+    )
+    client = EmptyFormulaBatchLLM()
+    runner = SinglePaperIngestionRunner(
+        workspace=WorkspaceStore(tmp_path / "workspace"),
+        jobs=JobStore(tmp_path / "jobs.sqlite3"),
+        llm_client=client,
+    )
+
+    cards, status = runner._run_v2_builders(
+        "paper",
+        normal_pack,
+        formula_pack,
+        None,
+        None,
+        skeleton,
+        summary,
+    )
+
+    formula_cards = cards["formula_cards"].formula_cards
+    assert status.status == "SUCCESS"
+    assert [len(batch) for batch in client.formula_prompt_refs] == [5, 2]
+    assert len(formula_cards) == 7
+    assert {card.formula_id for card in formula_cards} == {f"formula_{i:03d}" for i in range(1, 8)}
+    assert all(card.coverage_status == "SUMMARY_ONLY" for card in formula_cards)

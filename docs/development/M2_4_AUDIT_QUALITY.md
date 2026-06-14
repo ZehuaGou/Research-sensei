@@ -260,6 +260,7 @@ paper_terms = title_words | abstract_words
 | F-14 | formula_card missing formula_origin / formula_ocr_status | P0 | BLOCK | IMPLEMENTED |
 | F-15 | ocr_latex / reconstructed / unknown marked as original or high-confidence | P0 | BLOCK | IMPLEMENTED |
 | F-16 | canonicalization_status=blocked but user-facing card exists | P0 | BLOCK | IMPLEMENTED |
+| FSA-13 | formula_cards missing M1 FORMULA_CONTEXT evidence refs when formula understanding is ready | P0 | BLOCK | IMPLEMENTED |
 
 ### severity / effect 规则
 
@@ -295,6 +296,8 @@ paper_terms = title_words | abstract_words
 | test_f15_ocr_not_original | ocr_latex cannot be high-confidence original |
 | test_f15_reconstructed_speculative | reconstructed formula must be speculative |
 | test_f16_blocked_canonical_no_cards | canonicalization_status=blocked blocks user-facing cards |
+| test_formula_card_missing_formula_evidence_ref_produces_fsa13 | formula_cards must cover all M1 FORMULA_CONTEXT evidence refs when formula understanding is ready |
+| test_formula_card_coverage_skips_when_m1_formula_understanding_not_ready | FSA-13 does not block papers that M1 marks as not formula-understanding-ready |
 
 ### Pipeline audit integration 测试
 

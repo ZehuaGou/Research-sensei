@@ -350,6 +350,7 @@ class QualityAuditor:
         findings: list[AuditFinding] = []
         findings.extend(self._check_canonical_trace(artifacts))
         findings.extend(self._check_formula_cards_provenance(artifacts))
+        findings.extend(self._check_formula_card_coverage(artifacts))
         findings.extend(self._check_blocked_canonical_no_cards(artifacts))
         findings.extend(self._check_formula_claim_risks(artifacts))
         return findings
@@ -493,6 +494,44 @@ class QualityAuditor:
                     field=f"{field_prefix}.risk_flags",
                 ))
 
+        return findings
+
+    def _check_formula_card_coverage(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+        findings: list[AuditFinding] = []
+        us_status = (artifacts.understanding_status or {}).get("status", "")
+        if us_status not in {"SUCCESS", "DEGRADED_STRUCTURAL"}:
+            return findings
+        canonical_status = artifacts.canonical_status or {}
+        if canonical_status.get("m2_ready_for_formula_understanding") is False:
+            return findings
+        formula_claims = [
+            claim for claim in (artifacts.claim_evidence or {}).get("claims", [])
+            if str(claim.get("claim_type") or "") == "FORMULA_CONTEXT"
+            and str(claim.get("evidence_ref") or "")
+        ]
+        if not formula_claims:
+            return findings
+        cards = (artifacts.formula_cards or {}).get("formula_cards", [])
+        card_refs = {
+            str(card.get("evidence_ref") or "")
+            for card in cards
+            if isinstance(card, dict) and str(card.get("evidence_ref") or "")
+        }
+        missing = [
+            str(claim.get("evidence_ref") or "")
+            for claim in formula_claims
+            if str(claim.get("evidence_ref") or "") not in card_refs
+        ]
+        if missing:
+            sample = ", ".join(missing[:5])
+            findings.append(AuditFinding(
+                code="FSA-13",
+                severity="P0",
+                effect="BLOCK",
+                message=f"formula_cards do not cover all M1 formula evidence refs; missing {len(missing)} refs: {sample}",
+                artifact="formula_cards",
+                field="formula_cards[].evidence_ref",
+            ))
         return findings
 
     def _check_blocked_canonical_no_cards(self, artifacts: ArtifactBundle) -> list[AuditFinding]:

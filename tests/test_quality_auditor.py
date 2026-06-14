@@ -633,6 +633,71 @@ def test_llama_immutable_formula_mutation_produces_fsa12() -> None:
     assert any(f.code == "FSA-12" and f.effect == "BLOCK" for f in report.findings)
 
 
+def test_formula_card_missing_formula_evidence_ref_produces_fsa13() -> None:
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"].extend([
+        {
+            "claim_id": "test:claim:f001",
+            "evidence_ref": "test:eq001",
+            "passage_id": "p004",
+            "claim_type": "FORMULA_CONTEXT",
+            "claim_text": "Formula one",
+            "quote_or_summary": "Formula one",
+            "canonical_source_path": "canonical_paper.md",
+            "formula_id": "formula_001",
+            "formula_origin": "mineru_latex",
+        },
+        {
+            "claim_id": "test:claim:f002",
+            "evidence_ref": "test:eq002",
+            "passage_id": "p005",
+            "claim_type": "FORMULA_CONTEXT",
+            "claim_text": "Formula two",
+            "quote_or_summary": "Formula two",
+            "canonical_source_path": "canonical_paper.md",
+            "formula_id": "formula_002",
+            "formula_origin": "mineru_latex",
+        },
+    ])
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0]["evidence_ref"] = "test:eq001"
+
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards=formula_cards,
+        canonical_status=_make_canonical_status(),
+        claim_evidence=claim_evidence,
+        understanding_status=_make_success_status(),
+    ))
+
+    assert any(f.code == "FSA-13" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_formula_card_coverage_skips_when_m1_formula_understanding_not_ready() -> None:
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"].append({
+        "claim_id": "test:claim:f001",
+        "evidence_ref": "test:eq001",
+        "passage_id": "p004",
+        "claim_type": "FORMULA_CONTEXT",
+        "claim_text": "Formula one",
+        "quote_or_summary": "Formula one",
+        "canonical_source_path": "canonical_paper.md",
+        "formula_id": "formula_001",
+        "formula_origin": "raw_formula_text",
+    })
+    canonical_status = _make_canonical_status()
+    canonical_status["m2_ready_for_formula_understanding"] = False
+
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards={"paper_id": "test", "formula_cards": []},
+        canonical_status=canonical_status,
+        claim_evidence=claim_evidence,
+        understanding_status=_make_degraded_status(),
+    ))
+
+    assert not any(f.code == "FSA-13" for f in report.findings)
+
+
 # ---------------------------------------------------------------------------
 # Independence tests
 # ---------------------------------------------------------------------------

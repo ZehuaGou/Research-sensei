@@ -33,7 +33,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M1 | Direction exploration | not implemented | none | DOC_DESIGNED | Broad landscape/survey planning remains future work. |
 | M1 | Seed expansion | not implemented | none | DOC_DESIGNED | Upstream/downstream graph remains future work. |
 | M2 | Paper deep reading | implemented | unit + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Reads M1 bundles, calls real Mimo in full mode, and passes QualityAuditor on selected papers. |
-| M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_FOR_TOP_K | Formula provenance is preserved; all-formula advanced derivation remains pending. |
+| M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
 | M2 | Survey artifacts | implemented | unit/pipeline fixture | IMPLEMENTED_RULE_BASED | Real survey PDF live acceptance remains pending. |
 | M3 | Paper workspace | partial | component/API fragments | PARTIAL_CODE_NOT_REAL_VALIDATED | Not part of current M1 scope. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
@@ -180,9 +180,13 @@ Current M2 real selected-paper validation:
 - real Mimo provider in full mode
 - QualityAuditor success
 - M1 artifact hashes unchanged after M2 run
+- 2026-06-14 `2310_08800v2` DDMT real run: M1 PASS input -> M2 SUCCESS,
+  real Mimo `mimo-v2.5-pro`, 4 calls, 12,390 total tokens, 7 formula evidence
+  refs, 7 formula cards, formula coverage PASS, QualityAuditor findings empty,
+  M1 artifacts unmodified
 
-Known M2 limitation: detailed formula derivation is currently top-K, not
-advanced all-formula derivation.
+Known M2 limitation: formula card coverage is all-formula, but detailed symbolic
+derivation is only as strong as M1 LaTeX fidelity and nearby evidence.
 
 ## Hard Rules
 

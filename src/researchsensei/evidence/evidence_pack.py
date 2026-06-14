@@ -139,6 +139,11 @@ def build_evidence_pack(
                 formula_page=claim.formula_page,
                 formula_bbox=claim.formula_bbox,
                 formula_ocr_status=claim.formula_ocr_status,
+                equation_number=claim.equation_number,
+                equation_group_id=claim.equation_group_id,
+                group_order=claim.group_order,
+                group_crop_path=claim.group_crop_path,
+                group_overlay_path=claim.group_overlay_path,
                 block_source=claim.block_source,
                 risk_flags=list(claim.risk_flags),
             ))

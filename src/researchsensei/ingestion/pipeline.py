@@ -129,6 +129,19 @@ class SinglePaperIngestionRunner:
             else:
                 # V2 path
                 evidence_pack = build_evidence_pack(claim_evidence, passage_index, EvidenceRetriever())
+                formula_claim_count = sum(
+                    1 for claim in claim_evidence.claims
+                    if claim.claim_type == "FORMULA_CONTEXT"
+                )
+                formula_evidence_pack = build_evidence_pack(
+                    claim_evidence,
+                    passage_index,
+                    None,
+                    max_total_tokens=max(4000, formula_claim_count * 900),
+                    max_items_per_type=0,
+                    max_formula_items=max(formula_claim_count, 0),
+                    max_passage_chars=700,
+                )
                 evidence_pack_summary = _build_evidence_pack_summary(evidence_pack, claim_evidence)
 
                 if not evidence_pack.items:
@@ -151,6 +164,7 @@ class SinglePaperIngestionRunner:
                     card_artifacts, understanding_status = self._run_v2_builders(
                         actual_job_id,
                         evidence_pack,
+                        formula_evidence_pack,
                         claim_evidence,
                         passage_index,
                         paper_skeleton,
@@ -258,6 +272,7 @@ class SinglePaperIngestionRunner:
         self,
         paper_id: str,
         evidence_pack: EvidencePack,
+        formula_evidence_pack: EvidencePack,
         claim_evidence: ClaimEvidenceBundle,
         passage_index,
         paper_skeleton,
@@ -285,7 +300,7 @@ class SinglePaperIngestionRunner:
         # Formula cards v2
         try:
             formula_cards = _run_async_builder(
-                build_formula_cards_v2(evidence_pack, paper_skeleton, llm_client)
+                build_formula_cards_v2(formula_evidence_pack, paper_skeleton, llm_client)
             )
         except Exception as exc:
             logger.warning("formula_cards_v2 failed: %s", exc)

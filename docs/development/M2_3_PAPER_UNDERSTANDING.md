@@ -2,6 +2,30 @@
 
 ---
 
+## 2026-06-14 Current Formula Understanding Contract
+
+M2 formula card generation is no longer top-K-only. The current full pipeline
+builds a dedicated `formula_evidence_pack.json` from every M1
+`FORMULA_CONTEXT` claim and calls `build_formula_cards_v2()` in bounded batches.
+
+Contract:
+
+- every M1 formula evidence item must have a corresponding entry in
+  `formula_cards.json`
+- LLM output must cite an allowed `evidence_ref`; invalid refs still fail closed
+- if the LLM returns valid JSON but omits a formula, M2 creates an evidence-bound
+  `SUMMARY_ONLY` card instead of silently dropping the formula
+- raw/unknown/unresolved formulas get `BLOCKED_RAW_ONLY` / `derivation_status=blocked`
+  cards and are not treated as derivable LaTeX
+- formula cards carry `formula_page`, `equation_number`, `equation_group_id`,
+  `group_order`, `group_crop_path`, `coverage_status`, and `derivation_status`
+- QualityAuditor FSA-13 blocks SUCCESS/DEGRADED outputs when formula evidence is
+  missing from `formula_cards.json`
+
+This implements all-formula coverage for M2 handoff. It does not claim complete
+symbolic proof reconstruction for every formula; advanced derivation remains
+bounded by M1 LaTeX quality and available local evidence.
+
 ## 1. 模块目标
 
 基于 `canonical_paper.md` 派生的证据生成学习卡片，LLM 输出必须绑定 evidence，无 evidence 必须进入 BLOCKED_UNDERSTANDING，不允许生成最终解释。
@@ -108,7 +132,7 @@ v2 prompt 额外约束：
 - 如果证据不足，文本写 `INSUFFICIENT_EVIDENCE` 或不生成对应 card，不能编造 evidence_ref。
 - formula_card 只能基于 EvidencePack 中的 formula block / formula context。
 - formula_card 必须读取并输出 `formula_origin`、`formula_ocr_status`、`formula_explanation_status`。
-- M2 默认只深挖核心 top-K 公式，不默认解释全文所有公式。
+- M2 formula_cards 必须覆盖所有 M1 `FORMULA_CONTEXT` 公式证据；可深挖的公式生成 LLM card，证据不足或 LLM 遗漏的公式生成 summary-only / blocked card，不允许静默跳过。
 
 ## 8. Artifact
 
@@ -269,7 +293,7 @@ class SinglePaperIngestionRunner:
 | formula_origin == ocr_latex | 可解释，必须标注 OCR 来源，confidence 不得无依据升高 |
 | formula_origin == reconstructed | 只能作为推测解释，必须明确标注 |
 | formula_origin == unknown | 不能做详细公式推导 |
-| 非核心公式 | 不生成深挖 formula_card，保留摘要或跳过 |
+| 非核心或 LLM 遗漏公式 | 生成 evidence-bound summary-only formula_card，不允许静默跳过 |
 | rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
 | paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
 | paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
@@ -378,7 +402,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - 真实验收必须生成 understanding_status.json
 - evidence_ref 必须可追溯
 - formula_card 必须保留 formula_origin / formula_ocr_status / formula_explanation_status
-- 公式深挖必须只覆盖核心 top-K 公式
+- formula_cards 必须覆盖所有 M1 formula evidence；详细推导按 `derivation_status` 标记为 source_grounded / parser_derived / summary_only / blocked
 - DEGRADED / BLOCKED 必须真实反映质量，不允许为通过测试放宽
 - real LLM smoke 必须记录 model、prompt version、schema version、token、cost、latency、失败原因
 - real LLM smoke 失败不能伪装成普通 mock 测试通过
@@ -398,7 +422,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - Real LLM smoke 已实现 opt-in 入口：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
 - v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
 - formula_is_core heuristic 已在 EvidencePack 中实现：核心公式按公式长度、核心关键词、section/claim context、helper/where-clause demotion 排序
-- canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、top-K 公式深挖策略已接入 `src/researchsensei/m2/full_pipeline.py`
+- canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、all-formula coverage 策略已接入 `src/researchsensei/m2/full_pipeline.py`
 
 ## 16. ARIS Alignment
 
@@ -468,9 +492,9 @@ Status: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance re
 - `validate_formula_cards_llm_output` fails if formula evidence exists but the LLM returns no formula cards.
 - Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.
 - Current real verification: `reports/m2_full_2312_01729v1_mimo` has paper/formula/teaching cards, legal evidence refs, no audit findings, and `understanding_status.status=SUCCESS`.
-- Formula top-K is now heuristic rather than input-order based. On `2312_01729v1`, selected formulas include Attention, MultiHead attention, Gaussian kernel, final anomaly score, and dynamic Gaussian score context; OCR-style helper text such as `where` clauses is demoted.
+- Formula evidence selection for the ordinary evidence pack is still heuristic, but `formula_cards.json` now uses a dedicated all-formula evidence pack and must cover every M1 formula evidence ref.
 - Survey/review support now emits evidence-bound `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, and `survey_claims.json` from canonical passages. Non-survey papers get `survey_status=NOT_APPLICABLE`; survey outputs require passage/evidence trace and do not replace `paper_card` or `formula_cards`.
-- Limitation: advanced formula reasoning currently covers selected top-K formulas. Full-paper all-formula derivation remains future work and should not be claimed complete.
+- Limitation: all-formula coverage is implemented, but advanced symbolic derivation is only as strong as M1 LaTeX and nearby evidence. Raw/unknown formulas remain blocked for derivation.
 
 ## 19. 当前未解决问题
 

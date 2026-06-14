@@ -102,6 +102,11 @@ class ClaimEvidenceV2(SenseiModel):
     formula_page: int | None = None
     formula_bbox: tuple[float, float, float, float] | None = None
     formula_ocr_status: str = ""
+    equation_number: str = ""
+    equation_group_id: str = ""
+    group_order: int = 0
+    group_crop_path: str = ""
+    group_overlay_path: str = ""
     canonical_source_path: str = "canonical_paper.md"
     source_location: dict = Field(default_factory=dict)
     block_source: str = ""
@@ -143,6 +148,11 @@ class EvidencePackItem(SenseiModel):
     formula_page: int | None = None
     formula_bbox: tuple[float, float, float, float] | None = None
     formula_ocr_status: str = ""
+    equation_number: str = ""
+    equation_group_id: str = ""
+    group_order: int = 0
+    group_crop_path: str = ""
+    group_overlay_path: str = ""
     block_source: str = ""
     risk_flags: list[str] = Field(default_factory=list)
 

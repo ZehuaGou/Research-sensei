@@ -185,6 +185,11 @@ def _make_claim(
         formula_page=block.formula_page if block is not None else None,
         formula_bbox=block.formula_bbox if block is not None else None,
         formula_ocr_status=block.formula_ocr_status if block is not None else "",
+        equation_number=block.equation_number if block is not None else "",
+        equation_group_id=block.equation_group_id if block is not None else "",
+        group_order=block.group_order if block is not None else 0,
+        group_crop_path=block.group_crop_path if block is not None else "",
+        group_overlay_path=block.group_overlay_path if block is not None else "",
         source_location={
             "pdf_page": block.page if block is not None else None,
             "pdf_bbox": block.bbox if block is not None else None,

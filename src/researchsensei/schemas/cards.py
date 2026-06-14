@@ -75,6 +75,14 @@ class FormulaCard(SenseiModel):
     formula_origin: str = ""
     formula_ocr_status: str = ""
     formula_explanation_status: str = ""
+    formula_page: int | None = None
+    equation_number: str = ""
+    equation_group_id: str = ""
+    group_order: int = 0
+    group_crop_path: str = ""
+    coverage_status: str = ""
+    is_core_formula: bool = False
+    derivation_status: str = ""
     location: str = ""
     purpose: str = "UNKNOWN"
     inputs: list[str] = Field(default_factory=list)

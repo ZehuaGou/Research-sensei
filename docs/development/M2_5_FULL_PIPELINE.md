@@ -51,7 +51,7 @@ Raw LaTeX / HTML / DeepXiv / PDF / OCR material normalization belongs to M1. M2.
 - `canonicalization_status=success`: M2.1 may proceed if required front matter and body exist
 - `canonicalization_status=degraded`: M2.1 may proceed with warnings; M2.3/M2.4 decide card gates
 - `canonicalization_status=blocked` or `m2_ready=false`: BLOCKED_UNDERSTANDING
-- `formula_explanation_allowed` depends on `formula_origin`, `formula_ocr_status`, core top-K selection, and audit
+- `formula_explanation_allowed` depends on `formula_origin`, `formula_ocr_status`, M1 formula-readiness status, all-formula coverage, and audit
 
 ### Detailed chain
 
@@ -70,6 +70,7 @@ source resolved and normalized by M1
                     → paper_skeleton.json
                       → build_evidence_pack() [runtime]
                         → LLM paper_card → paper_card.json
+                        → build_formula_evidence_pack() → formula_evidence_pack.json
                         → LLM formula_cards → formula_cards.json
                         → LLM teaching_cards → teaching_cards.json
                           → QualityAuditor.audit()
@@ -91,7 +92,7 @@ source resolved and normalized by M1
 | build_paper_skeleton | DocumentIngestion + EvidenceIndex | PaperSkeleton | section MISSING warnings |
 | build_evidence_pack | ClaimEvidence + PassageIndex | EvidencePack [runtime] | 空 → BLOCKED; 缺 METHOD → BLOCKED |
 | LLM paper_card | EvidencePack + skeleton | paper_card.json | LLM 失败 → BLOCKED |
-| LLM formula_cards | EvidencePack + skeleton + formula_origin policy | formula_cards.json | 核心 top-K 公式失败 → BLOCKED; 无公式 → SKIPPED; unknown origin → derivation blocked |
+| LLM formula_cards | FormulaEvidencePack + skeleton + formula_origin policy | formula_cards.json | missing formula evidence coverage -> BLOCKED; no formulas -> SKIPPED; raw/unknown origin -> derivation blocked |
 | LLM teaching_cards | EvidencePack + skeleton | teaching_cards.json | 失败 → DEGRADED_STRUCTURAL |
 | QualityAuditor.audit | cards + evidence + passages | quality_report.json | finding BLOCK → BLOCKED |
 | Runner → UnderstandingStatus | QualityReport + component_status | understanding_status.json | 映射 |
@@ -114,7 +115,7 @@ source resolved and normalized by M1
 | LLM invalid evidence_ref | BLOCKED_UNDERSTANDING |
 | LLM missing evidence_ref | BLOCKED_UNDERSTANDING |
 | paper_card LLM 失败 | BLOCKED_UNDERSTANDING |
-| formula_cards 核心公式失败 | BLOCKED_UNDERSTANDING |
+| formula_cards missing required formula evidence coverage | BLOCKED_UNDERSTANDING |
 | formula_cards 无公式 | SKIPPED，不阻断 |
 | formula_origin=unknown | 详细公式推导 blocked |
 | formula_origin=reconstructed | 只能推测解释，audit 必须可见 |
@@ -237,7 +238,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 | test_pipeline_reads_formula_origin | formula_origin preserved into formula_cards/audit |
 | test_pipeline_unknown_formula_blocks_derivation | unknown origin blocks detailed formula derivation |
 | test_pipeline_ocr_formula_has_warning | ocr_latex keeps OCR warning |
-| test_pipeline_top_k_formula_only | only core top-K formulas get deep cards |
+| test_pipeline_all_formula_evidence_covered | every M1 FORMULA_CONTEXT evidence ref has a formula card or explicit blocked/summary card |
 
 ### 全局规则
 
@@ -265,7 +266,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - 测试已覆盖：15+ tests
 - canonical_paper.md fallback pipeline: IMPLEMENTED (demoted to fallback after paper_4_unseen blind eval)
 - canonical_paper.md canonical pipeline (MinerU2.5-Pro + optional Llama/Ollama refiner): IMPLEMENTED / real selected-paper verified; multi-paper acceptance pending
-- CanonicalPaperReader / formula_origin full chain: IMPLEMENTED for current M1 canonical bundle and top-K formula cards
+- CanonicalPaperReader / formula_origin full chain: IMPLEMENTED for current M1 canonical bundle and all-formula coverage in formula_cards
 - FormulaOCRAdapter: fallback only for unresolved crops, model not integrated
 
 ## 11. External Reference Implementation Notes
@@ -288,10 +289,38 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 - Full M2 orchestration from an M1 canonical bundle is implemented in `src/researchsensei/m2/full_pipeline.py`.
 - CLI: `python scripts/m2_run_understanding.py --mode full --enable-llm --provider mimo --input-dir <m1_dir> --output-dir <m2_dir>`.
-- The full pipeline writes `source_status.json`, `canonical_status.json`, `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, `survey_claims.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`, `m2_run_summary.json`, and `m2_full_report.md`.
+- The full pipeline writes `source_status.json`, `canonical_status.json`, `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `formula_evidence_pack.json`, `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, `survey_claims.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`, `m2_run_summary.json`, and `m2_full_report.md`.
 - M2 no-LLM mode remains `BASELINE_ONLY`; real completion requires `--enable-llm`.
 - M2 LLM default `--llm-max-tokens` is 2400 after real Mimo teaching-card JSON truncation was observed at lower limits.
 - Real verification on `2312_01729v1`: M1 PASS input -> M2 SUCCESS, QualityAuditor findings empty, real Mimo `mimo-v2.5-pro`, 3 calls, 8155 total tokens after full audit rerun, M1 artifacts unmodified.
+- Real verification on `2310_08800v2` after all-formula coverage update:
+  M1 PASS input -> M2 SUCCESS, QualityAuditor findings empty, real Mimo
+  `mimo-v2.5-pro`, 4 calls, 12,390 total tokens, 7 formula evidence refs, 7
+  formula cards, formula coverage PASS, M1 artifacts unmodified.
 - Downstream gates were all enabled for this run: reading display, pattern/drill flows, and advisor questions.
 - Survey artifacts are implemented rule-based and evidence-bound; non-survey papers are marked `survey_status=NOT_APPLICABLE`. Real survey PDF live acceptance remains pending.
-- Limitations: current M2 formula cards explain selected top-K formulas only; full all-formula derivation, real survey PDF live acceptance, and multi-paper acceptance remain pending.
+- Limitations: current M2 formula cards cover every M1 formula evidence ref, but full symbolic derivation quality remains bounded by M1 LaTeX fidelity and nearby evidence; real survey PDF live acceptance and multi-paper acceptance remain pending.
+
+## 2026-06-14 Current Formula Coverage Contract
+
+M2.5 full mode no longer treats formula cards as a core top-K-only artifact.
+The ordinary `evidence_pack.json` remains compact and heuristic for paper and
+teaching cards, but formula cards use a dedicated `formula_evidence_pack.json`
+that contains every M1 `FORMULA_CONTEXT` claim.
+
+The full pipeline must:
+
+- build `formula_evidence_pack.json` from all formula claims
+- call `build_formula_cards_v2()` in bounded batches
+- preserve M1 formula identity fields: `formula_id`, page, bbox, origin,
+  `equation_number`, `equation_group_id`, `group_order`, crop and overlay paths
+- produce one `formula_cards.json` entry for every formula evidence ref when
+  `m2_ready_for_formula_understanding=true`
+- mark LLM-omitted formula cards as `SUMMARY_ONLY`
+- mark raw/unknown/unresolved formulas as `BLOCKED_RAW_ONLY`
+- let QualityAuditor FSA-13 block SUCCESS/DEGRADED if any formula evidence ref
+  is missing from `formula_cards.json`
+
+This is all-formula coverage, not a claim of full symbolic proof for every
+equation. Advanced derivation remains bounded by M1 LaTeX fidelity and nearby
+paper evidence.
