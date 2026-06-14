@@ -41,13 +41,13 @@ M1 测试必须真实运行：真实 LLM、真实 arXiv、真实 OpenAlex/pyalex
 | M1 | FormulaOCRAdapter / pix2tex | interface exists | — | FALLBACK_ONLY | pix2tex adapter 接口存在但模型未集成；仅作为 unresolved formula crops 的 fallback，不是默认主线 |
 | M1 | DeepXiv | — | — | BLOCKED | pip 包不存在，无确认的公开 API |
 | M1 | Overall | implemented | unit tested | PARTIAL_REAL_E2E_VERIFIED | Focused acquisition 通过，source-aware 和 canonical_paper.md 已实现，direction / seed 尚未实现 |
-| M2 | Paper Deep Reading | implemented | unit tested + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_ONE_PAPER | `2312_01729v1` completed M1 canonical handoff + real Mimo LLM + QualityAuditor with SUCCESS; survey and all-formula derivation remain pending |
+| M2 | Paper Deep Reading | implemented | unit tested + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_ONE_PAPER | `2312_01729v1` completed M1 canonical handoff + real Mimo LLM + QualityAuditor with SUCCESS; all-formula derivation remains pending |
 | M2 | canonical input reader / validator | implemented | unit tested + real M1/M2 e2e | IMPLEMENTED | M2 reads current M1 canonical bundle and builds parsed document, passages, claims, evidence pack, and status artifacts |
 | M2 | formula_origin full chain | implemented | unit tested + real M1/M2 e2e | IMPLEMENTED_FOR_TOP_K | formula_origin / formula_ocr_status / original_latex are propagated to formula cards; detailed derivation is top-K only |
 | M2 | LaTeXSourceParser | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 职责前移到 M1 material normalization，文档已设计，代码未实现 |
 | M2 | MinerUAdapter / MarkerAdapter / DoclingAdapter | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 作为 M1 normalization 候选 adapter 评估，代码未实现 |
 | M2 | Source-aware parser selection | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 职责调整为 M1 source/material selection，M2 不直接处理混乱原始输入 |
-| M2 | Survey Deep Reading | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 综述论文精读文档已设计，代码未实现 |
+| M2 | Survey Deep Reading | implemented | unit tested + pipeline artifact tested | IMPLEMENTED_RULE_BASED, LIVE_PENDING | Writes evidence-bound survey_status, survey_landscape, method_taxonomy, extracted_key_papers, survey_claims; real survey PDF live acceptance remains pending |
 | M3 | PaperWorkspace | partial API/frontend code | component tests | PARTIAL_CODE_NOT_REAL_VALIDATED | 部分 API/前端代码存在，StatusBanner 测试存在，页面级真实后端验证缺失 |
 | M3 | DirectionWorkspace | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 文档已设计，代码未实现 |
 | M3 | SeedExpansionPanel | not implemented | — | DOC_DESIGNED, NOT_IMPLEMENTED | 文档已设计，代码未实现 |
@@ -188,7 +188,7 @@ Every target canonical A_READ_FOR_M2 must satisfy ALL:
 - API keys, `.env`, reports, downloaded PDFs, and large generated files must not be committed.
 - M1 focused acquisition is complete only if live validation shows real LLM query planning, at least one mature source success, real candidate metadata, at least one valid deep-reading source download, and at least one A_READ item that passes the strict gate above. Current verified implementation uses PDF-only path; LaTeX/HTML source priority is designed but not yet implemented.
 - 当前已实现能力包含：source-aware acquisition（LaTeX/HTML/PDF priority）、M1 canonical pipeline（MinerU25ProAdapter → RuleBasedStructureRefiner → optional OllamaSectionRefiner → CanonicalBuilder → M1QualityGate → visual audit）、MaterialNormalizer（fallback/debug）、MarkerDocumentFormulaDetector、FormulaCropper、A_READ canonical gate、section inference (nearby_text heading detection)。
-- 当前未实现能力包含：M2 survey deep reading、M2 all-formula advanced derivation、M1 direction exploration、M1 seed paper expansion；M1 MinerU primary route 的 multi-paper acceptance 仍 pending。
+- 当前未实现能力包含：M2 all-formula advanced derivation、M1 direction exploration、M1 seed paper expansion；M2 survey deep reading 已有规则版证据链路但真实 survey PDF live acceptance 仍 pending；M1 MinerU primary route 的 multi-paper acceptance 仍 pending。
 - MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser。Marker is fallback/audit baseline。PyMuPDF/MarkItDown are lightweight fallback/debug。
 - OllamaSectionRefiner is optional/default OFF and must not modify latex, bbox, page, or source identity. Ollama formula polish is a separate explicit path for guarded `final_latex` cleanup only.
 - M1 gate blocks: all-formulas-in-Abstract, section contradiction, source/title mismatch, missing latex/crop/overlay, dense raw-only formulas from formula understanding.
@@ -233,10 +233,10 @@ Current clean verification used `2312_01729v1` (`EdgeConvFormer: Dynamic Graph C
 - M1 LaTeX cleanup: deterministic postprocessing now runs both before and after guarded Ollama formula validation, so Ollama cannot reintroduce `$...$` wrappers or over-escaped norm delimiters into final formula slots.
 - M2 command: `python scripts/m2_run_understanding.py --mode full --enable-llm --provider mimo --input-dir reports/m1_canonical_acceptance/2312_01729v1 --output-dir reports/m2_full_2312_01729v1_mimo --llm-timeout 90`.
 - M2 output: `reports/m2_full_2312_01729v1_mimo`.
-- M2 status: SUCCESS, audit findings empty, M1 artifacts unmodified, real Mimo provider `mimo-v2.5-pro`, 3 LLM calls, 8038 total tokens after formula top-K rerun.
+- M2 status: SUCCESS, audit findings empty, M1 artifacts unmodified, real Mimo provider `mimo-v2.5-pro`, 3 LLM calls, 8011 total tokens after survey-artifact rerun.
 - M2 artifacts generated: `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`.
 - Limitation: M2 formula explanation currently generates top-K formula cards, not full derivations for all 19 formulas. This is sufficient for canonical M1->M2 handoff validation but not final "all formulas advanced math reasoning" completion.
-- Scope not proven by this run: multi-paper MinerU acceptance, survey-paper M2 behavior, and frontend/M3/M4/M5 integration.
+- Scope not proven by this run: multi-paper MinerU acceptance, real survey-paper live acceptance, and frontend/M3/M4/M5 integration.
 
 ## 2026-06-14 M2 Audit and Formula Top-K Update
 
@@ -244,3 +244,10 @@ Current clean verification used `2312_01729v1` (`EdgeConvFormer: Dynamic Graph C
 - EvidencePack formula selection is no longer input-order based. Formula contexts are ranked by formula shape, section/claim context, core method keywords, and helper-line demotion; real `2312_01729v1` M2 selected Attention, MultiHead attention, Gaussian kernel, final anomaly score, and dynamic Gaussian score context.
 - Deterministic M1 LaTeX postprocessing additionally normalizes OCR-spaced `w h e r e` to `where`, including a post-Ollama cleanup pass so guarded formula polish cannot reintroduce wrapped or malformed LaTeX.
 - Validation after this change: `python -m pytest -q` passed with 421 passed, 15 skipped; real M1 rerun on cached MinerU pages remained PASS; real M2 Mimo rerun remained SUCCESS with no audit findings.
+
+## 2026-06-14 M2 Survey Artifact Update
+
+- Added rule-based survey/review support inside M2 full pipeline. The pipeline now writes `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, and `survey_claims.json` for every run.
+- Non-survey papers are explicitly marked `survey_status=NOT_APPLICABLE`; survey/review papers are detected from title/abstract survey signals and only produce trusted landscape output when taxonomy evidence exists.
+- Survey artifacts are evidence-bound: taxonomy entries, extracted key papers, and survey claims carry `evidence_ref` and `passage_id`; QualityAuditor blocks untraceable survey entries (`S-1`/`S-2`/`S-3`).
+- Current validation is unit/pipeline fixture based. A real survey PDF live acceptance run is still required before claiming broad survey-paper quality.

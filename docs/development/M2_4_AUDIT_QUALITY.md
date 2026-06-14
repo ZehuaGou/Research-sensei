@@ -343,7 +343,8 @@ paper_terms = title_words | abstract_words
 - F-8 / F-9 / F-10 已实现：raw-copy、generic-output、formula-heavy explanation 会触发 BLOCK
 - F-13 到 F-16 已实现：canonical trace、formula provenance、OCR/reconstructed safety、blocked canonical cards
 - Formula Source Audit 已实现核心检查：FSA-1/FSA-2/FSA-6/FSA-7/FSA-8/FSA-9/FSA-10/FSA-11
-- 仍未完成：F-11/F-12 的语义重合 warning、FSA-3/FSA-4/FSA-5/FSA-12 的完整越权链路、survey/direction 专项审计
+- Survey trace audit 已实现：trusted survey_landscape 必须有 method_taxonomy，method_taxonomy / extracted_key_papers / survey_claims 必须可追溯到 passage_index
+- 仍未完成：F-11/F-12 的语义重合 warning、FSA-3/FSA-4/FSA-5/FSA-12 的完整越权链路、direction 专项审计
 
 ## 15. External Reference Implementation Notes
 
@@ -366,6 +367,14 @@ M2.4 audit must additionally verify:
 - Paper relation claims must be evidence-grounded.
 
 If evidence is insufficient, direction-related fields must NOT be used to update `direction_landscape`.
+
+Implemented survey-specific audit codes:
+
+| ID | 条件 | severity | effect | 状态 |
+|----|------|----------|--------|------|
+| S-1 | trusted survey_landscape / PASS survey_status without method_taxonomy evidence | P0 | BLOCK | IMPLEMENTED |
+| S-2 | survey taxonomy/key paper/claim evidence_ref not traceable to passage_index | P0 | BLOCK | IMPLEMENTED |
+| S-3 | survey taxonomy/key paper/claim passage_id missing from passage_index | P0 | BLOCK | IMPLEMENTED |
 
 ## 17. Formula Source Audit (FSA)
 

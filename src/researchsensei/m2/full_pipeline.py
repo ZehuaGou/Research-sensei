@@ -17,6 +17,7 @@ from researchsensei.formula_card_v2 import build_formula_cards_v2
 from researchsensei.grounding import build_evidence_index
 from researchsensei.llm.client import LLMClient
 from researchsensei.m2.artifact_reader import M1ArtifactBundle, M1ArtifactReader
+from researchsensei.m2.survey import build_survey_artifacts
 from researchsensei.paper_card import build_paper_card
 from researchsensei.paper_card_v2 import build_paper_card_v2
 from researchsensei.paper_skeleton import build_paper_skeleton
@@ -84,6 +85,7 @@ def run_m2_full_pipeline(
     paper_skeleton = build_paper_skeleton(document, evidence_index)
     evidence_pack = build_evidence_pack(claim_evidence, passage_index, None)
     evidence_pack_summary = _evidence_pack_summary(evidence_pack, claim_evidence)
+    survey_artifacts = build_survey_artifacts(document, passage_index, claim_evidence)
 
     card_artifacts: dict[str, Any] = {}
     status = _preflight_status(
@@ -127,6 +129,7 @@ def run_m2_full_pipeline(
         claim_evidence=claim_evidence,
         passage_index=passage_index,
         paper_skeleton=paper_skeleton,
+        survey_artifacts=survey_artifacts,
     )
 
     output.mkdir(parents=True, exist_ok=True)
@@ -138,6 +141,11 @@ def run_m2_full_pipeline(
     _write_json(output / "evidence_index.json", evidence_index)
     _write_json(output / "paper_skeleton.json", paper_skeleton)
     _write_json(output / "evidence_pack.json", evidence_pack)
+    _write_json(output / "survey_status.json", survey_artifacts["survey_status"])
+    _write_json(output / "survey_landscape.json", survey_artifacts["survey_landscape"])
+    _write_json(output / "method_taxonomy.json", survey_artifacts["method_taxonomy"])
+    _write_json(output / "extracted_key_papers.json", survey_artifacts["extracted_key_papers"])
+    _write_json(output / "survey_claims.json", survey_artifacts["survey_claims"])
     if "paper_card" in card_artifacts:
         _write_json(output / "paper_card.json", card_artifacts["paper_card"])
     if "formula_cards" in card_artifacts:
@@ -166,6 +174,9 @@ def run_m2_full_pipeline(
         "passage_count": len(passage_index.passages),
         "claim_count": len(claim_evidence.claims),
         "evidence_pack_count": len(evidence_pack.items),
+        "survey_status": survey_artifacts["survey_status"]["status"],
+        "survey_method_family_count": len(survey_artifacts["method_taxonomy"]["taxonomy"]),
+        "survey_key_paper_count": len(survey_artifacts["extracted_key_papers"]["papers"]),
         "formula_count": len([b for b in document.blocks if b.type == BlockType.FORMULA]),
         "llm_enabled": llm_client is not None,
         "llm_metadata": _llm_metadata(llm_client, llm_metadata or {}),
@@ -446,6 +457,7 @@ def _audit_candidate(
     claim_evidence,
     passage_index,
     paper_skeleton,
+    survey_artifacts: dict[str, dict[str, Any]],
 ) -> tuple[QualityReport, UnderstandingStatus, dict[str, Any]]:
     auditor = QualityAuditor()
     bundle = ArtifactBundle(
@@ -458,6 +470,11 @@ def _audit_candidate(
         passage_index=_to_dict(passage_index),
         paper_skeleton=_to_dict(paper_skeleton),
         understanding_status=_to_dict(status),
+        survey_status=survey_artifacts.get("survey_status"),
+        survey_landscape=survey_artifacts.get("survey_landscape"),
+        method_taxonomy=survey_artifacts.get("method_taxonomy"),
+        extracted_key_papers=survey_artifacts.get("extracted_key_papers"),
+        survey_claims=survey_artifacts.get("survey_claims"),
     )
     quality_report = auditor.audit(bundle)
     if status.status in {"SUCCESS", "DEGRADED_STRUCTURAL"} and any(f.effect == "BLOCK" for f in quality_report.findings):
@@ -631,6 +648,11 @@ def _checked_artifacts(*, include_cards: bool) -> list[str]:
         "evidence_index",
         "paper_skeleton",
         "evidence_pack",
+        "survey_status",
+        "survey_landscape",
+        "method_taxonomy",
+        "extracted_key_papers",
+        "survey_claims",
         "understanding_status",
         "quality_report",
     ]

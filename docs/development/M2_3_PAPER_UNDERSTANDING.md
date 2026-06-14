@@ -458,7 +458,7 @@ For survey/review papers, M2.3 additionally outputs:
 
 `survey_landscape` does NOT replace `paper_card`. `formula_card` is NOT replaced by survey summary.
 
-Status: NOT_IMPLEMENTED
+Status: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance remains pending.
 
 ## 2026-06-14 Implementation Update
 
@@ -469,6 +469,7 @@ Status: NOT_IMPLEMENTED
 - Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.
 - Current real verification: `reports/m2_full_2312_01729v1_mimo` has paper/formula/teaching cards, legal evidence refs, no audit findings, and `understanding_status.status=SUCCESS`.
 - Formula top-K is now heuristic rather than input-order based. On `2312_01729v1`, selected formulas include Attention, MultiHead attention, Gaussian kernel, final anomaly score, and dynamic Gaussian score context; OCR-style helper text such as `where` clauses is demoted.
+- Survey/review support now emits evidence-bound `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, and `survey_claims.json` from canonical passages. Non-survey papers get `survey_status=NOT_APPLICABLE`; survey outputs require passage/evidence trace and do not replace `paper_card` or `formula_cards`.
 - Limitation: advanced formula reasoning currently covers selected top-K formulas. Full-paper all-formula derivation remains future work and should not be claimed complete.
 
 ## 19. 当前未解决问题

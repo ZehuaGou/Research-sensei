@@ -92,6 +92,16 @@ class QualityAuditor:
             checked_artifacts.append("passage_index")
         if artifacts.understanding_status is not None:
             checked_artifacts.append("understanding_status")
+        if artifacts.survey_status is not None:
+            checked_artifacts.append("survey_status")
+        if artifacts.survey_landscape is not None:
+            checked_artifacts.append("survey_landscape")
+        if artifacts.method_taxonomy is not None:
+            checked_artifacts.append("method_taxonomy")
+        if artifacts.extracted_key_papers is not None:
+            checked_artifacts.append("extracted_key_papers")
+        if artifacts.survey_claims is not None:
+            checked_artifacts.append("survey_claims")
 
         # Run checks
         evidence_findings = self._check_evidence_chain(artifacts)
@@ -99,12 +109,14 @@ class QualityAuditor:
         card_ref_findings = self._check_card_refs(artifacts)
         content_findings = self._check_content_quality(artifacts)
         formula_findings = self._check_formula_source(artifacts)
+        survey_findings = self._check_survey_trace(artifacts)
 
         findings.extend(evidence_findings)
         findings.extend(status_findings)
         findings.extend(card_ref_findings)
         findings.extend(content_findings)
         findings.extend(formula_findings)
+        findings.extend(survey_findings)
 
         # Build component results
         component_results.append(ComponentAuditResult(
@@ -131,6 +143,11 @@ class QualityAuditor:
             component="formula_source",
             status="FAIL" if any(f.effect == "BLOCK" for f in formula_findings) else "PASS",
             findings=formula_findings,
+        ))
+        component_results.append(ComponentAuditResult(
+            component="survey_trace",
+            status="FAIL" if any(f.effect == "BLOCK" for f in survey_findings) else "PASS",
+            findings=survey_findings,
         ))
 
         return QualityReport(
@@ -464,6 +481,108 @@ class QualityAuditor:
         return findings
 
     # ------------------------------------------------------------------
+    # Survey trace checks
+    # ------------------------------------------------------------------
+
+    def _check_survey_trace(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+        if not any([
+            artifacts.survey_status,
+            artifacts.survey_landscape,
+            artifacts.method_taxonomy,
+            artifacts.extracted_key_papers,
+            artifacts.survey_claims,
+        ]):
+            return []
+
+        findings: list[AuditFinding] = []
+        survey_status = artifacts.survey_status or {}
+        if survey_status.get("status") == "NOT_APPLICABLE":
+            return findings
+
+        valid_refs, valid_passages = self._survey_valid_sources(artifacts)
+        taxonomy = (artifacts.method_taxonomy or {}).get("taxonomy", [])
+        key_papers = (artifacts.extracted_key_papers or {}).get("papers", [])
+        survey_claims = (artifacts.survey_claims or {}).get("claims", [])
+        landscape = artifacts.survey_landscape or {}
+
+        if survey_status.get("is_survey") and landscape.get("trusted") and not taxonomy:
+            findings.append(AuditFinding(
+                code="S-1",
+                severity="P0",
+                effect="BLOCK",
+                message="Trusted survey_landscape exists without method_taxonomy evidence",
+                artifact="survey_landscape",
+                field="trusted",
+            ))
+        if survey_status.get("is_survey") and survey_status.get("status") == "PASS" and not taxonomy:
+            findings.append(AuditFinding(
+                code="S-1",
+                severity="P0",
+                effect="BLOCK",
+                message="Survey status PASS requires method_taxonomy evidence",
+                artifact="survey_status",
+                field="status",
+            ))
+
+        for artifact, items in (
+            ("method_taxonomy", taxonomy),
+            ("extracted_key_papers", key_papers),
+            ("survey_claims", survey_claims),
+        ):
+            for index, item in enumerate(items):
+                findings.extend(self._check_survey_item_source(
+                    artifact=artifact,
+                    index=index,
+                    item=item,
+                    valid_refs=valid_refs,
+                    valid_passages=valid_passages,
+                ))
+
+        for index, evidence_ref in enumerate(landscape.get("evidence_refs", [])):
+            if evidence_ref and evidence_ref not in valid_refs:
+                findings.append(AuditFinding(
+                    code="S-2",
+                    severity="P0",
+                    effect="BLOCK",
+                    message=f"survey_landscape.evidence_refs[{index}] is not traceable to passage_index",
+                    artifact="survey_landscape",
+                    field=f"evidence_refs[{index}]",
+                ))
+        return findings
+
+    def _check_survey_item_source(
+        self,
+        *,
+        artifact: str,
+        index: int,
+        item: dict,
+        valid_refs: set[str],
+        valid_passages: set[str],
+    ) -> list[AuditFinding]:
+        findings: list[AuditFinding] = []
+        evidence_ref = str(item.get("evidence_ref") or "")
+        passage_id = str(item.get("passage_id") or "")
+        if not evidence_ref or evidence_ref not in valid_refs:
+            findings.append(AuditFinding(
+                code="S-2",
+                severity="P0",
+                effect="BLOCK",
+                message=f"{artifact}[{index}] evidence_ref is missing or not traceable to passage_index",
+                artifact=artifact,
+                field=f"[{index}].evidence_ref",
+            ))
+        if not passage_id or passage_id not in valid_passages:
+            findings.append(AuditFinding(
+                code="S-3",
+                severity="P0",
+                effect="BLOCK",
+                message=f"{artifact}[{index}] passage_id is missing or not present in passage_index",
+                artifact=artifact,
+                field=f"[{index}].passage_id",
+            ))
+        return findings
+
+    # ------------------------------------------------------------------
     # Status gate checks
     # ------------------------------------------------------------------
 
@@ -779,6 +898,25 @@ class QualityAuditor:
                     str(claim.get("quote_or_summary") or claim.get("claim_text") or "")
                 )
         return {ref: " ".join(texts) for ref, texts in by_ref.items()}
+
+    def _survey_valid_sources(self, artifacts: ArtifactBundle) -> tuple[set[str], set[str]]:
+        valid_refs: set[str] = set()
+        valid_passages: set[str] = set()
+        for passage in (artifacts.passage_index or {}).get("passages", []):
+            passage_id = str(passage.get("passage_id") or "")
+            if passage_id:
+                valid_passages.add(passage_id)
+            for evidence_ref in passage.get("evidence_refs", []):
+                if evidence_ref:
+                    valid_refs.add(str(evidence_ref))
+        for claim in (artifacts.claim_evidence or {}).get("claims", []):
+            evidence_ref = str(claim.get("evidence_ref") or "")
+            passage_id = str(claim.get("passage_id") or "")
+            if evidence_ref:
+                valid_refs.add(evidence_ref)
+            if passage_id:
+                valid_passages.add(passage_id)
+        return valid_refs, valid_passages
 
     def _iter_card_refs(self, artifacts: ArtifactBundle) -> list[tuple[str, str, str]]:
         refs: list[tuple[str, str, str]] = []

@@ -30,6 +30,11 @@ class ArtifactBundle(SenseiModel):
     passage_index: dict | None = None
     paper_skeleton: dict | None = None
     understanding_status: dict | None = None
+    survey_status: dict | None = None
+    survey_landscape: dict | None = None
+    method_taxonomy: dict | None = None
+    extracted_key_papers: dict | None = None
+    survey_claims: dict | None = None
 
 
 class QualityReport(SenseiModel):

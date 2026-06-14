@@ -272,7 +272,7 @@ M2.3 paper_card exposes direction-support fields when evidence exists:
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real `canonical_paper.md`, real Mimo LLM, and QualityAuditor; survey-paper behavior and all-formula derivation remain pending.
+**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real `canonical_paper.md`, real Mimo LLM, and QualityAuditor; survey artifacts are rule-based/unit-tested with real survey PDF live acceptance pending; all-formula derivation remains pending.
 
 ### Survey / Review Paper
 
@@ -299,7 +299,7 @@ Output (in addition to ordinary paper outputs):
 - no taxonomy evidence → no trusted `survey_landscape`
 - extracted paper without source passage → cannot become key paper
 
-**Current status**: NOT_IMPLEMENTED
+**Current status**: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey canonical_paper.md live acceptance remains pending.
 
 ---
 
@@ -553,7 +553,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); survey-paper behavior and all-formula derivation remain pending.
+**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); survey artifacts are rule-based/unit-tested with real survey PDF live acceptance pending; all-formula derivation remains pending.
 
 ### M2 Survey Deep Reading
 
@@ -574,7 +574,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - no taxonomy evidence → no trusted `survey_landscape`
 - extracted paper without source passage → cannot become key paper
 
-**Current status**: NOT_IMPLEMENTED
+**Current status**: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance remains pending.
 
 ### M3 Frontend
 
@@ -788,7 +788,7 @@ Formula explanation rules:
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 - `ocr_latex`, `reconstructed`, and `unknown` cannot produce high-confidence formula explanation without explicit verification
 
-**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real canonical Markdown + real Mimo LLM + real QualityAuditor; survey-paper behavior and all-formula derivation remain pending.
+**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real canonical Markdown + real Mimo LLM + real QualityAuditor; survey artifacts are rule-based/unit-tested with real survey PDF live acceptance pending; all-formula derivation remains pending.
 
 ### Survey / Review Paper
 
@@ -815,7 +815,7 @@ Output (in addition to ordinary paper outputs):
 - no taxonomy evidence → no trusted `survey_landscape`
 - extracted paper without source passage → cannot become key paper
 
-**Current status**: NOT_IMPLEMENTED
+**Current status**: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance remains pending.
 
 ---
 
@@ -1087,7 +1087,7 @@ This target gate is implemented for the current canonical M1 pipeline and was ve
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); multi-paper acceptance, survey-paper behavior, and all-formula derivation remain pending.
+**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); multi-paper acceptance, real survey PDF live acceptance, and all-formula derivation remain pending.
 
 ### M1 / M2 Canonical Formula Chain
 
@@ -1132,7 +1132,7 @@ This target gate is implemented for the current canonical M1 pipeline and was ve
 - no taxonomy evidence → no trusted `survey_landscape`
 - extracted paper without source passage → cannot become key paper
 
-**Current status**: NOT_IMPLEMENTED
+**Current status**: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance remains pending.
 
 ### M3 Frontend
 
