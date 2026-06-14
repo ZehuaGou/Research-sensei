@@ -494,6 +494,52 @@ def test_formula_heavy_teaching_explanation_produces_f10() -> None:
     assert any(f.code == "F-10" and f.effect == "BLOCK" for f in report.findings)
 
 
+def test_limitation_raw_overlap_produces_f11_warning() -> None:
+    card = _make_paper_card()
+    copied = (
+        "Graph neural network approach for anomaly detection uses graph neural network "
+        "approach for anomaly detection with graph neural network approach."
+    )
+    card["limitations"] = {"text": copied, "evidence_ref": "test:b002"}
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"][1]["quote_or_summary"] = copied
+    report = QualityAuditor().audit(ArtifactBundle(
+        paper_card=card,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=claim_evidence,
+        understanding_status=_make_success_status(),
+    ))
+    assert any(f.code == "F-11" and f.effect == "WARNING" for f in report.findings)
+
+
+def test_teaching_analogy_source_overlap_produces_f12_warning() -> None:
+    teaching_cards = _make_teaching_cards()
+    copied = "Graph neural network approach for anomaly detection with sensor graph transformer signals."
+    teaching_cards["teaching_cards"][0]["analogy_explanation"] = copied
+    teaching_cards["teaching_cards"][0]["evidence_refs"] = ["test:b002"]
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"][1]["quote_or_summary"] = copied
+    report = QualityAuditor().audit(ArtifactBundle(
+        teaching_cards=teaching_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=claim_evidence,
+        understanding_status=_make_success_status(),
+    ))
+    assert any(f.code == "F-12" and f.effect == "WARNING" for f in report.findings)
+
+
+def test_direction_field_without_evidence_ref_produces_d1() -> None:
+    card = _make_paper_card()
+    card["method_family"] = {"text": "graph transformer anomaly detection", "evidence_ref": ""}
+    report = QualityAuditor().audit(ArtifactBundle(
+        paper_card=card,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    ))
+    assert any(f.code == "D-1" and f.effect == "BLOCK" for f in report.findings)
+
+
 def test_canonical_trace_required_produces_f13() -> None:
     claim_evidence = _make_claim_evidence()
     claim_evidence["claims"][0]["canonical_source_path"] = "external.txt"
@@ -573,6 +619,18 @@ def test_blocked_canonical_with_user_cards_produces_f16() -> None:
     )
     report = auditor.audit(bundle)
     assert any(f.code == "F-16" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_llama_immutable_formula_mutation_produces_fsa12() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0]["risk_flags"] = ["LLAMA_MODIFIED_FORMULA_LATEX"]
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards=formula_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    ))
+    assert any(f.code == "FSA-12" and f.effect == "BLOCK" for f in report.findings)
 
 
 # ---------------------------------------------------------------------------

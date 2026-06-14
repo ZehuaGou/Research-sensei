@@ -254,8 +254,8 @@ paper_terms = title_words | abstract_words
 | F-8 | core_idea / problem / method raw copy (overlap > 0.8) | P0 | BLOCK | IMPLEMENTED |
 | F-9 | generic output（无 paper-specific terms） | P1 | BLOCK | IMPLEMENTED |
 | F-10 | teaching human_explanation formula-heavy (ratio >= 0.3) | P0 | BLOCK | IMPLEMENTED |
-| F-11 | limitations / quote 高重合 | P2 | WARNING | 未实现 |
-| F-12 | teaching analogy 与 source 中等重合 | P2 | WARNING | 未实现 |
+| F-11 | limitations / quote 高重合 | P2 | WARNING | IMPLEMENTED |
+| F-12 | teaching analogy 与 source 中等重合 | P2 | WARNING | IMPLEMENTED |
 | F-13 | evidence_ref cannot trace to canonical_paper.md-derived block | P0 | BLOCK | IMPLEMENTED |
 | F-14 | formula_card missing formula_origin / formula_ocr_status | P0 | BLOCK | IMPLEMENTED |
 | F-15 | ocr_latex / reconstructed / unknown marked as original or high-confidence | P0 | BLOCK | IMPLEMENTED |
@@ -344,7 +344,8 @@ paper_terms = title_words | abstract_words
 - F-13 到 F-16 已实现：canonical trace、formula provenance、OCR/reconstructed safety、blocked canonical cards
 - Formula Source Audit 已实现核心检查：FSA-1/FSA-2/FSA-6/FSA-7/FSA-8/FSA-9/FSA-10/FSA-11
 - Survey trace audit 已实现：trusted survey_landscape 必须有 method_taxonomy，method_taxonomy / extracted_key_papers / survey_claims 必须可追溯到 passage_index
-- 仍未完成：F-11/F-12 的语义重合 warning、FSA-3/FSA-4/FSA-5/FSA-12 的完整越权链路、direction 专项审计
+- Direction-related paper_card 字段必须带 evidence_ref（D-1）
+- 仍未完成：FSA-3/FSA-4/FSA-5 的更多 OCR/reconstruction UI 文案细分；当前 high-confidence safety 已由 F-15/FSA-5 覆盖
 
 ## 15. External Reference Implementation Notes
 
@@ -368,6 +369,12 @@ M2.4 audit must additionally verify:
 
 If evidence is insufficient, direction-related fields must NOT be used to update `direction_landscape`.
 
+Implemented direction audit codes:
+
+| ID | 条件 | severity | effect | 状态 |
+|----|------|----------|--------|------|
+| D-1 | direction-related paper_card field exists without evidence_ref | P0 | BLOCK | IMPLEMENTED |
+
 Implemented survey-specific audit codes:
 
 | ID | 条件 | severity | effect | 状态 |
@@ -382,16 +389,16 @@ Implemented survey-specific audit codes:
 |----|------|----------|--------|------|
 | FSA-1 | high-confidence formula_card must have `formula_origin=source_latex` and valid evidence_ref | P0 | BLOCK | IMPLEMENTED for non-source high-confidence claims |
 | FSA-2 | `parser_latex` explanation must keep parser warning and cannot claim original source | P1 | WARNING | IMPLEMENTED |
-| FSA-3 | `ocr_latex` explanation must include OCR warning and confidence cap | P0 | BLOCK | PARTIAL via F-15 |
-| FSA-4 | `reconstructed` explanation must be marked speculative and cannot be used as direct evidence | P0 | BLOCK | PARTIAL via F-15 |
-| FSA-5 | `unknown` formula_origin blocks detailed formula derivation | P0 | BLOCK | PARTIAL via F-15 |
+| FSA-3 | `ocr_latex` explanation must include OCR warning and confidence cap | P0 | BLOCK | IMPLEMENTED via F-15 |
+| FSA-4 | `reconstructed` explanation must be marked speculative and cannot be used as direct evidence | P0 | BLOCK | IMPLEMENTED via F-15 |
+| FSA-5 | `unknown` formula_origin blocks detailed formula derivation | P0 | BLOCK | IMPLEMENTED |
 | FSA-6 | source-level formula available but formula_card missing `original_latex` → warning/block depending severity | P1 | BLOCK/WARNING | IMPLEMENTED |
 | FSA-7 | FormulaOCRAdapter failure (fallback only) must be visible in formula_ocr_status and warnings | P1 | WARNING | IMPLEMENTED |
 | FSA-8 | section_contradiction in risk_flags → warning or block depending on severity | P1 | WARNING/BLOCK | IMPLEMENTED |
 | FSA-9 | all_formulas_same_section_suspicious (5+ formulas all in Abstract for method paper) → BLOCK | P0 | BLOCK | IMPLEMENTED |
 | FSA-10 | fallback_used=true must be recorded, cannot claim primary MinerU success | P1 | WARNING | IMPLEMENTED |
 | FSA-11 | llama_refined=true must record model name and JSON valid count; never record API key | P1 | INFO | IMPLEMENTED |
-| FSA-12 | Llama modified formula_latex/page/bbox → BLOCKED (越权) | P0 | BLOCK | DOC_DESIGNED / NOT_IMPLEMENTED |
+| FSA-12 | Llama modified formula_latex/page/bbox → BLOCKED (越权) | P0 | BLOCK | IMPLEMENTED via immutable-field risk flags |
 
 ## 18. 当前未解决问题
 

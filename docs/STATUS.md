@@ -233,7 +233,7 @@ Current clean verification used `2312_01729v1` (`EdgeConvFormer: Dynamic Graph C
 - M1 LaTeX cleanup: deterministic postprocessing now runs both before and after guarded Ollama formula validation, so Ollama cannot reintroduce `$...$` wrappers or over-escaped norm delimiters into final formula slots.
 - M2 command: `python scripts/m2_run_understanding.py --mode full --enable-llm --provider mimo --input-dir reports/m1_canonical_acceptance/2312_01729v1 --output-dir reports/m2_full_2312_01729v1_mimo --llm-timeout 90`.
 - M2 output: `reports/m2_full_2312_01729v1_mimo`.
-- M2 status: SUCCESS, audit findings empty, M1 artifacts unmodified, real Mimo provider `mimo-v2.5-pro`, 3 LLM calls, 8011 total tokens after survey-artifact rerun.
+- M2 status: SUCCESS, audit findings empty, M1 artifacts unmodified, real Mimo provider `mimo-v2.5-pro`, 3 LLM calls, 8155 total tokens after full audit rerun.
 - M2 artifacts generated: `parsed_document.json`, `passage_index.json`, `claim_evidence.json`, `evidence_index.json`, `paper_skeleton.json`, `evidence_pack.json`, `paper_card.json`, `formula_cards.json`, `teaching_cards.json`, `quality_report.json`, `understanding_status.json`.
 - Limitation: M2 formula explanation currently generates top-K formula cards, not full derivations for all 19 formulas. This is sufficient for canonical M1->M2 handoff validation but not final "all formulas advanced math reasoning" completion.
 - Scope not proven by this run: multi-paper MinerU acceptance, real survey-paper live acceptance, and frontend/M3/M4/M5 integration.
@@ -243,7 +243,7 @@ Current clean verification used `2312_01729v1` (`EdgeConvFormer: Dynamic Graph C
 - QualityAuditor now implements F-8/F-9/F-10/F-13/F-14/F-15/F-16 plus core Formula Source Audit checks for parser provenance, source_latex/raw mismatch, OCR failure visibility, section contradiction, Abstract formula overload, fallback provenance, and Llama/Ollama provenance.
 - EvidencePack formula selection is no longer input-order based. Formula contexts are ranked by formula shape, section/claim context, core method keywords, and helper-line demotion; real `2312_01729v1` M2 selected Attention, MultiHead attention, Gaussian kernel, final anomaly score, and dynamic Gaussian score context.
 - Deterministic M1 LaTeX postprocessing additionally normalizes OCR-spaced `w h e r e` to `where`, including a post-Ollama cleanup pass so guarded formula polish cannot reintroduce wrapped or malformed LaTeX.
-- Validation after this change: `python -m pytest -q` passed with 421 passed, 15 skipped; real M1 rerun on cached MinerU pages remained PASS; real M2 Mimo rerun remained SUCCESS with no audit findings.
+- Validation after this change: `python -m pytest -q` passed with 428 passed, 15 skipped; real M1 rerun on cached MinerU pages remained PASS; real M2 Mimo rerun remained SUCCESS with no audit findings.
 
 ## 2026-06-14 M2 Survey Artifact Update
 

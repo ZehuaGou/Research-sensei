@@ -17,6 +17,20 @@ CORE_PAPER_CARD_FIELDS = [
     "method_overview",
     "experiment_summary",
 ]
+LIMITATION_COPY_FIELDS = [
+    "limitations",
+    "bottleneck",
+]
+DIRECTION_RELATED_FIELDS = [
+    "method_family",
+    "contribution_to_direction",
+    "what_problem_it_solves",
+    "what_limitation_it_leaves",
+    "relation_to_previous_methods",
+    "relation_to_later_methods",
+    "datasets_and_metrics",
+    "comparable_methods",
+]
 
 _GENERIC_OUTPUT_TERMS = {
     "paper", "method", "approach", "model", "proposes", "propose", "improves",
@@ -193,8 +207,11 @@ class QualityAuditor:
         findings: list[AuditFinding] = []
         if artifacts.paper_card:
             findings.extend(self._check_raw_copy_and_generic_paper_fields(artifacts))
+            findings.extend(self._check_limitation_quote_overlap(artifacts))
+            findings.extend(self._check_direction_fields_have_refs(artifacts))
         if artifacts.teaching_cards:
             findings.extend(self._check_teaching_formula_heavy(artifacts))
+            findings.extend(self._check_teaching_analogy_overlap(artifacts))
         return findings
 
     def _check_raw_copy_and_generic_paper_fields(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
@@ -235,6 +252,54 @@ class QualityAuditor:
 
         return findings
 
+    def _check_limitation_quote_overlap(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+        findings: list[AuditFinding] = []
+        paper_card = artifacts.paper_card or {}
+        evidence_by_ref = self._evidence_text_by_ref(artifacts)
+        for field_name in LIMITATION_COPY_FIELDS:
+            field_val = paper_card.get(field_name)
+            if not isinstance(field_val, dict):
+                continue
+            text = str(field_val.get("text") or "")
+            ref = str(field_val.get("evidence_ref") or "")
+            evidence_text = evidence_by_ref.get(ref, "")
+            if evidence_text and self._token_overlap(text, evidence_text) > 0.7 and len(self._tokens(text)) >= 12:
+                findings.append(AuditFinding(
+                    code="F-11",
+                    severity="P2",
+                    effect="WARNING",
+                    message=f"paper_card.{field_name} closely overlaps its evidence passage; consider summarizing rather than quoting",
+                    artifact="paper_card",
+                    field=f"{field_name}.text",
+                ))
+        return findings
+
+    def _check_direction_fields_have_refs(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+        findings: list[AuditFinding] = []
+        paper_card = artifacts.paper_card or {}
+        for field_name in DIRECTION_RELATED_FIELDS:
+            if field_name not in paper_card:
+                continue
+            value = paper_card.get(field_name)
+            if value in (None, "", [], {}):
+                continue
+            if isinstance(value, dict):
+                text = str(value.get("text") or value.get("value") or "")
+                ref = str(value.get("evidence_ref") or "")
+            else:
+                text = str(value)
+                ref = ""
+            if text and text != "INSUFFICIENT_EVIDENCE" and not ref:
+                findings.append(AuditFinding(
+                    code="D-1",
+                    severity="P0",
+                    effect="BLOCK",
+                    message=f"paper_card.{field_name} is direction-related but has no evidence_ref",
+                    artifact="paper_card",
+                    field=field_name,
+                ))
+        return findings
+
     def _check_teaching_formula_heavy(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
         findings: list[AuditFinding] = []
         for i, card in enumerate((artifacts.teaching_cards or {}).get("teaching_cards", [])):
@@ -252,6 +317,30 @@ class QualityAuditor:
                     field=f"teaching_cards[{i}].human_explanation",
                 ))
         return findings
+
+    def _check_teaching_analogy_overlap(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+        findings: list[AuditFinding] = []
+        evidence_by_ref = self._evidence_text_by_ref(artifacts)
+        for i, card in enumerate((artifacts.teaching_cards or {}).get("teaching_cards", [])):
+            text = str(card.get("analogy_explanation") or "")
+            if not text:
+                continue
+            refs = [str(card.get("evidence_ref") or "")]
+            refs.extend(str(ref) for ref in card.get("evidence_refs", []))
+            for ref in refs:
+                evidence_text = evidence_by_ref.get(ref, "")
+                if evidence_text and self._token_overlap(text, evidence_text) > 0.5 and len(self._tokens(text)) >= 8:
+                    findings.append(AuditFinding(
+                        code="F-12",
+                        severity="P2",
+                        effect="WARNING",
+                        message=f"teaching_cards[{i}].analogy_explanation overlaps source text; analogy may be copied rather than explanatory",
+                        artifact="teaching_cards",
+                        field=f"teaching_cards[{i}].analogy_explanation",
+                    ))
+                    break
+        return findings
+
 
     # ------------------------------------------------------------------
     # Formula source / canonical provenance checks
@@ -304,6 +393,7 @@ class QualityAuditor:
             warnings = [str(item).lower() for item in card.get("warnings", [])]
             confidence = self._float(card.get("confidence"), 0.0)
             field_prefix = f"formula_cards[{i}]"
+            card_risks = [str(item).upper() for item in card.get("risk_flags", [])]
 
             if not origin or origin not in _FORMULA_ORIGINS:
                 findings.append(AuditFinding(
@@ -387,6 +477,20 @@ class QualityAuditor:
                     message=f"{field_prefix} is high-confidence but formula_origin is not source_latex",
                     artifact="formula_cards",
                     field=f"{field_prefix}.confidence",
+                ))
+
+            if (
+                card.get("llama_modified_immutable_fields") is True
+                or card.get("immutable_fields_modified") is True
+                or any("LLAMA_MODIFIED" in flag or "FORMULA_MUTATION" in flag or "IMMUTABLE_FIELD_MODIFIED" in flag for flag in card_risks)
+            ):
+                findings.append(AuditFinding(
+                    code="FSA-12",
+                    severity="P0",
+                    effect="BLOCK",
+                    message=f"{field_prefix} records Llama/Ollama modification of immutable formula identity",
+                    artifact="formula_cards",
+                    field=f"{field_prefix}.risk_flags",
                 ))
 
         return findings
@@ -477,6 +581,15 @@ class QualityAuditor:
                     message=f"Formula claim {claim.get('claim_id', '')} records OCR failure without warning text",
                     artifact="claim_evidence",
                     field=f"claim[{claim.get('claim_id', '')}].formula_ocr_status",
+                ))
+            if any("LLAMA_MODIFIED" in flag or "FORMULA_MUTATION" in flag or "IMMUTABLE_FIELD_MODIFIED" in flag for flag in flags):
+                findings.append(AuditFinding(
+                    code="FSA-12",
+                    severity="P0",
+                    effect="BLOCK",
+                    message=f"Formula claim {claim.get('claim_id', '')} records Llama/Ollama modification of immutable formula identity",
+                    artifact="claim_evidence",
+                    field=f"claim[{claim.get('claim_id', '')}].risk_flags",
                 ))
         return findings
 
