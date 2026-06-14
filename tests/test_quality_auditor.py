@@ -57,9 +57,9 @@ def _make_evidence_index() -> dict:
     return {
         "paper_id": "test",
         "claims": [
-            {"claim_id": "c1", "evidence_ref": "test:b001", "claim_text": "P"},
-            {"claim_id": "c2", "evidence_ref": "test:b002", "claim_text": "M"},
-            {"claim_id": "c3", "evidence_ref": "test:b003", "claim_text": "R"},
+            {"claim_id": "c1", "evidence_ref": "test:b001", "claim_text": "P", "quote_or_summary": "Detecting anomalies in graph transformer signals."},
+            {"claim_id": "c2", "evidence_ref": "test:b002", "claim_text": "M", "quote_or_summary": "Graph neural network approach for anomaly detection."},
+            {"claim_id": "c3", "evidence_ref": "test:b003", "claim_text": "R", "quote_or_summary": "The model reports 95 F1 on benchmark datasets."},
         ],
         "warnings": [],
     }
@@ -70,8 +70,36 @@ def _make_claim_evidence() -> dict:
         "schema_version": "v2",
         "paper_id": "test",
         "claims": [
-            {"claim_id": "test:claim:c001", "evidence_ref": "test:b002", "passage_id": "p002", "claim_type": "METHOD"},
-            {"claim_id": "test:claim:c002", "evidence_ref": "test:b003", "passage_id": "p003", "claim_type": "RESULT"},
+            {
+                "claim_id": "test:claim:c000",
+                "evidence_ref": "test:b001",
+                "passage_id": "p001",
+                "claim_type": "PROBLEM",
+                "claim_text": "Detecting anomalies in graph transformer signals.",
+                "quote_or_summary": "Detecting anomalies in graph transformer signals.",
+                "canonical_source_path": "canonical_paper.md",
+                "block_source": "mineru25pro",
+            },
+            {
+                "claim_id": "test:claim:c001",
+                "evidence_ref": "test:b002",
+                "passage_id": "p002",
+                "claim_type": "METHOD",
+                "claim_text": "Graph neural network approach for anomaly detection.",
+                "quote_or_summary": "Graph neural network approach for anomaly detection.",
+                "canonical_source_path": "canonical_paper.md",
+                "block_source": "mineru25pro",
+            },
+            {
+                "claim_id": "test:claim:c002",
+                "evidence_ref": "test:b003",
+                "passage_id": "p003",
+                "claim_type": "RESULT",
+                "claim_text": "The model reports 95 F1 on benchmark datasets.",
+                "quote_or_summary": "The model reports 95 F1 on benchmark datasets.",
+                "canonical_source_path": "canonical_paper.md",
+                "block_source": "mineru25pro",
+            },
         ],
     }
 
@@ -92,7 +120,15 @@ def _make_formula_cards() -> dict:
     return {
         "paper_id": "test",
         "formula_cards": [
-            {"formula_id": "eq1", "purpose": "Loss", "evidence_ref": "test:b002"},
+            {
+                "formula_id": "eq1",
+                "purpose": "Loss",
+                "evidence_ref": "test:b002",
+                "formula_origin": "mineru_latex",
+                "formula_ocr_status": "not_required",
+                "formula_explanation_status": "parser_derived",
+                "confidence": 0.6,
+            },
         ],
     }
 
@@ -107,6 +143,15 @@ def _make_teaching_cards() -> dict:
                 "evidence_refs": ["test:b002"],
             },
         ],
+    }
+
+
+def _make_canonical_status() -> dict:
+    return {
+        "paper_id": "test",
+        "canonicalization_status": "success",
+        "canonical_quality_status": "PASS",
+        "m2_ready": True,
     }
 
 
@@ -238,6 +283,7 @@ def test_valid_success_artifacts_pass() -> None:
         paper_card=_make_paper_card(),
         formula_cards=_make_formula_cards(),
         teaching_cards=_make_teaching_cards(),
+        canonical_status=_make_canonical_status(),
         evidence_index=_make_evidence_index(),
         claim_evidence=_make_claim_evidence(),
         passage_index=_make_passage_index(),
@@ -254,6 +300,7 @@ def test_valid_baseline_only_artifacts_pass() -> None:
         paper_card=_make_paper_card(),
         formula_cards=_make_formula_cards(),
         teaching_cards=_make_teaching_cards(),
+        canonical_status=_make_canonical_status(),
         evidence_index=_make_evidence_index(),
         understanding_status=_make_baseline_status(),
     )
@@ -278,6 +325,7 @@ def test_valid_degraded_without_teaching_pass() -> None:
     bundle = ArtifactBundle(
         paper_card=_make_paper_card(),
         formula_cards=_make_formula_cards(),
+        canonical_status=_make_canonical_status(),
         evidence_index=_make_evidence_index(),
         understanding_status=_make_degraded_status(),
     )
@@ -390,6 +438,141 @@ def test_claim_evidence_passage_id_missing_produces_f6() -> None:
     f6 = [f for f in report.findings if f.code == "F-6"]
     assert len(f6) == 1
     assert "nonexistent" in f6[0].message
+
+
+def test_core_claim_raw_copy_produces_f8() -> None:
+    card = _make_paper_card()
+    copied = (
+        "Graph neural network approach for anomaly detection uses graph neural network "
+        "approach for anomaly detection with graph neural network approach."
+    )
+    card["method_overview"] = {"text": copied, "evidence_ref": "test:b002"}
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"][0]["quote_or_summary"] = copied
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        paper_card=card,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=claim_evidence,
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-8" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_generic_paper_output_produces_f9() -> None:
+    card = _make_paper_card()
+    card["core_idea"] = {
+        "text": "This paper proposes a method that improves performance and works well on tasks.",
+        "evidence_ref": "test:b002",
+    }
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        paper_card=card,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        paper_skeleton={"title": "Graph Transformer Anomaly Detection"},
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-9" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_formula_heavy_teaching_explanation_produces_f10() -> None:
+    teaching_cards = _make_teaching_cards()
+    teaching_cards["teaching_cards"][0]["human_explanation"] = (
+        r"L=\sum_{i=1}^{N} x_i^2 + \frac{a_b}{c_d} = \alpha_{\theta}"
+    )
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        teaching_cards=teaching_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-10" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_canonical_trace_required_produces_f13() -> None:
+    claim_evidence = _make_claim_evidence()
+    claim_evidence["claims"][0]["canonical_source_path"] = "external.txt"
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        paper_card=_make_paper_card(),
+        evidence_index=_make_evidence_index(),
+        claim_evidence=claim_evidence,
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-13" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_formula_origin_required_produces_f14() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].pop("formula_origin")
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        formula_cards=formula_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-14" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_ocr_formula_high_confidence_without_warning_produces_f15() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].update({
+        "formula_origin": "ocr_latex",
+        "formula_ocr_status": "ocr_success",
+        "formula_explanation_status": "original",
+        "confidence": 0.95,
+        "warnings": [],
+    })
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        formula_cards=formula_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-15" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_reconstructed_formula_must_be_speculative() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].update({
+        "formula_origin": "reconstructed",
+        "formula_ocr_status": "not_required",
+        "formula_explanation_status": "parser_derived",
+        "confidence": 0.8,
+    })
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        formula_cards=formula_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-15" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_blocked_canonical_with_user_cards_produces_f16() -> None:
+    canonical_status = _make_canonical_status()
+    canonical_status["canonicalization_status"] = "blocked"
+    auditor = QualityAuditor()
+    bundle = ArtifactBundle(
+        canonical_status=canonical_status,
+        paper_card=_make_paper_card(),
+        evidence_index=_make_evidence_index(),
+        understanding_status=_make_success_status(),
+    )
+    report = auditor.audit(bundle)
+    assert any(f.code == "F-16" and f.effect == "BLOCK" for f in report.findings)
 
 
 # ---------------------------------------------------------------------------

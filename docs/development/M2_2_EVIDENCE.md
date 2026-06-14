@@ -398,7 +398,7 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 - evidence_index v1 wrapper 保留（grounding.py）
 - pipeline 已写入 passage_index.json + claim_evidence.json + evidence_index.json
 - 测试已覆盖：30+ tests
-- canonical_paper.md trace、formula_origin 全链路、formula_bbox/formula_page/formula_ocr_status 证据传播为 DOC_DESIGNED / NOT_IMPLEMENTED
+- canonical_paper.md trace、formula_origin、formula_bbox/formula_page/formula_ocr_status 证据传播已实现并在 `2312_01729v1` M1->M2 real run 中验证
 - evidence_ref 前端跳转未实现
 - embedding retriever / vector DB 未实现
 

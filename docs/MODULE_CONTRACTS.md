@@ -164,7 +164,7 @@ MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
 - Primary parser: MinerU2.5-Pro via mineru-vl-utils
 - failure: model unavailable, GPU OOM, parse error
-- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED; two new unseen primary-route papers passed in `reports/m1_canonical_acceptance/`
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED_ON_SELECTED_PAPERS; primary route has been validated on paper_4 and `2312_01729v1`, while formal multi-paper MinerU acceptance remains pending.
 
 DocumentBlock (IMPLEMENTED / UNIT_TESTED):
 - fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
@@ -272,7 +272,7 @@ M2.3 paper_card exposes direction-support fields when evidence exists:
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: partial code exists; real canonical_paper.md + real LLM + real audit e2e not yet verified
+**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real `canonical_paper.md`, real Mimo LLM, and QualityAuditor; survey-paper behavior and all-formula derivation remain pending.
 
 ### Survey / Review Paper
 
@@ -540,11 +540,12 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - `quality_report.json`
 
 **Live validation contract**:
-- real PDF input
-- real parser output
+- real `canonical_paper.md` from M1
+- real M2 canonical reader output
 - real LLM card generation
 - `evidence_ref` traceable
 - QualityAuditor runs on real artifacts
+- formula_origin / formula_ocr_status preserved when formulas exist
 
 **Failure contract**:
 - parser failure → `FAILED`
@@ -552,7 +553,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: NOT_REAL_E2E_VERIFIED
+**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); survey-paper behavior and all-formula derivation remain pending.
 
 ### M2 Survey Deep Reading
 
@@ -676,7 +677,7 @@ The following modules are part of the ResearchSensei system:
 - `llm_judged_candidate_count` exists
 - every `A_READ_FOR_M2` has: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `source_type != metadata_only`, `canonical_paper.md exists`, `canonicalization_status in {success, degraded}`, `m2_ready==true`
 
-This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
+This target gate is implemented for the current canonical M1 pipeline and was verified on `2312_01729v1`; multi-paper MinerU acceptance remains pending.
 
 **Failure contract**:
 
@@ -787,7 +788,7 @@ Formula explanation rules:
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 - `ocr_latex`, `reconstructed`, and `unknown` cannot produce high-confidence formula explanation without explicit verification
 
-**Current status**: partial code exists; canonical input reader / validator is DOC_DESIGNED / NOT_IMPLEMENTED; real canonical Markdown + real LLM + real audit e2e not yet verified
+**Current status**: implemented for ordinary research papers and verified on `2312_01729v1` with real canonical Markdown + real Mimo LLM + real QualityAuditor; survey-paper behavior and all-formula derivation remain pending.
 
 ### Survey / Review Paper
 
@@ -1027,7 +1028,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - `canonicalization_status in {success, degraded}`
 - `m2_ready==true`
 
-This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
+This target gate is implemented for the current canonical M1 pipeline and was verified on `2312_01729v1`; multi-paper MinerU acceptance remains pending.
 
 **Failure contract**:
 - missing LLM client → fail
@@ -1086,7 +1087,7 @@ This target gate is DOC_DESIGNED / NOT_IMPLEMENTED.
 - LLM failure / invalid JSON / invalid evidence_ref → `BLOCKED_UNDERSTANDING`
 - audit BLOCK → `BLOCKED_UNDERSTANDING`
 
-**Current status**: NOT_REAL_E2E_VERIFIED
+**Current status**: REAL_E2E_VERIFIED_ON_ONE_PAPER (`2312_01729v1`); multi-paper acceptance, survey-paper behavior, and all-formula derivation remain pending.
 
 ### M1 / M2 Canonical Formula Chain
 

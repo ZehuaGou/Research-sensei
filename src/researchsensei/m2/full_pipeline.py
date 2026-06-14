@@ -122,6 +122,7 @@ def run_m2_full_pipeline(
         paper_id=paper_id,
         status=status,
         card_artifacts=card_artifacts,
+        canonical_status=canonical_status,
         evidence_index=evidence_index,
         claim_evidence=claim_evidence,
         passage_index=passage_index,
@@ -440,6 +441,7 @@ def _audit_candidate(
     paper_id: str,
     status: UnderstandingStatus,
     card_artifacts: dict[str, Any],
+    canonical_status: dict[str, Any],
     evidence_index,
     claim_evidence,
     passage_index,
@@ -447,6 +449,7 @@ def _audit_candidate(
 ) -> tuple[QualityReport, UnderstandingStatus, dict[str, Any]]:
     auditor = QualityAuditor()
     bundle = ArtifactBundle(
+        canonical_status=canonical_status,
         paper_card=_to_dict(card_artifacts.get("paper_card")),
         formula_cards=_to_dict(card_artifacts.get("formula_cards")),
         teaching_cards=_to_dict(card_artifacts.get("teaching_cards")),

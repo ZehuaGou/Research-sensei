@@ -54,13 +54,14 @@ class TestLatexPostProcessor:
     def test_fixes_known_ocr_split_formula_tokens(self):
         input_latex = (
             r"t 2 v(x) = \left\{a, & i f & x=0 \\ b, & f o r & x>0\right. "
-            r"+ R e L U \left(y\right) + T r + E r_{t}^{i} + F c_{1}"
+            r"+ R e L U \left(y\right) + w h e r e + T r + E r_{t}^{i} + F c_{1}"
         )
         result = postprocess_latex(input_latex)
         assert "t2v" in result
         assert "if" in result
         assert "for" in result
         assert "ReLU" in result
+        assert "where" in result
         assert "Tr" in result
         assert r"Er_{t}^{i}" in result
         assert r"Fc_{1}" in result

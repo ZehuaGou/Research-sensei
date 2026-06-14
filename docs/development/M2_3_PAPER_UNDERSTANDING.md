@@ -397,8 +397,8 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - 测试已覆盖：15+ tests
 - Real LLM smoke 已实现 opt-in 入口：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
 - v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
-- formula_is_core 判断未实现
-- canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、top-K 公式深挖策略为 DOC_DESIGNED / NOT_IMPLEMENTED
+- formula_is_core heuristic 已在 EvidencePack 中实现：核心公式按公式长度、核心关键词、section/claim context、helper/where-clause demotion 排序
+- canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、top-K 公式深挖策略已接入 `src/researchsensei/m2/full_pipeline.py`
 
 ## 16. ARIS Alignment
 
@@ -468,11 +468,12 @@ Status: NOT_IMPLEMENTED
 - `validate_formula_cards_llm_output` fails if formula evidence exists but the LLM returns no formula cards.
 - Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.
 - Current real verification: `reports/m2_full_2312_01729v1_mimo` has paper/formula/teaching cards, legal evidence refs, no audit findings, and `understanding_status.status=SUCCESS`.
+- Formula top-K is now heuristic rather than input-order based. On `2312_01729v1`, selected formulas include Attention, MultiHead attention, Gaussian kernel, final anomaly score, and dynamic Gaussian score context; OCR-style helper text such as `where` clauses is demoted.
 - Limitation: advanced formula reasoning currently covers selected top-K formulas. Full-paper all-formula derivation remains future work and should not be claimed complete.
 
 ## 19. 当前未解决问题
 
-- formula_is_core 的具体判断算法
+- formula_is_core heuristic 已实现；仍需要更多论文调参验证
 - EvidencePackSummary 是否足够复现 LLM 输入
 - component_status 的值是否还需要 DEGRADED
 - 旧 rule-based baseline builders 与 current builders 的边界仍需确认（old `*_with_llm` 函数可能仍有 fallback，但 pipeline 不走它们）

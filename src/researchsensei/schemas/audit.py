@@ -21,6 +21,7 @@ class ComponentAuditResult(SenseiModel):
 
 
 class ArtifactBundle(SenseiModel):
+    canonical_status: dict | None = None
     paper_card: dict | None = None
     formula_cards: dict | None = None
     teaching_cards: dict | None = None

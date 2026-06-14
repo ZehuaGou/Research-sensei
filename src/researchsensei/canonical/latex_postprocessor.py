@@ -55,6 +55,7 @@ _KNOWN_OCR_TOKEN_REPLACEMENTS = (
     (re.compile(r"(?<![A-Za-z])i\s+f(?![A-Za-z])"), "if"),
     (re.compile(r"(?<![A-Za-z])f\s+o\s+r(?![A-Za-z])"), "for"),
     (re.compile(r"(?<![A-Za-z])R\s+e\s+L\s+U(?=\s*(?:\\left|\())"), "ReLU"),
+    (re.compile(r"(?<![A-Za-z])w\s+h\s+e\s+r\s+e(?![A-Za-z])"), "where"),
     (re.compile(r"(?<![A-Za-z])T\s+r(?=\s*(?:=|[+\-),.]|\\left|\\right|\())"), "Tr"),
     (re.compile(r"(?<![A-Za-z])E\s+r(?=\s*(?:[_{]|[A-Za-z]*_))"), "Er"),
     (re.compile(r"(?<![A-Za-z])F\s+c(?=\s*_)"), "Fc"),
