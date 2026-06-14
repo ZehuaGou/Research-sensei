@@ -49,6 +49,53 @@ Overall M1 status is `PARTIAL_REAL_E2E_VERIFIED`: focused acquisition and
 selected-paper canonical PDF handoff are real-verified; direction exploration,
 seed expansion, and broad multi-paper parser acceptance are not complete.
 
+## Current Completion Definition
+
+In the current project state, "M1 complete" means complete for the focused
+selected-paper handoff path, not complete for every M1 product mode.
+
+M1 may be marked complete for a concrete paper only when all of the following
+are true:
+
+- the paper was regenerated with the current M1 code, not copied from a stale
+  historical report
+- the selected source identity matches the target paper
+- the primary route is declared honestly: MinerU primary, fallback, or blocked
+- `canonical_paper.md` is readable as a paper, not merely as extracted text
+- section structure is usable for evidence extraction
+- formula slots preserve page, bbox, crop, overlay, origin, final LaTeX or an
+  explicit raw/unresolved reason
+- `M1QualityGate` returns `PASS` or an explicitly acceptable `DEGRADED`
+- `m2_ready=true` before ordinary M2 reading
+- `m2_ready_for_formula_understanding=true` before M2 formula reasoning
+- the M2 artifact bundle contract below is satisfied
+- a downstream M2 reader smoke can load the bundle without reading the raw PDF
+
+M1 must not be called broadly complete until direction exploration, seed paper
+expansion, first-class LaTeX/HTML normalization, and broad multi-paper MinerU
+primary acceptance are implemented and real-validated.
+
+## Current Code Ownership Map
+
+The current focused selected-paper route is owned by these implementation
+surfaces:
+
+| Responsibility | Primary code |
+|---|---|
+| Live focused acquisition and reading-plan gate | `scripts/run_live_eval.py`, `src/researchsensei/acquisition/`, `src/researchsensei/selection/` |
+| Source resolution | `src/researchsensei/source_resolver.py` |
+| MinerU primary parsing | `src/researchsensei/canonical/mineru25_adapter.py` |
+| Canonical pipeline orchestration | `src/researchsensei/canonical/pipeline.py` |
+| Structure cleanup and section assignment | `src/researchsensei/canonical/structure_refiner.py` |
+| Canonical Markdown and formula slot rendering | `src/researchsensei/canonical/canonical_builder.py` |
+| Formula LaTeX normalization/polish guards | `src/researchsensei/canonical/latex_normalizer.py`, `src/researchsensei/canonical/ollama_latex_validator.py` |
+| Quality gate | `src/researchsensei/canonical/quality_gate.py` |
+| M2 artifact loading contract | `src/researchsensei/m2/artifact_reader.py` |
+| Legacy fallback/debug normalization | `src/researchsensei/materials/material_normalizer.py` |
+
+Changes to any of these surfaces can change M1 acceptance and require the
+selected-paper acceptance checks in this document.
+
 ## Operating Modes
 
 ### Focused Acquisition Mode
@@ -178,6 +225,18 @@ Parser rules:
 Formal M1 output must be faithful enough for M2 evidence extraction. If the body
 contains severe repeated or hallucinated text, the paper must fail the M1 gate.
 
+Section quality is judged by downstream usability, not by heading labels alone.
+A paper is not M2-ready when the Introduction is actually bibliography entries,
+when Method/Experiments are dominated by reference-list text, or when repeated
+page headers become synthetic subsections. These conditions must be repaired by
+the structure refiner or surfaced as `FAIL`/`DEGRADED`; they must not be hidden
+behind a nominal `PASS`.
+
+For formal handoff, References/Bibliography is a one-way boundary: after that
+heading, content remains References unless a clear Appendix heading begins.
+References formulas may be retained for audit traceability, but they are not
+eligible for formula-understanding handoff.
+
 ## Formula Extraction And Handoff
 
 Formula extraction is not just text extraction. A formula that can enter M2
@@ -208,6 +267,22 @@ Formula origins:
 `raw_formula_text` must never be placed in the `latex` field or treated as
 derivable LaTeX. Dense raw-only outputs are degraded for paper reading and
 blocked for formula understanding.
+
+Formula handoff decision tree:
+
+1. If trusted source LaTeX exists, use `source_latex`.
+2. Else if MinerU emits a valid formula LaTeX block, use parser/MinerU LaTeX and
+   preserve parser provenance.
+3. Else if an explicitly enabled OCR/polish path produces a guarded valid LaTeX
+   result, use `ocr_latex` or the configured final parser origin.
+4. Else if only readable formula-like text exists, store it as `raw_formula_text`
+   and mark formula reasoning unavailable as required by the dense raw-only
+   rule.
+5. Else mark the slot `unresolved` with an explicit reason.
+
+The `final_latex` field is for downstream-consumable LaTeX only. Raw text,
+ambiguous equation fragments, and prose-like math candidates must stay out of
+`final_latex` unless a guarded validator accepts them as LaTeX.
 
 Dense raw-only rule:
 
@@ -307,6 +382,38 @@ M2 treats these M1-owned fields as immutable evidence:
 
 M2 must not silently repair M1 parser failures. If M1 marks the paper or formula
 as not ready, M2 must degrade or block accordingly.
+
+## M1 To M2 Continuity Contract
+
+M1 and M2 are intentionally separated by files, not by in-memory parser state.
+That separation is part of the reliability design.
+
+M1 must provide:
+
+- stable canonical text for section/paragraph evidence
+- stable formula slots for formula evidence
+- immutable location fields for PDF traceability
+- explicit quality status and degradation reasons
+- enough nearby text for M2 to explain formula roles without re-parsing the PDF
+
+M2 must provide:
+
+- validation that required M1 artifacts and fields exist
+- evidence references that point back to M1-derived blocks
+- no mutation of M1 artifacts during understanding runs
+- degradation/blocking when M1 marks formula understanding unavailable
+
+The correct handoff check is therefore:
+
+```text
+M1 bundle exists
+  -> M2 artifact reader loads it
+  -> parsed_document preserves M1 formula/page/bbox/origin fields
+  -> M2 run leaves M1 artifact hashes unchanged
+```
+
+If this check fails, the problem belongs to the M1/M2 contract boundary and must
+be fixed before claiming either module is ready for that paper.
 
 ## Canonical Markdown Contract
 
@@ -413,6 +520,51 @@ What this does not prove:
 - M2 advanced derivation quality
 - frontend/M3/M4/M5 behavior
 
+### Per-Paper Acceptance Checklist
+
+For every new paper used as M1 acceptance evidence, record the following in the
+generated report or reviewer notes:
+
+- selected parser and whether it is primary MinerU, fallback, or blocked
+- `canonical_quality_status`
+- `m2_ready`
+- `m2_ready_for_formula_understanding`
+- formula count, LaTeX count, raw-only count, unresolved count
+- crop count and overlay count
+- whether References content leaked into Introduction/Method/Experiments
+- whether repeated page headers/footers remain in `canonical_paper.md`
+- whether the first page title/authors/source identity match the PDF
+- whether all formula slots include M2 contract fields
+- whether M2 diagnostic mode can read the bundle
+- whether any generated artifact comes from a stale report
+
+The acceptance result is allowed to be:
+
+- `PASS`: ordinary M2 reading and formula understanding may proceed
+- `DEGRADED`: ordinary M2 reading may proceed, but warnings must be explicit
+- `BLOCKED`: M2 must not run without manual override
+
+`PASS` is not allowed when crop/overlay is missing in formal mode, when a dense
+formula paper has only raw formula text, when source identity is wrong, or when
+the canonical body is structurally polluted.
+
+### Manual PDF-Vs-Canonical Audit
+
+The automatic gate is necessary but not sufficient for a new parser route or a
+new representative paper. A reviewer should inspect:
+
+1. title, abstract, and first main section against the PDF
+2. section order through Conclusion/References
+3. several dense formula pages using the crop/overlay images
+4. formula LaTeX against the formula crop for core equations
+5. whether tables/figures are represented or explicitly degraded
+6. whether body paragraphs are free from large line-join, CID, page-number, or
+   hallucinated repetition artifacts
+
+Minor punctuation, hyphenation, and line-break differences are acceptable. Wrong
+paper identity, wrong section ownership, missing core formulas, false LaTeX,
+or repeated non-paper text are not acceptable.
+
 ## Scripts
 
 Full focused acquisition live eval:
@@ -460,6 +612,33 @@ M2 contract smoke on an M1 bundle:
   --input-dir reports\m1_canonical_acceptance\<paper_id> `
   --output-dir reports\m2_diagnostic_<paper_id>
 ```
+
+## Report And Bundle Policy
+
+Generated reports are evidence for the current run, not source code. They must
+stay out of commits unless a small fixture is intentionally added under
+`tests/fixtures/`.
+
+Formal M1 selected-paper acceptance should write, at minimum:
+
+- `source.pdf`
+- `canonical_paper.md`
+- `document_blocks.json`
+- `formula_slots.json`
+- `formula_slots.md`
+- `paper_metadata.json`
+- `quality_report.md`
+- `performance_report.json`
+- visual audit pages under `visual_audit/`
+
+Review/heavy runs may additionally write raw parser payloads, comparison
+reports, cropped pages, overlays, and public verification notes. These files are
+useful for inspection but do not change the contract: M2 readiness is determined
+by the required bundle plus quality status.
+
+When regenerating reports, delete stale report directories first or use `--force`
+so that acceptance is tied to the current code. Never use a historical report as
+proof for a new parser or gate change.
 
 ## Test Policy
 

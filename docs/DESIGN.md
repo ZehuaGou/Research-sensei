@@ -347,17 +347,17 @@ seed_paper_metadata → paper_relation_graph.json → seed_expansion_result.json
 | Direction Exploration Mode | M1 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | Focused Acquisition Mode | M1 | REAL_E2E_VERIFIED |
 | Seed Paper Expansion Mode | M1 | DOC_DESIGNED, NOT_IMPLEMENTED |
-| Source-aware acquisition (LaTeX/HTML priority) | M1.3 | DOC_DESIGNED, NOT_IMPLEMENTED |
-| canonical_paper.md pipeline | M1 / M2.1 | DOC_DESIGNED, NOT_IMPLEMENTED |
-| M1 material normalization | M1.3 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| Source-aware acquisition (LaTeX/HTML priority) | M1.3 | IMPLEMENTED_PRIORITY, LATEX_HTML_NORMALIZATION_PENDING |
+| canonical_paper.md pipeline | M1 / M2.1 | SELECTED_PAPER_PDF_HANDOFF_IMPLEMENTED |
+| M1 material normalization | M1.3 | MINERU_PRIMARY_SELECTED_PAPER_VERIFIED |
 | FormulaRegionDetector | M1 formula detection | SUPERSEDED by MinerU25ProAdapter (primary) and MarkerDocumentFormulaDetector (fallback) |
 | FormulaOCRAdapter / pix2tex adapter | M1 formula OCR (fallback only) | interface exists, model not integrated; fallback for unresolved crops only |
 | DeepXiv structured adapter | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
 | Survey Deep Reading | M2 | DOC_DESIGNED, NOT_IMPLEMENTED |
-| M2 canonical input reader / validator | M2.1 | DOC_DESIGNED, NOT_IMPLEMENTED |
+| M2 canonical input reader / validator | M2.1 | IMPLEMENTED_FOR_M1_BUNDLES |
 | LaTeXSourceParser | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
-| MinerUAdapter / MarkerAdapter / DoclingAdapter | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
-| Source-aware parser selection | M1 material normalization | DOC_DESIGNED, NOT_IMPLEMENTED |
+| MinerUAdapter / MarkerAdapter / DoclingAdapter | M1 material normalization | MINERU_IMPLEMENTED_MARKER_FALLBACK_DOCLING_NOT_IMPLEMENTED |
+| Source-aware parser selection | M1 material normalization | PDF_PRIMARY_IMPLEMENTED_LATEX_HTML_PENDING |
 | evidence_ref 原文跳转 | M2.2 / M3 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | DirectionWorkspace | M3 | DOC_DESIGNED, NOT_IMPLEMENTED |
 | PaperWorkspace full real validation | M3 | PARTIAL_CODE, REAL_PAGE_VALIDATION_MISSING |
