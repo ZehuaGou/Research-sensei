@@ -1,5 +1,62 @@
 # ResearchSensei Module Contracts
 
+## Current M1 Contract Override (2026-06-14)
+
+This section supersedes older duplicated M1 notes in this file when they
+conflict.
+
+M1 is currently `PARTIAL_REAL_E2E_VERIFIED`, not fully complete across all
+modes. Focused acquisition and selected-paper PDF canonical handoff are
+real-verified. Direction exploration, seed paper expansion, first-class
+LaTeX/HTML normalization, and broad multi-paper MinerU acceptance remain
+pending.
+
+Current formal M1->M2 handoff input is an M1 artifact directory containing:
+
+- `canonical_paper.md`
+- `document_blocks.json`
+- `formula_slots.json`
+- `formula_slots.md`
+- `paper_metadata.json`
+- `quality_report.md`
+- `performance_report.json`
+- `visual_audit/`
+
+M1 owns parser provenance and immutable formula evidence: page, bbox, crop path,
+overlay path, parser source, `final_latex`, `raw_formula_text`, equation
+grouping fields, and nearby text fields. M2 must consume these fields as
+evidence and must not repair or rewrite them.
+
+Primary parser policy:
+
+- MinerU2.5-Pro via `mineru-vl-utils` is the formal primary PDF parser.
+- Marker, MarkItDown, and PyMuPDF are fallback/audit/debug only.
+- Fallback success cannot be used as primary MinerU acceptance evidence.
+- Historical reports may be stale; formal claims require regeneration with
+  current M1 code.
+
+Quality gate policy:
+
+- formal formula slots require crop and overlay unless explicitly disabled for
+  review-only artifacts
+- `formula_count >= 5` and `latex_count == 0` means formulas are not ready for
+  downstream formula understanding
+- `raw_formula_text` must not masquerade as LaTeX
+- section pollution, References-as-Introduction, all-formulas-in-Abstract,
+  source mismatch, missing bbox/crop/overlay, and severe repeated parser text
+  must block formal M2 entry
+
+Ollama policy:
+
+- Ollama formula polish is optional and explicit; it may update `final_latex`
+  only after crop-based guarded validation.
+- Ollama section refinement is optional/default off and cannot modify latex,
+  bbox, page, parser source, source identity, or paper metadata.
+- Formal M1 handoff must not let Ollama rewrite body structure.
+
+The authoritative detailed M1 development contract is
+`docs/development/M1_LITERATURE_SEARCH.md`.
+
 > **Canonical docs**: See `docs/DESIGN.md`, `docs/DEVELOPMENT.md`, and `docs/development/*.md`.
 >
 > Module contracts distinguish:
@@ -164,7 +221,7 @@ MinerU25ProAdapter (IMPLEMENTED / UNIT_TESTED):
 - output: normalized document JSON with blocks (title/text/formula/table/figure), bbox, page, latex, reading_order, confidence, source=mineru25pro
 - Primary parser: MinerU2.5-Pro via mineru-vl-utils
 - failure: model unavailable, GPU OOM, parse error
-- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED_ON_SELECTED_PAPERS; primary route has been validated on paper_4 and `2312_01729v1`, while formal multi-paper MinerU acceptance remains pending.
+- current status: IMPLEMENTED / UNIT_TESTED / REAL_E2E_VERIFIED_ON_SELECTED_PAPERS; primary route has selected-paper validation, while formal broad multi-paper MinerU acceptance remains pending.
 
 DocumentBlock (IMPLEMENTED / UNIT_TESTED):
 - fields: block_id, page, bbox, block_type, text, latex, html, reading_order, source, confidence, parent_section, raw_payload_ref
@@ -677,7 +734,7 @@ The following modules are part of the ResearchSensei system:
 - `llm_judged_candidate_count` exists
 - every `A_READ_FOR_M2` has: `verification_status == verified`, `llm_relevance_score >= 0.65`, `llm_relevance_label in {HIGH, MEDIUM}`, `should_a_read == true`, `source_type != metadata_only`, `canonical_paper.md exists`, `canonicalization_status in {success, degraded}`, `m2_ready==true`
 
-This target gate is implemented for the current canonical M1 pipeline and was verified on `2312_01729v1`; multi-paper MinerU acceptance remains pending.
+This target gate is implemented for the current canonical M1 pipeline and has selected-paper real validation; broad multi-paper MinerU acceptance remains pending.
 
 **Failure contract**:
 
@@ -1028,7 +1085,7 @@ M5 defines the real-validation matrix for M1-M4 and the engineering rules for re
 - `canonicalization_status in {success, degraded}`
 - `m2_ready==true`
 
-This target gate is implemented for the current canonical M1 pipeline and was verified on `2312_01729v1`; multi-paper MinerU acceptance remains pending.
+This target gate is implemented for the current canonical M1 pipeline and has selected-paper real validation; broad multi-paper MinerU acceptance remains pending.
 
 **Failure contract**:
 - missing LLM client → fail
@@ -1204,8 +1261,6 @@ This target gate is implemented for the current canonical M1 pipeline and was ve
 **Current status**: PARTIAL_INFRA / NOT_PRODUCTION_READY
 
 **Test policy**: `python -m pytest -q` runs stable small real chain. Manual / nightly live validation runs network, LLM, OCR/parser heavy cases. Missing env/key/network in live validation = failure, not skip. mock/fake/skip are not valid module completion evidence.
-
----
 
 ## 2026-06-11 M2 Rule-Based Understanding Addendum
 

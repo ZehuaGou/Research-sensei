@@ -1,1177 +1,511 @@
-# M1 Literature Search, Source Acquisition, And Reading Plan
+# M1 Literature Search, Source Acquisition, And Canonical Handoff
 
-## Goal
+Last updated: 2026-06-14
 
-M1 has three modes:
+This document is the authoritative M1 development contract. If older reports or
+duplicated notes conflict with this file, this file wins.
 
-**Direction Exploration Mode**: Given a broad research direction, search for surveys first, then build a direction framework with method families, chronology stages, landscape anchors, and recommended reading order.
+## Purpose
 
-**Focused Acquisition Mode**: Given a narrow query / title / DOI / URL / arXiv ID, find verified + relevant papers, resolve best available source, normalize raw material, and produce `canonical_paper.md` for M2.
+M1 turns a user research target into verified, M2-readable paper material.
 
-**Seed Paper Expansion Mode**: Given a seed paper (already read or being read), find upstream papers, downstream papers, related surveys, follow-up improvements, and build a local paper relation graph.
+M1 owns:
 
-M1 does not teach the paper or generate paper/formula/drill cards. M1 does own material normalization: raw PDF / LaTeX / HTML / DeepXiv / parser output is converted into `canonical_paper.md`. M2.1 reads and validates that canonical input.
+- query planning for focused paper acquisition
+- multi-source paper metadata acquisition
+- candidate verification and relevance filtering
+- best available source resolution
+- material normalization into `canonical_paper.md`
+- formula location, crop, overlay, provenance, and LaTeX handoff metadata
+- M2 entry gates
 
-## Three Modes
+M1 does not own:
 
-### Direction Exploration Mode
+- paper teaching cards
+- formula explanations or derivations
+- method graph construction
+- paper Q&A
+- frontend rendering
+- M3/M4/M5 behavior
 
-Status: NOT_IMPLEMENTED
+Those downstream tasks belong to M2+ and must consume the M1 artifact bundle
+rather than re-reading raw PDFs behind M1.
 
-Input: research direction (e.g. "时间序列异常检测")
+## Current Status
 
-Behavior:
-1. Search for high-quality surveys first
-2. If no qualified survey found, execute staged multi-source search
-3. Build direction framework
+| Area | Status | Notes |
+|---|---|---|
+| Focused acquisition | IMPLEMENTED / REAL_E2E_VERIFIED | Narrow-query search, verification, relevance judge, PDF download, and reading-plan gate have real live validation. |
+| Source-aware acquisition | IMPLEMENTED | Source priority and arXiv source/PDF resolution are implemented; LaTeX/HTML normalization is not yet the primary proven route. |
+| PDF canonical pipeline | IMPLEMENTED / REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Current MinerU-primary artifacts can be M2-readable when regenerated with current code and all quality gates pass. |
+| MinerU2.5-Pro primary parser | IMPLEMENTED / SELECTED_PAPER_VERIFIED | Primary route uses `mineru-vl-utils` and has selected-paper real validation; broad multi-paper generalization remains pending. |
+| Marker / MarkItDown / PyMuPDF fallback | IMPLEMENTED / FALLBACK_ONLY | Allowed for debug, audit, and fallback. They cannot prove primary MinerU stability. |
+| Ollama formula LaTeX polish | IMPLEMENTED / OPTIONAL | Explicitly enabled only for formula `final_latex` cleanup; never rewrites body structure in formal handoff. |
+| Ollama section refiner | IMPLEMENTED / OPTIONAL_NOT_DEFAULT | Review/heavy diagnostic only; formal M1 handoff remains rule-based for structure. |
+| Direction exploration | DOC_DESIGNED / NOT_IMPLEMENTED | Broad landscape, staged survey search, and route map remain future work. |
+| Seed paper expansion | DOC_DESIGNED / NOT_IMPLEMENTED | Upstream/downstream paper graph remains future work. |
 
-Output:
-- `survey_candidates.json`
-- `direction_landscape.json` — with `method_families`, `chronology_stages`, `landscape_anchors`, `representative_papers`, `recommended_reading_order`, `gaps_or_open_questions`
-- `reading_plan.json`
+Overall M1 status is `PARTIAL_REAL_E2E_VERIFIED`: focused acquisition and
+selected-paper canonical PDF handoff are real-verified; direction exploration,
+seed expansion, and broad multi-paper parser acceptance are not complete.
 
-`direction_landscape.json` does NOT replace `reading_plan.json`. `direction_landscape.json` serves direction understanding. `reading_plan.json` serves reading plan. `A_READ_FOR_M2` serves single-paper deep reading entry.
-
-LandscapeAnchor serves direction understanding, not necessarily M2 entry. A LandscapeAnchor can temporarily lack a PDF.
+## Operating Modes
 
 ### Focused Acquisition Mode
 
-Status: PARTIAL_REAL_E2E_VERIFIED
+Input: title, DOI, URL, arXiv ID, or narrow natural-language query.
 
-Input: focused query / title / DOI / arXiv ID / URL
+Output:
 
-Pipeline:
-```
-user query
-  -> real LLM query plan
-  -> multi-source acquisition
-  -> dedup
-  -> verification
-  -> LLM relevance judge
-  -> quality ranking
-  -> best available source resolution
-  -> source download
-  -> MinerU25ProAdapter (PRIMARY, via mineru-vl-utils)
-  -> DocumentBlock JSON normalization
-  -> RuleBasedStructureRefiner (always)
-  -> optional LlamaSectionRefiner (local, bounded)
-  -> CanonicalBuilder
-  -> M1 Quality Gate
-  -> m2_ready gate
-  -> reading_plan.json (A_READ_FOR_M2)
+- `query_plan.json`
+- `candidate_pool.json`
+- `source_resolution.json`
+- `filtered_candidates.json`
+- `reading_plan.json`
+- canonical bundle for any selected `A_READ_FOR_M2` paper that passes material
+  normalization
 
-Fallback (when MinerU2.5-Pro unavailable):
-  -> MarkerDocumentFormulaDetector (fallback formula bbox/LaTeX)
-  -> FormulaCropper
-  -> FormulaMerger
-  -> canonical_paper.md
-```
+This is the only M1 mode with real end-to-end validation today.
 
-A_READ_FOR_M2 must satisfy ALL:
-- `verification_status == verified`
-- `llm_relevance_score >= 0.65`
-- `llm_relevance_label in {HIGH, MEDIUM}`
-- `should_a_read == true`
-- `can_enter_m2 == true`
-- `source_confidence in {high, medium}`
-- `has_valid_deep_reading_source == true`
+### Direction Exploration Mode
 
-`has_valid_deep_reading_source` means one of:
-1. `latex_source_downloaded == true` and `latex_main_file` exists
-2. `structured_html_downloaded == true`
-3. `pdf_downloaded == true` and `pdf_metadata_check == passed` and `pdf_title_match == match`
+Input: broad research direction.
 
-`metadata_only` cannot enter `A_READ_FOR_M2`.
+Target output:
 
-Current implemented capability: PDF-focused focused acquisition live eval + Marker fallback path (IMPLEMENTED but demoted to fallback after paper_4_unseen blind eval failure) + M1 canonical components in `src/researchsensei/canonical/` (DocumentBlock, MinerU25ProAdapter, RuleBasedStructureRefiner, OllamaStructuredClient, OllamaSectionRefiner, CanonicalBuilder, M1QualityGate, visual audit report generator). Remaining verification work is real multi-paper parser acceptance, not basic module implementation.
+- `survey_candidates.json`
+- `direction_landscape.json`
+- `reading_plan.json`
+
+Status: not implemented. Do not claim M1 direction exploration is complete.
 
 ### Seed Paper Expansion Mode
 
-Status: NOT_IMPLEMENTED
+Input: a seed paper or paper ID.
 
-Input: seed paper metadata / paper_id / uploaded paper
+Target output:
 
-Behavior:
-1. Find citing papers, cited papers, related surveys, same-route papers, follow-up improvements
-2. Build local paper relation graph
-
-Output:
 - `paper_relation_graph.json`
 - `seed_expansion_result.json`
 
-## Non-Negotiable Requirements
-
-- Query planning requires a real LLM. No heuristic fallback is allowed for M1 completion.
-- Search/acquisition must use mature projects or official clients through adapters.
-- Thin/wrapper-style HTTP implementations without User-Agent, retry, rate-limit detection, and structured diagnostics are not allowed.
-- M1 primary parser is MinerU2.5-Pro through `mineru-vl-utils`.
-- Marker (`MarkerDocumentFormulaDetector`) is fallback/audit baseline, not primary parser. After paper_4_unseen blind eval failure, Marker section inference cannot be the final mainline.
-- LlamaSectionRefiner may refine document structure (section, reading_order, context) but CANNOT alter formula_latex, bbox, page, or source identity. If Llama modifies these fields, the result must be BLOCKED.
-- M1 quality gate must block: section_contradiction, all_formulas_in_Abstract_suspicious (5+ formulas all in Abstract for method paper), abstract_formula_overload.
-- A_READ papers must be cleared for M2. Valid deep-reading source is required to enter M2: LaTeX source (preferred), structured HTML/XML/DeepXiv structured output, or validated PDF parser output.
-- M1 must produce `canonical_paper.md` before M2. `metadata_only` cannot enter M2. A raw PDF cannot bypass M1 canonicalization.
-- M1 tests must run with real LLM, real network, real PDF download. Missing env/key/network = failure, not skip.
-- `python -m pytest -q` must include tests_live. No more `--ignore=tests_live`.
-- Mock/fake/skip are not valid test outcomes for M1.
-
-## M1 Parser Boundary
-
-MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser. The required adapter is `MinerU25ProAdapter` and it calls the `mineru-vl-utils` client for `opendatalab/MinerU2.5-Pro-2604-1.2B` output normalization.
-
-The legacy MinerUPdfAdapter (magic_pdf) has been removed from the codebase.
-
-Marker is fallback/audit baseline. It may supply fallback formula bbox/LaTeX and comparison artifacts, but it is no longer the default parser after the paper_4_unseen all-formulas-in-Abstract failure.
-
-Ollama has two separate optional paths. The section refiner remains off by default and must not modify latex, bbox, page, or source identity; invalid JSON is a no-op with warnings. The formula LaTeX polish path is enabled only with `--enable-ollama-latex` and runs after MinerU/regex LaTeX extraction, before M2 consumes `canonical_paper.md` / `formula_slots.json`.
-
-Formula LaTeX polish safety rules:
-- use a vision-capable Ollama model, currently `qwen3.5:4b` in the local environment
-- prefer `group_crop_path` over `crop_path` for multi-line equation groups, but treat it as visual context only; a single `formula_id` must still receive only its own formula line
-- require JSON Schema output, `think=false`, confidence >= `--ollama-min-confidence` (default 0.8)
-- preserve M1 immutable evidence: page, bbox, crop path, overlay path, parser source identity
-- preserve equation tags; if the model drops a `\tag{...}`, M1 restores the original tag deterministically and records `latex_tag_restored=true`
-- low-confidence, malformed, over-expanded, or left-hand-side-mismatched Ollama output is not accepted and is reported in metrics/risk flags
-
-Ollama must not rewrite M1 body/section structure in the formal handoff path.
-M1 structure remains rule-based and quality-gated; M2 receives the canonical
-section/block layout plus formula metadata. The optional section refiner is for
-review/heavy diagnostics only.
-
-M1 gate blocks all-formulas-in-Abstract. M1 gate blocks section contradiction. M1 gate blocks source mismatch. M1 gate checks missing crop/overlay for formal acceptance. Dense raw-only formula sets (`formula_count >= 5` and `latex_count == 0`) set `m2_ready_for_formula_understanding=false`; raw_formula_text cannot be treated as derivable LaTeX. M1 also blocks severe repeated/hallucinated body text, because a parser can otherwise produce M2-readable artifacts whose prose is not faithful enough for deep reading. A blocked canonical paper cannot enter M2.
-
-When `source_pdf_path` is available, the MinerU-primary pipeline keeps MinerU for layout/formula identity and crop/overlay generation, but repairs suspicious non-formula text blocks from the same PDF bbox using embedded PyMuPDF text. This is only a body-text repair path: it does not modify formula bbox/page/source identity and it records `pdf_text_repair_*` metrics in the canonical front matter/report.
-
-### 2026-06-10 acceptance result
-
-`reports/m1_canonical_acceptance/` contains historical acceptance/debug artifacts. The default route is MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner, but the primary MinerU route is verified on paper_4 only; multi-paper MinerU acceptance remains pending. Marker remains fallback/audit baseline, and PyMuPDF/MarkItDown are fallback/debug only. Fallback reports are allowed for review/debugging, but they cannot prove primary-route stability.
-
-Five-paper acceptance summary:
-- paper_1 Monte Carlo EM: DEGRADED, m2_ready=true, formula_m2_ready=true, formulas=54, latex=41, raw_formula_text=13, high_risk=2.
-- paper_2 GTA: DEGRADED, m2_ready=false, formula_m2_ready=false, formulas=26, latex=0, raw_formula_text=26, high_risk=3.
-- paper_3 EDAD: PASS, m2_ready=true, formula_m2_ready=true, formulas=9, latex=9, raw_formula_text=0, high_risk=0.
-- paper_4_unseen MEMTO: PASS, m2_ready=true, formula_m2_ready=true, MinerU2.5-Pro cached output, formulas=11, latex=11, raw_formula_text=0, high_risk=0.
-- paper_5_unseen TranAD: DEGRADED, m2_ready=false, formula_m2_ready=false, live_eval auto-downloaded unseen PDF, formulas=129, latex=0, raw_formula_text=129, high_risk=3.
-
-Primary MinerU acceptance summary:
-- paper_4_unseen MEMTO: verified primary MinerU route sample.
-- 2310_08800v2 DDMT: regenerated 2026-06-14 with current M1, current M2 contract artifacts, PDF-text repair, crop/overlay enforcement, Ollama formula LaTeX polish, and manual PDF-vs-canonical audit. Result: PASS, m2_ready=true, formula_m2_ready=true, formulas=7, latex=7, crop/overlay=7/7, PDF significant-vocab coverage=0.956, canonical significant-vocab-in-PDF=0.963, no repeated hallucinated text, no arXiv/page/CID/Unknown pollution. M2 diagnostic and full real Mimo handoff both succeeded.
-- 2508_11528v1 TPIDM: historical report exists, but current M2 contract audit shows stale artifacts; it cannot be used as multi-paper primary MinerU acceptance evidence until regenerated with current `paper_metadata.json`, `quality_report.md`, `performance_report.json`, `visual_audit/`, and complete formula slot fields.
-
-Ollama section refinement remains optional/off by default. Cached paper_4_unseen section eval had JSON valid=0 / invalid=17; current local qwen2.5:0.5b section compare on the two primary acceptance papers had JSON valid=0, invalid=2, timeout=2, changed_by_count=0, forbidden_mutation_count=0. The formula LaTeX polish path is separate and should be enabled explicitly when producing M2 handoff artifacts.
-
-Example formula-polish run:
-
-```powershell
-.\.venv\Scripts\python.exe scripts\m1_acceptance_runner.py --enable-ollama-latex --ollama-latex-model qwen3.5:4b --ollama-timeout 120 --ollama-min-confidence 0.8
-```
-
-Local smoke result on `reports/m1_acceptance_manual_review_2510_18998` formula_004: `qwen3.5:4b` returned valid JSON in about 6.6s, M1 accepted the cleaned LaTeX, restored the original equation tag, and did not modify M1 page/bbox/crop/source identity.
-
-Guarded 5-formula smoke on the same report checked `formula_004`, `formula_009`, `formula_016`, `formula_018`, and `formula_025`. `formula_009` was rejected because group context caused a wrong left-hand side (`Q` instead of original `S`); `formula_016` remained unchanged after malformed JSON; `formula_004`, `formula_018`, and `formula_025` were accepted after deterministic cleanup. Full `m1_acceptance_runner.py` with MinerU reparse remains a heavy/review run; regular target-mode smoke should not enable Ollama formula polish unless it is specifically producing M2 handoff artifacts.
-
-### 2026-06-11 target-mode generalization check
-
-`scripts/m1_target_mode_eval.py` runs a lightweight target-mode evaluation to reduce overfit risk. The default run does metadata search plus static M1 artifact contract checks and does not run full MinerU. Output lives in `reports/m1_target_mode_eval/`.
-
-Current checks:
-
-- excludes tuned/old samples (`2510.18998`, DDMT, TPIDM, MEMTO, TeVAE, and earlier parser review samples)
-- finds at least two unseen time-series candidates
-- checks formula_slots schema, `final_latex`, equation group fields, nearby text, crop/overlay paths, reference formula exclusion, and performance gate wording
-- scans production code for target-specific hardcodes while allowing tests and the evaluator's own exclusion/detection configuration
-
-Current run found:
-
-- `2312.01729` EdgeConvFormer: Dynamic Graph CNN and Transformer based Anomaly Detection in Multivariate Time Series
-- `1610.06761` Maximally Divergent Intervals for Anomaly Detection
-
-This target-mode report is not full parser acceptance and does not prove M1 perfect generalization. Live page-level eval was not run in the default report. Performance remains WARNING when `seconds_per_page` exceeds the threshold.
-
-## Reused Components
-
-## External Projects / Adapter Candidates
-
-| 项目 | 对应模块 | 具体能力 | 可复用文件/函数/CLI | 接入方式 | 是否默认依赖 | 风险 | 当前状态 |
-|---|---|---|---|---|---|---|---|
-| ARIS / Auto-claude-code-research-in-sleep | M1.1-M1.5 | 科研自动化 workflow、文献搜索流程、verify_papers 三层验证、source diagnostics | `tools/arxiv_fetch.py`, `tools/semantic_scholar_fetch.py`, `tools/openalex_fetch.py`, `tools/deepxiv_fetch.py`, `tools/verify_papers.py`, `skills/research-lit/SKILL.md` | STRATEGY_BORROW | 否 | 不能把 ResearchSensei 改成 ARIS clone；只能借鉴流程、字段、失败处理 | DOC_DESIGNED |
-| ARIS verify_papers | M1.4 | arXiv ID / Crossref DOI / Semantic Scholar fuzzy title 三层验证 | `tools/verify_papers.py` | OPTIONAL_ADAPTER | 否 | 需适配 ResearchSensei Candidate schema；不能直接采用 ARIS artifact | RESEARCH_REQUIRED |
-| DeepXiv / deepxiv_sdk | M1.3 material normalization | arXiv 搜索、brief、head、section、raw markdown、structured JSON、progressive reading | `deepxiv_sdk/reader.py`, `deepxiv_sdk/cli.py`; 必须调研 reader 输出字段、CLI 参数、raw/json 格式 | OPTIONAL_ADAPTER | 否 | 不能作为唯一正式发表论文来源；不负责顶会顶刊质量判断；不保证 formula source fidelity | RESEARCH_REQUIRED |
-| Semantic Scholar | M1.2 / M1.4 | 正式发表论文、venue、citation、publicationTypes、openAccessPdf、fieldsOfStudy | Official Graph API `/graph/v1/paper/search`, `/graph/v1/paper/{id}`; existing `SemanticScholarAdapter` | DIRECT_DEPENDENCY | 是 | 免费层限流；API key 可选；字段缺失需要降级 | IMPLEMENTED |
-| OpenAlex | M1.2 / M1.4 | venue、OA URL、citation、topics、concepts、institution、metadata | `pyalex.Works`, inverted abstract reconstruction; existing `OpenAlexAdapter` | DIRECT_DEPENDENCY | 是 | topic/venue 字段需归一化；不是唯一质量源 | IMPLEMENTED |
-| Crossref | M1.2 / M1.4 | DOI、publisher metadata、container-title、正式出版验证 | `habanero.Crossref.works`, DOI lookup; existing `CrossrefAdapter` | DIRECT_DEPENDENCY | 是 | 覆盖偏出版 metadata；不提供完整全文 | IMPLEMENTED |
-| arXiv source/e-print | M1.3 source acquisition | LaTeX source / PDF 获取；preprint/source 获取 | arXiv API, e-print/source endpoint, PDF endpoint, existing `ArxivAdapter`; source adapter must inspect source package and main `.tex` | DIRECT_DEPENDENCY | 是 | arXiv 是 source/preprint 获取源，不是质量判断源；429/503 需要 retry/backoff | DOC_DESIGNED |
-| DBLP | M1.4 quality ranking | CS venue / publication venue metadata 校验 | DBLP API / XML dumps; 必须调研 venue field、conference/journal mapping、本地化数据方式 | OPTIONAL_ADAPTER | 否 | venue 缩写与论文 title 匹配易错；需要去重 | RESEARCH_REQUIRED |
-| OpenReview | M1.4 quality ranking | ICLR/NeurIPS workshop/review status、投稿/接收状态 | OpenReview API / venue group endpoints; 必须调研 forum/invitation/venueid 字段 | OPTIONAL_ADAPTER | 否 | 覆盖有限；不同 venue schema 不统一 | RESEARCH_REQUIRED |
-| CORE | M1.2 / M1.3 | open access metadata / OA source discovery | CORE API / provider metadata; 必须调研 API key、rate limit、OA URL 字段 | OPTIONAL_ADAPTER | 否 | API key / coverage / quality信号有限 | RESEARCH_REQUIRED |
-| CCF ranking data | M1.4 quality ranking | CCF A/B/C 会议期刊质量辅助判断 | CCF ranking dataset source; 必须调研可本地化 ranking 数据、license、更新频率 | OPTIONAL_ADAPTER | 否 | 不能凭空实现 ranking；非 CS 领域不适用 | RESEARCH_REQUIRED |
-
-| Capability | Implementation | Adapter |
-|---|---|---|
-| arXiv search | httpx + Atom XML parsing (custom robust fetcher) | `ArxivAdapter` |
-| OpenAlex metadata search | `pyalex` | `OpenAlexAdapter` |
-| Semantic Scholar metadata/search | httpx REST API (custom adapter) | `SemanticScholarAdapter` |
-| Crossref DOI metadata | `habanero` | `CrossrefAdapter` |
-| Best available source resolution | arXiv source / structured HTML / PDF with retry/backoff | `PaperSourceResolver` |
-| Structured paper reading | DeepXiv structured output / publisher HTML/XML through adapter | `StructuredSourceAdapter` |
-| PDF/layout normalization (PRIMARY) | MinerU2.5-Pro via mineru-vl-utils | `MinerU25ProAdapter` |
-| PDF/layout normalization (FALLBACK) | Marker build_document() | `MarkerDocumentFormulaDetector` |
-| Structure refinement (optional) | local Llama model | `LlamaSectionRefiner` |
-| Structure refinement (always) | rule-based sanity checks | `RuleBasedStructureRefiner` |
-| Formula region detection (fallback) | Marker build_document() Equation blocks | `MarkerDocumentFormulaDetector` |
-| Formula region detection (PRIMARY) | MinerU2.5-Pro block JSON | `MinerU25ProAdapter` |
-| Formula OCR (fallback) | pix2tex / LaTeX-OCR for unresolved crops | `FormulaOCRAdapter` |
-
-All third-party packages are isolated behind adapters so the core schemas and selection logic remain replaceable.
-
-## External Project Borrowed Strategy
-
-ResearchSensei's arXiv access strategy borrows engineering patterns from:
-
-`wanshuiyin/Auto-claude-code-research-in-sleep/tools/arxiv_fetch.py`
-
-Borrowed strategies (not copied code):
-
-- Descriptive User-Agent on all arXiv requests
-- Contact email via environment variable
-- 429 retry with backoff
-- 503 retry with backoff
-- Rate exceeded body detection
-- arXiv ID normalization and id_list lookup
-- PDF download file size guard
-- PDF header validation
-
-These strategies are not optional optimizations. They are part of M1 real validation. Without them, arXiv requests easily fail due to default client behavior, network exit points, or rate limiting.
-
-## External Reference Implementation Notes
-
-### M1.1 Query Planning
-
-- **Reference source**: ARIS `skills/research-lit/SKILL.md`, `skills/idea-discovery/SKILL.md`
-- **Reference use**: STRATEGY_BORROW
-- **Borrowed behavior**: Split broad research direction into searchable academic queries; preserve user direction / constraints / scope; use LLM to generate structured search plan instead of keyword splitting
-- **ResearchSensei-owned target**: `query_plan.json`
-- **Schema / artifact impact**: `english_query`, `query_variants`, `core_terms`, `related_terms`, `exclude_terms`, `search_intents`
-- **Boundary**: Does not use ARIS skill output format. ResearchSensei retains QueryPlan schema.
-- **Validation implication**: Chinese query must produce English academic query via real LLM. No LLM / LLM JSON failure = M1 failure.
-
-### M1.2 Multi-source Acquisition
-
-- **Reference source**: ARIS `tools/arxiv_fetch.py`, `tools/semantic_scholar_fetch.py`, `tools/openalex_fetch.py`, `skills/research-lit/SKILL.md`
-- **Reference use**: STRATEGY_BORROW
-- **Borrowed behavior**: arXiv User-Agent / contact email / rate-limit handling; source contribution tracking; source success/failure diagnostics; do not hide source failures
-- **ResearchSensei-owned target**: `candidate_pool.json`, `source_metrics`
-- **Schema / artifact impact**: `sources_attempted`, `sources_success`, `source_failures`, `source_contribution`, `candidate.source_ids`, `candidate.raw_source_metadata`
-- **Boundary**: Does not adopt ARIS-only search. ResearchSensei retains best-of-breed source set: arXiv robust official endpoint adapter, OpenAlex/pyalex, Semantic Scholar official REST, Crossref/habanero. Other projects open for evaluation: Unpaywall, PaperQA, STORM, DeepXiv, Exa.
-- **Validation implication**: `sources_attempted >= 4`. Source failure must have structured error. One source success does not mean multi-source stability.
-
-### M1.3 论文原始材料获取 / Best Available Source Resolution
-
-- **Reference source**: ARIS `tools/arxiv_fetch.py`, `skills/research-lit/SKILL.md`
-- **Reference use**: STRATEGY_BORROW
-- **Borrowed behavior**: Download only top-relevant PDFs; PDF download uses User-Agent / retry / backoff; PDF size guard; PDF header validation
-- **ResearchSensei-owned target**: `source_resolution.json`
-- **Schema / artifact impact**: `source_type`, `source_priority`, `preferred_m2_input=canonical_paper.md`, `latex_source_url`, `latex_source_downloaded`, `latex_source_path`, `latex_source_sha256`, `latex_source_format`, `latex_main_file`, `structured_html_url`, `structured_html_downloaded`, `pdf_url`, `pdf_downloaded`, `pdf_metadata_check`, `pdf_title_match`, `source_confidence`, `canonicalization_status`, `m2_ready`, `source_warning`
-- **Boundary**: M1 does lightweight source validation only, not M2 full-text parsing. Source files not committed to git. Does not download all candidates.
-- **Validation implication**: M1 must try LaTeX source first, then structured HTML, then PDF. At least one deep-reading source downloaded. Metadata-only cannot enter M2.
-
-M1.3 不只下载 PDF。M1.3 必须优先尝试获取 LaTeX source / arXiv source。如果 source 不可得，再尝试 structured HTML / XML。最后才是 PDF。
-
-### M1.3.5 Material Normalization / canonical_paper.md
-
-- **Reference source**: DeepXiv structured reading ideas, MinerU / Marker layout extraction, pix2tex / LaTeX-OCR formula OCR, ARIS source verification discipline
-- **Reference use**: OPTIONAL_ADAPTER / STRATEGY_BORROW
-- **ResearchSensei-owned target**: `canonical_paper.md`
-- **Schema / artifact impact**: YAML front matter, normalized sections, formula blocks, source/confidence/status fields
-- **Boundary**: Does not force all papers into true LaTeX. LaTeX source yields `source_latex`; parser/OCR/reconstruction must be labelled.
-- **Validation implication**: M2 may only consume `canonical_paper.md` with `m2_ready=true` or explicit override. Metadata-only cannot enter M2.
-
-### M1.4 Dedup / Verification / Relevance
-
-- **Reference source**: ARIS `tools/verify_papers.py`, `skills/research-lit/SKILL.md`
-- **Reference use**: STRATEGY_BORROW
-- **Borrowed behavior**: Three-layer candidate verification: (1) arXiv ID verification, (2) CrossRef DOI verification, (3) Semantic Scholar fuzzy title verification. Candidate status uses: `verified`, `unverified`, `verify_pending`, `error`. Transient API failure is `verify_pending`, not hallucination. Unverified candidates cannot enter A_READ. `verification_method` and `verification_reason` preserved.
-- **ResearchSensei-owned target**: `filtered_candidates.json`
-- **Schema / artifact impact**: `verification_status`, `verification_method`, `verification_reason`, `verification_confidence`, `rule_relevance_score`, `llm_relevance_score`, `llm_relevance_label`, `matched_concepts`, `missing_concepts`, `relevance_reason`, `should_download`, `should_a_read`
-- **Boundary**: Does not vendor ARIS `verify_papers.py`. Does not treat ARIS CLI output as ResearchSensei artifact. ResearchSensei implements its own schema conversion and gate.
-- **Validation implication**: `verified_candidate_count` must exist. `unverified_candidate_count` must exist. `verify_pending_count` must exist. `llm_judged_candidate_count` must exist. `relevance_filtered_count` must exist. A_READ_FOR_M2 must be verified + relevant + valid deep-reading source. Valid deep-reading source can be LaTeX source, structured HTML, or validated PDF. PDF is fallback, not the only valid input.
-
-### M1.5 Reading Plan
-
-- **Reference source**: ARIS `skills/research-lit/SKILL.md`
-- **Reference use**: STRATEGY_BORROW
-- **Borrowed behavior**: Each recommended paper must state: Problem, Method, Results, Relevance, Source, Verification status. Only top-relevant papers enter the reading plan.
-- **ResearchSensei-owned target**: `reading_plan.json`
-- **Schema / artifact impact**: `role`, `selection_reason`, `relevance_reason`, `verification_status`, `source_confidence`, `metadata_confidence`, `risk_note`, `can_enter_m2`
-- **Boundary**: Does not reuse ARIS markdown table. ReadingPlan is a ResearchSensei artifact. A_READ serves M2 downstream.
-- **Validation implication**: `A_READ count >= 1`. Every A_READ has `can_enter_m2=true`. Every A_READ has `verification_status`, validated PDF, `relevance_reason`.
-
-### General M1 Boundary
-
-ARIS is one external reference. ResearchSensei retains its own module boundaries, schemas, artifacts, gates, APIs, frontend, and validation rules. Other external projects remain open for evaluation (Unpaywall, PaperQA, STORM, DeepXiv, Exa).
+Status: not implemented. Do not claim seed expansion is complete.
 
 ## Pipeline
 
+Formal focused-acquisition flow:
+
 ```text
-QueryPlanner.plan()
-  -> query_plan.json
-DirectionRunner._acquire()
-  -> candidate_pool.json
-SelectionService.deduplicate()
-  -> deduplicated candidates
-CandidateVerifier.verify_many()
-  -> verification fields
-RelevanceJudge.judge_many()
-  -> LLM relevance fields
-DirectionRunner._should_download()
-  -> download/source decision
-PaperSourceResolver.resolve_many()
-  -> try latex_source first
-  -> then structured_html
-  -> then pdf
-  -> source_resolution.json
-MaterialNormalizationService.normalize()
-  -> read best available source
-  -> MinerU25ProAdapter (PRIMARY) or MarkerDocumentFormulaDetector (fallback)
-  -> RuleBasedStructureRefiner (always) + optional LlamaSectionRefiner
-  -> CanonicalBuilder -> canonical_paper.md
-  -> M1 Quality Gate
-  -> canonicalization_status + m2_ready
-SelectionService.build_reading_plan()
-  -> filtered_candidates.json + reading_plan.json
+user query/title/DOI/arXiv ID
+  -> QueryPlanner with real LLM
+  -> acquisition adapters
+     -> ArxivAdapter
+     -> OpenAlexAdapter
+     -> SemanticScholarAdapter
+     -> CrossrefAdapter
+  -> verification
+  -> LLM relevance judge
+  -> SelectionService
+  -> PaperSourceResolver
+  -> material normalization
+     -> M1CanonicalPipeline
+     -> MinerU25ProAdapter (primary)
+     -> RuleBasedStructureRefiner
+     -> optional Ollama formula LaTeX validator
+     -> CanonicalBuilder
+     -> M1QualityGate
+     -> visual audit and M2 bundle artifacts
+  -> reading_plan.json with A_READ_FOR_M2 entries
 ```
 
-Note: verification + LLM relevance judge happen before download. Candidates with `should_download=false` are not downloaded. `filtered_candidates.json` contains post-verify + post-relevance + post-source-resolution final candidates. M1 must not stop at PDF if LaTeX source is available. PDF success is not the best possible result when source is available.
+The legacy `MaterialNormalizer` remains as fallback/debug infrastructure. The
+formal PDF route is `M1CanonicalPipeline`.
 
-## M1.1 Query Planning
+## Best Available Source Policy
 
-`QueryPlanner.plan(user_query)` now requires an injected LLM client. If no LLM is available, or if the LLM output is not valid JSON, it raises `QueryPlanningError`.
+M1 must not stop at metadata. It must resolve the best available source:
 
-Required fields:
+1. `latex_source`
+2. `structured_html` / `xml` / confirmed structured reader output
+3. `pdf`
+4. `low_confidence_text`
+5. `metadata_only`
 
-- `direction_en`
-- `english_query`
-- `query_variants`
-- `core_terms`
-- `related_terms`
-- `exclude_terms`
-- `search_intents`
+`metadata_only` can never enter M2.
 
-This prevents Chinese directions from being searched with poor heuristic English terms.
+Current real canonical acceptance is PDF-focused through MinerU2.5-Pro. LaTeX
+source and structured HTML remain preferred target sources, but their full
+normalization path is not yet the dominant real-verified route.
 
-## M1.2 Acquisition
+## Primary Parser Boundary
 
-`DirectionRunner` defaults to four sources:
+Primary parser:
 
-- `arxiv`
-- `openalex`
-- `semantic_scholar`
-- `crossref`
+- `src/researchsensei/canonical/mineru25_adapter.py`
+- model family: `opendatalab/MinerU2.5-Pro-2604-1.2B`
+- runtime: `mineru-vl-utils`
+- normalized output: `CanonicalDocumentBlock`
 
-Each source records source metrics:
+Fallback / audit parsers:
 
-- `source`
-- `attempted`
-- `success`
-- `count`
-- `latency_ms`
-- `error`
+- `MarkerDocumentFormulaDetector`
+- `MarkItDownAdapter`
+- `MarkerPdfAdapter`
+- PyMuPDF text extraction
 
-Source failure is recorded in warnings and does not hide other source results.
+Parser rules:
 
-### arXiv Adapter
+- MinerU is the only primary PDF parser in formal M1 canonical acceptance.
+- Marker is fallback/audit baseline, not proof of primary-route quality.
+- PyMuPDF repairs only suspicious non-formula body text by PDF bbox. It must not
+  change formula identity, bbox, page, crop, overlay, or parser source.
+- Parser outputs from historical reports may be stale. Formal claims require
+  regeneration with current code.
 
-`ArxivAdapter` uses httpx with a custom robust fetch strategy (not the `arxiv` Python package's default client).
+## Section And Body Structure Rules
 
-**User-Agent**:
+`RuleBasedStructureRefiner` always runs. It must:
 
-```
-ResearchSensei/0.5 (+https://github.com/ZehuaGou/Research-sensei)
-```
+- recognize Abstract, Introduction, Related Work, Method/Methodology/Approach,
+  Experiments/Evaluation/Results, Conclusion, References, and Appendix
+- keep all content after References/Bibliography inside References unless an
+  explicit Appendix begins
+- prevent References entries from polluting Introduction, Method, or Experiments
+- suppress repeated page headers, page numbers, author footers, front-matter
+  affiliation noise, funding notes, and arXiv sidebar headers
+- avoid creating `## Unknown` content after References in formal output
+- flag section contradictions and reference contamination for the quality gate
 
-If `RESEARCHSENSEI_CONTACT_EMAIL` is set, the User-Agent includes `mailto:<email>`.
+Formal M1 output must be faithful enough for M2 evidence extraction. If the body
+contains severe repeated or hallucinated text, the paper must fail the M1 gate.
 
-**Query strategy** — at least three query forms are attempted:
+## Formula Extraction And Handoff
 
-1. `all:"<query>"` — all-fields exact phrase
-2. `ti:"<query>"` — title-only exact phrase
-3. raw query — fallback
+Formula extraction is not just text extraction. A formula that can enter M2
+formula understanding needs:
 
-If any form returns results, no further forms are tried.
+- stable `formula_id`
+- PDF page
+- bbox in PDF/page coordinates
+- crop image
+- overlay image
+- parser source
+- final LaTeX when available
+- raw text only when reliable LaTeX is unavailable
+- nearby text before and after
+- section assignment
+- equation grouping metadata
 
-**arXiv ID lookup** — when a candidate has an arXiv ID from another source (OpenAlex, Crossref, Semantic Scholar), `ArxivAdapter.search_by_id(arxiv_id)` uses the `id_list` parameter instead of `search_query`, bypassing the search endpoint entirely.
+Formula origins:
 
-**Retry/backoff** — applies to both API search and PDF download:
+1. `source_latex`
+2. `mineru_latex`
+3. `marker_latex`
+4. `parser_latex`
+5. `ocr_latex`
+6. `raw_formula_text`
+7. `unresolved`
 
-| Error | Backoff sequence | Max retries |
-|---|---|---|
-| HTTP 429 | 5s, 10s, 15s | 3 |
-| HTTP 503 | 2s, 4s, 8s | 3 |
-| Rate exceeded (body) | 5s, 10s, 15s | 3 |
-| Timeout / ConnectionError | 2s, 4s, 8s | 3 |
+`raw_formula_text` must never be placed in the `latex` field or treated as
+derivable LaTeX. Dense raw-only outputs are degraded for paper reading and
+blocked for formula understanding.
 
-Body detection checks for `"Rate exceeded"` and `"Please reduce"` in the response text.
+Dense raw-only rule:
 
-**Diagnostics recorded per attempt**:
-
-- status code
-- exception type
-- query string
-- attempt count
-- retry/backoff wait time
-- rate-limit body content
-
-### Semantic Scholar Adapter
-
-`SemanticScholarAdapter` uses the official Semantic Scholar REST API via httpx (not the `semanticscholar` Python package).
-
-**Endpoint**: `https://api.semanticscholar.org/graph/v1/paper/search`
-
-**Proxy support**: `httpx.Client(..., trust_env=True)` reads `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY` from the environment. This allows Clash or other local proxies to route Semantic Scholar traffic.
-
-**API key**: reads `SEMANTIC_SCHOLAR_API_KEY` from environment. When set, sends `x-api-key` header. Without a key, the free tier rate limit (currently ~100 requests/5min) applies.
-
-**Retry/backoff**:
-
-| Error | Backoff sequence | Max retries |
-|---|---|---|
-| HTTP 429 | 3s, 6s, 12s | 3 |
-| HTTP 503 | 2s, 4s, 8s | 3 |
-| Timeout / ConnectionError | 2s, 4s, 8s | 3 |
-
-**Known limitation**: if Clash or the local proxy does not route `api.semanticscholar.org`, `ConnectionRefusedError` may occur even with `trust_env=True`. This is a runtime environment issue, not a code bug. The error is structured and recorded in source metrics.
-
-### Crossref Adapter
-
-`CrossrefAdapter` uses `habanero` for DOI metadata retrieval.
-
-### OpenAlex Adapter
-
-`OpenAlexAdapter` uses `pyalex` for metadata search with inverted-index abstract reconstruction.
-
-## M1.3 Source Acquisition
-
-`PaperSourceResolver` resolves best available source for each candidate. M1 不只下载 PDF，必须优先尝试获取 LaTeX source。
-
-### M1.3 Source Priority
-
-1. **latex_source** — preferred when arXiv source / LaTeX source package is available; best for formulas, citations, section hierarchy, labels, references, and bibliography
-2. **structured_html / xml / deepxiv_structured** — preferred when publisher/arXiv HTML/XML or DeepXiv structured output is available; useful for reading order and MathML/HTML structure
-3. **pdf_parser_output** — acceptable for M2 only when source is unavailable; must pass PDF validation, title match, parser status, and canonicalization gate
-4. **low_confidence_text_fallback** — can produce degraded `canonical_paper.md` only when sufficient body text exists; formula explanation is blocked or degraded
-5. **metadata_only** — can be used for landscape anchor or reference; cannot enter M2 deep reading
-
-### source_resolution.json Schema
-
-```json
-{
-  "paper_id": "",
-  "title": "",
-  "source_type": "latex_source | structured_html | xml | deepxiv_structured | pdf_parser_output | low_confidence_text_fallback | metadata_only",
-  "source_priority": 1,
-  "preferred_m2_input": "canonical_paper.md | none",
-
-  "latex_source_url": "",
-  "latex_source_downloaded": false,
-  "latex_source_path": "",
-  "latex_source_sha256": "",
-  "latex_source_format": "tar | gz | zip | tex | unknown",
-  "latex_main_file": "",
-  "latex_aux_files": [],
-  "latex_compile_status": "not_checked | compile_ok | compile_failed | not_applicable",
-  "latex_source_error": "",
-
-  "structured_html_url": "",
-  "structured_html_downloaded": false,
-  "structured_html_path": "",
-  "structured_html_error": "",
-
-  "pdf_url": "",
-  "pdf_downloaded": false,
-  "pdf_path": "",
-  "pdf_sha256": "",
-  "pdf_metadata_check": "passed | mismatch | unknown | not_applicable",
-  "pdf_title_match": "match | mismatch | unknown | not_applicable",
-  "pdf_error": "",
-
-  "source_confidence": "high | medium | low",
-  "canonicalization_status": "not_started | success | degraded | blocked",
-  "m2_ready": false,
-  "degradation_reason": [],
-  "source_warning": []
-}
+```text
+if formula_count >= 5 and latex_count == 0:
+  canonical_quality_status = DEGRADED
+  m2_ready_for_formula_understanding = false
 ```
 
-## M1.3.5 Material Normalization
+## Ollama Formula Polish
 
-M1 Material Normalization converts the best available source into `canonical_paper.md`. This is the M1→M2 core contract.
+Ollama has two separate M1 paths:
 
-### Architecture (2026-06-09)
+- section refinement: optional, default off, diagnostic/review only
+- formula LaTeX polish: optional, explicit, crop-based
 
-M1 PDF canonicalization: MinerU2.5-Pro primary + Llama structure refiner + Marker fallback.
-
-```
-PDF
-  -> MinerU2.5-Pro adapter (PRIMARY)
-       mineru-vl-utils
-       opendatalab/MinerU2.5-Pro-2604-1.2B
-       output: page/block JSON
-       blocks: title / text / formula / table / figure
-       bbox / page / latex / reading_order
-  -> StructureRefiner
-       RuleBasedStructureRefiner (always)
-         section hierarchy sanity
-         reading_order validation
-         formula context checks
-       LlamaSectionRefiner (optional, local)
-         section / context / reading_order refinement
-         strict JSON output only
-         forbidden: modify formula_latex, bbox, page, paper metadata
-  -> CanonicalBuilder
-       canonical_paper.md
-       formula_slots.json
-       visual audit artifacts
-  -> M1 Quality Gate
-       source/title verification
-       formula bbox / crop / overlay
-       latex / canonical match
-       section contradiction detection
-       all_formulas_same_section_suspicious
-       abstract_formula_overload
-       nearby_heading_conflict
-       fallback_used flag
-       llama_refined flag
-```
-
-### Fallback architecture (audit baseline)
-
-The Marker-based architecture is retained as fallback when MinerU2.5-Pro is unavailable. The legacy MinerUPdfAdapter (magic_pdf) has been removed.
-
-```
-PDF (fallback, IMPLEMENTED but demoted)
-  -> Body pipeline
-       MarkItDown / PyMuPDF / optional Marker body output
-       parser quality scoring
-       sections
-  -> Formula pipeline
-       Marker build_document()
-       Equation/TextInlineMath blocks
-       FormulaSlot(page, bbox, marker_latex/text)
-       FormulaCropper(PyMuPDF crop)
-       FormulaOCRAdapter for unresolved crops only
-  -> FormulaMerger
-       sections + FormulaSlot + final_latex/unresolved
-       canonical_paper.md
-```
-
-### Parser positioning
-
-| Component | Role in primary pipeline | Role in fallback |
-|---|---|---|
-| MinerU2.5-Pro | **PRIMARY** canonical parser | not available |
-| MarkerDocumentFormulaDetector | fallback formula bbox/LaTeX detector, audit baseline | primary formula detector |
-| MarkItDown | fast text fallback, source/title verification | default body parser |
-| PyMuPDF | page text extraction, crop, overlay, debug/audit | text fallback, crop engine |
-| LlamaSectionRefiner | optional structure refinement | not available |
-| RuleBasedStructureRefiner | always-on sanity checks | always-on sanity checks |
-
-### Inputs
-
-- verified candidate metadata
-- `source_resolution.json`
-- downloaded LaTeX source / structured HTML / XML / DeepXiv structured output / validated PDF / parser output
-- optional parser/layout outputs from MinerU, Marker, Docling, GROBID, PyMuPDF
-- formula OCR policy config
-
-### Outputs
-
-- `canonical_paper.md`
-- normalization warnings
-- `canonicalization_status`
-- `m2_ready`
-- formula slot metadata
-
-### FormulaSlot
-
-FormulaSlot is the core data structure for the formula pipeline. It represents a detected formula region with position, source, and resolution status.
-
-```python
-class FormulaSlot(SenseiModel):
-    formula_id: str                    # unique ID, e.g. "eq_001"
-    page: int                          # 0-indexed page number
-    bbox: list[float]                  # [x1, y1, x2, y2] in PDF points
-    polygon: list[list[float]] | None  # 4-corner coords if available
-    block_type: str                    # "Equation" | "TextInlineMath" | "Math" | "Formula"
-    detection_source: str              # "marker_document" | "mineru25pro" | "pymupdf"
-    detection_confidence: float        # 0-1
-    marker_text: str                   # raw text from Marker block (if any)
-    marker_latex: str                  # LaTeX from Marker block (if any)
-    mineru_latex: str                  # LaTeX from MinerU2.5-Pro (if any)
-    nearby_text_before: str            # text context before the formula
-    nearby_text_after: str             # text context after the formula
-    section: str                       # matched section name
-    section_confidence: str            # "high" | "medium" | "low"
-    section_source: str                # "heading_above" | "nearby_heading" | "nearby_after_heading" | "llama_refined" | "unknown"
-    section_reason: str                # human-readable explanation
-    slot_marker: str                   # "marker_equation" | "marker_inlinemath" | "regex" | etc.
-    block_source: str                  # "mineru25pro" | "marker_document" | "ocr" | "latex_source"
-    crop_path: str | None              # path to cropped formula image
-    overlay_path: str | None           # path to overlay image
-    ocr_latex: str                     # OCR result (if OCR was run)
-    ocr_status: str                    # "not_required" | "success" | "failed" | "skipped_by_policy"
-    final_latex: str                   # final resolved LaTeX
-    final_origin: str                  # "source_latex" | "mineru_latex" | "marker_latex" | "ocr_latex" | "raw_formula_text" | "unresolved"
-    unresolved_reason: str             # why it couldn't be resolved (if unresolved)
-    risk_flags: list[str]              # e.g. ["SECTION_CONTRADICTION", "ABSTRACT_OVERLOAD"]
-```
-
-### Formula origin priority
-
-```
-source_latex > mineru_latex > marker_latex > ocr_latex > raw_formula_text > unresolved
-```
-
-- `source_latex`: From original LaTeX source (highest confidence)
-- `mineru_latex`: From MinerU2.5-Pro (primary parser, reliable when block has LaTeX)
-- `marker_latex`: From Marker `build_document()` Equation block (fallback)
-- `ocr_latex`: From FormulaOCRAdapter on cropped image
-- `raw_formula_text`: Extracted from text but no reliable LaTeX
-- `unresolved`: Formula detected but could not be resolved
-
-### DocumentBlock (M2.1 input)
-
-```python
-class DocumentBlock(SenseiModel):
-    block_id: str                    # unique block ID
-    page: int                        # page number
-    bbox: list[float]                # [x1, y1, x2, y2]
-    block_type: str                  # title / text / formula / table / figure / caption / reference / unknown
-    text: str                        # plain text content
-    latex: str                       # LaTeX if applicable
-    html: str                        # HTML if applicable
-    reading_order: int               # reading order within document
-    source: str                      # mineru25pro / marker_document / pymupdf / markitdown
-    confidence: float                # 0-1
-    parent_section: str              # section name
-    raw_payload_ref: str             # reference to raw parser output
-```
-
-### MinerU25ProAdapter contract
-
-- Uses `mineru-vl-utils` to call `opendatalab/MinerU2.5-Pro-2604-1.2B`
-- Input: PDF path or page image
-- Output: normalized document JSON with blocks
-- Must preserve: page, bbox, block_type, text, latex, reading_order, confidence, source=mineru25pro
-
-### LlamaSectionRefiner contract
-
-- Only refines document structure and formula context
-- Input: blocks from MinerU / Marker / PyMuPDF
-- Output: strict JSON
-- May modify: section, section_confidence, section_reason, reading_order_warning, formula_context_reason, risk_flags
-- **Forbidden**: modify formula_latex, bbox, page, source_pdf identity, paper metadata
-- If Llama output is invalid JSON: fallback to RuleBasedStructureRefiner, record risk
-
-### StructureRefiner contract
-
-Two layers:
-
-1. **RuleBasedStructureRefiner** (always active)
-   - Section hierarchy sanity checks
-   - Reading order validation
-   - Formula context checks
-   - Abstract overload detection
-
-2. **LlamaSectionRefiner** (optional, local)
-   - Section / context / reading_order refinement
-   - Requires local Llama model
-   - Strict JSON output only
-
-Priority: MinerU sections/layout → rule-based sanity → optional Llama → audit gate. Llama cannot decide alone.
-
-### canonical_paper.md front matter
-
-```yaml
----
-paper_id:
-title:
-authors:
-year:
-venue:
-source_type:
-source_confidence:
-canonicalization_status:
-parser_used:                    # legacy, kept for compatibility
-m2_ready:
-degradation_reason:
-
-# Parser pipeline
-primary_parser:                 # "mineru25pro" | "marker_document" (fallback)
-fallback_used:                  # true if Marker fallback was used instead of MinerU
-llama_refined:                  # true if LlamaSectionRefiner was applied
-mineru_available:               # true if MinerU2.5-Pro was available
-
-# Formula pipeline
-formula_detector:               # "mineru25pro" | "marker_document" | "regex" | "none"
-formula_slot_count:             # total FormulaSlot count
-formula_crop_count:             # how many were cropped
-mineru_latex_count:             # formulas with MinerU-provided LaTeX
-marker_latex_count:             # formulas with Marker-provided LaTeX (fallback)
-ocr_latex_count:                # formulas resolved via OCR (fallback)
-raw_formula_text_count:         # formulas with raw text only
-unresolved_formula_count:       # formulas that couldn't be resolved
-
-# Quality gate
-canonical_quality_status:       # "PASS" | "DEGRADED" | "BLOCKED"
-structure_audit_status:         # "PASS" | "WARNING" | "BLOCKED"
-section_contradiction_count:    # number of section contradictions detected
----
-```
-
-### canonical body
-
-The body should preserve these sections when available:
-
-- Title
-- Abstract
-- Introduction
-- Related Work
-- Method
-- Experiments
-- Conclusion
-- References
-
-Missing sections remain missing with warnings. Empty generated placeholders are not allowed.
-
-### Formula block format in canonical_paper.md
-
-Formulas with resolved LaTeX:
-
-````markdown
-<!-- formula_id: eq_001 | page: 3 | bbox: [x1,y1,x2,y2] | source: marker_document | origin: parser_latex | confidence: 0.8 -->
-```latex
-\mathcal{L} = ...
-```
-````
-
-Unresolved formulas:
-
-```markdown
-<!-- formula_id: eq_001 | page: 3 | bbox: [...] | source: marker_document | origin: unresolved | reason: OCR failed or disabled -->
-{{FORMULA:eq_001 unresolved}}
-```
-
-### Marker new role
-
-Marker is no longer just a Markdown parser. Its primary value in M1 is as a **formula position detector**:
-
-**MarkerDocumentFormulaDetector**:
-- Uses `converter.build_document(pdf_path)` to get the internal `Document`
-- Iterates `Page.children` to find `Equation` / `TextInlineMath` / `Math` / `Formula` blocks
-- Extracts `page_id` and `block.polygon.bbox`
-- Extracts `marker_latex` / `marker_text` when available
-
-**Key finding**: `MarkdownOutput` and `JSONRenderer` both discard Equation block positions. The internal `Document` object is the only source of formula position data. The `MarkdownOutput` flattens equations to `$...$` text; `JSONRenderer` inlines them into parent Text blocks.
-
-### OCR strategy
-
-OCR is not run by default on all formulas:
-
-1. **Marker block has reliable LaTeX** → `final_origin = parser_latex` → no OCR needed
-2. **Marker block has bbox but no reliable LaTeX** → crop → OCR:
-   - OCR succeeds → `final_origin = ocr_latex`
-   - OCR fails → `final_origin = unresolved`
-3. **OCR result must never be labeled as `source_latex`** — OCR is a fallback, not a source-quality signal
-
-### FormulaRegionDetector (DEPRECATED)
-
-FormulaRegionDetector was the original formula detection approach. It has been superseded by:
-- **PRIMARY**: MinerU2.5-Pro block JSON (MinerU25ProAdapter) — provides formula bbox, LaTeX, and reading_order directly
-- **FALLBACK**: MarkerDocumentFormulaDetector — uses Marker `build_document()` Equation blocks
-
-Current status: DEPRECATED. Not used in the canonical pipeline.
-
-### FormulaOCRAdapter (fallback only)
-
-Input:
-- formula region image
-- bbox
-- page number
-- surrounding text
-- OCR config
-
-Output:
-- `formula_latex`
-- `formula_origin=ocr_latex`
-- `formula_ocr_status`
-- `ocr_confidence`
-- warnings
-
-Candidate implementations:
-- pix2tex / LaTeX-OCR
-
-Trigger conditions (OCR is NOT automatic):
-- Marker block has bbox but no reliable LaTeX
-- user requests formula explanation
-- M2 marks formula as core top-K
-- deep reading mode requests formula-level explanation
-
-Run policy:
-
-```yaml
-formula_ocr_enabled: true
-default_formula_ocr_mode: on_demand
-max_formula_ocr_per_paper: 3
-max_formula_ocr_batch: 10
-formula_ocr_timeout_seconds: configurable
-```
-
-Failure conditions:
-- timeout
-- GPU/resource error
-- low OCR confidence
-- malformed LaTeX
-- context mismatch
-
-Gate rules:
-- failed OCR writes `formula_ocr_status=failed`
-- OCR result never becomes `source_latex`
-- OCR result cannot silently upgrade to high-confidence explanation
-
-Current status: FormulaOCRAdapter interface exists but model not integrated. In the canonical pipeline, OCR is a fallback only for unresolved formula crops — not part of the primary pipeline. pix2tex model weight download is slow (97.4MB at ~5KB/s).
-
-### m2_ready gate
-
-`m2_ready=true` requires:
-
-- front matter contains `paper_id`, `title`, `source_type`, `source_confidence`, `canonicalization_status`
-- canonical body has abstract or enough body text
-- source is not `metadata_only`
-- formula blocks, if present, include `formula_id` and `origin`
-- degradation reasons are explicit
-
-Blocked conditions:
-
-- metadata-only input
-- missing title or paper identity
-- empty body
-- no source status
-- formula blocks without origin
-- security rejection or parser corruption
-
-### Source Resolution Strategy
-
-`PaperSourceResolver` records source resolution status for each type.
-
-For downloaded sources it records:
-
-- `download_status`
-- `final_url`
-- `content_type`
-- `file_size`
-- `sha256`
-- `local_path`
-- `error_code`
-
-Supported status values include:
-
-- `RESOLVED_LATEX_SOURCE_DOWNLOADED`
-- `RESOLVED_STRUCTURED_HTML_DOWNLOADED`
-- `RESOLVED_PDF_DOWNLOADED`
-- `RESOLVED_PDF_URL_ONLY`
-- `RESOLVED_LANDING_ONLY`
-- `METADATA_ONLY`
-- `FAILED_DOWNLOAD`
-- `NO_SOURCE_FOUND`
-
-`RESOLVED_LATEX_SOURCE_DOWNLOADED` or `RESOLVED_STRUCTURED_HTML_DOWNLOADED` or `RESOLVED_PDF_DOWNLOADED` can clear a paper for M2. LaTeX source is preferred over PDF.
-
-### PDF Download Strategy
-
-PDF downloads use:
-
-- ResearchSensei User-Agent (same as arXiv adapter)
-- `httpx.Client(trust_env=True)` for proxy support
-- Retry/backoff on 429, 503, timeout, connection error (2s, 4s, 8s; max 3 retries)
-
-After download, validation includes:
-
-- content-type check
-- `%PDF` magic header check (first 5 bytes)
-- minimum file size (10 KB) to reject HTML error pages
-- maximum file size (80 MB default)
-- sha256 hash computation
-- local_path recording
-
-PDF files are not committed to git.
-
-## M1.4 Dedup And Scoring
-
-Dedup priority:
-
-1. DOI
-2. arXiv ID
-3. Semantic Scholar ID
-4. normalized title
-5. normalized title + year
-
-Metadata merge keeps source lists and fills missing DOI/arXiv/PDF/landing/citation/abstract fields from duplicates.
-
-Scoring uses real metadata fields:
-
-- relevance score
-- venue prestige signal
-- citation count
-- code availability
-- method representativeness
-- source reliability
-- open-access signal
-- PDF availability
-- metadata completeness
-- recency
-- noise penalty
-
-## M1.5 Reading Plan Gate
-
-Priorities:
-
-- `A_READ`: deep reading candidate. Must have `can_enter_m2=true`.
-- `B_SKIM`: useful background but not cleared for deep-card generation.
-- `C_REFERENCE`: metadata-only reference.
-- `D_IGNORE`: filtered out of the returned learning plan.
-
-`A_READ` requires ALL of (AND logic):
-
-- `verification_status == verified`
-- `scoring_breakdown.relevance_score >= 0.45` (rule-based)
-- `llm_relevance_score >= 0.65` (LLM-based)
-- `llm_relevance_label in {HIGH, MEDIUM}`
-- `should_a_read == true`
-- `can_enter_m2 == true`
-- `source_confidence >= medium`
-- `metadata_confidence >= medium`
-- `role != IRRELEVANT`
-
-A_READ_FOR_M2 must have one valid deep-reading input:
-
-**Either** (preferred):
-- `source_type == latex_source`
-- `latex_source_downloaded == true`
-- `latex_main_file` exists
-- `source_confidence in {high, medium}`
-
-**Or**:
-- `source_type in {structured_html, xml, deepxiv_structured}`
-- `structured_html_downloaded == true`
-- `source_confidence in {high, medium}`
-
-**Or** (fallback):
-- `source_type == pdf_parser_output`
-- `pdf_downloaded == true`
-- `pdf_metadata_check == passed`
-- `pdf_title_match == match`
-- `source_confidence in {high, medium}`
-
-And in all cases:
-- `canonicalization_status in {success, degraded}`
-- `m2_ready == true`
-- `canonical_paper.md` exists
-
-`metadata_only` cannot enter `A_READ_FOR_M2`.
-
-If no paper satisfies this, `reading_plan.status` becomes `DEGRADED` or `FAILED`, not a fake success.
-
-## Artifacts
-
-### Direction Exploration Mode
-
-| Artifact | Description |
-|---|---|
-| `survey_candidates.json` | Survey candidates found by search |
-| `direction_landscape.json` | Direction framework with method families, chronology stages, landscape anchors, recommended reading order, gaps |
-| `reading_plan.json` | Reading plan derived from direction framework |
-
-### Focused Acquisition Mode
-
-| Artifact | Description |
-|---|---|
-| `query_plan.json` | Real LLM-generated query plan |
-| `candidate_pool.json` | Raw candidate pool and source metrics |
-| `source_resolution.json` | PDF/source acquisition status and download metadata |
-| `canonical_paper.md` | Markdown-first canonical input for M2 |
-| `filtered_candidates.json` | Final candidates with verification/LLM relevance/PDF fields |
-| `reading_plan.json` | Prioritized plan with A_READ_FOR_M2/B_SKIM/C_REFERENCE and warnings |
-
-### Seed Paper Expansion Mode
-
-| Artifact | Description |
-|---|---|
-| `paper_relation_graph.json` | Graph of upstream/downstream/related papers |
-| `seed_expansion_result.json` | Structured expansion result |
-
-## M1 Quality Gate
-
-M1 quality gate validates the canonical output before M2 consumption. The gate checks both artifact completeness and semantic correctness.
-
-### Gate checks
-
-| Check | Severity | Condition |
-|---|---|---|
-| source/title verified | BLOCKING | `title_verified in {YES, YES_WITH_BAD_METADATA}` |
-| formula_slot_count | BLOCKING | `>= 5` for method papers |
-| crop_exists | BLOCKING | 100% of formula slots |
-| overlay_exists | BLOCKING | 100% of formula slots |
-| latex_non_empty | BLOCKING | 100% of formula slots |
-| final_vs_canonical_match | BLOCKING | 100% of formula slots |
-| polluted_section | BLOCKING | must be 0 |
-| section_contradiction_count | HIGH | must be 0 for PASSED |
-| all_formulas_same_section_suspicious | HIGH | if 5+ formulas all in Abstract for a method paper → BLOCKED |
-| abstract_formula_overload | HIGH | formulas on Method/Experiment pages labeled Abstract |
-| nearby_heading_conflict | MEDIUM | section and nearby text disagree |
-| reading_order_conflict | MEDIUM | MinerU reading_order inconsistent |
-| llama_json_invalid_count | HIGH | Llama output not valid JSON |
-| mineru_parse_failed | HIGH | MinerU2.5-Pro returned error |
-| fallback_used | INFO | Marker fallback was used instead of MinerU |
-
-### Hard rules
-
-1. If 5+ formulas in a method paper are all assigned to Abstract: must be HIGH risk, cannot be PASSED.
-2. If section=Abstract but nearby_text contains Method / Experiments / Conclusion / References: must be SECTION_CONTRADICTION, cannot be high confidence.
-3. If MinerU2.5-Pro is unavailable and fallback to Marker: must record `fallback_used`, cannot claim primary success.
-4. If Llama participates in refinement: must record model name, base_url type, JSON valid count. Never record API key.
-5. If Llama modifies formula_latex / page / bbox: must be BLOCKED (越权).
-
-## Live Acceptance
-
-Run:
+Formal M1->M2 handoff may enable formula polish with:
 
 ```powershell
-$env:RUN_LIVE_TESTS="1"
-$env:RUN_LLM_TESTS="1"
-$env:RESEARCHSENSEI_LIVE_EVAL="1"
-$env:RESEARCHSENSEI_MAX_LIVE_CASES="5"
-$env:RESEARCHSENSEI_MAX_LLM_COST_USD="1.00"
-$env:RESEARCHSENSEI_MAX_LLM_TOKENS="30000"
-
-python -m pytest -q
-python scripts/run_live_eval.py
+.\.venv\Scripts\python.exe scripts\run_m1_v2_mineru_primary_acceptance.py `
+  --limit 1 `
+  --keys <arxiv_key> `
+  --force `
+  --enable-ollama-latex `
+  --ollama-latex-model qwen3.5:4b `
+  --ollama-timeout 30 `
+  --ollama-min-confidence 0.8
 ```
 
-### Direction Exploration Mode 验收
+Safety rules:
 
-当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
+- model must be locally available and vision-capable
+- use formula crop or group crop only as visual evidence
+- send JSON-schema requests with `think=false`
+- accept only high-confidence corrections
+- preserve page, bbox, crop path, overlay path, parser source, and source PDF
+  identity
+- preserve equation tags; restore tags deterministically if the model drops them
+- reject malformed JSON, low confidence, over-expanded group answers, changed
+  left-hand side, and changed relation operands
+- run deterministic LaTeX postprocessing before and after Ollama validation
 
-DOC_DESIGNED 验收要求：
+Ollama must not rewrite body text, headings, section order, or references in the
+formal handoff path.
 
-- broad direction query uses real LLM and real network
-- `survey_candidates.json` exists
-- `direction_landscape.json` exists
-- `method_families` non-empty
-- `chronology_stages` non-empty
-- `landscape_anchors` non-empty
-- `recommended_reading_order` non-empty
-- every survey candidate has quality reason
-- every landscape anchor has source, reason, verification status
+## M2 Artifact Bundle Contract
 
-### Focused Acquisition Mode 验收
+M2 reads an M1 directory, not a raw PDF. The required bundle is:
 
-当前状态：PARTIAL_REAL_E2E_VERIFIED。
+- `canonical_paper.md`
+- `document_blocks.json`
+- `formula_slots.json`
+- `formula_slots.md`
+- `paper_metadata.json`
+- `quality_report.md`
+- `performance_report.json`
+- `visual_audit/`
 
-当前 IMPLEMENTED 范围：PDF-focused focused acquisition live eval。完整 focused acquisition 的 canonical material normalization 能力为 DOC_DESIGNED / NOT_IMPLEMENTED。
+Recommended review/debug files:
 
-验收必须满足：
+- `source.pdf`
+- `raw_mineru_output.json`
+- `raw_mineru_pages/`
+- `visual_audit.html`
+- `compare_report.md`
+- `PUBLIC_VERIFY_REPORT.md`
+- `acceptance_metrics.json`
 
-- `query_plan.json` exists
-- `candidate_pool.json` exists
-- `source_resolution.json` exists
-- `canonical_paper.md` exists for each A_READ entering M2
-- `filtered_candidates.json` exists
-- `reading_plan.json` exists
-- `sources_success >= 2`
-- `verified_candidate_count` exists
-- `llm_judged_candidate_count` exists
-- at least one deep-reading source downloaded (latex_source or structured_html or pdf)
-- `canonicalization_status` recorded
-- `m2_ready=true` for every A_READ entering M2
-- every `A_READ_FOR_M2` satisfies:
-  - `verification_status == verified`
-  - `llm_relevance_score >= 0.65`
-  - `llm_relevance_label in {HIGH, MEDIUM}`
-  - `should_a_read == true`
-  - has one valid deep-reading input (latex_source or structured_html/deepxiv_structured/xml or pdf_parser_output with title match)
-  - has `canonical_paper.md`
-  - has explicit `source_type`, `source_confidence`, `canonicalization_status`, `m2_ready`
-  - `can_enter_m2 == true`
+`formula_slots.json` must include the fields required by
+`M1ArtifactReader.FORMULA_SLOT_CONTRACT_FIELDS`:
 
-**degraded_passed**:
+- `formula_id`
+- `block_id`
+- `page`
+- `section`
+- `final_latex`
+- `equation_number`
+- `equation_group_id`
+- `group_order`
+- `group_crop_path`
+- `nearby_text_before`
+- `nearby_text_after`
+- `risk_flags`
+- `final_origin`
+- `block_source`
 
-- `sources_success = 1`
-- `pdf_download_success_count >= 1`
-- `A_READ count >= 1`
-- every A_READ has `can_enter_m2=true`
-- failed sources have structured diagnostics (status code, exception type, retry count)
+M2 treats these M1-owned fields as immutable evidence:
 
-**failed**:
+- page
+- bbox
+- LaTeX/final LaTeX
+- formula origin
+- parser source
+- crop path
+- overlay path
+- source identity
 
-- `sources_success < 1`
-- or no valid deep-reading source downloaded
-- or no `canonical_paper.md` for A_READ
-- or no A_READ paper
-- or any A_READ has `can_enter_m2=false`
+M2 must not silently repair M1 parser failures. If M1 marks the paper or formula
+as not ready, M2 must degrade or block accordingly.
 
-### Seed Paper Expansion Mode 验收
+## Canonical Markdown Contract
 
-当前状态：DOC_DESIGNED / NOT_IMPLEMENTED。
+`canonical_paper.md` must contain YAML front matter with:
 
-DOC_DESIGNED 验收要求：
+- `paper_id`
+- `title`
+- `source_type`
+- `source_confidence`
+- `canonicalization_status`
+- `canonical_quality_status`
+- `primary_parser`
+- `fallback_used`
+- `m2_ready`
+- `m2_ready_for_formula_understanding`
+- `formula_slot_count`
+- `mineru_latex_count`
+- `raw_formula_text_count`
+- `raw_only_formula_dense`
+- `section_contradiction_count`
+- `all_formulas_in_Abstract_suspicious`
 
-- seed paper metadata exists
-- `paper_relation_graph.json` exists
-- `seed_expansion_result.json` exists
-- `upstream_papers` / `downstream_papers` / `related_surveys` / `follow_up_papers` present
-- every relation has `relation_type`, evidence source, confidence
-- unverified relation cannot be shown as trusted
+Formula blocks in the body must be traceable to `formula_slots.json`. Parser
+LaTeX is emitted as display math. Raw-only formulas are emitted as raw text with
+origin metadata and must remain visibly degraded.
 
-### Additional Checks
+The canonical body must not include:
 
-- `real_llm_query_planning=true`
-- `english_query` is present
-- generated report contains no API keys or bearer tokens
-- downloaded PDF files are not committed to git
+- large page-header/footer repetition
+- arXiv sidebar text
+- CID replacement artifacts
+- References entries in Introduction/Method/Experiments
+- generated placeholder sections
+- `Unknown` sections after References
 
-## Known Runtime Limitations
+## Quality Gate
 
-M1 real validation has observed:
+`M1QualityGate` returns `PASS`, `DEGRADED`, or `FAIL`.
 
-- arXiv may return 429 or 503. Requires descriptive User-Agent, contact email, and retry/backoff to recover.
-- Semantic Scholar without an API key may trigger free-tier rate limits. Setting `SEMANTIC_SCHOLAR_API_KEY` raises the limit.
-- Clash or local proxy rules affect Semantic Scholar and arXiv access. If `api.semanticscholar.org` or `export.arxiv.org` is not routed through the proxy, `ConnectionRefusedError` or timeout may occur.
-- OpenAlex and Crossref serve as stable supplementary sources but do not replace arXiv or Semantic Scholar for coverage and diagnostics.
+Hard failures:
 
-## Current Boundary
+- parser unavailable with no valid fallback artifact
+- source mismatch
+- title/source mismatch severe enough to question identity
+- missing formula bbox
+- missing formula crop when crop is required
+- missing formula overlay when overlay is required
+- all 5+ formulas assigned to Abstract in a method paper
+- section contradiction
+- reference contamination in Introduction/Method/Experiments
+- severe repeated/hallucinated body text
 
-M1 still does not perform:
+Degraded but possibly M2-readable:
 
-- M2 evidence parsing
-- paper understanding
-- teaching card generation
-- formula explanation
-- direction synthesis
-- advisor/drill/interactive learning
+- missing formula LaTeX on sparse formulas
+- dense raw-only formulas for body reading only
+- non-critical warnings that are explicitly represented in front matter and
+  reports
 
-M1 IMPLEMENTED (fallback path):
-- Marker-based fallback (Body + Formula + FormulaMerger) — works on 3 debug papers, failed paper_4_unseen blind eval
-- `canonical_paper.md` generation via fallback pipeline
-- FormulaCropper, visual audit, public PDF verify report
+M2 entry requires:
 
-M1 IMPLEMENTED / UNIT_TESTED (canonical components):
-- MinerU2.5-Pro primary pipeline adapter contract (mineru-vl-utils + opendatalab/MinerU2.5-Pro-2604-1.2B)
-- MinerU25ProAdapter
-- OllamaStructuredClient and OllamaSectionRefiner (optional, bounded structured refiner)
-- StructureRefiner (RuleBasedStructureRefiner + optional OllamaSectionRefiner)
-- M1 Quality Gate (section_contradiction, abstract_formula_overload, source mismatch, missing latex/crop/overlay)
-- formula_origin propagation for mineru_latex / marker_latex / raw_formula_text / unresolved
+- `canonical_paper.md` exists
+- `document_blocks.json` exists
+- `formula_slots.json` exists and passes schema checks
+- `canonicalization_status in {success, degraded}`
+- `canonical_quality_status != FAIL`
+- `m2_ready == true`
+- all degradation reasons are explicit and acceptable for evidence-only reading
 
-M1 DOC_DESIGNED / NOT_IMPLEMENTED:
-- DeepXiv structured adapter
+Formula-understanding entry additionally requires:
 
-FormulaOCRAdapter: interface exists, model not integrated. Fallback only for unresolved formula crops.
+- `m2_ready_for_formula_understanding == true`
+- body formulas have `final_latex`
+- crop/overlay paths exist
+- formulas in References are excluded from formula understanding
+
+## Acceptance And Validation
+
+Current selected-paper evidence:
+
+- `paper_4_unseen` MEMTO: primary MinerU route sample, PASS in historical
+  selected-paper acceptance.
+- `2312_01729v1` EdgeConvFormer: selected-paper M1->M2 handoff with real Mimo
+  validation was completed in a prior run; reports must be regenerated before
+  use as current formal evidence.
+- `2310_08800v2` DDMT: regenerated on 2026-06-14 with current M1, PDF text
+  repair, crop/overlay enforcement, Ollama formula polish, and manual
+  PDF-vs-canonical audit. Result: PASS, `m2_ready=true`,
+  `m2_ready_for_formula_understanding=true`, 7 formulas, 7 LaTeX, 7 crops, 7
+  overlays, no repeated hallucinated text, no arXiv/page/CID/Unknown pollution.
+
+What this proves:
+
+- current M1 can produce an M2-readable canonical bundle on selected real papers
+- M2 can consume the bundle without touching raw PDF
+- formula crop/overlay/LaTeX identity can be preserved through the handoff
+
+What this does not prove:
+
+- broad multi-paper MinerU stability
+- survey-paper live acceptance
+- direction exploration
+- seed expansion
+- M2 advanced derivation quality
+- frontend/M3/M4/M5 behavior
+
+## Scripts
+
+Full focused acquisition live eval:
+
+```powershell
+$env:RUN_LIVE_TESTS='1'
+$env:RUN_LLM_TESTS='1'
+$env:RESEARCHSENSEI_LIVE_EVAL='1'
+.\.venv\Scripts\python.exe scripts\run_live_eval.py
+```
+
+Selected-paper MinerU primary acceptance:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_m1_v2_mineru_primary_acceptance.py `
+  --limit 1 `
+  --keys 2310_08800v2 `
+  --force `
+  --enable-ollama-latex `
+  --ollama-latex-model qwen3.5:4b `
+  --ollama-timeout 30
+```
+
+Existing searched-paper acceptance:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\m1_acceptance_runner.py `
+  --search-dir reports\m1_unseen_paper_search `
+  --output-dir reports\m1_acceptance_manual_review_<paper_id> `
+  --enable-ollama-latex `
+  --ollama-latex-model qwen3.5:4b
+```
+
+Static target-mode check:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\m1_target_mode_eval.py
+```
+
+M2 contract smoke on an M1 bundle:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\m2_run_understanding.py `
+  --mode diagnostic `
+  --input-dir reports\m1_canonical_acceptance\<paper_id> `
+  --output-dir reports\m2_diagnostic_<paper_id>
+```
+
+## Test Policy
+
+Code changes must run:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+Parser/heavy changes must also run a real selected-paper acceptance and a real
+M2 artifact-reader smoke. Live/network/LLM failures are failures, not skips, for
+claims of completed M1 behavior.
+
+Do not commit:
+
+- `reports/`
+- downloaded PDFs
+- `_candidate_downloads/`
+- `.env`
+- API keys
+- `.venv/`
+- model weights
+- cache directories
+
+## External Projects / Adapter Candidates
+
+| Project | M1 role | Reusable capability | Integration | Default dependency | Risk | Status |
+|---|---|---|---|---|---|---|
+| arXiv official API / PDF / e-print | search and source resolution | metadata, PDF, source package | direct adapter | yes | rate limits, source package variability | IMPLEMENTED |
+| OpenAlex / pyalex | metadata search | OA metadata, concepts, venues | direct adapter | yes | metadata noise | IMPLEMENTED |
+| Semantic Scholar Graph API | metadata search and verification | title/venue/citation metadata | direct adapter | yes | rate limits | IMPLEMENTED |
+| Crossref / habanero | DOI metadata verification | DOI and publisher metadata | direct adapter | yes | incomplete abstracts/full text | IMPLEMENTED |
+| MinerU2.5-Pro via mineru-vl-utils | primary PDF layout/formula parser | blocks, bbox, LaTeX, reading order | direct adapter | yes for PDF canonical acceptance | heavy model/runtime, page latency | IMPLEMENTED |
+| Marker | fallback formula/body parser | equation blocks, fallback markdown | optional adapter | no | historical section failures, GPL package | FALLBACK_ONLY |
+| MarkItDown | lightweight fallback text extraction | debug markdown | optional adapter | no | weak layout/formula fidelity | FALLBACK_ONLY |
+| PyMuPDF | PDF text/crop/overlay | crop, overlay, bbox text repair | direct utility | yes | embedded text can be incomplete | IMPLEMENTED |
+| Ollama qwen3.5:4b | optional formula LaTeX polish | crop-based guarded correction | optional local model | no | hallucination if unguarded | OPTIONAL_IMPLEMENTED |
+| pix2tex / LaTeX-OCR | unresolved formula OCR fallback | formula OCR from crop | optional adapter | no | model weights and slow download | INTERFACE_ONLY |
+| DeepXiv | possible structured reader | structured arXiv reading if available | research required | no | no confirmed stable public package/API | BLOCKED |
+
+## Open Work
+
+- Broad multi-paper MinerU primary acceptance.
+- First-class LaTeX source normalization.
+- First-class structured HTML/XML normalization.
+- Direction exploration implementation.
+- Seed paper expansion implementation.
+- Faster/heavier parser validation policy for nightly runs.
+- Optional OCR model integration for unresolved formula crops.
