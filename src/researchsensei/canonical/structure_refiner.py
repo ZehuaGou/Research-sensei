@@ -178,17 +178,30 @@ class RuleBasedStructureRefiner:
     def _mark_page_headers_footers(self, blocks: list[CanonicalDocumentBlock]) -> None:
         """Mark blocks that are repeated page headers, footers, or page numbers."""
         title_counts: dict[str, int] = {}
+        repeated_counts: dict[str, int] = {}
         for block in blocks:
+            normalized = re.sub(r"\s+", " ", block.text.strip()).lower()
             if block.block_type == "title":
-                normalized = re.sub(r"\s+", " ", block.text.strip()).lower()
                 title_counts[normalized] = title_counts.get(normalized, 0) + 1
+            if block.block_type != "formula" and normalized:
+                repeated_counts[normalized] = repeated_counts.get(normalized, 0) + 1
 
         for block in blocks:
             text = block.text.strip()
             normalized = re.sub(r"\s+", " ", text).lower()
 
-            # Repeated title blocks (e.g. "### EdgeConvFormer" on every page)
-            if block.block_type == "title" and title_counts.get(normalized, 0) >= 3:
+            # Repeated page headers (e.g. "EdgeConvFormer" on every page).
+            # MinerU may label the same header as title, text, caption, or
+            # figure across different pages, so rely on text repetition plus
+            # top-of-page position instead of block type alone.
+            repeated_title_header = block.block_type == "title" and title_counts.get(normalized, 0) >= 3
+            repeated_top_header = (
+                block.block_type != "formula"
+                and repeated_counts.get(normalized, 0) >= 3
+                and len(text) <= 120
+                and self._is_top_edge_block(block)
+            )
+            if repeated_title_header or repeated_top_header:
                 if "PAGE_HEADER_REPEATED" not in block.risk_flags:
                     block.risk_flags.append("PAGE_HEADER_REPEATED")
 
@@ -250,6 +263,17 @@ class RuleBasedStructureRefiner:
             if block.block_type == "title" and len(text) < 5 and title_counts.get(normalized, 0) >= 3:
                 if "PAGE_HEADER_REPEATED" not in block.risk_flags:
                     block.risk_flags.append("PAGE_HEADER_REPEATED")
+
+    @staticmethod
+    def _is_top_edge_block(block: CanonicalDocumentBlock) -> bool:
+        if len(block.bbox) < 4:
+            return False
+        y1 = float(block.bbox[1])
+        y2 = float(block.bbox[3])
+        max_coord = max(abs(float(v)) for v in block.bbox)
+        if max_coord <= 1.5:
+            return y1 <= 0.08 and y2 <= 0.12
+        return y1 <= 100 and y2 <= 140
 
 
     def _repair_misplaced_references(self, blocks: list[CanonicalDocumentBlock]) -> None:

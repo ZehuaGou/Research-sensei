@@ -1271,7 +1271,8 @@ def test_page_header_footer_blocks_suppressed_from_canonical(tmp_path) -> None:
     blocks = [_block("b000", page=0, block_type="title", text="EdgeConvFormer Paper")]
     for i in range(1, 33):
         page = i
-        blocks.append(_block(f"h{i:03d}", page=page, block_type="title", text="EdgeConvFormer"))
+        header_type = "title" if i % 3 == 0 else "text"
+        blocks.append(_block(f"h{i:03d}", page=page, block_type=header_type, text="EdgeConvFormer", bbox=[0.43, 0.044, 0.568, 0.062]))
         blocks.append(_block(f"t{i:03d}", page=page, text=f"Content on page {i}."))
         blocks.append(_block(f"f{i:03d}", page=page, text=f"Page {i} of 32"))
         blocks.append(_block(f"a{i:03d}", page=page, text="Jie Liu et al.: Preprint submitted to Elsevier"))
@@ -1288,6 +1289,7 @@ def test_page_header_footer_blocks_suppressed_from_canonical(tmp_path) -> None:
     # Page header "EdgeConvFormer" should not appear as ### headings
     header_count = len([line for line in markdown.splitlines() if line.strip() == "### EdgeConvFormer"])
     assert header_count == 0, f"Found {header_count} page-header headings in canonical"
+    assert "\nEdgeConvFormer\n" not in markdown
 
     # Footer "Page N of M" should not appear
     assert "Page 1 of 32" not in markdown

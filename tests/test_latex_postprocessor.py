@@ -66,6 +66,26 @@ class TestLatexPostProcessor:
         assert r"Er_{t}^{i}" in result
         assert r"Fc_{1}" in result
 
+    def test_fixes_rolling_error_sensor_superscript_ocr(self):
+        input_latex = (
+            r"\mu_ {t} ^ {i} = \frac {1}{l _ {w}} \sum_ {j = 0} ^ {l _ {w} - 1} "
+            r"E r _ {t - j} ^ {j} \tag {9}"
+        )
+        result = postprocess_latex(input_latex)
+        assert r"Er_{t-j}^{i}" in result
+        assert r"Er_{t-j}^{j}" not in result
+
+    def test_fixes_rolling_variance_sensor_superscript_ocr(self):
+        input_latex = (
+            r"\left(\sigma_ {t} ^ {i}\right) ^ {2} = \frac {1}{l _ {w} - 1} "
+            r"\sum_ {j = 0} ^ {l _ {w} - 1} \left(E r _ {t - j} ^ {j} - \mu_ {t} ^ {j}\right) ^ {2}."
+        )
+        result = postprocess_latex(input_latex)
+        assert r"Er_{t-j}^{i}" in result
+        assert r"\mu_{t}^{i}" in result
+        assert r"Er_{t-j}^{j}" not in result
+        assert r"\mu_{t}^{j}" not in result
+
     def test_strips_inline_math_wrappers_from_formula_blocks(self):
         input_latex = r"$A_{t} = \sum_{i=1}^{N} a_{t}^{i}$. \tag{11}"
         result = postprocess_latex(input_latex)

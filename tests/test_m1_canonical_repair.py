@@ -185,9 +185,10 @@ def test_page_header_footer_blocks_marked_with_risk_flags() -> None:
     ]
     # Simulate 20 pages with the same "EdgeConvFormer" header
     for i in range(1, 21):
+        header_type = "title" if i % 2 else "text"
         blocks.append(CanonicalDocumentBlock(
-            block_id=f"header{i}", page=i + 1, bbox=[10, 10, 100, 30],
-            block_type="title", text="EdgeConvFormer",
+            block_id=f"header{i}", page=i + 1, bbox=[0.43, 0.044, 0.568, 0.062],
+            block_type=header_type, text="EdgeConvFormer",
         ))
         blocks.append(CanonicalDocumentBlock(
             block_id=f"footer{i}", page=i + 1, bbox=[10, 750, 100, 770],
@@ -205,7 +206,7 @@ def test_page_header_footer_blocks_marked_with_risk_flags() -> None:
     refiner = RuleBasedStructureRefiner()
     refiner.refine(blocks)
 
-    # Repeated title blocks should be marked
+    # Repeated header blocks should be marked even when MinerU emits mixed types.
     header_flags = [
         b.risk_flags for b in blocks
         if b.block_id.startswith("header") and "PAGE_HEADER_REPEATED" in b.risk_flags

@@ -61,6 +61,9 @@ _KNOWN_OCR_TOKEN_REPLACEMENTS = (
     (re.compile(r"(?<![A-Za-z])F\s+c(?=\s*_)"), "Fc"),
 )
 
+_SUM_INDEX_RE = re.compile(r"\\sum_\{(?P<idx>[A-Za-z])\s*=\s*0\}")
+_LHS_SENSOR_SUPER_RE = re.compile(r"\^\{(?P<sensor>[A-Za-z])\}")
+
 _CIRCLED_COMPONENT_SEQUENCE = re.compile(
     r"(?:①|\\text\{\(1\)\})\s*\+\s*(?:Ⓐ|ⓐ|\\text\{\(A\)\})"
     r"\s*-\s*(?:ⓘ|ⓙ|\\text\{\(i\)\})\s*-\s*(?:ⓘⓘ|ⓘ\s*ⓘ|ⓙ|ⓑ|Ⓤ|\\text\{\(ii\)\})"
@@ -151,6 +154,33 @@ def _fix_known_ocr_token_spacing(latex: str) -> str:
     return latex
 
 
+def _fix_rolling_error_sensor_superscript(latex: str) -> str:
+    """Repair a narrow MinerU OCR confusion in rolling error formulas.
+
+    In formulas such as mu_t^i = sum_j Er_{t-j}^i, the summation index is j
+    while the sensor/channel index remains i. MinerU sometimes copies the
+    summation index into the Er/mu superscript. Restrict the fix to formulas
+    whose left-hand side already exposes a non-j sensor superscript.
+    """
+    if "Er" not in latex or "\\sum_" not in latex or "=" not in latex:
+        return latex
+    lhs = latex.split("=", 1)[0]
+    sensor_match = _LHS_SENSOR_SUPER_RE.search(lhs)
+    sum_match = _SUM_INDEX_RE.search(latex)
+    if not sensor_match or not sum_match:
+        return latex
+    sensor = sensor_match.group("sensor")
+    index = sum_match.group("idx")
+    if sensor == index:
+        return latex
+
+    er_pattern = re.compile(rf"(Er_\{{t\s*-\s*{re.escape(index)}\}}\^)\{{{re.escape(index)}\}}")
+    mu_pattern = re.compile(rf"(\\mu_\{{t\}}\^)\{{{re.escape(index)}\}}")
+    latex = er_pattern.sub(lambda match: f"{match.group(1)}{{{sensor}}}", latex)
+    latex = mu_pattern.sub(lambda match: f"{match.group(1)}{{{sensor}}}", latex)
+    return latex
+
+
 def _strip_inline_math_wrappers(latex: str) -> str:
     """Remove redundant inline math delimiters around formula-block LaTeX."""
     stripped = latex.strip()
@@ -207,6 +237,9 @@ def postprocess_latex(latex: str) -> str:
         result = _NESTED_CMD_SUB_SUPER_SPACED.sub(_fix_nested_command_subscript_spacing, result)
         if result == prev:
             break
+
+    # Correct a recurring MinerU sensor-index OCR error in rolling mean/variance formulas.
+    result = _fix_rolling_error_sensor_superscript(result)
 
     # Collapse double spaces
     result = _DOUBLE_SPACE.sub(" ", result)
