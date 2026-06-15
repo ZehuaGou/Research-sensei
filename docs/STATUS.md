@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 
 This file records real engineering status. Mock, fake, or skipped tests do not
 count as module completion. Reports, downloaded PDFs, `.env`, API keys,
@@ -42,6 +42,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M3 | Seed expansion | minimal render + PaperWorkspace handoff | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | SeedExpansionPanel accepts typed seed input or a selected Direction candidate, displays grouped seed-expansion papers with relation reason/confidence/source/verification/can_enter_m2, shows DEGRADED/EMPTY_RESULT states, and calls existing `/api/v1/directions/deep_read` for source-backed expansion papers. This is not product-ready SeedExpansion. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
 | M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
+| M5 | Main-chain smoke script | implemented | unit + manual no-LLM smoke | DEGRADED_SMOKE | `scripts/run_main_chain_smoke.py` exercises direction search -> seed expansion -> deep_read handoff -> understanding_status -> cards gating through local API handlers. Core logic is unit-tested with fake clients and does not run live network/LLM inside pytest. 2026-06-16 manual run used no-LLM mode because `RESEARCHSENSEI_ENABLE_API_LLM` was not enabled; verdict was DEGRADED_PASS, job `dba63377572d`, final status `BASELINE_ONLY`, `/cards=403`. This is not LLM handoff evidence and not REAL_E2E. |
 
 ## M1 Current Statement
 
@@ -290,11 +291,30 @@ handoff smoke plus a minimal SeedExpansionPanel/API DEGRADED smoke. It does not
 prove broad multi-paper behavior, full DirectionWorkspace product behavior,
 verified citation-graph SeedExpansion, or product readiness.
 
+Main-chain smoke status:
+
+- `scripts/run_main_chain_smoke.py` now provides a manual M1 -> M2 -> M3 API
+  smoke path: direction query -> `/api/v1/directions/search` -> arXiv
+  candidate -> `/api/v1/directions/seed_expansion` -> source-backed expansion
+  candidate -> `/api/v1/directions/deep_read` -> `/understanding_status` ->
+  `/cards` gating.
+- The script supports `--query`, `--provider`, `--max-candidates`,
+  `--skip-llm`, and `--workspace`; it prints a console summary only and does
+  not write reports.
+- If API LLM is not enabled or the provider key is missing, the script runs a
+  no-LLM smoke and expects `BASELINE_ONLY` plus `/cards=403`. That validates
+  structural API/gating behavior only.
+- 2026-06-16 manual run with `--provider mimo` did not enable LLM because
+  `RESEARCHSENSEI_ENABLE_API_LLM` was not enabled. Result:
+  DEGRADED_PASS, job `dba63377572d`, final status `BASELINE_ONLY`,
+  seed expansion status DEGRADED, group counts upstream=6, downstream=6,
+  same-route=6, surveys=3, `/cards=403`. This is not Mimo LLM handoff evidence.
+
 ## Test Status Summary
 
-As of 2026-06-15:
+As of 2026-06-16:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 491 passed, 15 skipped
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 496 passed, 15 skipped
 - Frontend: `cd frontend && npm test` -> 5 test files, 33 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
 - M1 Direction Exploration external smoke: arXiv-only query
