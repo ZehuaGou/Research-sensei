@@ -33,13 +33,13 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M1 | Ollama section refiner | implemented | unit/local compare | OPTIONAL_NOT_DEFAULT | Diagnostic/review path only; default formal handoff remains rule-based. |
 | M1 | Marker/MarkItDown/PyMuPDF fallback | implemented | unit/live tested | FALLBACK_ONLY | Review/debug/fallback only; cannot prove primary MinerU stability. |
 | M1 | Direction exploration | implemented minimal loop + handoff API | unit + arXiv smoke | DEGRADED_SMOKE | Minimal query -> DirectionBundle loop exists with real source adapters, heuristic query plan, candidate cards, reading order, source metrics, strict A_READ_FOR_M2 gate, and `/api/v1/directions/deep_read` handoff to PaperWorkspace. 2026-06-15 arXiv-only smoke for `time series anomaly detection` returned SUCCESS with 3 real candidates, then Mimo-enabled handoff created job `c09ff92ee955`; final status was DEGRADED_STRUCTURAL with `FORMULA_DERIVATION_BLOCKED`. No broad multi-source acceptance or A_READ canonical handoff yet. |
-| M1 | Seed expansion | not implemented | none | DOC_DESIGNED | Upstream/downstream graph remains future work. |
+| M1 | Seed expansion | implemented minimal loop | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | `/api/v1/directions/seed_expansion` accepts seed title/arXiv/DOI/URL/candidate payloads and returns upstream, downstream, same-route, survey, follow-up, and expansion-order fields from real paper-source adapters. Relations are explicitly weak query/title-similarity relations with `citation_graph_verified=false`; no citation graph is faked. 2026-06-15 smoke for seed arXiv `2510.18998` returned DEGRADED with 17 candidates: upstream=5, downstream=3, same-route=6, surveys=3. Degradation was due to Semantic Scholar 429 and Crossref timeouts. No broad Seed Expansion acceptance yet. |
 | M2 | Paper deep reading | implemented | unit + selected-paper live acceptance | PARTIAL_REAL_E2E_VERIFIED | M2 selected-paper live acceptance passed on `2310_08800v2` via `reports/m2_live_acceptance.md`; broad multi-paper and survey live acceptance remain pending. |
 | M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
 | M2 | Survey artifacts | implemented | unit/pipeline fixture | IMPLEMENTED_RULE_BASED | Real survey PDF live acceptance remains pending. |
 | M3 | Paper workspace | implemented minimal API/frontend | backend + vitest + build + selected-paper + raw-degraded API/UI live check | PARTIAL_REAL_E2E_VERIFIED | `/parse -> /understanding_status -> /cards` supports configured real LLM entry, existing M2 artifact registration, and strict gating. Selected-paper API/UI loop passed on real M2 artifacts for `2310_08800v2` (`reports/m3_paperworkspace_ui_live.json`): SUCCESS status, paper/formula/teaching cards rendered, and BLOCKED_UNDERSTANDING `/cards` stayed 403. Raw-input DEGRADED API/UI verified (`reports/m3_degraded_ui_live.md`): raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01` both DEGRADED_STRUCTURAL with FORMULA_DERIVATION_BLOCKED, `/cards=200` returns paper_card+teaching_cards only, formula tab shows controlled degradation message with formula_origin/ocr_status, component_status/degradation_reason visible. Product readiness remains pending. |
 | M3 | Direction workspace | minimal render + PaperWorkspace handoff | backend + vitest + build + arXiv smoke | DEGRADED_SMOKE | DirectionSearchView now submits a direction query, displays status/sources/warnings, overview, sub-directions, method families, candidate papers, and reading order. Candidates with arXiv/PDF source show `准备精读`, call `/api/v1/directions/deep_read`, and route to `/learn/{job_id}` on success. DOI remains `DOI_NOT_IMPLEMENTED`; unavailable sources fail closed. This is not M3 product readiness. |
-| M3 | Seed expansion | explicit not implemented | backend + vitest | NOT_IMPLEMENTED_CONTRACT | API/UI return and display NOT_IMPLEMENTED; no fake seed papers. |
+| M3 | Seed expansion | minimal render + PaperWorkspace handoff | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | SeedExpansionPanel accepts typed seed input or a selected Direction candidate, displays grouped seed-expansion papers with relation reason/confidence/source/verification/can_enter_m2, shows DEGRADED/EMPTY_RESULT states, and calls existing `/api/v1/directions/deep_read` for source-backed expansion papers. This is not product-ready SeedExpansion. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
 | M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
 
@@ -53,10 +53,12 @@ artifact bundle on selected real papers, with MinerU2.5-Pro as the primary
 parser, crop/overlay enforcement, formula provenance, optional guarded Ollama
 formula LaTeX polish, and quality gates. Direction exploration now has a
 minimal unit-tested loop plus a narrow arXiv live smoke and a minimal
-PaperWorkspace handoff API, but broad multi-source acceptance, LLM-based
-planning, A_READ canonical handoff from direction candidates, seed expansion,
-first-class LaTeX/HTML normalization, broad multi-paper MinerU acceptance, and
-production-scale parser stability remain pending.
+PaperWorkspace handoff API. Seed expansion now has a minimal unit-tested loop
+plus a narrow DEGRADED external-source smoke, but broad multi-source acceptance,
+verified citation-graph expansion, LLM-based planning, A_READ canonical handoff
+from direction candidates, first-class LaTeX/HTML normalization, broad
+multi-paper MinerU acceptance, and production-scale parser stability remain
+pending.
 
 The authoritative M1 development contract is
 `docs/development/M1_LITERATURE_SEARCH.md`.
@@ -234,8 +236,8 @@ supports configured real LLM construction through `create_app(...)` or
 DEGRADED_STRUCTURAL, BASELINE_ONLY, BLOCKED_UNDERSTANDING, and FAILED, debug-only
 raw artifact access, DOI rejection as `DOI_NOT_IMPLEMENTED`, minimal
 DirectionSearchView rendering of the M1 DirectionBundle, minimal
-`/api/v1/directions/deep_read` handoff for arXiv/PDF candidates, and explicit
-SeedExpansion NOT_IMPLEMENTED contracts.
+`/api/v1/directions/deep_read` handoff for arXiv/PDF candidates, and minimal
+SeedExpansion API/UI contracts.
 
 API LLM configuration now loads `.env` before checking
 `RESEARCHSENSEI_ENABLE_API_LLM`, so `.env` can enable API LLM and choose
@@ -247,7 +249,8 @@ cards only for SUCCESS/DEGRADED_STRUCTURAL, hides cards for BASELINE_ONLY and
 BLOCKED_UNDERSTANDING, displays source/canonical/formula/evidence/quality status
 fields, renders the minimal M1 Direction Exploration bundle in
 DirectionSearchView, lets source-backed candidates prepare a PaperWorkspace job,
-and keeps SeedExpansionPanel explicitly NOT_IMPLEMENTED.
+and lets SeedExpansionPanel run minimal seed expansion plus PaperWorkspace
+handoff for source-backed expansion papers.
 
 M3 selected-paper API/UI evidence:
 
@@ -283,15 +286,16 @@ M3 raw-input DEGRADED API/UI evidence:
 
 M3 caveat: this verifies the selected-paper and raw-input DEGRADED PaperWorkspace
 API/UI handoff plus a minimal DirectionSearchView render and arXiv-to-job
-handoff smoke. It does not prove broad multi-paper behavior, full
-DirectionWorkspace product behavior, SeedExpansion, or product readiness.
+handoff smoke plus a minimal SeedExpansionPanel/API DEGRADED smoke. It does not
+prove broad multi-paper behavior, full DirectionWorkspace product behavior,
+verified citation-graph SeedExpansion, or product readiness.
 
 ## Test Status Summary
 
 As of 2026-06-15:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 482 passed, 15 skipped
-- Frontend: `cd frontend && npm test` -> 5 test files, 27 tests passed
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 491 passed, 15 skipped
+- Frontend: `cd frontend && npm test` -> 5 test files, 33 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
 - M1 Direction Exploration external smoke: arXiv-only query
   `time series anomaly detection` -> SUCCESS, 3 real candidates,
@@ -301,6 +305,11 @@ As of 2026-06-15:
   smoke selected arXiv `2510.18998`, created job `c09ff92ee955`, and returned
   `DEGRADED_STRUCTURAL` with `FORMULA_DERIVATION_BLOCKED`; paper_card and
   teaching_cards succeeded, formula_cards failed closed.
+- M1 Seed Expansion external smoke: seed arXiv `2510.18998` via
+  `/api/v1/directions/seed_expansion` -> DEGRADED, 17 real-source candidates,
+  upstream=5, downstream=3, same-route=6, surveys=3. Semantic Scholar rate
+  limited and Crossref timed out in part of the run. Relations remain weak
+  query/title-similarity relations, not verified citation graph edges.
 
 ## Hard Rules
 

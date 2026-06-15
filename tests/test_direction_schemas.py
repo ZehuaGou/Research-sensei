@@ -11,6 +11,9 @@ from researchsensei.schemas import (
     ReadingPlanItem,
     ScoringBreakdown,
     SearchIntent,
+    SeedExpansionBundle,
+    SeedExpansionPaper,
+    SeedPaperInput,
 )
 
 
@@ -123,6 +126,28 @@ def test_direction_bundle_serializes() -> None:
 
     assert restored.query_plan.user_query == "test"
     assert restored.filtered_candidates.query == "test"
+
+
+def test_seed_expansion_bundle_serializes() -> None:
+    bundle = SeedExpansionBundle(
+        status="DEGRADED",
+        seed_expansion_status="DEGRADED",
+        seed=SeedPaperInput(title="Seed Paper", arxiv_id="2401.00001"),
+        upstream_papers=[
+            SeedExpansionPaper(
+                paper_id="p1",
+                title="Foundation Paper",
+                relation_type="upstream",
+                relation_reason="weak_relation: query similarity, not a verified citation graph.",
+            )
+        ],
+    )
+
+    restored = SeedExpansionBundle.model_validate_json(bundle.model_dump_json())
+
+    assert restored.seed.title == "Seed Paper"
+    assert restored.upstream_papers[0].citation_graph_verified is False
+    assert restored.upstream_papers[0].is_weak_relation is True
 
 
 def test_search_intent_enum_values() -> None:

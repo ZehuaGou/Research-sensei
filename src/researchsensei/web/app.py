@@ -10,7 +10,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from researchsensei.core.config import ConfigService
-from researchsensei.direction import DirectionExplorationService
+from researchsensei.direction import DirectionExplorationService, SeedExpansionService
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
@@ -39,6 +39,7 @@ def create_app(
     llm_config: LLMConfig | None = None,
     config_service: ConfigService | None = None,
     direction_service: DirectionExplorationService | None = None,
+    seed_expansion_service: SeedExpansionService | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ResearchSensei", version="0.5.0")
     workspace = WorkspaceStore(workspace_root)
@@ -60,6 +61,7 @@ def create_app(
         max_download_bytes=max_download_bytes,
     )
     resolved_direction_service = direction_service or DirectionExplorationService()
+    resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -355,19 +357,14 @@ def create_app(
 
     @app.post("/api/v1/directions/seed_expansion")
     def seed_expansion(payload: dict[str, object]) -> dict[str, object]:
-        query = str(payload.get("query") or "")
-        return {
-            "status": "NOT_IMPLEMENTED",
-            "seed_expansion_status": "NOT_IMPLEMENTED",
-            "query": query,
-            "seeds": [],
-            "warnings": [
-                {
-                    "code": "SEED_EXPANSION_NOT_IMPLEMENTED",
-                    "message": "Seed expansion backend is intentionally not faked.",
-                }
-            ],
-        }
+        seed_payload = payload.get("seed") or payload.get("candidate") or payload
+        if not isinstance(seed_payload, dict):
+            raise HTTPException(
+                status_code=400,
+                detail={"status": "BLOCKED", "message": "Seed payload must be an object."},
+            )
+        bundle = resolved_seed_expansion_service.expand(seed_payload)
+        return bundle.model_dump(mode="json")
 
     return app
 

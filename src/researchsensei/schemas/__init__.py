@@ -1,6 +1,6 @@
 from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBundle, FormulaSymbol, FormulaTerm, PaperCard, TeachingCard, TeachingCardBundle
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
-from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
+from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SeedExpansionBundle, SeedExpansionOrderItem, SeedExpansionPaper, SeedPaperInput, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceRecord, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
 from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
@@ -75,6 +75,10 @@ __all__ = [
     "ReadingPlanItem",
     "ResolvedPaperSource",
     "ScoringBreakdown",
+    "SeedExpansionBundle",
+    "SeedExpansionOrderItem",
+    "SeedExpansionPaper",
+    "SeedPaperInput",
     "SearchIntent",
     "StatusEnvelope",
     "SourcePriority",

@@ -224,3 +224,82 @@ class DirectionBundle(SenseiModel):
     # M1.4 verification and relevance metadata
     verification_summary: dict[str, int] = Field(default_factory=dict)
     relevance_summary: dict[str, int] = Field(default_factory=dict)
+
+
+class SeedPaperInput(SenseiModel):
+    """Seed paper payload accepted by the minimal Seed Expansion loop."""
+
+    title: str = ""
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    venue: str = ""
+    source: str = ""
+    url: str = ""
+    landing_url: str = ""
+    paper_url: str = ""
+    doi: str = ""
+    arxiv_id: str = ""
+    arxiv_url: str = ""
+    pdf_url: str = ""
+    paper_id: str = ""
+    source_confidence: str = "low"
+    verification_status: str = "unverified"
+
+
+class SeedExpansionPaper(SenseiModel):
+    """One paper in the seed expansion reading network."""
+
+    paper_id: str
+    source: str = ""
+    title: str
+    authors: list[str] = Field(default_factory=list)
+    year: int | None = None
+    venue: str = ""
+    url: str = ""
+    landing_url: str = ""
+    paper_url: str = ""
+    doi: str = ""
+    arxiv_id: str = ""
+    arxiv_url: str = ""
+    pdf_url: str = ""
+    relation_type: str
+    relation_reason: str
+    relation_basis: str = "query_similarity"
+    citation_graph_verified: bool = False
+    confidence: float = 0.0
+    verification_status: str = "unverified"
+    source_confidence: str = "low"
+    can_enter_m2: bool = False
+    can_prepare_deep_read: bool = False
+    deep_read_unavailable_reason: str = ""
+    is_weak_relation: bool = True
+
+
+class SeedExpansionOrderItem(SenseiModel):
+    """Recommended reading order item for seed expansion."""
+
+    rank: int
+    title: str
+    relation_type: str
+    reason: str = ""
+    can_enter_m2: bool = False
+
+
+class SeedExpansionBundle(SenseiModel):
+    """Minimal seed-paper expansion bundle built from real source adapters."""
+
+    status: str = "UNKNOWN"
+    seed_expansion_status: str = "UNKNOWN"
+    message: str = ""
+    query: str = ""
+    seed: SeedPaperInput = Field(default_factory=SeedPaperInput)
+    upstream_papers: list[SeedExpansionPaper] = Field(default_factory=list)
+    downstream_papers: list[SeedExpansionPaper] = Field(default_factory=list)
+    same_route_papers: list[SeedExpansionPaper] = Field(default_factory=list)
+    related_surveys: list[SeedExpansionPaper] = Field(default_factory=list)
+    follow_up_improvements: list[dict[str, object]] = Field(default_factory=list)
+    recommended_expansion_order: list[SeedExpansionOrderItem] = Field(default_factory=list)
+    papers: list[SeedExpansionPaper] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+    source_metrics: list[dict[str, object]] = Field(default_factory=list)
+    generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

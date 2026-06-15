@@ -90,8 +90,9 @@ def test_parse_doi_returns_not_implemented_source_status(tmp_path: Path) -> None
     assert "DOI_NOT_IMPLEMENTED" in detail["source_status"]["warnings"]
 
 
-def test_direction_endpoint_returns_minimal_bundle_and_seed_stays_not_implemented(tmp_path: Path) -> None:
+def test_direction_endpoint_returns_minimal_bundle_and_seed_expansion_is_wired(tmp_path: Path) -> None:
     from researchsensei.schemas import CandidatePool, DirectionBundle, QueryPlan, ReadingPlan
+    from researchsensei.direction.seed_expansion import SeedExpansionService
 
     class StubDirectionService:
         def explore(self, query: str) -> DirectionBundle:
@@ -107,18 +108,32 @@ def test_direction_endpoint_returns_minimal_bundle_and_seed_stays_not_implemente
                 reading_plan=ReadingPlan(topic=query),
             )
 
-    client = TestClient(create_app(workspace_root=tmp_path / "workspace", direction_service=StubDirectionService()))  # type: ignore[arg-type]
+    class EmptySeedAdapter:
+        def search(self, query: str, max_results: int = 20) -> list:
+            return []
+
+    seed_service = SeedExpansionService(
+        adapters={"arxiv": EmptySeedAdapter()},  # type: ignore[arg-type]
+        sources=["arxiv"],
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            direction_service=StubDirectionService(),  # type: ignore[arg-type]
+            seed_expansion_service=seed_service,
+        )
+    )
 
     direction = client.post("/api/v1/directions/search", json={"query": "time series anomaly detection"})
-    seed = client.post("/api/v1/directions/seed_expansion", json={"query": "time series anomaly detection"})
+    seed = client.post("/api/v1/directions/seed_expansion", json={"seed": {"title": "time series anomaly detection"}})
 
     assert direction.status_code == 200
     assert direction.json()["direction_workspace_status"] == "SUCCESS"
     assert direction.json()["overview"] == "fixture overview"
     assert direction.json()["papers"] == []
     assert seed.status_code == 200
-    assert seed.json()["seed_expansion_status"] == "NOT_IMPLEMENTED"
-    assert seed.json()["seeds"] == []
+    assert seed.json()["seed_expansion_status"] == "EMPTY_RESULT"
+    assert seed.json()["papers"] == []
 
 
 def test_health_endpoint_is_preserved(tmp_path: Path) -> None:

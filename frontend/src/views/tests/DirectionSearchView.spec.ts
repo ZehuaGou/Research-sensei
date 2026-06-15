@@ -227,6 +227,22 @@ describe('DirectionSearchView', () => {
     expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('Not cleared for M2')
   })
 
+  it('passes a selected candidate into SeedExpansionPanel', async () => {
+    mockFetch(directionResponse())
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-testid="seed-select-button"]').trigger('click')
+    await flushPromises()
+
+    expect((wrapper.get('[data-testid="seed-title-input"]').element as HTMLInputElement).value)
+      .toBe('Time Series Anomaly Detection with Transformers')
+    expect((wrapper.get('[data-testid="seed-arxiv-input"]').element as HTMLInputElement).value)
+      .toBe('2401.00001')
+  })
+
   it('disables handoff when candidate has no supported source', async () => {
     mockFetch(directionResponse({
       papers: [

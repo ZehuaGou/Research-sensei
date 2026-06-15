@@ -9,6 +9,7 @@ const isLoading = ref(false)
 const error = ref('')
 const result = ref<Record<string, any> | null>(null)
 const handoffStates = ref<Record<string, { loading?: boolean; error?: string }>>({})
+const selectedSeed = ref<Record<string, any> | null>(null)
 
 const status = computed(() => result.value?.direction_workspace_status || result.value?.status || '')
 const warnings = computed(() => normalizeWarnings(result.value?.warnings || []))
@@ -21,6 +22,7 @@ async function search() {
   error.value = ''
   result.value = null
   handoffStates.value = {}
+  selectedSeed.value = null
   try {
     const res = await fetch('/api/v1/directions/search', {
       method: 'POST',
@@ -97,6 +99,10 @@ function deepReadLabel(paper: Record<string, any>) {
 
 function deepReadDisabled(paper: Record<string, any>) {
   return Boolean(handoffState(paper).loading || (!deepReadJobId(paper) && !hasDeepReadSource(paper)))
+}
+
+function selectSeed(paper: Record<string, any>) {
+  selectedSeed.value = paper
 }
 
 async function openDeepRead(paper: Record<string, any>) {
@@ -258,6 +264,15 @@ async function openDeepRead(paper: Record<string, any>) {
             >
               {{ deepReadLabel(paper) }}
             </button>
+            <button
+              type="button"
+              class="px-3 py-2 rounded-md text-xs font-semibold"
+              style="background: transparent; color: var(--accent); border: 1px solid var(--border);"
+              data-testid="seed-select-button"
+              @click="selectSeed(paper)"
+            >
+              Expand network
+            </button>
           </div>
 
           <div class="grid gap-2 mt-4 md:grid-cols-4">
@@ -309,6 +324,7 @@ async function openDeepRead(paper: Record<string, any>) {
     <SeedExpansionPanel
       :status="result?.seed_expansion_status || 'NOT_IMPLEMENTED'"
       :warnings="warnings"
+      :seed="selectedSeed"
     />
   </div>
 </template>
