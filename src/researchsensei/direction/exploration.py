@@ -507,6 +507,7 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "sources": paper.sources,
             "url": paper.url or paper.landing_url or paper.pdf_url,
             "landing_url": paper.landing_url,
+            "arxiv_url": _arxiv_url(paper),
             "doi": paper.doi,
             "arxiv_id": paper.arxiv_id,
             "pdf_url": paper.pdf_url,
@@ -525,7 +526,12 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "role": item.role,
             "selection_reason": item.selection_reason,
             "risk_note": item.risk_note,
-            "deep_read_button_state": "ready" if priority == "A_READ_FOR_M2" else "pending_integration",
+            "can_prepare_deep_read": _can_prepare_deep_read(paper),
+            "deep_read_unavailable_reason": _deep_read_unavailable_reason(paper),
+            "m2_unavailable_reason": "" if item.can_enter_m2 else item.risk_note,
+            "deep_read_button_state": "ready" if priority == "A_READ_FOR_M2" else (
+                "prepare" if _can_prepare_deep_read(paper) else "source_unavailable"
+            ),
         })
     return cards
 
@@ -601,6 +607,27 @@ def _role_description(role: str, topic: str) -> str:
 
 def _sub_direction_description(name: str) -> str:
     return f"Track candidate papers and methods related to {name}."
+
+
+def _arxiv_url(paper: CandidatePaper) -> str:
+    if paper.arxiv_id:
+        return f"https://arxiv.org/abs/{paper.arxiv_id}"
+    for value in (paper.landing_url, paper.url, paper.pdf_url):
+        if value and "arxiv.org/" in value:
+            return value
+    return ""
+
+
+def _can_prepare_deep_read(paper: CandidatePaper) -> bool:
+    return bool(paper.arxiv_id or paper.pdf_url or _arxiv_url(paper))
+
+
+def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
+    if _can_prepare_deep_read(paper):
+        return ""
+    if paper.doi:
+        return "DOI handoff is not implemented yet."
+    return "No arXiv ID, arXiv URL, or PDF URL is available for this candidate."
 
 
 def _unique(values: list[str]) -> list[str]:

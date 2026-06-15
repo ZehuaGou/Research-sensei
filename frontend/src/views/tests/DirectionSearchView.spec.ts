@@ -2,6 +2,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import DirectionSearchView from '../DirectionSearchView.vue'
 
+const routerPush = vi.hoisted(() => vi.fn())
+
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ push: routerPush }),
+}))
+
 function directionResponse(overrides: Record<string, any> = {}) {
   return {
     status: 'SUCCESS',
@@ -27,6 +33,7 @@ function directionResponse(overrides: Record<string, any> = {}) {
         url: 'https://arxiv.org/abs/2401.00001',
         doi: '',
         arxiv_id: '2401.00001',
+        arxiv_url: 'https://arxiv.org/abs/2401.00001',
         relevance_score: 0.82,
         verification_status: 'verified',
         source_confidence: 'high',
@@ -34,8 +41,11 @@ function directionResponse(overrides: Record<string, any> = {}) {
         canonicalization_status: 'not_attempted',
         m2_ready: false,
         can_enter_m2: false,
+        can_prepare_deep_read: true,
         priority: 'B_SKIM',
         risk_note: 'Not cleared for M2 deep-card generation until full text is downloaded and validated.',
+        m2_unavailable_reason: 'Not cleared for M2 deep-card generation until full text is downloaded and validated.',
+        deep_read_unavailable_reason: '',
       },
     ],
     recommended_reading_order: [
@@ -62,6 +72,7 @@ function mockFetch(data: Record<string, any>, ok = true) {
 describe('DirectionSearchView', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    routerPush.mockReset()
   })
 
   it('submits a query and renders the direction bundle', async () => {
@@ -134,7 +145,7 @@ describe('DirectionSearchView', () => {
     expect(card.text()).toContain('m2_ready: false')
   })
 
-  it('keeps deep-read disabled when backend has no PaperWorkspace job', async () => {
+  it('shows prepare deep-read when candidate has a supported source', async () => {
     mockFetch(directionResponse())
 
     const wrapper = mount(DirectionSearchView)
@@ -143,7 +154,114 @@ describe('DirectionSearchView', () => {
     await flushPromises()
 
     const button = wrapper.get('[data-testid="deep-read-button"]')
-    expect(button.text()).toContain('待接入')
+    expect(button.text()).toContain('准备精读')
+    expect((button.element as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('calls handoff API and redirects to PaperWorkspace on success', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => directionResponse(),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'JOB_CREATED',
+          handoff_status: 'JOB_CREATED',
+          job_id: 'job-123',
+          final_status: 'DEGRADED_STRUCTURAL',
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-testid="deep-read-button"]').trigger('click')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/deep_read')
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body).candidate.arxiv_id).toBe('2401.00001')
+    expect(routerPush).toHaveBeenCalledWith('/learn/job-123')
+  })
+
+  it('shows handoff failure reason on the candidate card', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => directionResponse(),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          detail: {
+            status: 'PDF_DOWNLOAD_FAILED',
+            message: 'PDF download failed for the direction candidate.',
+          },
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-testid="deep-read-button"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="handoff-error"]').text()).toContain('PDF_DOWNLOAD_FAILED')
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('shows why a candidate is not currently cleared for M2', async () => {
+    mockFetch(directionResponse())
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('Not cleared for M2')
+  })
+
+  it('disables handoff when candidate has no supported source', async () => {
+    mockFetch(directionResponse({
+      papers: [
+        {
+          paper_id: 'p2',
+          title: 'Metadata Only Paper',
+          authors: ['A. Researcher'],
+          year: 2022,
+          source: 'crossref',
+          doi: '',
+          arxiv_id: '',
+          arxiv_url: '',
+          pdf_url: '',
+          relevance_score: 0.51,
+          verification_status: 'unverified',
+          source_confidence: 'low',
+          pdf_available: false,
+          canonicalization_status: 'not_attempted',
+          m2_ready: false,
+          can_enter_m2: false,
+          can_prepare_deep_read: false,
+          priority: 'C_REFERENCE',
+          deep_read_unavailable_reason: 'No arXiv ID, arXiv URL, or PDF URL is available for this candidate.',
+        },
+      ],
+    }))
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('metadata only')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const button = wrapper.get('[data-testid="deep-read-button"]')
+    expect(button.text()).toContain('源不可用')
     expect((button.element as HTMLButtonElement).disabled).toBe(true)
+    expect(wrapper.get('[data-testid="source-unavailable-note"]').text()).toContain('No arXiv ID')
   })
 })

@@ -299,6 +299,60 @@ def create_app(
         response["papers"] = response.get("candidate_cards", [])
         return response
 
+    @app.post("/api/v1/directions/deep_read")
+    async def direction_deep_read(payload: dict[str, object]) -> dict[str, object]:
+        candidate = _direction_candidate_payload(payload)
+        title, doi, pdf_url, arxiv_id, arxiv_url = _direction_handoff_inputs(candidate)
+        job_id = uuid.uuid4().hex[:12]
+        run_dir = workspace.new_run_dir(job_id)
+        source_status = _resolve_source(
+            resolver=resolver,
+            run_dir=run_dir,
+            title=title,
+            doi=doi,
+            local_path="",
+            pdf_url=pdf_url,
+            arxiv_id=arxiv_id,
+            arxiv_url=arxiv_url,
+        )
+        if source_status.status != "resolved":
+            job = _record_failed_source_job(workspace, jobs, job_id, run_dir, source_status)
+            raise HTTPException(
+                status_code=400,
+                detail=_direction_handoff_failure(job, source_status),
+            )
+
+        job = await run_in_threadpool(
+            runner.run,
+            source_status.resolved_path,
+            job_id=job_id,
+            source_status=source_status,
+        )
+        if job.status == JobStatus.FAILED:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "status": "BLOCKED",
+                    "handoff_status": "BLOCKED",
+                    "job_id": job.job_id,
+                    "message": job.error or "Direction candidate handoff failed during PaperWorkspace parsing.",
+                    "source_status": source_status.model_dump(mode="json"),
+                },
+            )
+
+        understanding_status = _job_understanding_status(job)
+        response = {
+            **_job_parse_response(job),
+            "status": "JOB_CREATED",
+            "handoff_status": "JOB_CREATED",
+            "source_status": source_status.model_dump(mode="json"),
+        }
+        if understanding_status:
+            response["understanding_status"] = understanding_status
+            response["paper_workspace_status"] = _paper_workspace_status(job, understanding_status)
+            response["final_status"] = understanding_status.get("status", "")
+        return response
+
     @app.post("/api/v1/directions/seed_expansion")
     def seed_expansion(payload: dict[str, object]) -> dict[str, object]:
         query = str(payload.get("query") or "")
@@ -454,6 +508,78 @@ def _configured_llm_client(
 
 def _env_truthy(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
+
+
+def _direction_candidate_payload(payload: dict[str, object]) -> dict[str, object]:
+    candidate = payload.get("candidate")
+    if isinstance(candidate, dict):
+        return candidate
+    return payload
+
+
+def _direction_handoff_inputs(candidate: dict[str, object]) -> tuple[str, str, str, str, str]:
+    title = str(candidate.get("title") or "").strip()
+    doi = str(candidate.get("doi") or "").strip()
+    pdf_url = str(candidate.get("pdf_url") or "").strip()
+    arxiv_id = str(candidate.get("arxiv_id") or "").strip()
+    arxiv_url = str(candidate.get("arxiv_url") or "").strip()
+    for key in ("url", "landing_url", "source_url"):
+        value = str(candidate.get(key) or "").strip()
+        if value and not arxiv_url and SourceResolver.arxiv_to_pdf_url(arxiv_url=value):
+            arxiv_url = value
+    # Choose one resolvable source. Direction candidates often carry both
+    # arxiv_id and pdf_url; parse API intentionally accepts only one source.
+    if arxiv_id:
+        return title, "", "", arxiv_id, ""
+    if arxiv_url:
+        return title, "", "", "", arxiv_url
+    if pdf_url:
+        return title, "", pdf_url, "", ""
+    if doi:
+        return title, doi, "", "", ""
+    return title, "", "", "", ""
+
+
+def _direction_handoff_failure(job: JobRecord, source_status: SourceStatus) -> dict[str, object]:
+    status = _direction_failure_status(source_status)
+    return {
+        "status": status,
+        "handoff_status": status,
+        "job_id": job.job_id,
+        "message": _direction_failure_message(status, source_status),
+        "source_status": source_status.model_dump(mode="json"),
+    }
+
+
+def _direction_failure_status(source_status: SourceStatus) -> str:
+    warnings = set(source_status.warnings)
+    if "DOI_NOT_IMPLEMENTED" in warnings:
+        return "DOI_NOT_IMPLEMENTED"
+    if "DOWNLOAD_FAILED" in warnings or source_status.status == "failed":
+        return "PDF_DOWNLOAD_FAILED"
+    if "INVALID_ARXIV_ID" in warnings or "UNSUPPORTED_SOURCE" in warnings:
+        return "SOURCE_UNAVAILABLE"
+    if source_status.status in {"rejected", "failed"}:
+        return "SOURCE_UNAVAILABLE"
+    return "BLOCKED"
+
+
+def _direction_failure_message(status: str, source_status: SourceStatus) -> str:
+    if status == "DOI_NOT_IMPLEMENTED":
+        return "DOI handoff is not implemented. Use an arXiv ID, arXiv URL, or PDF URL."
+    if status == "PDF_DOWNLOAD_FAILED":
+        return "PDF download failed for the direction candidate."
+    if status == "SOURCE_UNAVAILABLE":
+        return "No supported full-text source is available for this direction candidate."
+    return "; ".join(source_status.warnings) or "Direction candidate handoff was blocked."
+
+
+def _job_understanding_status(job: JobRecord) -> dict[str, object]:
+    artifact = _find_artifact(job, "understanding_status")
+    if artifact is None:
+        return {}
+    content = _read_artifact_content(job, artifact.path)
+    return content if isinstance(content, dict) else {}
 
 
 def _degraded_missing_component_is_required(component: str, component_status: dict[str, object]) -> bool:

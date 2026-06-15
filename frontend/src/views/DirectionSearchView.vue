@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import SeedExpansionPanel from '../components/SeedExpansionPanel.vue'
 
+const router = useRouter()
 const query = ref('')
 const isLoading = ref(false)
 const error = ref('')
 const result = ref<Record<string, any> | null>(null)
+const handoffStates = ref<Record<string, { loading?: boolean; error?: string }>>({})
 
 const status = computed(() => result.value?.direction_workspace_status || result.value?.status || '')
 const warnings = computed(() => normalizeWarnings(result.value?.warnings || []))
@@ -17,6 +20,7 @@ async function search() {
   isLoading.value = true
   error.value = ''
   result.value = null
+  handoffStates.value = {}
   try {
     const res = await fetch('/api/v1/directions/search', {
       method: 'POST',
@@ -66,14 +70,79 @@ function deepReadJobId(paper: Record<string, any>) {
   return paper.paper_workspace_job_id || paper.job_id || ''
 }
 
-function deepReadLabel(paper: Record<string, any>) {
-  return deepReadJobId(paper) ? '进入精读' : '待接入'
+function candidateKey(paper: Record<string, any>) {
+  return paper.paper_id || paper.arxiv_id || paper.pdf_url || paper.title || 'candidate'
 }
 
-function openDeepRead(paper: Record<string, any>) {
+function handoffState(paper: Record<string, any>) {
+  return handoffStates.value[candidateKey(paper)] || {}
+}
+
+function setHandoffState(paper: Record<string, any>, state: { loading?: boolean; error?: string }) {
+  handoffStates.value = {
+    ...handoffStates.value,
+    [candidateKey(paper)]: state,
+  }
+}
+
+function hasDeepReadSource(paper: Record<string, any>) {
+  return Boolean(paper.arxiv_id || paper.arxiv_url || paper.pdf_url)
+}
+
+function deepReadLabel(paper: Record<string, any>) {
+  if (deepReadJobId(paper)) return '进入精读'
+  if (!hasDeepReadSource(paper)) return '源不可用'
+  return handoffState(paper).loading ? '准备中' : '准备精读'
+}
+
+function deepReadDisabled(paper: Record<string, any>) {
+  return Boolean(handoffState(paper).loading || (!deepReadJobId(paper) && !hasDeepReadSource(paper)))
+}
+
+async function openDeepRead(paper: Record<string, any>) {
   const jobId = deepReadJobId(paper)
   if (jobId) {
-    window.location.assign(`/learn/${jobId}`)
+    await router.push(`/learn/${jobId}`)
+    return
+  }
+  if (!hasDeepReadSource(paper)) {
+    setHandoffState(paper, {
+      error: paper.deep_read_unavailable_reason || 'No arXiv ID, arXiv URL, or PDF URL is available.',
+    })
+    return
+  }
+
+  setHandoffState(paper, { loading: true, error: '' })
+  try {
+    const res = await fetch('/api/v1/directions/deep_read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        candidate: {
+          title: paper.title || '',
+          doi: paper.doi || '',
+          arxiv_id: paper.arxiv_id || '',
+          arxiv_url: paper.arxiv_url || paper.url || paper.landing_url || '',
+          pdf_url: paper.pdf_url || '',
+        },
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.job_id) {
+      const detail = data.detail || data
+      setHandoffState(paper, {
+        error: `${detail.status || detail.handoff_status || 'HANDOFF_FAILED'}: ${detail.message || 'Direction candidate handoff failed.'}`,
+      })
+      return
+    }
+    await router.push(`/learn/${data.job_id}`)
+  } catch {
+    setHandoffState(paper, { error: 'Network error while preparing PaperWorkspace job.' })
+  } finally {
+    const state = handoffState(paper)
+    if (state.loading) {
+      setHandoffState(paper, { ...state, loading: false })
+    }
   }
 }
 </script>
@@ -183,7 +252,7 @@ function openDeepRead(paper: Record<string, any>) {
               type="button"
               class="px-3 py-2 rounded-md text-xs font-semibold disabled:opacity-50"
               style="background: var(--accent); color: white;"
-              :disabled="!deepReadJobId(paper)"
+              :disabled="deepReadDisabled(paper)"
               data-testid="deep-read-button"
               @click="openDeepRead(paper)"
             >
@@ -201,7 +270,15 @@ function openDeepRead(paper: Record<string, any>) {
             <div class="text-xs" style="color: var(--text-secondary);">m2_ready: {{ paper.m2_ready ? 'true' : 'false' }}</div>
             <div class="text-xs" style="color: var(--text-secondary);">priority: {{ paper.priority }}</div>
           </div>
-          <p v-if="paper.risk_note" class="text-xs mt-3" style="color: var(--text-muted);">{{ paper.risk_note }}</p>
+          <p v-if="!paper.can_enter_m2" class="text-xs mt-3" style="color: var(--text-muted);" data-testid="m2-readiness-note">
+            M2 gate: {{ paper.m2_unavailable_reason || paper.risk_note || 'Not cleared until source download and canonical validation finish.' }}
+          </p>
+          <p v-if="!hasDeepReadSource(paper)" class="text-xs mt-2" style="color: #f59e0b;" data-testid="source-unavailable-note">
+            {{ paper.deep_read_unavailable_reason || 'No supported full-text source is available.' }}
+          </p>
+          <p v-if="handoffState(paper).error" class="text-xs mt-2" style="color: #ef4444;" data-testid="handoff-error">
+            {{ handoffState(paper).error }}
+          </p>
         </article>
       </div>
     </section>

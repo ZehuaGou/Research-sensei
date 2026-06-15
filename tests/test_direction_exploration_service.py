@@ -191,7 +191,7 @@ def test_a_read_for_m2_gate_is_not_relaxed_without_canonical_readiness() -> None
 
     assert card["priority"] != "A_READ_FOR_M2"
     assert card["can_enter_m2"] is False
-    assert card["deep_read_button_state"] == "pending_integration"
+    assert card["deep_read_button_state"] == "prepare"
 
 
 def test_a_read_for_m2_requires_all_existing_selection_gates() -> None:
