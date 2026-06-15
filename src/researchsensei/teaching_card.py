@@ -103,7 +103,7 @@ def _convert_to_bundle(
     for i, llm_card in enumerate(output.teaching_cards):
         ref = llm_card.evidence_ref if llm_card.evidence_ref in valid_refs else ""
         cards.append(TeachingCard(
-            card_id=llm_card.card_id or f"{paper_id}:teach:v2:{i:03d}",
+            card_id=llm_card.card_id or f"{paper_id}:teaching:{i:03d}",
             paper_id=paper_id,
             target_type=llm_card.target_type or "concept",
             target_id=llm_card.target_id or "",

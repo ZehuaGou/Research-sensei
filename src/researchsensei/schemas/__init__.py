@@ -2,7 +2,7 @@ from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBund
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
-from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceV2, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
+from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceRecord, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
 from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
 from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
@@ -29,7 +29,7 @@ __all__ = [
     "ComponentAuditResult",
     "ClaimEvidence",
     "ClaimEvidenceBundle",
-    "ClaimEvidenceV2",
+    "ClaimEvidenceRecord",
     "DirectionBundle",
     "DownstreamGates",
     "DocumentBlock",

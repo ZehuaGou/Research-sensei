@@ -76,7 +76,7 @@ class PassageIndexStats(SenseiModel):
 
 
 class PassageIndex(SenseiModel):
-    schema_version: str = "v2"
+    schema_version: str = "passage_index"
     paper_id: str
     passages: list[Passage] = Field(default_factory=list)
     warnings: list[WarningItem] = Field(default_factory=list)
@@ -84,7 +84,7 @@ class PassageIndex(SenseiModel):
     stats: PassageIndexStats | None = None
 
 
-class ClaimEvidenceV2(SenseiModel):
+class ClaimEvidenceRecord(SenseiModel):
     claim_id: str
     claim_text: str
     evidence_ref: str
@@ -118,9 +118,9 @@ class ClaimEvidenceV2(SenseiModel):
 
 
 class ClaimEvidenceBundle(SenseiModel):
-    schema_version: str = "v2"
+    schema_version: str = "claim_evidence"
     paper_id: str
-    claims: list[ClaimEvidenceV2] = Field(default_factory=list)
+    claims: list[ClaimEvidenceRecord] = Field(default_factory=list)
     warnings: list[WarningItem] = Field(default_factory=list)
     source_artifacts: list[str] = Field(default_factory=list)
 

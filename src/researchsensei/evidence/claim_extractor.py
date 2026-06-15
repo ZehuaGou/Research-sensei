@@ -6,7 +6,7 @@ from researchsensei.schemas.common import WarningItem
 from researchsensei.schemas.document import DocumentIngestion
 from researchsensei.schemas.evidence import (
     ClaimEvidenceBundle,
-    ClaimEvidenceV2,
+    ClaimEvidenceRecord,
     Passage,
     PassageIndex,
 )
@@ -39,7 +39,7 @@ def build_claim_evidence(
 ) -> ClaimEvidenceBundle:
     paper_id = document.paper_id
     blocks_by_id = {block.block_id: block for block in document.blocks}
-    claims: list[ClaimEvidenceV2] = []
+    claims: list[ClaimEvidenceRecord] = []
     warnings: list[WarningItem] = []
     counter = 0
 
@@ -163,11 +163,11 @@ def _make_claim(
     semantic_support: str,
     source_sentence: str,
     claim_text: str | None = None,
-) -> ClaimEvidenceV2:
+) -> ClaimEvidenceRecord:
     evidence_ref = passage.evidence_refs[0] if passage.evidence_refs else ""
     block_id = passage.block_ids[0] if passage.block_ids else ""
     block = blocks_by_id.get(block_id)
-    return ClaimEvidenceV2(
+    return ClaimEvidenceRecord(
         claim_id=f"{paper_id}:claim:c{counter:03d}",
         claim_text=claim_text or source_sentence[:300],
         evidence_ref=evidence_ref,

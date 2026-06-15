@@ -64,8 +64,8 @@ source resolved and normalized by M1
         → build_passage_index()
           → passage_index.json (PassageIndex, v2)
             → extract_claims()
-              → claim_evidence.json (ClaimEvidence v2)
-                → evidence_index.json (v1 wrapper)
+              → claim_evidence.json (ClaimEvidenceRecord)
+                → evidence_index.json (compatibility wrapper)
                   → build_paper_skeleton()
                     → paper_skeleton.json
                       → build_evidence_pack() [runtime]
@@ -87,8 +87,8 @@ source resolved and normalized by M1
 |------|------|------|----------|
 | CanonicalPaperReader.validate | canonical_paper.md | ParserResult | invalid canonical input → BLOCKED_UNDERSTANDING; degraded → DEGRADED_STRUCTURAL |
 | build_passage_index | DocumentIngestion.blocks | PassageIndex → passage_index.json | NO_PASSAGES → BLOCKED |
-| extract_claims | PassageIndex.passages | ClaimEvidence v2 → claim_evidence.json | NO_CLAIMS → BLOCKED |
-| evidence_index wrapper | claim_evidence.json | evidence_index.json (v1) | — |
+| extract_claims | PassageIndex.passages | ClaimEvidenceRecord → claim_evidence.json | NO_CLAIMS → BLOCKED |
+| evidence_index wrapper | claim_evidence.json | evidence_index.json (compatibility) | — |
 | build_paper_skeleton | DocumentIngestion + EvidenceIndex | PaperSkeleton | section MISSING warnings |
 | build_evidence_pack | ClaimEvidence + PassageIndex | EvidencePack [runtime] | 空 → BLOCKED; 缺 METHOD → BLOCKED |
 | LLM paper_card | EvidencePack + skeleton | paper_card.json | LLM 失败 → BLOCKED |

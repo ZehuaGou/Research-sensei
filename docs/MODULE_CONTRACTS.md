@@ -298,7 +298,7 @@ Output:
 - `parsed_document.json`
 - `passage_index.json`
 - `claim_evidence.json`
-- `evidence_index.json` (v1 compatibility)
+- `evidence_index.json` (compatibility wrapper)
 - `paper_skeleton.json`
 - `paper_card.json` / `formula_cards.json` / `teaching_cards.json`
 - `understanding_status.json`
@@ -788,7 +788,7 @@ Output:
 - `parsed_document.json`
 - `passage_index.json`
 - `claim_evidence.json`
-- `evidence_index.json` (v1 compatibility)
+- `evidence_index.json` (compatibility wrapper)
 - `paper_skeleton.json`
 - `paper_card.json` / `formula_cards.json` / `teaching_cards.json`
 - `understanding_status.json`
@@ -1168,7 +1168,7 @@ This target gate is implemented for the current canonical M1 pipeline and has se
 - `unresolved` origin → detailed derivation blocked
 - Marker timeout → body pipeline continues without formula detection
 
-**Current status**: IMPLEMENTED (MarkerDocumentFormulaDetector + FormulaCropper + MaterialNormalizer (deprecated fallback))
+**Current status**: IMPLEMENTED (MarkerDocumentFormulaDetector + FormulaCropper + MaterialNormalizer (legacy fallback))
 
 ### M2 Survey Deep Reading
 

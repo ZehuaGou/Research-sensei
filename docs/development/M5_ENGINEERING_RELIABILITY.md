@@ -781,8 +781,8 @@ CI / release readiness 必须区分三类结果：
 
 ## 13. Artifact Versioning
 
-- 每个 artifact 顶层应显式写 `schema_version="v2"`
-- 旧 artifact 没有 `schema_version` 时按 v1 读取
+- 每个 artifact 顶层应显式写 `schema_version="current"`
+- 旧 artifact 没有 `schema_version` 时按 legacy 读取
 - additive schema change 通过 Pydantic 默认值兼容
 - breaking change 的 migration 策略为 DOC_DESIGNED / NOT_IMPLEMENTED
 - `artifact_manifest.json` 为 DOC_DESIGNED / NOT_IMPLEMENTED

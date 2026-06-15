@@ -179,7 +179,7 @@ class QualityAuditor:
     def _check_evidence_chain(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
         findings: list[AuditFinding] = []
 
-        # F-6: ClaimEvidenceV2.passage_id not in PassageIndex
+        # F-6: ClaimEvidenceRecord.passage_id not in PassageIndex
         if artifacts.claim_evidence and artifacts.passage_index:
             passage_ids = {
                 p.get("passage_id", "")

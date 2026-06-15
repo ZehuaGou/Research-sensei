@@ -75,8 +75,8 @@ canonical_paper.md
 - `src/researchsensei/evidence/claim_extractor.py` — `build_claim_evidence()`, `ClaimExtractor`
 - `src/researchsensei/evidence/retriever.py` — `EvidenceRetriever`, BM25 实现
 - `src/researchsensei/evidence/evidence_pack.py` — `build_evidence_pack()`
-- `src/researchsensei/grounding.py` — `build_evidence_index()` (v1 compatibility)
-- `src/researchsensei/schemas/evidence.py` — Passage, PassageIndex, ClaimEvidence, ClaimEvidenceV2, EvidencePack, EvidencePackItem 等
+- `src/researchsensei/grounding.py` — `build_evidence_index()` (compatibility)
+- `src/researchsensei/schemas/evidence.py` — Passage, PassageIndex, ClaimEvidence, ClaimEvidenceRecord, EvidencePack, EvidencePackItem 等
 - `src/researchsensei/ingestion/pipeline.py` — passage_index.json / claim_evidence.json / evidence_index.json 写入位置
 
 ## 7. 输入输出
@@ -84,7 +84,7 @@ canonical_paper.md
 | 项 | 值 |
 |----|-----|
 | 输入 | `canonical_paper.md` trace + `DocumentIngestion` / `DocumentBlock` |
-| 输出 | `passage_index.json`, `claim_evidence.json`, `evidence_index.json` (v1 wrapper) |
+| 输出 | `passage_index.json`, `claim_evidence.json`, `evidence_index.json` (compatibility wrapper) |
 | 每个 claim 必须 | 能回指原始 block/passage |
 
 ## 8. Artifact
@@ -93,14 +93,14 @@ canonical_paper.md
 
 | artifact | 用途 | schema_version |
 |----------|------|----------------|
-| `passage_index.json` | PassageIndex，passage 级文档表示 | v2 |
-| `claim_evidence.json` | ClaimEvidence v2，含 passage_id / claim_type / semantic_support | v2 |
-| `evidence_index.json` | v1 兼容 wrapper，保留旧字段 | v1（无 schema_version 时默认 v1） |
+| `passage_index.json` | PassageIndex，passage 级文档表示 | current |
+| `claim_evidence.json` | ClaimEvidenceRecord，含 passage_id / claim_type / semantic_support | current |
+| `evidence_index.json` | compatibility wrapper，保留旧字段 | compatibility (no schema_version defaults to legacy) |
 
-- `evidence_index.json` 保留 v1 兼容，旧测试可继续读取。
+- `evidence_index.json` 保留 compatibility，旧测试可继续读取。
 - `claim_evidence.json` 承载 passage-level 字段，M2.4 Audit 和 M4 互动式学习读取此文件。
 - `passage_index.json` 持久化 passage 构建结果，M2.4 Audit 和前端 evidence 跳转依赖此文件。
-- 旧 artifact 缺少 `schema_version` 时按 v1 读取。
+- 旧 artifact 缺少 `schema_version` 时按 legacy 读取。
 - additive 字段通过 Pydantic 默认值兼容。
 
 ## 9. Schema / 数据结构
@@ -140,7 +140,7 @@ class PassageIndexStats(SenseiModel):
     sections_found: list[str]
 
 class PassageIndex(SenseiModel):
-    schema_version: str = "v2"
+    schema_version: str = "claim_evidence"
     paper_id: str
     passages: list[Passage]
     warnings: list[WarningItem] = Field(default_factory=list)
@@ -152,7 +152,7 @@ class PassageIndex(SenseiModel):
 
 ```python
 class ClaimEvidence(SenseiModel):
-    # v1 字段（不变）
+    # legacy fields（不变）
     claim_id: str
     block_id: str
     evidence_type: EvidenceType
@@ -341,8 +341,8 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 | test_claim_extractor_method_section | at least one claim with claim_type == "METHOD" |
 | test_claim_extractor_result_section | at least one claim with claim_type == "RESULT" |
 | test_claim_extractor_formula_context | at least one claim with claim_type == "FORMULA_CONTEXT" |
-| test_claim_evidence_v2_backward_compatible | v1 字段不变，v2 字段默认空 |
-| test_claim_evidence_schema_round_trip | ClaimEvidenceV2 serialize → deserialize preserves all fields |
+| test_claim_evidence_record_backward_compatible | legacy fields不变，passage-level 字段默认空 |
+| test_claim_evidence_schema_round_trip | ClaimEvidenceRecord serialize → deserialize preserves all fields |
 | test_claim_evidence_formula_origin_round_trip | formula_origin values preserved |
 | test_claim_evidence_reconstructed_not_high_confidence | reconstructed formula confidence capped |
 | test_claim_evidence_unknown_blocks_derivation | unknown formula origin cannot support detailed derivation |
@@ -373,7 +373,7 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 |------|------|
 | test_passage_index_json_round_trip | passage_index.json serialize → deserialize |
 | test_claim_evidence_json_round_trip | claim_evidence.json serialize → deserialize |
-| test_evidence_index_v1_compat | old evidence_index.json still loads |
+| test_evidence_index_compat | old evidence_index.json still loads |
 
 ### 全局规则
 
@@ -383,19 +383,19 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 ## 13. 验收标准
 
 - PassageIndex 正确构建 passages
-- ClaimEvidenceV2 正确提取 claims
+- ClaimEvidenceRecord 正确提取 claims
 - BM25 能检索到相关 passages
-- evidence_index.json v1 兼容
+- evidence_index.json compatibility
 - 真实验收必须验证 evidence_ref 可追溯到 canonical-derived block
 - formula evidence 必须保留 `formula_origin`
 
 ## 14. 当前实现状态
 
 - PassageIndex 已实现（passage_index.py）
-- ClaimEvidenceV2 / claim_evidence.json 已实现（claim_extractor.py）
+- ClaimEvidenceRecord / claim_evidence.json 已实现（claim_extractor.py）
 - EvidenceRetriever / BM25 已实现（retriever.py）
 - EvidencePack 已实现（evidence_pack.py）
-- evidence_index v1 wrapper 保留（grounding.py）
+- evidence_index compatibility wrapper 保留（grounding.py）
 - pipeline 已写入 passage_index.json + claim_evidence.json + evidence_index.json
 - 测试已覆盖：30+ tests
 - canonical_paper.md trace、formula_origin、formula_bbox/formula_page/formula_ocr_status 证据传播已实现并在 `2312_01729v1` M1->M2 real run 中验证

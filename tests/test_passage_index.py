@@ -61,7 +61,7 @@ def test_passage_index_json_round_trip() -> None:
     json_str = index.model_dump_json()
     restored = PassageIndex.model_validate_json(json_str)
 
-    assert restored.schema_version == "v2"
+    assert restored.schema_version == "passage_index"
     assert restored.paper_id == "test"
     assert len(restored.passages) == 1
     assert restored.passages[0].passage_id == "p001"

@@ -25,7 +25,7 @@ class PromptBuilder:
         self,
         *,
         system_instruction: str = SYSTEM_INSTRUCTION,
-        prompt_version: str = "v1",
+        prompt_version: str = "default",
     ) -> None:
         self.system_instruction = system_instruction
         self.prompt_version = prompt_version

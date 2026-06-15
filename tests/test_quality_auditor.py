@@ -18,7 +18,7 @@ from researchsensei.schemas import (
 
 def _make_success_status() -> dict:
     return {
-        "schema_version": "v1",
+        "schema_version": "understanding_status",
         "paper_id": "test",
         "status": "SUCCESS",
         "blocking_reason": "",
@@ -67,7 +67,7 @@ def _make_evidence_index() -> dict:
 
 def _make_claim_evidence() -> dict:
     return {
-        "schema_version": "v2",
+        "schema_version": "claim_evidence",
         "paper_id": "test",
         "claims": [
             {
@@ -106,7 +106,7 @@ def _make_claim_evidence() -> dict:
 
 def _make_passage_index() -> dict:
     return {
-        "schema_version": "v2",
+        "schema_version": "claim_evidence",
         "paper_id": "test",
         "passages": [
             {"passage_id": "p001", "text": "Abstract text.", "section": "abstract"},
@@ -258,7 +258,7 @@ def test_quality_report_round_trip() -> None:
     json_str = report.model_dump_json()
     restored = QualityReport.model_validate_json(json_str)
     assert restored.paper_id == "test"
-    assert restored.schema_version == "v1"
+    assert restored.schema_version == "quality_report"
 
 
 def test_artifact_bundle_round_trip() -> None:

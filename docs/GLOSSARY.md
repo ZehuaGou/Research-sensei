@@ -6,15 +6,15 @@
 
 - **ResearchSensei**: Paper reading tutor system for graduate students.
 - **Paper Skeleton**: Structured extraction of paper components (problem, method, experiments, limitations).
-- **Evidence Index**: Mapping of claims to source blocks with confidence scores (v1 compatibility).
+- **Evidence Index**: Mapping of claims to source blocks with confidence scores (compatibility).
 - **Paper Card**: Learning card summarizing a paper's core contributions.
 - **Formula Card**: Explanation card for formulas with symbol breakdown.
 - **Teaching Card**: Five-layer explanation card (human, analogy, formula, example, paper role).
 - **Reading Plan**: Prioritized list of papers with scoring breakdown.
 - **ParserAdapter**: Interface for document parsers.
 - **PassageIndex**: Passage-level text index, grouping blocks into semantic passages.
-- **ClaimEvidence**: Evidence binding for a specific claim (v1, block-level).
-- **ClaimEvidenceV2**: Evidence binding with passage_id, claim_type, semantic_support (v2, passage-level).
+- **ClaimEvidence**: Evidence binding for a specific claim (block-level).
+- **ClaimEvidenceRecord**: Evidence binding with passage_id, claim_type, semantic_support (passage-level).
 - **EvidencePack**: Runtime collection of evidence items for LLM input. Not persisted.
 - **EvidencePackSummary**: Summary of what the LLM saw, stored in UnderstandingStatus.
 - **EvidenceRetriever**: BM25-based passage retrieval for supporting evidence.
@@ -41,8 +41,8 @@
 - `source_status.json`: Source resolution status
 - `parsed_document.json`: Parsed document blocks
 - `passage_index.json`: Passage-level text index
-- `claim_evidence.json`: Claim evidence (passage-level)
-- `evidence_index.json`: Evidence bindings (v1 compatibility wrapper)
+- `claim_evidence.json`: Claim evidence record (passage-level)
+- `evidence_index.json`: Evidence bindings (compatibility wrapper)
 - `paper_skeleton.json`: Paper structure extraction
 - `paper_card.json`: Paper learning card
 - `formula_cards.json`: Formula explanation cards

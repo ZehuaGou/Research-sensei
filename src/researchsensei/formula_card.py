@@ -151,7 +151,7 @@ def _convert_to_bundle(
         formula_raw = _formula_raw_from_evidence(evidence)
         formula_origin = _formula_origin_from_evidence(evidence)
         formula_ocr_status = _formula_ocr_status_from_evidence(evidence, formula_origin)
-        formula_id = evidence.formula_id or f"{paper_id}:eq:v2:{i:03d}"
+        formula_id = evidence.formula_id or f"{paper_id}:formula:{i:03d}"
         explanation_status = _normalized_explanation_status(
             llm_card.formula_explanation_status,
             formula_origin,

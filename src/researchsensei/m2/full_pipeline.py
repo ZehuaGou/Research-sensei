@@ -181,7 +181,7 @@ def run_m2_full_pipeline(
     current_hashes = reader.hash_required_inputs()
     runtime_seconds = round(time.perf_counter() - started, 3)
     run_summary = {
-        "schema_version": "m2_full_v1",
+        "schema_version": "m2_full",
         "paper_id": paper_id,
         "title": paper_skeleton.title,
         "input_dir": str(bundle.input_dir),
@@ -618,7 +618,7 @@ def _canonical_status(bundle: M1ArtifactBundle) -> dict[str, Any]:
 
 def _baseline_status(paper_id: str, evidence_pack_summary: EvidencePackSummary) -> UnderstandingStatus:
     return UnderstandingStatus(
-        schema_version="v2",
+        schema_version="current",
         paper_id=paper_id,
         status="BASELINE_ONLY",
         blocking_reason="NO_LLM_CLIENT",
@@ -644,7 +644,7 @@ def _success_status(
 ) -> UnderstandingStatus:
     formula_status = "SKIPPED" if not formula_cards.formula_cards else "SUCCESS"
     return UnderstandingStatus(
-        schema_version="v2",
+        schema_version="current",
         paper_id=paper_id,
         status="SUCCESS",
         allowed_for_user_display=True,
@@ -680,7 +680,7 @@ def _degraded_status(
     formula_status = formula_cards_status or ("SKIPPED" if not formula_cards.formula_cards else "SUCCESS")
     teaching_status = teaching_cards_status or ("FAILED" if warnings else "SUCCESS")
     return UnderstandingStatus(
-        schema_version="v2",
+        schema_version="current",
         paper_id=paper_id,
         status="DEGRADED_STRUCTURAL",
         blocking_reason=blocking_reason,
@@ -719,7 +719,7 @@ def _blocked_status(
 ) -> UnderstandingStatus:
     llm_component_status = llm_status or ("FAILED" if llm_failed else "SUCCESS")
     return UnderstandingStatus(
-        schema_version="v2",
+        schema_version="current",
         paper_id=paper_id,
         status="BLOCKED_UNDERSTANDING",
         blocking_reason=blocking_reason,
@@ -822,7 +822,7 @@ def _write_missing_input_result(
     _write_json(output / "understanding_status.json", status)
     runtime_seconds = round(time.perf_counter() - started, 3)
     run_summary = {
-        "schema_version": "m2_full_v1",
+        "schema_version": "m2_full",
         "paper_id": paper_id,
         "title": "",
         "input_dir": str(input_dir),

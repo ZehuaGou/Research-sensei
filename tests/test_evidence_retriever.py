@@ -168,7 +168,7 @@ def test_retriever_does_not_write_artifacts(tmp_path: Path) -> None:
 
 
 def test_claim_evidence_bundle_shape_unchanged() -> None:
-    """EvidenceRetrievalResult should be a separate type from ClaimEvidenceV2."""
+    """EvidenceRetrievalResult should be a separate type from ClaimEvidenceRecord."""
     result = EvidenceRetrievalResult(
         passage_id="p001",
         score=1.5,

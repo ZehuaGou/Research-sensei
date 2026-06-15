@@ -151,5 +151,5 @@ def test_prompt_builder_simple_method() -> None:
 
 
 def test_prompt_builder_prompt_version() -> None:
-    builder = PromptBuilder(prompt_version="v2")
-    assert builder.prompt_version == "v2"
+    builder = PromptBuilder(prompt_version="evidence_grounded")
+    assert builder.prompt_version == "evidence_grounded"

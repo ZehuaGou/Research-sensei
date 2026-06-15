@@ -313,7 +313,7 @@ source_status.json
 → parsed_document.json
 → passage_index.json
 → claim_evidence.json
-→ evidence_index.json (v1 兼容)
+→ evidence_index.json (compatibility)
 → paper_skeleton.json
 → paper_card.json / formula_cards.json / teaching_cards.json
 → understanding_status.json

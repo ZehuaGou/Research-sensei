@@ -29,7 +29,7 @@ class ResponseCache:
         model_name: str,
         prompt_version: str,
         prompt_hash: str,
-        schema_version: str = "v1",
+        schema_version: str = "current",
     ) -> str:
         """Build a deterministic cache key from request parameters."""
         raw = f"{model_name}||{prompt_version}||{prompt_hash}||{schema_version}"

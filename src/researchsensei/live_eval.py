@@ -482,7 +482,7 @@ def run_full_live_eval(
     report_dir.mkdir(parents=True, exist_ok=True)
     work_root = Path(work_dir or report_dir / "work")
     report: dict[str, Any] = {
-        "schema_version": "v2-m1-real",
+        "schema_version": "m1_live_eval",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "live_eval": {
             "enabled": actual_config.live_eval_enabled,

@@ -23,7 +23,7 @@ class DownstreamGates(SenseiModel):
 
 
 class UnderstandingStatus(SenseiModel):
-    schema_version: str = "v1"
+    schema_version: str = "understanding_status"
     paper_id: str
     status: str  # SUCCESS / DEGRADED_STRUCTURAL / BASELINE_ONLY / BLOCKED_UNDERSTANDING / FAILED
     blocking_reason: str = ""

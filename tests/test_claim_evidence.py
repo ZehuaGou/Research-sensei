@@ -12,7 +12,7 @@ from researchsensei.schemas import (
     BlockType,
     ClaimEvidence,
     ClaimEvidenceBundle,
-    ClaimEvidenceV2,
+    ClaimEvidenceRecord,
     DocumentBlock,
     DocumentIngestion,
     EvidenceIndex,
@@ -29,8 +29,8 @@ from researchsensei.workspace import WorkspaceStore
 # ---------------------------------------------------------------------------
 
 
-def test_claim_evidence_v2_round_trip() -> None:
-    claim = ClaimEvidenceV2(
+def test_claim_evidence_record_round_trip() -> None:
+    claim = ClaimEvidenceRecord(
         claim_id="p1:claim:c001",
         claim_text="We propose a new method.",
         evidence_ref="p1:b001",
@@ -46,7 +46,7 @@ def test_claim_evidence_v2_round_trip() -> None:
     )
 
     json_str = claim.model_dump_json()
-    restored = ClaimEvidenceV2.model_validate_json(json_str)
+    restored = ClaimEvidenceRecord.model_validate_json(json_str)
 
     assert restored.claim_id == "p1:claim:c001"
     assert restored.claim_type == "METHOD"
@@ -56,7 +56,7 @@ def test_claim_evidence_v2_round_trip() -> None:
 
 
 def test_claim_evidence_bundle_round_trip() -> None:
-    claim = ClaimEvidenceV2(
+    claim = ClaimEvidenceRecord(
         claim_id="p1:claim:c001",
         claim_text="Test claim.",
         evidence_ref="p1:b001",
@@ -73,7 +73,7 @@ def test_claim_evidence_bundle_round_trip() -> None:
     json_str = bundle.model_dump_json()
     restored = ClaimEvidenceBundle.model_validate_json(json_str)
 
-    assert restored.schema_version == "v2"
+    assert restored.schema_version == "claim_evidence"
     assert restored.paper_id == "p1"
     assert len(restored.claims) == 1
     assert restored.claims[0].claim_id == "p1:claim:c001"
@@ -339,7 +339,7 @@ def test_runner_writes_claim_evidence_artifact(tmp_path: Path) -> None:
     assert claim_evidence_path.exists()
     data = json.loads(claim_evidence_path.read_text(encoding="utf-8"))
     assert data["paper_id"] == "test-ce"
-    assert data["schema_version"] == "v2"
+    assert data["schema_version"] == "claim_evidence"
     assert "claims" in data
 
 

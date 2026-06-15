@@ -148,12 +148,12 @@ class ComponentAuditResult(SenseiModel):
 
 ```python
 class QualityReport(SenseiModel):
-    schema_version: str = "v2"
+    schema_version: str = "current"
     paper_id: str
     findings: list[AuditFinding] = Field(default_factory=list)
     component_results: list[ComponentAuditResult] = Field(default_factory=list)
     checked_artifacts: list[str] = Field(default_factory=list)
-    audit_version: str = "v1"
+    audit_version: str = "current"
     created_at: str = ""
 ```
 

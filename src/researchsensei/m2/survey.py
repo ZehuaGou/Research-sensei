@@ -59,7 +59,7 @@ def build_survey_artifacts(
     landscape_summary = _first_text(survey_claims) or _first_taxonomy_text(taxonomy) or "INSUFFICIENT_EVIDENCE"
 
     survey_status = {
-        "schema_version": "m2_survey_v1",
+        "schema_version": "m2_survey",
         "paper_id": paper_id,
         "is_survey": True,
         "status": status,
@@ -69,7 +69,7 @@ def build_survey_artifacts(
         "signal_passage_id": survey_signal.get("passage_id", ""),
     }
     survey_landscape = {
-        "schema_version": "m2_survey_v1",
+        "schema_version": "m2_survey",
         "paper_id": paper_id,
         "trusted": trusted,
         "status": status,
@@ -79,17 +79,17 @@ def build_survey_artifacts(
         "evidence_refs": _unique([item.get("evidence_ref", "") for item in taxonomy + survey_claims]),
     }
     method_taxonomy = {
-        "schema_version": "m2_survey_v1",
+        "schema_version": "m2_survey",
         "paper_id": paper_id,
         "taxonomy": taxonomy,
     }
     extracted_key_papers = {
-        "schema_version": "m2_survey_v1",
+        "schema_version": "m2_survey",
         "paper_id": paper_id,
         "papers": key_papers,
     }
     survey_claim_bundle = {
-        "schema_version": "m2_survey_v1",
+        "schema_version": "m2_survey",
         "paper_id": paper_id,
         "claims": survey_claims,
     }
@@ -105,7 +105,7 @@ def build_survey_artifacts(
 def _not_applicable(paper_id: str, reason: str) -> dict[str, dict[str, Any]]:
     return {
         "survey_status": {
-            "schema_version": "m2_survey_v1",
+            "schema_version": "m2_survey",
             "paper_id": paper_id,
             "is_survey": False,
             "status": "NOT_APPLICABLE",
@@ -115,7 +115,7 @@ def _not_applicable(paper_id: str, reason: str) -> dict[str, dict[str, Any]]:
             "signal_passage_id": "",
         },
         "survey_landscape": {
-            "schema_version": "m2_survey_v1",
+            "schema_version": "m2_survey",
             "paper_id": paper_id,
             "trusted": False,
             "status": "NOT_APPLICABLE",
@@ -125,17 +125,17 @@ def _not_applicable(paper_id: str, reason: str) -> dict[str, dict[str, Any]]:
             "evidence_refs": [],
         },
         "method_taxonomy": {
-            "schema_version": "m2_survey_v1",
+            "schema_version": "m2_survey",
             "paper_id": paper_id,
             "taxonomy": [],
         },
         "extracted_key_papers": {
-            "schema_version": "m2_survey_v1",
+            "schema_version": "m2_survey",
             "paper_id": paper_id,
             "papers": [],
         },
         "survey_claims": {
-            "schema_version": "m2_survey_v1",
+            "schema_version": "m2_survey",
             "paper_id": paper_id,
             "claims": [],
         },

@@ -44,7 +44,7 @@
 ## 历史归档
 
 - [docs/TECHNICAL_DISCUSSION.md](docs/TECHNICAL_DISCUSSION.md) — 历史技术讨论，不作为当前开发依据
-- [docs/MAIN_CHAIN_V1_REVIEW.md](docs/MAIN_CHAIN_V1_REVIEW.md) — 主链路 v1 封版记录
+- [docs/MAIN_CHAIN_V1_REVIEW.md](docs/MAIN_CHAIN_V1_REVIEW.md) — 历史封版记录（归档）
 
 ## 安装
 

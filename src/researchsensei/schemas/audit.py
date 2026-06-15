@@ -38,10 +38,10 @@ class ArtifactBundle(SenseiModel):
 
 
 class QualityReport(SenseiModel):
-    schema_version: str = "v1"
+    schema_version: str = "quality_report"
     paper_id: str
     findings: list[AuditFinding] = Field(default_factory=list)
     component_results: list[ComponentAuditResult] = Field(default_factory=list)
     checked_artifacts: list[str] = Field(default_factory=list)
-    audit_version: str = "v1"
+    audit_version: str = "current"
     created_at: str = ""

@@ -181,7 +181,7 @@ class DownstreamGates(SenseiModel):
     advisor_questions: bool = False
 
 class UnderstandingStatus(SenseiModel):
-    schema_version: str = "v2"
+    schema_version: str = "current"
     paper_id: str
     status: str  # SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING / FAILED / BASELINE_ONLY
     blocking_reason: str = ""

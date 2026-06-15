@@ -404,10 +404,10 @@ reference_entries: list[str] = Field(default_factory=list)
 - 前端 evidence 跳转需要 passage 层信息；
 - ClaimEvidence.passage_id 不能指向不存在的运行时对象。
 
-**2. ClaimEvidence v2 应持久化为 claim_evidence.json。**
+**2. ClaimEvidenceRecord 应持久化为 claim_evidence.json。**
 
-- evidence_index.json 保留 v1 兼容；
-- claim_evidence.json 承载 v2 字段（passage_id, claim_type, semantic_support, source_sentence, generated_by）；
+- evidence_index.json 保留 compatibility；
+- claim_evidence.json 承载 passage-level fields（passage_id, claim_type, semantic_support, source_sentence, generated_by）；
 - audit 和未来 Phase 12 读取 claim_evidence.json。
 
 **3. UnderstandingStatus 使用 5 个主状态。**
@@ -510,7 +510,7 @@ class QualityReport(SenseiModel):
     findings: list[AuditFinding] = []
     component_results: list[ComponentAuditResult] = []
     checked_artifacts: list[str] = []
-    audit_version: str = "v1"
+    audit_version: str = "current"
     created_at: str = ""
 ```
 
@@ -630,8 +630,8 @@ class DownstreamGates(SenseiModel):
 **1. Artifact versioning。**
 
 - 每个 artifact 顶层应有 `schema_version`。
-- 旧 artifact 没有 `schema_version` 时按 v1 读取。
-- 新 v2 artifact 写出时必须显式写 `schema_version="v2"`。
+- 旧 artifact 没有 `schema_version` 时按 legacy 读取。
+- 新 artifact 写出时必须显式写 `schema_version="v2"`。
 - additive schema change 通过 Pydantic 默认值兼容。
 - breaking change 未来再引入 migration，不在初版实现。
 - 暂不引入 `artifact_manifest.json`。

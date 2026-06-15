@@ -66,7 +66,7 @@ def test_m1_real_llm_multisource_pdf_acquisition_and_report(tmp_path) -> None:
     report_path = Path(report["report_path"])
     assert report_path.exists()
     loaded = json.loads(report_path.read_text(encoding="utf-8"))
-    assert loaded["schema_version"] == "v2-m1-real"
+    assert loaded["schema_version"] == "m1_live_eval"
     assert loaded["m1_live"]["status"] == "passed", loaded["m1_live"].get("failure_reason", "")
     assert loaded["m1_live"]["real_llm_query_planning"] is True
     assert loaded["m1_live"]["pdf_download_success_count"] >= 1

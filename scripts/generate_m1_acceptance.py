@@ -360,7 +360,7 @@ def safe_int(value: object, default: int = 1) -> int:
 
 
 def blocks_from_mineru_spike(spec: PaperSpec) -> list[CanonicalDocumentBlock]:
-    data = json.loads((spec.source_dir / "mineru25_v2_spike" / "document_blocks.json").read_text(encoding="utf-8"))
+    data = json.loads((spec.source_dir / "mineru25_spike" / "document_blocks.json").read_text(encoding="utf-8"))
     return [CanonicalDocumentBlock.model_validate(item) for item in data]
 
 
@@ -415,7 +415,7 @@ def looks_formula_like(line: str) -> bool:
 def load_formula_slots(spec: PaperSpec) -> list[dict]:
     candidates = [
         spec.source_dir / "formula_slots.json",
-        spec.source_dir / "mineru25_v2_spike" / "formula_slots_v2.json",
+        spec.source_dir / "mineru25_spike" / "formula_slots.json",
     ]
     for path in candidates:
         if path.exists():
@@ -676,7 +676,7 @@ def write_formula_review(out_dir: Path, title: str, metrics: dict, blocks: list[
         lines.append(f"OK: {block.block_id} uses raw_formula_text and leaves latex empty")
     text = "\n".join(lines)
     (out_dir / "formula_review.md").write_text(text, encoding="utf-8")
-    (out_dir / "formula_review_v2.md").write_text(text, encoding="utf-8")
+    (out_dir / "formula_review.md").write_text(text, encoding="utf-8")
 
     candidate_lines = [
         f"# Formula Candidates: {title}",

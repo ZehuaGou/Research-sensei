@@ -4,14 +4,14 @@ from researchsensei.evidence.evidence_pack import build_evidence_pack
 from researchsensei.schemas import EvidenceType
 from researchsensei.schemas.evidence import (
     ClaimEvidenceBundle,
-    ClaimEvidenceV2,
+    ClaimEvidenceRecord,
     Passage,
     PassageIndex,
 )
 
 
-def _claim(idx: int, *, formula_id: str, text: str) -> ClaimEvidenceV2:
-    return ClaimEvidenceV2(
+def _claim(idx: int, *, formula_id: str, text: str) -> ClaimEvidenceRecord:
+    return ClaimEvidenceRecord(
         claim_id=f"paper:claim:c{idx:03d}",
         claim_text=text,
         evidence_ref=f"paper:b{idx:04d}",

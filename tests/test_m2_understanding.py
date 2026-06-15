@@ -662,7 +662,7 @@ def test_m2_audit_warning_is_preserved_in_understanding_status() -> None:
         },
     }
     claim_evidence = {
-        "schema_version": "v2",
+        "schema_version": "claim_evidence",
         "paper_id": "test",
         "claims": [
             {
@@ -704,7 +704,7 @@ def test_m2_audit_warning_is_preserved_in_understanding_status() -> None:
         ],
     }
     passage_index = {
-        "schema_version": "v2",
+        "schema_version": "claim_evidence",
         "paper_id": "test",
         "passages": [
             {"passage_id": f"p{i}", "text": f"passage {i}", "section": "method"}

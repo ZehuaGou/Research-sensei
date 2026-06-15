@@ -415,7 +415,7 @@ class PaperMemory(SenseiModel):
     evidence_refs: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class PassageMemory(SenseiModel):
     memory_id: str = ""
@@ -428,7 +428,7 @@ class PassageMemory(SenseiModel):
     evidence_refs: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class FormulaMemory(SenseiModel):
     memory_id: str = ""
@@ -440,7 +440,7 @@ class FormulaMemory(SenseiModel):
     evidence_refs: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class SymbolMemory(SenseiModel):
     memory_id: str = ""
@@ -452,7 +452,7 @@ class SymbolMemory(SenseiModel):
     evidence_refs: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class SessionContext(SenseiModel):
     session_id: str
@@ -462,7 +462,7 @@ class SessionContext(SenseiModel):
     token_budget_used: int = 0
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class UserQuestionMemory(SenseiModel):
     memory_id: str = ""
@@ -475,7 +475,7 @@ class UserQuestionMemory(SenseiModel):
     source_artifact: str = ""
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 # Direction-level memory types
 
@@ -490,7 +490,7 @@ class DirectionMemory(SenseiModel):
     user_notes: str = ""
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class MethodFamilyMemory(SenseiModel):
     """Memory of a method family within a direction."""
@@ -503,7 +503,7 @@ class MethodFamilyMemory(SenseiModel):
     user_understanding_level: str = "unknown"
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class StageMemory(SenseiModel):
     """Memory of a chronology stage within a direction."""
@@ -516,7 +516,7 @@ class StageMemory(SenseiModel):
     breakthrough: str = ""
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class PaperRelationMemory(SenseiModel):
     """Memory of how papers relate to each other."""
@@ -528,7 +528,7 @@ class PaperRelationMemory(SenseiModel):
     user_notes: str = ""
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 
 class UserLearningProgressMemory(SenseiModel):
     """Memory of user's learning progress across directions."""
@@ -540,7 +540,7 @@ class UserLearningProgressMemory(SenseiModel):
     strong_areas: list[str] = Field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
-    schema_version: str = "v1"
+    schema_version: str = "current"
 ```
 
 ### Artifact / 持久化内容

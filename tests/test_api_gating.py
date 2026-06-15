@@ -655,7 +655,7 @@ def _write_m2_artifact_run(root: Path) -> Path:
         "m2_ready": True,
     })
     _plain_write_json(root / "understanding_status.json", {
-        "schema_version": "v2",
+        "schema_version": "understanding_status",
         "paper_id": "paper",
         "status": "SUCCESS",
         "blocking_reason": "",
