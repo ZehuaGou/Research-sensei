@@ -16,6 +16,7 @@ from researchsensei.schemas.llm_output import FormulaCardLLMOutput, FormulaCards
 
 
 FORMULA_CARD_BATCH_SIZE = 5
+DERIVATION_BLOCKED_ORIGINS = {"raw_formula_text", "unknown", "unresolved"}
 
 
 async def build_formula_cards_v2(
@@ -39,10 +40,14 @@ async def build_formula_cards_v2(
             evidence_status=EvidenceType.INSUFFICIENT_EVIDENCE,
         )
 
+    derivable_items = [
+        item for item in formula_items
+        if not _is_derivation_blocked_formula(item)
+    ]
     llm_cards: list[FormulaCardLLMOutput] = []
     warnings: list[str] = []
-    for start in range(0, len(formula_items), FORMULA_CARD_BATCH_SIZE):
-        batch = formula_items[start:start + FORMULA_CARD_BATCH_SIZE]
+    for start in range(0, len(derivable_items), FORMULA_CARD_BATCH_SIZE):
+        batch = derivable_items[start:start + FORMULA_CARD_BATCH_SIZE]
         batch_pack = EvidencePack(
             paper_id=evidence_pack.paper_id,
             items=batch,
@@ -73,7 +78,8 @@ def _build_batch_messages(
             "You are the ResearchSensei formula-understanding builder.\n"
             "Use only the supplied formula evidence. Do not infer from outside knowledge.\n"
             "Each formula_card must cite exactly one allowed evidence_ref.\n"
-            "Preserve formula_id, formula_raw, formula_origin, formula_ocr_status, page, and equation identity from evidence.\n"
+            "Preserve formula_id, formula_origin, formula_ocr_status, page, and equation identity from evidence.\n"
+            "Do not output formula_raw; M2 restores exact LaTeX from evidence to avoid invalid JSON escaping.\n"
             "Never claim parser/OCR/raw formulas are source-level LaTeX.\n"
             "Return only valid JSON."
         ),
@@ -89,7 +95,8 @@ Constraints:
 - Generate one formula_card for every formula evidence item in this batch.
 - If a formula has insufficient context, still return a degraded card for that formula and write INSUFFICIENT_EVIDENCE in unsupported fields.
 - Choose evidence_ref exactly from the allowed list.
-- Use formula_id/formula_raw/formula_origin/formula_ocr_status exactly as shown in evidence.
+- Use formula_id/formula_origin/formula_ocr_status exactly as shown in evidence.
+- Do not include formula_raw or raw LaTeX strings in the JSON output.
 - For source_latex, formula_explanation_status should be source_exact.
 - For parser_latex, mineru_latex, or marker_latex, formula_explanation_status should be parser_derived.
 - For ocr_latex, formula_explanation_status should be ocr_derived and confidence should be cautious.
@@ -101,7 +108,6 @@ Return JSON with this schema:
   "formula_cards": [
     {{
       "formula_id": "formula id from evidence",
-      "formula_raw": "formula text from evidence",
       "formula_origin": "origin from evidence",
       "formula_ocr_status": "ocr status from evidence",
       "formula_explanation_status": "source_exact | parser_derived | ocr_derived | degraded",
@@ -143,14 +149,18 @@ def _convert_to_bundle(
             continue
         used_refs.add(ref)
         formula_raw = _formula_raw_from_evidence(evidence)
-        formula_origin = evidence.formula_origin or llm_card.formula_origin
-        formula_ocr_status = evidence.formula_ocr_status or llm_card.formula_ocr_status
-        formula_id = evidence.formula_id or llm_card.formula_id or f"{paper_id}:eq:v2:{i:03d}"
+        formula_origin = _formula_origin_from_evidence(evidence)
+        formula_ocr_status = _formula_ocr_status_from_evidence(evidence, formula_origin)
+        formula_id = evidence.formula_id or f"{paper_id}:eq:v2:{i:03d}"
         explanation_status = _normalized_explanation_status(
             llm_card.formula_explanation_status,
             formula_origin,
         )
-        confidence = _card_confidence(formula_origin, avg_confidence, llm_card.formula_explanation_status)
+        confidence = _card_confidence(formula_origin, avg_confidence, explanation_status)
+        if _is_derivation_blocked_origin(formula_origin):
+            cards.append(_fallback_card(evidence, paper_id))
+            warnings.append(f"FORMULA_DERIVATION_BLOCKED_FOR_UNRELIABLE_PROVENANCE: {ref}")
+            continue
         cards.append(FormulaCard(
             formula_id=formula_id,
             paper_id=paper_id,
@@ -187,10 +197,15 @@ def _convert_to_bundle(
             continue
         if item.evidence_ref not in used_refs:
             cards.append(_fallback_card(item, paper_id))
-            warnings.append(f"LLM_CARD_MISSING_FOR_FORMULA: {item.formula_id or item.evidence_ref}")
+            if _is_derivation_blocked_formula(item):
+                warnings.append(
+                    f"FORMULA_DERIVATION_BLOCKED_FOR_UNRELIABLE_PROVENANCE: {item.formula_id or item.evidence_ref}"
+                )
+            else:
+                warnings.append(f"LLM_CARD_MISSING_FOR_FORMULA: {item.formula_id or item.evidence_ref}")
 
     evidence_refs = sorted({c.evidence_ref for c in cards if c.evidence_ref})
-    if not output_cards:
+    if _has_derivable_formula_items(evidence_pack) and not output_cards:
         warnings.append("NO_FORMULA_CARDS_FROM_LLM")
 
     return FormulaCardBundle(
@@ -208,6 +223,38 @@ def _formula_items(evidence_pack: EvidencePack) -> list[EvidencePackItem]:
         item for item in evidence_pack.items
         if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
     ]
+
+
+def _formula_origin_from_evidence(evidence: EvidencePackItem) -> str:
+    return (evidence.formula_origin or "").strip() or "unknown"
+
+
+def _formula_ocr_status_from_evidence(evidence: EvidencePackItem, formula_origin: str) -> str:
+    status = (evidence.formula_ocr_status or "").strip()
+    if status:
+        return status
+    if formula_origin == "ocr_latex":
+        return "ocr_status_unknown"
+    if _is_derivation_blocked_origin(formula_origin):
+        return "not_available"
+    return "not_required"
+
+
+def _is_derivation_blocked_formula(item: EvidencePackItem) -> bool:
+    return _is_derivation_blocked_origin(_formula_origin_from_evidence(item))
+
+
+def _is_derivation_blocked_origin(formula_origin: str) -> bool:
+    return formula_origin in DERIVATION_BLOCKED_ORIGINS
+
+
+def _has_derivable_formula_items(evidence_pack: EvidencePack) -> bool:
+    return any(
+        item.claim_type == "FORMULA_CONTEXT"
+        and item.evidence_ref
+        and not _is_derivation_blocked_formula(item)
+        for item in evidence_pack.items
+    )
 
 
 def _formula_raw_from_evidence(evidence: EvidencePackItem | None) -> str:
@@ -230,6 +277,14 @@ def _explanation_status(formula_origin: str) -> str:
 
 def _normalized_explanation_status(candidate: str, formula_origin: str) -> str:
     candidate = (candidate or "").strip().lower()
+    if formula_origin == "source_latex":
+        return "source_exact"
+    if formula_origin in {"parser_latex", "mineru_latex", "marker_latex"}:
+        return "parser_derived"
+    if formula_origin == "ocr_latex":
+        return "ocr_derived"
+    if _is_derivation_blocked_origin(formula_origin):
+        return "degraded"
     allowed = {"source_exact", "parser_derived", "ocr_derived", "degraded"}
     if candidate in allowed:
         return candidate
@@ -261,8 +316,8 @@ def _card_confidence(formula_origin: str, avg_confidence: float, explanation_sta
 
 def _fallback_card(item: EvidencePackItem, paper_id: str) -> FormulaCard:
     formula_raw = _formula_raw_from_evidence(item)
-    origin = item.formula_origin or "unknown"
-    raw_or_unknown = origin in {"raw_formula_text", "unknown", "unresolved"}
+    origin = _formula_origin_from_evidence(item)
+    raw_or_unknown = _is_derivation_blocked_origin(origin)
     warning = "RAW_OR_UNRESOLVED_FORMULA_DERIVATION_BLOCKED" if raw_or_unknown else "LLM_CARD_MISSING"
     return FormulaCard(
         formula_id=item.formula_id or item.evidence_ref,
@@ -270,7 +325,7 @@ def _fallback_card(item: EvidencePackItem, paper_id: str) -> FormulaCard:
         formula_raw=formula_raw,
         original_latex=formula_raw if origin == "source_latex" else "",
         formula_origin=origin,
-        formula_ocr_status=item.formula_ocr_status or "not_required",
+        formula_ocr_status=_formula_ocr_status_from_evidence(item, origin),
         formula_explanation_status="degraded" if raw_or_unknown else _explanation_status(origin),
         formula_page=item.formula_page,
         equation_number=item.equation_number,
@@ -289,7 +344,7 @@ def _fallback_card(item: EvidencePackItem, paper_id: str) -> FormulaCard:
         plain_summary=_fallback_summary(item, raw_or_unknown),
         evidence_ref=item.evidence_ref,
         evidence_status=EvidenceType.NEEDS_HUMAN_CHECK if raw_or_unknown else EvidenceType.SUPPORTED_BY_FORMULA,
-        confidence=0.2 if raw_or_unknown else 0.45,
+        confidence=0.0 if raw_or_unknown else 0.45,
         warnings=list(dict.fromkeys([*item.risk_flags, warning])),
     )
 

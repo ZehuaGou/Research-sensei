@@ -324,3 +324,33 @@ The full pipeline must:
 This is all-formula coverage, not a claim of full symbolic proof for every
 equation. Advanced derivation remains bounded by M1 LaTeX fidelity and nearby
 paper evidence.
+
+## 2026-06-14 Current Artifact Count Contract
+
+This section supersedes the older compact artifact-count table above. The
+current `run_m2_full_pipeline()` implementation writes the full evidence and
+survey chain, so counts are larger than the original 9/11/12 design sketch.
+
+Current full-mode artifact files:
+
+- SUCCESS / BASELINE_ONLY: 19 pipeline JSON artifacts plus
+  `m2_run_summary.json` and `m2_full_report.md` (21 files total).
+- DEGRADED_STRUCTURAL with failed teaching cards: 18 pipeline JSON artifacts
+  plus `m2_run_summary.json` and `m2_full_report.md` (20 files total), because
+  `teaching_cards.json` is not written.
+- Preflight BLOCKED_UNDERSTANDING after a readable M1 bundle: 16 pipeline JSON
+  artifacts plus `m2_run_summary.json` and `m2_full_report.md` (18 files total),
+  with no explanatory card artifacts.
+- Missing canonical/M1 bundle entry failure: `source_status.json`,
+  `quality_report.json`, `understanding_status.json`, `m2_run_summary.json`,
+  and `m2_full_report.md` (5 files total), with
+  `blocking_reason=MISSING_CANONICAL_INPUT` and no explanatory card artifacts.
+
+The status contract is stricter than the raw file count:
+
+- `checked_artifacts` must list the artifacts that the status claims were
+  checked.
+- `output_artifacts` in `m2_run_summary.json` records the pipeline artifacts
+  written before the summary/report files are emitted.
+- BLOCKED_UNDERSTANDING and BASELINE_ONLY must not be treated as user-facing
+  explanation cards.

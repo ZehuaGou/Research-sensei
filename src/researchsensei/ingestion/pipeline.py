@@ -327,11 +327,23 @@ class SinglePaperIngestionRunner:
                 "formula_cards": formula_cards,
                 "teaching_cards": teaching_cards,
             }
-            understanding_status = _build_success_status(
-                paper_id,
-                formula_cards=formula_cards,
-                evidence_pack_summary=evidence_pack_summary,
-            )
+            formula_warnings = _formula_derivation_warnings(formula_cards)
+            if formula_warnings:
+                understanding_status = _build_degraded_status(
+                    paper_id,
+                    formula_cards=formula_cards,
+                    evidence_pack_summary=evidence_pack_summary,
+                    warnings=formula_warnings,
+                    blocking_reason="FORMULA_DERIVATION_BLOCKED",
+                    formula_cards_status="FAILED",
+                    teaching_cards_status="SUCCESS",
+                )
+            else:
+                understanding_status = _build_success_status(
+                    paper_id,
+                    formula_cards=formula_cards,
+                    evidence_pack_summary=evidence_pack_summary,
+                )
             return card_artifacts, understanding_status
 
         except Exception as exc:
@@ -517,12 +529,16 @@ def _build_degraded_status(
     formula_cards,
     evidence_pack_summary: EvidencePackSummary,
     warnings: list[WarningItem] | None = None,
+    *,
+    blocking_reason: str = "TEACHING_CARDS_FAILED",
+    formula_cards_status: str | None = None,
+    teaching_cards_status: str = "FAILED",
 ) -> UnderstandingStatus:
-    formula_status = "SKIPPED" if not formula_cards.formula_cards else "SUCCESS"
+    formula_status = formula_cards_status or ("SKIPPED" if not formula_cards.formula_cards else "SUCCESS")
     return UnderstandingStatus(
         paper_id=paper_id,
         status="DEGRADED_STRUCTURAL",
-        blocking_reason="TEACHING_CARDS_FAILED",
+        blocking_reason=blocking_reason,
         warnings=warnings or [],
         allowed_for_user_display=True,
         allowed_downstream=DownstreamGates(
@@ -535,7 +551,7 @@ def _build_degraded_status(
         component_status={
             "paper_card": "SUCCESS",
             "formula_cards": formula_status,
-            "teaching_cards": "FAILED",
+            "teaching_cards": teaching_cards_status,
             "llm": "SUCCESS",
             "evidence_pack": "SUCCESS",
         },
@@ -590,6 +606,28 @@ def _component_status(
 
 def _has_method_evidence(evidence_pack: EvidencePack) -> bool:
     return any(item.claim_type == "METHOD" for item in evidence_pack.items)
+
+
+def _formula_derivation_warnings(formula_cards) -> list[WarningItem]:
+    cards = getattr(formula_cards, "formula_cards", []) or []
+    blocked = [
+        card for card in cards
+        if getattr(card, "derivation_status", "") == "blocked"
+        or getattr(card, "coverage_status", "") == "BLOCKED_RAW_ONLY"
+    ]
+    if not blocked:
+        return []
+    origins = sorted({
+        str(getattr(card, "formula_origin", "") or "unknown")
+        for card in blocked
+    })
+    return [
+        WarningItem(
+            code="FORMULA_DERIVATION_BLOCKED",
+            message="Formula derivation was blocked because formula provenance is raw or unknown.",
+            detail=f"blocked_formula_count={len(blocked)}; formula_origins={','.join(origins)}",
+        )
+    ]
 
 
 def _build_evidence_pack_summary(

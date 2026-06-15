@@ -74,6 +74,36 @@ def test_parse_upload_rejects_unsupported_file_type(tmp_path: Path) -> None:
     assert response.json()["detail"] == "Unsupported file type: .exe"
 
 
+def test_parse_doi_returns_not_implemented_source_status(tmp_path: Path) -> None:
+    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+
+    response = client.post(
+        "/api/v1/documents/parse",
+        data={"title": "Example Paper", "doi": "10.1145/example"},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["job_id"]
+    assert detail["source_status"]["source_type"] == "doi"
+    assert detail["source_status"]["status"] == "rejected"
+    assert "DOI_NOT_IMPLEMENTED" in detail["source_status"]["warnings"]
+
+
+def test_direction_and_seed_endpoints_are_explicitly_not_implemented(tmp_path: Path) -> None:
+    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+
+    direction = client.post("/api/v1/directions/search", json={"query": "time series anomaly detection"})
+    seed = client.post("/api/v1/directions/seed_expansion", json={"query": "time series anomaly detection"})
+
+    assert direction.status_code == 200
+    assert direction.json()["direction_workspace_status"] == "NOT_IMPLEMENTED"
+    assert direction.json()["papers"] == []
+    assert seed.status_code == 200
+    assert seed.json()["seed_expansion_status"] == "NOT_IMPLEMENTED"
+    assert seed.json()["seeds"] == []
+
+
 def test_health_endpoint_is_preserved(tmp_path: Path) -> None:
     client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
 

@@ -143,7 +143,7 @@ M3 must show:
 - `formula_ocr_status`
 - `evidence_status`
 
-Status: PARTIAL_CODE / PAGE_REAL_VALIDATION_MISSING
+Status: PARTIAL_REAL_E2E_VERIFIED (selected-paper SUCCESS + raw-input DEGRADED UI verified)
 
 ### SeedExpansionPanel future APIs
 
@@ -431,6 +431,9 @@ Formula provenance display:
 | test_workspace_shows_formula_origin | formula_origin visible on formula cards |
 | test_workspace_shows_formula_ocr_status | formula_ocr_status visible when present |
 | test_workspace_hides_unknown_formula_derivation | unknown formula origin hides derivation |
+| test_workspace_shows_formula_degraded_message | DEGRADED + formula_cards missing → formula tab shows degradation message |
+| test_workspace_formula_tab_clickable_in_degraded | DEGRADED state keeps formula tab clickable (not disabled) |
+| test_workspace_no_formula_degraded_message_when_blocked | BLOCKED state does not show formula degradation message |
 
 ### M3.4 StatusBanner 测试
 
@@ -443,6 +446,7 @@ Formula provenance display:
 | test_banner_shows_canonical_status | canonicalization_status visible |
 | test_banner_shows_m2_ready | m2_ready visible |
 | test_banner_shows_formula_degradation | formula degradation reason visible |
+| test_banner_shows_raw_formula_degradation | raw input DEGRADED shows formula_origin, formula_ocr_status, component_status.formula_cards=FAILED, degradation_reason |
 
 ### M3.5 Debug/Artifacts 测试
 
@@ -488,7 +492,9 @@ Formula provenance display:
 - StatusBanner 组件（4 种状态）
 - UploadView 对齐 /api/v1/documents/parse
 - LearningWorkspaceView 对齐 /understanding_status + /cards
-- StatusBanner 测试（7 tests）
+- LearningWorkspaceView DEGRADED formula degradation message（formula tab shows controlled degradation when formula_cards missing）
+- StatusBanner 测试（8 tests）
+- LearningWorkspaceView 测试（6 tests，含 DEGRADED formula degradation）
 - API status gating 测试（15 tests）
 - canonical source panel、formula provenance badges、evidence_status display 为 DOC_DESIGNED / NOT_IMPLEMENTED
 

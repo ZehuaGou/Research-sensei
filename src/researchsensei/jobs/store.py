@@ -20,12 +20,12 @@ class JobStore:
 
     def create(self, job: JobRecord) -> JobRecord:
         with self._connect() as conn:
+            values = _to_column_values(job)
+            columns = [column for column in values if column in _table_columns(conn)]
+            placeholders = ",".join("?" for _ in columns)
             conn.execute(
-                """
-                insert into jobs(job_id,status,source_path,run_dir,current_step,error,warnings,artifacts,created_at,updated_at)
-                values(?,?,?,?,?,?,?,?,?,?)
-                """,
-                self._to_row(job),
+                f"insert into jobs({','.join(columns)}) values({placeholders})",
+                tuple(values[column] for column in columns),
             )
         return job
 
@@ -107,6 +107,23 @@ class JobStore:
                 )
                 """
             )
+            self._migrate(conn)
+
+    def _migrate(self, conn: sqlite3.Connection) -> None:
+        columns = {row["name"] for row in conn.execute("pragma table_info(jobs)").fetchall()}
+        required_columns = {
+            "source_path": "text not null default ''",
+            "run_dir": "text not null default ''",
+            "current_step": "text not null default ''",
+            "error": "text not null default ''",
+            "warnings": "text not null default '[]'",
+            "artifacts": "text not null default '[]'",
+            "created_at": "text not null default ''",
+            "updated_at": "text not null default ''",
+        }
+        for column, definition in required_columns.items():
+            if column not in columns:
+                conn.execute(f"alter table jobs add column {column} {definition}")
 
     def _to_row(self, job: JobRecord) -> tuple[str, ...]:
         return (
@@ -145,3 +162,25 @@ def _dump_models(values: list[object]) -> str:
         ],
         ensure_ascii=False,
     )
+
+
+def _table_columns(conn: sqlite3.Connection) -> set[str]:
+    return {row["name"] for row in conn.execute("pragma table_info(jobs)").fetchall()}
+
+
+def _to_column_values(job: JobRecord) -> dict[str, str]:
+    source_name = Path(job.source_path).name if job.source_path else ""
+    return {
+        "job_id": job.job_id,
+        "status": job.status.value,
+        "filename": source_name,
+        "source_pdf": job.source_path,
+        "source_path": job.source_path,
+        "run_dir": job.run_dir,
+        "current_step": job.current_step,
+        "error": job.error,
+        "warnings": _dump_models(job.warnings),
+        "artifacts": _dump_models(job.artifacts),
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+    }

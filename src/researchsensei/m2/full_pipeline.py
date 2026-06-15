@@ -70,8 +70,19 @@ def run_m2_full_pipeline(
     """Run the full M2.1-M2.5 chain from an M1 canonical artifact bundle."""
     started = time.perf_counter()
     reader = M1ArtifactReader(input_dir)
-    bundle = reader.load()
     output = Path(output_dir)
+    try:
+        bundle = reader.load()
+    except FileNotFoundError as exc:
+        return _write_missing_input_result(
+            input_dir=Path(input_dir),
+            output=output,
+            started=started,
+            reason=str(exc),
+            llm_client=llm_client,
+            llm_metadata=llm_metadata or {},
+        )
+
     _reset_output_dir(output)
 
     paper_id = str(bundle.front_matter.get("paper_id") or bundle.paper_metadata.get("paper_id") or bundle.input_dir.name)
@@ -387,19 +398,67 @@ def _preflight_status(
     llm_client: LLMClient | None,
 ) -> UnderstandingStatus | None:
     if bundle.contract.get("status") != "PASS":
-        return _blocked_status(paper_id, "M1_CONTRACT_FAILED", evidence_pack_summary, document.warnings)
+        return _blocked_status(
+            paper_id,
+            "M1_CONTRACT_FAILED",
+            evidence_pack_summary,
+            document.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if not bundle.front_matter.get("m2_ready", False):
-        return _blocked_status(paper_id, "M1_M2_NOT_READY", evidence_pack_summary, document.warnings)
+        return _blocked_status(
+            paper_id,
+            "M1_M2_NOT_READY",
+            evidence_pack_summary,
+            document.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if str(bundle.front_matter.get("canonical_quality_status") or "") == "FAIL":
-        return _blocked_status(paper_id, "M1_CANONICAL_QUALITY_FAIL", evidence_pack_summary, document.warnings)
+        return _blocked_status(
+            paper_id,
+            "M1_CANONICAL_QUALITY_FAIL",
+            evidence_pack_summary,
+            document.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if not passage_index.passages:
-        return _blocked_status(paper_id, "NO_PASSAGES", evidence_pack_summary, passage_index.warnings)
+        return _blocked_status(
+            paper_id,
+            "NO_PASSAGES",
+            evidence_pack_summary,
+            passage_index.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if not claim_evidence.claims:
-        return _blocked_status(paper_id, "NO_CLAIMS", evidence_pack_summary, claim_evidence.warnings)
+        return _blocked_status(
+            paper_id,
+            "NO_CLAIMS",
+            evidence_pack_summary,
+            claim_evidence.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if not evidence_pack.items:
-        return _blocked_status(paper_id, "EMPTY_EVIDENCE_PACK", evidence_pack_summary, evidence_pack.warnings)
+        return _blocked_status(
+            paper_id,
+            "EMPTY_EVIDENCE_PACK",
+            evidence_pack_summary,
+            evidence_pack.warnings,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     if llm_client is not None and not any(item.claim_type == "METHOD" for item in evidence_pack.items):
-        return _blocked_status(paper_id, "MISSING_METHOD_EVIDENCE", evidence_pack_summary)
+        return _blocked_status(
+            paper_id,
+            "MISSING_METHOD_EVIDENCE",
+            evidence_pack_summary,
+            llm_failed=False,
+            llm_status="SKIPPED",
+        )
     return None
 
 
@@ -459,6 +518,17 @@ def _build_llm_cards(
         "formula_cards": formula_cards,
         "teaching_cards": teaching_cards,
     }
+    formula_warnings = _formula_derivation_warnings(formula_cards)
+    if formula_warnings:
+        return card_artifacts, _degraded_status(
+            paper_id,
+            formula_cards,
+            evidence_pack_summary,
+            formula_warnings,
+            blocking_reason="FORMULA_DERIVATION_BLOCKED",
+            formula_cards_status="FAILED",
+            teaching_cards_status="SUCCESS",
+        )
     if str(bundle.front_matter.get("canonical_quality_status") or "") == "DEGRADED" or not formula_ready:
         return card_artifacts, _degraded_status(paper_id, formula_cards, evidence_pack_summary, document_warnings_from_bundle(bundle))
     return card_artifacts, _success_status(paper_id, formula_cards, evidence_pack_summary)
@@ -498,6 +568,8 @@ def _audit_candidate(
         survey_claims=survey_artifacts.get("survey_claims"),
     )
     quality_report = auditor.audit(bundle)
+    if status.status in {"SUCCESS", "DEGRADED_STRUCTURAL"}:
+        status = _with_audit_warnings(status, quality_report)
     if status.status in {"SUCCESS", "DEGRADED_STRUCTURAL"} and any(f.effect == "BLOCK" for f in quality_report.findings):
         status = _blocked_status(
             paper_id,
@@ -600,13 +672,18 @@ def _degraded_status(
     formula_cards: FormulaCardBundle,
     evidence_pack_summary: EvidencePackSummary,
     warnings: list[WarningItem] | None = None,
+    *,
+    blocking_reason: str = "PARTIAL_M2_OUTPUT",
+    formula_cards_status: str | None = None,
+    teaching_cards_status: str | None = None,
 ) -> UnderstandingStatus:
-    formula_status = "SKIPPED" if not formula_cards.formula_cards else "SUCCESS"
+    formula_status = formula_cards_status or ("SKIPPED" if not formula_cards.formula_cards else "SUCCESS")
+    teaching_status = teaching_cards_status or ("FAILED" if warnings else "SUCCESS")
     return UnderstandingStatus(
         schema_version="v2",
         paper_id=paper_id,
         status="DEGRADED_STRUCTURAL",
-        blocking_reason="PARTIAL_M2_OUTPUT",
+        blocking_reason=blocking_reason,
         warnings=warnings or [],
         allowed_for_user_display=True,
         allowed_downstream=DownstreamGates(
@@ -619,7 +696,7 @@ def _degraded_status(
         component_status={
             "paper_card": "SUCCESS",
             "formula_cards": formula_status,
-            "teaching_cards": "FAILED" if warnings else "SUCCESS",
+            "teaching_cards": teaching_status,
             "llm": "SUCCESS",
             "evidence_pack": "SUCCESS",
             "audit": "SUCCESS",
@@ -637,7 +714,10 @@ def _blocked_status(
     *,
     llm_failed: bool = True,
     audit_failed: bool = False,
+    llm_status: str | None = None,
+    checked_artifacts: list[str] | None = None,
 ) -> UnderstandingStatus:
+    llm_component_status = llm_status or ("FAILED" if llm_failed else "SUCCESS")
     return UnderstandingStatus(
         schema_version="v2",
         paper_id=paper_id,
@@ -650,12 +730,135 @@ def _blocked_status(
             "paper_card": "FAILED" if llm_failed else "SKIPPED",
             "formula_cards": "SKIPPED",
             "teaching_cards": "SKIPPED",
-            "llm": "FAILED" if llm_failed else "SUCCESS",
+            "llm": llm_component_status,
             "evidence_pack": "SUCCESS" if evidence_pack_summary else "FAILED",
             "audit": "FAILED" if audit_failed else "SKIPPED",
         },
-        checked_artifacts=_checked_artifacts(include_cards=False),
+        checked_artifacts=checked_artifacts or _checked_artifacts(include_cards=False),
         evidence_pack_summary=evidence_pack_summary,
+    )
+
+
+def _with_audit_warnings(status: UnderstandingStatus, quality_report: QualityReport) -> UnderstandingStatus:
+    warning_items = [
+        WarningItem(
+            code=finding.code,
+            message=finding.message,
+            detail=f"artifact={finding.artifact}; field={finding.field}",
+        )
+        for finding in quality_report.findings
+        if finding.effect == "WARNING"
+    ]
+    if not warning_items:
+        return status
+
+    seen = {(warning.code, warning.message, warning.detail) for warning in status.warnings}
+    merged = list(status.warnings)
+    for warning in warning_items:
+        key = (warning.code, warning.message, warning.detail)
+        if key not in seen:
+            merged.append(warning)
+            seen.add(key)
+    return status.model_copy(update={"warnings": merged})
+
+
+def _formula_derivation_warnings(formula_cards: FormulaCardBundle) -> list[WarningItem]:
+    blocked = [
+        card for card in formula_cards.formula_cards
+        if card.derivation_status == "blocked"
+        or card.coverage_status == "BLOCKED_RAW_ONLY"
+    ]
+    if not blocked:
+        return []
+    origins = sorted({card.formula_origin or "unknown" for card in blocked})
+    return [
+        WarningItem(
+            code="FORMULA_DERIVATION_BLOCKED",
+            message="Formula derivation was blocked because formula provenance is raw or unknown.",
+            detail=f"blocked_formula_count={len(blocked)}; formula_origins={','.join(origins)}",
+        )
+    ]
+
+
+def _write_missing_input_result(
+    *,
+    input_dir: Path,
+    output: Path,
+    started: float,
+    reason: str,
+    llm_client: LLMClient | None,
+    llm_metadata: dict[str, Any],
+) -> M2FullRunResult:
+    _reset_output_dir(output)
+    paper_id = input_dir.name or "unknown"
+    warning = WarningItem(
+        code="M1_ARTIFACT_BUNDLE_INCOMPLETE",
+        message="M1 canonical artifact bundle is incomplete.",
+        detail=reason,
+    )
+    status = _blocked_status(
+        paper_id,
+        "MISSING_CANONICAL_INPUT",
+        None,
+        [warning],
+        llm_failed=False,
+        llm_status="SKIPPED",
+        checked_artifacts=["source_status", "quality_report", "understanding_status"],
+    )
+    source_status = SourceStatus(
+        source_type="m1_canonical_bundle",
+        original_input=str(input_dir),
+        resolved_path=str(input_dir / "canonical_paper.md"),
+        status="error",
+        warnings=[reason],
+        degraded_flags=["M1_ARTIFACT_BUNDLE_INCOMPLETE"],
+        content_type="text/markdown",
+        size_bytes=0,
+    )
+    quality_report = QualityAuditor().audit(ArtifactBundle(understanding_status=_to_dict(status)))
+
+    _write_json(output / "source_status.json", source_status)
+    _write_json(output / "quality_report.json", quality_report)
+    _write_json(output / "understanding_status.json", status)
+    runtime_seconds = round(time.perf_counter() - started, 3)
+    run_summary = {
+        "schema_version": "m2_full_v1",
+        "paper_id": paper_id,
+        "title": "",
+        "input_dir": str(input_dir),
+        "output_dir": str(output),
+        "status": status.status,
+        "blocking_reason": status.blocking_reason,
+        "m1_contract_status": "MISSING",
+        "m1_canonical_quality_status": "",
+        "m1_m2_ready": False,
+        "m1_formula_m2_ready": False,
+        "m1_artifacts_modified": False,
+        "document_block_count": 0,
+        "passage_count": 0,
+        "claim_count": 0,
+        "evidence_pack_count": 0,
+        "formula_evidence_pack_count": 0,
+        "survey_status": "NOT_RUN",
+        "survey_method_family_count": 0,
+        "survey_key_paper_count": 0,
+        "formula_count": 0,
+        "formula_card_count": 0,
+        "formula_card_coverage": {"expected_count": 0, "covered_count": 0, "missing_refs": [], "extra_refs": [], "status": "PASS"},
+        "llm_enabled": llm_client is not None,
+        "llm_metadata": _llm_metadata(llm_client, llm_metadata),
+        "runtime_seconds": runtime_seconds,
+        "output_artifacts": sorted(path.name for path in output.iterdir() if path.is_file()),
+    }
+    _write_json(output / "m2_run_summary.json", run_summary)
+    (output / "m2_full_report.md").write_text(_render_report(run_summary, quality_report, status), encoding="utf-8")
+
+    return M2FullRunResult(
+        paper_id=paper_id,
+        output_dir=output,
+        status=status,
+        quality_report=quality_report,
+        run_summary=run_summary,
     )
 
 

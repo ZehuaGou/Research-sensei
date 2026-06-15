@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -64,3 +65,29 @@ def test_job_store_lists_recent_jobs_sorted_by_created_time(tmp_path: Path) -> N
     jobs = store.list_recent(limit=2)
 
     assert [job.job_id for job in jobs] == ["new", "old"]
+
+
+def test_job_store_migrates_legacy_db_missing_source_path(tmp_path: Path) -> None:
+    db_path = tmp_path / "jobs.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            """
+            create table jobs(
+                job_id text primary key,
+                status text not null,
+                filename text not null,
+                source_pdf text not null,
+                run_dir text not null,
+                current_step text not null,
+                error text not null default '',
+                artifacts text not null default '[]',
+                created_at text not null,
+                updated_at text not null
+            )
+            """
+        )
+
+    store = JobStore(db_path)
+    created = store.create(_job("job-1"))
+
+    assert store.get("job-1") == created

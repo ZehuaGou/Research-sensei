@@ -568,6 +568,74 @@ def test_formula_origin_required_produces_f14() -> None:
     assert any(f.code == "F-14" and f.effect == "BLOCK" for f in report.findings)
 
 
+def test_unknown_formula_origin_with_detailed_derivation_produces_fsa5() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].update({
+        "formula_origin": "unknown",
+        "formula_ocr_status": "not_available",
+        "formula_explanation_status": "degraded",
+        "purpose": "This objective optimizes reconstruction and regularization terms.",
+        "intuition": "The first term fits the input and the second term constrains the model.",
+        "plain_summary": "The formula balances reconstruction fidelity with a penalty.",
+        "confidence": 0.3,
+    })
+
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards=formula_cards,
+        understanding_status=_make_success_status(),
+    ))
+
+    assert any(f.code == "FSA-5" and f.effect == "BLOCK" for f in report.findings)
+
+
+def test_unknown_formula_origin_with_unavailable_explanation_passes_fsa5() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].update({
+        "formula_origin": "unknown",
+        "formula_ocr_status": "not_available",
+        "formula_explanation_status": "degraded",
+        "coverage_status": "BLOCKED_RAW_ONLY",
+        "derivation_status": "blocked",
+        "purpose": "INSUFFICIENT_EVIDENCE: formula provenance is unknown.",
+        "symbols": [],
+        "terms": [],
+        "intuition": "INSUFFICIENT_EVIDENCE",
+        "numeric_example": "INSUFFICIENT_EVIDENCE",
+        "plain_summary": "INSUFFICIENT_EVIDENCE: detailed formula explanation unavailable.",
+        "confidence": 0.0,
+    })
+
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards=formula_cards,
+        understanding_status=_make_success_status(),
+    ))
+
+    assert not any(f.code == "FSA-5" for f in report.findings)
+
+
+def test_parser_formula_origin_with_evidence_ref_allows_detailed_explanation() -> None:
+    formula_cards = _make_formula_cards()
+    formula_cards["formula_cards"][0].update({
+        "formula_origin": "parser_latex",
+        "formula_ocr_status": "not_required",
+        "formula_explanation_status": "parser_derived",
+        "purpose": "The parser-derived equation defines the model objective.",
+        "intuition": "It combines the terms described in the formula evidence.",
+        "plain_summary": "This formula summarizes the objective.",
+        "confidence": 0.6,
+    })
+
+    report = QualityAuditor().audit(ArtifactBundle(
+        formula_cards=formula_cards,
+        evidence_index=_make_evidence_index(),
+        claim_evidence=_make_claim_evidence(),
+        understanding_status=_make_success_status(),
+    ))
+
+    assert not any(f.code == "FSA-5" for f in report.findings)
+    assert not any(f.effect == "BLOCK" for f in report.findings)
+
+
 def test_ocr_formula_high_confidence_without_warning_produces_f15() -> None:
     formula_cards = _make_formula_cards()
     formula_cards["formula_cards"][0].update({

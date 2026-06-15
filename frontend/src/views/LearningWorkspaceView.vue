@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLearningStore } from '../stores/learning'
 import AskPanel from '../components/layout/AskPanel.vue'
@@ -14,43 +14,65 @@ const store = useLearningStore()
 const jobId = route.params.jobId as string
 
 const understandingStatus = ref<any>(null)
-const cards = ref<any>(null)
+const paperWorkspaceStatus = ref<Record<string, any>>({})
+const cards = ref<Record<string, any> | null>(null)
 const degraded = ref(false)
 const missingComponents = ref<string[]>([])
 const isLoading = ref(true)
 const error = ref('')
-const activeTab = ref<'cards' | 'formulas' | 'patterns' | 'drill'>('cards')
-
-const tabs = [
-  { key: 'cards' as const, label: '论文卡片', icon: '📖' },
-  { key: 'formulas' as const, label: '公式卡片', icon: '🔢' },
-  { key: 'patterns' as const, label: '科研模式', icon: '🧩', disabled: true },
-  { key: 'drill' as const, label: '训练题', icon: '🎯', disabled: true },
-]
+const activeTab = ref<'paper' | 'formulas' | 'teaching'>('paper')
 
 const status = computed(() => understandingStatus.value?.status || '')
 const canShowCards = computed(() => ['SUCCESS', 'DEGRADED_STRUCTURAL'].includes(status.value))
 const paperCard = computed(() => cards.value?.paper_card || null)
+const teachingCards = computed(() => cards.value?.teaching_cards?.teaching_cards || [])
 const formulaCardsList = computed(() => {
-  const fc = cards.value?.formula_cards
-  if (!fc) return []
-  if (Array.isArray(fc)) return fc
-  if (fc.formula_cards && Array.isArray(fc.formula_cards)) return fc.formula_cards
+  const bundle = cards.value?.formula_cards
+  if (!bundle) return []
+  if (Array.isArray(bundle)) return bundle
+  if (Array.isArray(bundle.formula_cards)) return bundle.formula_cards
   return []
 })
 
-function normalizeFormulaCard(card: any): any {
-  if (!card) return card
-  return {
-    ...card,
-    formula_latex: card.formula_latex || card.formula_raw || '',
-    problem: card.problem || card.purpose || card.intuition || '公式说明',
-    formula_ref: card.formula_ref || card.location || card.formula_id || '',
-    remove_effect: card.remove_effect || card.what_if_removed || '',
-    weight_change_effect: card.weight_change_effect || card.weight_sensitivity || '',
-    plain_summary: card.plain_summary || card.intuition || '',
-  }
-}
+const statusRows = computed(() => {
+  const details = paperWorkspaceStatus.value || {}
+  const rows: Array<[string, any]> = [
+    ['blocking_reason', understandingStatus.value?.blocking_reason],
+    ['source_type', details.source_type],
+    ['verification_status', details.verification_status],
+    ['pdf_metadata_check', details.pdf_metadata_check],
+    ['pdf_title_match', details.pdf_title_match],
+    ['can_enter_m2', details.can_enter_m2],
+    ['source_confidence', details.source_confidence],
+    ['canonicalization_status', details.canonicalization_status],
+    ['m2_ready', details.m2_ready],
+    ['degradation_reason', details.degradation_reason],
+    ['formula_origin', details.formula_origin],
+    ['formula_ocr_status', details.formula_ocr_status],
+    ['evidence_status', details.evidence_status],
+    ['quality_status', details.quality_status],
+  ]
+  Object.entries(understandingStatus.value?.component_status || {}).forEach(([key, value]) => {
+    rows.push([`component_status.${key}`, value])
+  })
+  Object.entries(understandingStatus.value?.allowed_downstream || {}).forEach(([key, value]) => {
+    rows.push([`allowed_downstream.${key}`, value])
+  })
+  return rows.filter(([, value]) => value !== undefined && value !== null && value !== '')
+})
+
+const formulaTabDisabled = computed(() => {
+  if (formulaCardsList.value.length > 0) return false
+  // In DEGRADED state, keep tab clickable so user can see degradation message
+  if (status.value === 'DEGRADED_STRUCTURAL') return false
+  return true
+})
+
+const tabs = computed(() => [
+  { key: 'paper' as const, label: 'Paper', disabled: !paperCard.value },
+  { key: 'formulas' as const, label: 'Formulas', disabled: formulaTabDisabled.value },
+  { key: 'teaching' as const, label: 'Teaching', disabled: teachingCards.value.length === 0 },
+])
 
 function normalizePaperCard(card: any): any {
   if (!card) return null
@@ -61,9 +83,9 @@ function normalizePaperCard(card: any): any {
       card.problem?.text,
       card.core_idea?.text,
       card.method_overview?.text,
-    ].filter(Boolean).join('。') + '。',
+    ].filter(Boolean).join(' '),
     deep_dive: card.experiment_summary?.text || '',
-    evidence_status: card.evidence_status || 'UNKNOWN',
+    evidence_status: card.evidence_status || paperWorkspaceStatus.value.evidence_status || 'UNKNOWN',
   }
 }
 
@@ -75,156 +97,211 @@ function normalizeSkeleton(card: any): any {
   }
 }
 
-onMounted(async () => {
-  store.currentJobId = jobId
+function normalizeFormulaCard(card: any): any {
+  if (!card) return card
+  return {
+    ...card,
+    formula_latex: card.formula_latex || card.formula_raw || '',
+    problem: card.problem || card.purpose || card.intuition || 'Formula explanation',
+    formula_ref: card.formula_ref || card.location || card.formula_id || '',
+    remove_effect: card.remove_effect || card.what_if_removed || '',
+    weight_change_effect: card.weight_change_effect || card.weight_sensitivity || '',
+    plain_summary: card.plain_summary || card.intuition || '',
+  }
+}
+
+async function loadWorkspace() {
+  isLoading.value = true
+  error.value = ''
   try {
-    // Step 1: Get understanding status
     const statusRes = await fetch(`/api/v1/jobs/${jobId}/understanding_status`)
     if (!statusRes.ok) {
-      if (statusRes.status === 404) {
-        error.value = '分析结果不存在，该论文可能尚未完成分析'
-      } else {
-        error.value = '状态加载失败'
-      }
+      error.value = statusRes.status === 404 ? 'Analysis result not found.' : 'Failed to load understanding status.'
       return
     }
-    understandingStatus.value = (await statusRes.json()).understanding_status
 
-    // Step 2: Get cards if status allows
-    if (canShowCards.value) {
-      const cardsRes = await fetch(`/api/v1/jobs/${jobId}/cards`)
-      if (cardsRes.ok) {
-        const cardsData = await cardsRes.json()
-        cards.value = cardsData.cards
-        degraded.value = cardsData.degraded || false
-        missingComponents.value = cardsData.missing_components || []
-      } else if (cardsRes.status === 409) {
-        error.value = '卡片状态不一致，请重新分析'
-      } else if (cardsRes.status === 403) {
-        const detail = await cardsRes.json().catch(() => ({}))
-        understandingStatus.value = {
-          ...understandingStatus.value,
-          status: detail.detail?.status || status.value,
-          blocking_reason: detail.detail?.blocking_reason || '',
-        }
+    const statusData = await statusRes.json()
+    understandingStatus.value = statusData.understanding_status
+    paperWorkspaceStatus.value = statusData.paper_workspace_status || {}
+
+    if (!canShowCards.value) return
+
+    const cardsRes = await fetch(`/api/v1/jobs/${jobId}/cards`)
+    if (cardsRes.ok) {
+      const cardsData = await cardsRes.json()
+      cards.value = cardsData.cards
+      paperWorkspaceStatus.value = {
+        ...paperWorkspaceStatus.value,
+        ...(cardsData.paper_workspace_status || {}),
+      }
+      degraded.value = Boolean(cardsData.degraded)
+      missingComponents.value = cardsData.missing_components || []
+      return
+    }
+
+    if (cardsRes.status === 409) {
+      const detail = await cardsRes.json().catch(() => ({}))
+      error.value = detail.detail?.message || 'Card artifacts do not match understanding status.'
+      return
+    }
+
+    if (cardsRes.status === 403) {
+      const detail = await cardsRes.json().catch(() => ({}))
+      understandingStatus.value = {
+        ...understandingStatus.value,
+        status: detail.detail?.status || status.value,
+        blocking_reason: detail.detail?.blocking_reason || understandingStatus.value?.blocking_reason || '',
+        warnings: detail.detail?.warnings || understandingStatus.value?.warnings || [],
       }
     }
   } catch {
-    error.value = '网络错误，请稍后重试'
+    error.value = 'Network error while loading the workspace.'
   } finally {
     isLoading.value = false
   }
+}
+
+onMounted(() => {
+  store.currentJobId = jobId
+  void loadWorkspace()
 })
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-56px)]">
-    <!-- Sidebar -->
-    <aside class="w-56 flex-shrink-0 border-r flex flex-col" style="border-color: var(--border-subtle); background: var(--bg-secondary);">
-      <div class="p-4">
-        <div class="text-[11px] font-semibold uppercase tracking-wider mb-3" style="color: var(--text-muted);">学习模块</div>
-        <nav class="space-y-0.5">
-          <button v-for="tab in tabs" :key="tab.key"
-            @click="!tab.disabled && (activeTab = tab.key)"
-            class="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all"
-            :class="tab.disabled ? 'opacity-40 cursor-not-allowed' : ''"
-            :style="activeTab === tab.key && !tab.disabled
-              ? 'background: var(--accent-light); color: var(--accent);'
-              : 'color: var(--text-secondary);'"
-          >
-            <span class="text-base">{{ tab.icon }}</span>
-            {{ tab.label }}
-            <span v-if="tab.disabled" class="ml-auto text-[10px]" style="color: var(--text-muted);">未开放</span>
-          </button>
-        </nav>
-      </div>
-
-      <div v-if="understandingStatus" class="mt-auto p-4 border-t" style="border-color: var(--border-subtle);">
-        <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">分析状态</div>
-        <div class="text-xs" style="color: var(--text-secondary);">
-          {{ status }}
-        </div>
+  <div class="flex min-h-[calc(100vh-56px)]">
+    <aside class="w-64 flex-shrink-0 border-r p-4" style="border-color: var(--border-subtle); background: var(--bg-secondary);">
+      <div class="text-[11px] font-semibold uppercase mb-3" style="color: var(--text-muted);">PaperWorkspace</div>
+      <nav class="space-y-1">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          :disabled="tab.disabled"
+          class="w-full text-left px-3 py-2 rounded-md text-[13px] font-medium disabled:opacity-40"
+          :style="activeTab === tab.key ? 'background: var(--accent-light); color: var(--accent);' : 'color: var(--text-secondary);'"
+          @click="activeTab = tab.key"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
+      <div v-if="understandingStatus" class="mt-6 text-xs space-y-1" style="color: var(--text-secondary);">
+        <div>Status: {{ status }}</div>
+        <div v-if="degraded">Degraded: true</div>
       </div>
     </aside>
 
-    <!-- Main Content -->
     <main class="flex-1 overflow-y-auto">
-      <div class="max-w-2xl mx-auto px-8 py-10">
-        <div v-if="isLoading" class="flex items-center justify-center py-32">
-          <div class="text-sm" style="color: var(--text-muted);">加载中...</div>
-        </div>
+      <div class="max-w-3xl mx-auto px-8 py-10">
+        <div v-if="isLoading" class="py-24 text-sm" style="color: var(--text-muted);">Loading workspace...</div>
 
-        <div v-else-if="error" class="flex flex-col items-center justify-center py-32">
-          <div class="text-4xl mb-4">😔</div>
-          <div class="text-sm font-medium mb-2" style="color: var(--text-primary);">{{ error }}</div>
-          <button @click="router.push('/')"
-            class="mt-4 px-4 py-2 rounded-xl text-[13px] font-medium transition-all hover:scale-105"
-            style="background: var(--accent-light); color: var(--accent);">
-            返回首页
+        <div v-else-if="error" class="py-24">
+          <div class="text-sm font-medium mb-4" style="color: #ef4444;">{{ error }}</div>
+          <button
+            class="px-4 py-2 rounded-md text-[13px] font-medium"
+            style="background: var(--accent-light); color: var(--accent);"
+            @click="router.push('/')"
+          >
+            Back
           </button>
         </div>
 
         <div v-else>
-          <!-- Status Banner -->
           <StatusBanner
             :status="status"
             :blockingReason="understandingStatus?.blocking_reason"
             :warnings="understandingStatus?.warnings"
             :missingComponents="missingComponents"
+            :paperWorkspaceStatus="paperWorkspaceStatus"
+            :componentStatus="understandingStatus?.component_status"
+            :allowedDownstream="understandingStatus?.allowed_downstream"
           />
 
-          <!-- Cards Content -->
-          <div v-if="canShowCards" class="space-y-6">
-            <template v-if="activeTab === 'cards'">
-              <PaperCard v-if="paperCard" :card="normalizePaperCard(paperCard)" :skeleton="normalizeSkeleton(paperCard)" />
-              <div v-else class="text-center py-20">
-                <div class="text-3xl mb-3">📖</div>
-                <div class="text-sm" style="color: var(--text-muted);">暂无论文卡片</div>
+          <section class="mb-6">
+            <div class="text-xs font-semibold uppercase mb-2" style="color: var(--text-muted);">Status Details</div>
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div
+                v-for="[label, value] in statusRows"
+                :key="String(label)"
+                class="rounded-md px-3 py-2"
+                style="background: var(--bg-card); border: 1px solid var(--border-subtle);"
+              >
+                <dt class="text-[11px] font-semibold" style="color: var(--text-muted);">{{ label }}</dt>
+                <dd class="text-xs break-words" style="color: var(--text-primary);">{{ String(value) }}</dd>
               </div>
-            </template>
-            <template v-else-if="activeTab === 'formulas'">
-              <FormulaCard v-for="(fc, i) in formulaCardsList" :key="i" :card="normalizeFormulaCard(fc)" />
-              <div v-if="!formulaCardsList.length" class="text-center py-20">
-                <div class="text-3xl mb-3">🔢</div>
-                <div class="text-sm" style="color: var(--text-muted);">暂无公式卡片</div>
-              </div>
-            </template>
-            <template v-else-if="activeTab === 'patterns'">
-              <div class="text-center py-20">
-                <div class="text-3xl mb-3">🧩</div>
-                <div class="text-sm" style="color: var(--text-muted);">Phase 12 尚未开放</div>
-              </div>
-            </template>
-            <template v-else-if="activeTab === 'drill'">
-              <div class="text-center py-20">
-                <div class="text-3xl mb-3">🎯</div>
-                <div class="text-sm" style="color: var(--text-muted);">Phase 12 尚未开放</div>
-              </div>
-            </template>
-          </div>
+            </dl>
+          </section>
 
-          <!-- Non-card status: show nothing more, banner already shown -->
-          <div v-else class="text-center py-20">
-            <button @click="router.push('/')"
-              class="mt-4 px-4 py-2 rounded-xl text-[13px] font-medium transition-all hover:scale-105"
-              style="background: var(--accent-light); color: var(--accent);">
-              返回首页
-            </button>
-          </div>
+          <section v-if="canShowCards" class="space-y-6">
+            <PaperCard
+              v-if="activeTab === 'paper' && paperCard"
+              :card="normalizePaperCard(paperCard)"
+              :skeleton="normalizeSkeleton(paperCard)"
+            />
+
+            <template v-else-if="activeTab === 'formulas'">
+              <template v-if="formulaCardsList.length > 0">
+                <FormulaCard
+                  v-for="formula in formulaCardsList"
+                  :key="formula.formula_id || formula.evidence_ref"
+                  :card="normalizeFormulaCard(formula)"
+                />
+              </template>
+              <div
+                v-else-if="status === 'DEGRADED_STRUCTURAL'"
+                class="rounded-lg p-6 text-center"
+                style="background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.15);"
+                data-testid="formula-degraded-message"
+              >
+                <div class="text-sm font-semibold mb-2" style="color: #6366f1;">公式推导不可用</div>
+                <p class="text-xs leading-relaxed" style="color: var(--text-secondary);">
+                  公式推导因来源不可靠被阻断（{{ paperWorkspaceStatus.degradation_reason || 'FORMULA_DERIVATION_BLOCKED' }}）。
+                  公式来源为 raw_formula_text，无法生成可信的详细公式讲解。
+                </p>
+                <div v-if="paperWorkspaceStatus.formula_origin" class="text-[11px] mt-3" style="color: var(--text-muted);">
+                  formula_origin: {{ paperWorkspaceStatus.formula_origin }}
+                </div>
+                <div v-if="paperWorkspaceStatus.formula_ocr_status" class="text-[11px]" style="color: var(--text-muted);">
+                  formula_ocr_status: {{ paperWorkspaceStatus.formula_ocr_status }}
+                </div>
+              </div>
+            </template>
+
+            <div
+              v-else-if="activeTab === 'teaching'"
+              class="space-y-3"
+              data-testid="teaching-cards"
+            >
+              <article
+                v-for="card in teachingCards"
+                :key="card.card_id || card.title"
+                class="rounded-lg p-4"
+                style="background: var(--bg-card); border: 1px solid var(--border);"
+              >
+                <div class="text-sm font-semibold mb-2" style="color: var(--text-primary);">{{ card.title || card.target_type }}</div>
+                <p class="text-sm leading-relaxed" style="color: var(--text-secondary);">{{ card.human_explanation }}</p>
+                <div class="text-[11px] mt-3" style="color: var(--text-muted);">
+                  evidence_ref: {{ card.evidence_refs?.join(', ') || card.evidence_ref || 'none' }}
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section v-else class="py-12 text-sm" style="color: var(--text-secondary);" data-testid="no-cards-state">
+            No user-facing cards are available for this status.
+          </section>
         </div>
       </div>
     </main>
 
-    <!-- Ask Panel -->
     <Transition name="slide-right">
-      <aside v-if="store.isAskPanelOpen"
+      <aside
+        v-if="store.isAskPanelOpen"
         class="w-80 flex-shrink-0 border-l hidden lg:flex flex-col"
-        style="border-color: var(--border-subtle);">
+        style="border-color: var(--border-subtle);"
+      >
         <AskPanel />
       </aside>
     </Transition>
 
-    <!-- Text Selection Toolbar -->
     <TextSelectionToolbar />
   </div>
 </template>

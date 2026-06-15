@@ -32,8 +32,17 @@ async function renderFormula() {
         <span v-if="card.evidence_status" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(16,185,129,0.08); color: #10b981;">
           {{ card.evidence_status }}
         </span>
+        <span v-if="card.formula_origin" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(99,102,241,0.08); color: #6366f1;">
+          origin: {{ card.formula_origin }}
+        </span>
+        <span v-if="card.formula_ocr_status" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(245,158,11,0.08); color: #b45309;">
+          OCR: {{ card.formula_ocr_status }}
+        </span>
       </div>
       <div class="text-sm font-medium" style="color: var(--text-primary);">{{ card.problem }}</div>
+      <div v-if="card.evidence_ref" class="text-[11px] mt-1" style="color: var(--text-muted);">
+        evidence_ref: {{ card.evidence_ref }}
+      </div>
       <div class="text-[11px] mt-1" style="color: var(--text-muted);">§ {{ card.formula_ref }}</div>
     </div>
 

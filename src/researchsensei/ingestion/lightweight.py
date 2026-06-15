@@ -119,14 +119,22 @@ class LightweightIngestionService:
             if formula_match:
                 formula_count += 1
                 block_id = f"eq{formula_count:03d}"
+                formula_text = formula_match.group("formula").strip()
                 blocks.append(
                     DocumentBlock(
                         block_id=block_id,
                         type=BlockType.FORMULA,
                         section=current_section,
-                        text=formula_match.group("formula").strip(),
-                        raw_latex=formula_match.group("formula").strip(),
+                        text=formula_text,
+                        raw_latex=formula_text,
                         evidence_ref=f"{paper_id}:{block_id}",
+                        formula_id=f"raw_formula_{formula_count:03d}",
+                        formula_latex=formula_text,
+                        formula_origin="raw_formula_text",
+                        formula_ocr_status="not_available",
+                        formula_explanation_status="degraded",
+                        risk_flags=["RAW_FORMULA_TEXT"],
+                        parse_quality_status="raw_text_formula",
                     )
                 )
             paragraph_count += 1

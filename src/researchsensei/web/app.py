@@ -7,9 +7,13 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 
+from researchsensei.core.config import ConfigService
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
+from researchsensei.llm.client import LLMClient
+from researchsensei.llm.types import LLMConfig
 from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.source_resolver import SourceResolver
 from researchsensei.workspace import WorkspaceStore
@@ -28,11 +32,26 @@ def create_app(
     allowed_local_roots: list[str | Path] | None = None,
     http_client: httpx.Client | None = None,
     max_download_bytes: int = 80 * 1024 * 1024,
+    llm_client: LLMClient | None = None,
+    enable_configured_llm: bool | None = None,
+    llm_provider: str = "",
+    llm_config: LLMConfig | None = None,
+    config_service: ConfigService | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ResearchSensei", version="0.5.0")
     workspace = WorkspaceStore(workspace_root)
     jobs = JobStore(job_db_path or (workspace.root / "sensei.sqlite3"))
-    runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
+    resolved_llm_client = llm_client or _configured_llm_client(
+        enable_configured_llm=enable_configured_llm,
+        provider_name=llm_provider,
+        llm_config=llm_config,
+        config_service=config_service,
+    )
+    runner = SinglePaperIngestionRunner(
+        workspace=workspace,
+        jobs=jobs,
+        llm_client=resolved_llm_client,
+    )
     resolver = SourceResolver(
         allowed_roots=allowed_local_roots if allowed_local_roots is not None else [workspace.root],
         http_client=http_client,
@@ -46,6 +65,8 @@ def create_app(
     @app.post("/api/v1/documents/parse")
     async def parse_document(
         file: UploadFile | None = File(None),
+        title: str = Form(""),
+        doi: str = Form(""),
         local_path: str = Form(""),
         pdf_url: str = Form(""),
         arxiv_id: str = Form(""),
@@ -65,13 +86,30 @@ def create_app(
                 original_filename=file.filename,
                 content_type=file.content_type or "",
             )
-            job = runner.run(incoming_path, job_id=job_id, source_status=source_status)
+            job = await run_in_threadpool(
+                runner.run,
+                incoming_path,
+                job_id=job_id,
+                source_status=source_status,
+            )
             return _job_parse_response(job)
 
         run_dir = workspace.new_run_dir(job_id)
+        if local_path.strip():
+            m2_artifact_job = _try_register_m2_artifact_job(
+                resolver=resolver,
+                jobs=jobs,
+                job_id=job_id,
+                artifact_dir_text=local_path.strip(),
+            )
+            if m2_artifact_job is not None:
+                return _job_parse_response(m2_artifact_job)
+
         source_status = _resolve_source(
             resolver=resolver,
             run_dir=run_dir,
+            title=title,
+            doi=doi,
             local_path=local_path,
             pdf_url=pdf_url,
             arxiv_id=arxiv_id,
@@ -87,7 +125,12 @@ def create_app(
                 },
             )
 
-        job = runner.run(source_status.resolved_path, job_id=job_id, source_status=source_status)
+        job = await run_in_threadpool(
+            runner.run,
+            source_status.resolved_path,
+            job_id=job_id,
+            source_status=source_status,
+        )
         return _job_parse_response(job)
 
     @app.get("/api/v1/jobs")
@@ -129,7 +172,11 @@ def create_app(
             raise HTTPException(status_code=404, detail="understanding_status not found.")
 
         content = _read_artifact_content(job, artifact.path)
-        return {"job_id": job.job_id, "understanding_status": content}
+        return {
+            "job_id": job.job_id,
+            "understanding_status": content,
+            "paper_workspace_status": _paper_workspace_status(job, content),
+        }
 
     @app.get("/api/v1/jobs/{job_id}/cards")
     def get_cards(job_id: str) -> dict[str, object]:
@@ -146,6 +193,10 @@ def create_app(
         status_content = _read_artifact_content(job, us_artifact.path)
         status = status_content.get("status", "")
         blocking_reason = status_content.get("blocking_reason", "")
+        paper_workspace_status = _paper_workspace_status(job, status_content)
+        component_status = status_content.get("component_status", {})
+        if not isinstance(component_status, dict):
+            component_status = {}
 
         # Gating by status
         if status == "BASELINE_ONLY":
@@ -164,7 +215,7 @@ def create_app(
                 detail={
                     "status": "BLOCKED_UNDERSTANDING",
                     "blocking_reason": blocking_reason,
-                    "warnings": [w.model_dump(mode="json") for w in job.warnings],
+                    "warnings": status_content.get("warnings", []),
                 },
             )
 
@@ -184,10 +235,18 @@ def create_app(
 
         for card_type in card_types:
             artifact = _find_artifact(job, card_type)
+            if status == "DEGRADED_STRUCTURAL":
+                status_for_component = str(component_status.get(card_type) or "").upper()
+                if status_for_component and status_for_component != "SUCCESS":
+                    if status_for_component != "SKIPPED":
+                        missing.append(card_type)
+                    continue
             if artifact is not None:
                 cards[card_type] = _read_artifact_content(job, artifact.path)
             else:
-                missing.append(card_type)
+                status_for_component = str(component_status.get(card_type) or "").upper()
+                if status_for_component != "SKIPPED":
+                    missing.append(card_type)
 
         # SUCCESS requires all cards
         if status == "SUCCESS" and missing:
@@ -202,7 +261,10 @@ def create_app(
 
         # DEGRADED requires paper_card + formula_cards; teaching_cards may be missing
         if status == "DEGRADED_STRUCTURAL":
-            required_missing = [m for m in missing if m != "teaching_cards"]
+            required_missing = [
+                m for m in missing
+                if _degraded_missing_component_is_required(m, component_status)
+            ]
             if required_missing:
                 raise HTTPException(
                     status_code=409,
@@ -216,6 +278,7 @@ def create_app(
         result: dict[str, object] = {
             "job_id": job.job_id,
             "status": status,
+            "paper_workspace_status": paper_workspace_status,
             "cards": cards,
         }
 
@@ -225,7 +288,186 @@ def create_app(
 
         return result
 
+    @app.post("/api/v1/directions/search")
+    def search_direction(payload: dict[str, object]) -> dict[str, object]:
+        query = str(payload.get("query") or "")
+        return {
+            "status": "NOT_IMPLEMENTED",
+            "direction_workspace_status": "NOT_IMPLEMENTED",
+            "query": query,
+            "message": "DirectionWorkspace backend is not implemented yet.",
+            "seed_expansion_status": "NOT_IMPLEMENTED",
+            "papers": [],
+            "warnings": [
+                {
+                    "code": "DIRECTION_WORKSPACE_NOT_IMPLEMENTED",
+                    "message": "Direction search is intentionally not faked.",
+                }
+            ],
+        }
+
+    @app.post("/api/v1/directions/seed_expansion")
+    def seed_expansion(payload: dict[str, object]) -> dict[str, object]:
+        query = str(payload.get("query") or "")
+        return {
+            "status": "NOT_IMPLEMENTED",
+            "seed_expansion_status": "NOT_IMPLEMENTED",
+            "query": query,
+            "seeds": [],
+            "warnings": [
+                {
+                    "code": "SEED_EXPANSION_NOT_IMPLEMENTED",
+                    "message": "Seed expansion backend is intentionally not faked.",
+                }
+            ],
+        }
+
     return app
+
+
+M2_ARTIFACT_TYPES = {
+    "source_status.json": "source_status",
+    "canonical_status.json": "canonical_status",
+    "parsed_document.json": "parsed_document",
+    "passage_index.json": "passage_index",
+    "claim_evidence.json": "claim_evidence",
+    "evidence_index.json": "evidence_index",
+    "paper_skeleton.json": "paper_skeleton",
+    "evidence_pack.json": "evidence_pack",
+    "formula_evidence_pack.json": "formula_evidence_pack",
+    "survey_status.json": "survey_status",
+    "survey_landscape.json": "survey_landscape",
+    "method_taxonomy.json": "method_taxonomy",
+    "extracted_key_papers.json": "extracted_key_papers",
+    "survey_claims.json": "survey_claims",
+    "paper_card.json": "paper_card",
+    "formula_cards.json": "formula_cards",
+    "teaching_cards.json": "teaching_cards",
+    "quality_report.json": "quality_report",
+    "understanding_status.json": "understanding_status",
+    "m2_run_summary.json": "m2_run_summary",
+    "m2_full_report.md": "m2_full_report",
+}
+
+
+def _try_register_m2_artifact_job(
+    *,
+    resolver: SourceResolver,
+    jobs: JobStore,
+    job_id: str,
+    artifact_dir_text: str,
+) -> JobRecord | None:
+    try:
+        artifact_dir = Path(artifact_dir_text).resolve(strict=True)
+    except OSError:
+        return None
+    if not artifact_dir.is_dir() or not _looks_like_m2_artifact_dir(artifact_dir):
+        return None
+    if not resolver._is_allowed(artifact_dir):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "job_id": job_id,
+                "source_status": SourceStatus(
+                    source_type="m2_artifact_dir",
+                    original_input=artifact_dir_text,
+                    status="rejected",
+                    warnings=["SECURITY_REJECTED"],
+                    degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
+                ).model_dump(mode="json"),
+            },
+        )
+
+    artifacts = [
+        WorkspaceArtifact(artifact_type=artifact_type, path=str(artifact_dir / filename))
+        for filename, artifact_type in M2_ARTIFACT_TYPES.items()
+        if (artifact_dir / filename).exists()
+    ]
+    status_content = _read_json_file(artifact_dir / "understanding_status.json")
+    source_status = _read_json_file(artifact_dir / "source_status.json")
+    warnings = [
+        WarningItem(code="M2_ARTIFACT_JOB", message="Registered existing M2 artifact run for PaperWorkspace display.")
+    ]
+    for warning in status_content.get("warnings", []):
+        if isinstance(warning, dict):
+            warnings.append(WarningItem(
+                code=str(warning.get("code") or "M2_WARNING"),
+                message=str(warning.get("message") or ""),
+                detail=str(warning.get("detail") or ""),
+            ))
+
+    return jobs.create(JobRecord(
+        job_id=job_id,
+        source_path=str(source_status.get("resolved_path") or artifact_dir),
+        run_dir=str(artifact_dir),
+        status=JobStatus.SUCCEEDED,
+        current_step="m2_artifacts_registered",
+        warnings=warnings,
+        artifacts=artifacts,
+    ))
+
+
+def _looks_like_m2_artifact_dir(path: Path) -> bool:
+    return (path / "understanding_status.json").exists() and (
+        (path / "m2_run_summary.json").exists()
+        or (path / "paper_card.json").exists()
+        or (path / "quality_report.json").exists()
+    )
+
+
+def _read_json_file(path: Path) -> dict[str, object]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _configured_llm_client(
+    *,
+    enable_configured_llm: bool | None,
+    provider_name: str,
+    llm_config: LLMConfig | None,
+    config_service: ConfigService | None,
+) -> LLMClient | None:
+    """Build the real API LLM client only when explicitly enabled."""
+    enabled = (
+        _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM")
+        if enable_configured_llm is None
+        else enable_configured_llm
+    )
+    if not enabled:
+        return None
+
+    service = config_service or ConfigService()
+    config = service.load()
+    actual_provider = provider_name or os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider
+    if actual_provider not in config.providers:
+        raise RuntimeError(f"Unknown LLM provider for API: {actual_provider}")
+
+    provider = config.providers[actual_provider]
+    if provider.api_key_env and not os.getenv(provider.api_key_env, ""):
+        raise RuntimeError(provider.missing_api_key_message())
+
+    runtime_config = llm_config or LLMConfig(
+        temperature=0.2,
+        max_tokens=2400,
+        json_mode=True,
+        timeout=float(provider.timeout_seconds or 60),
+        max_retries=0,
+    )
+    return LLMClient(provider, config=runtime_config)
+
+
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
+
+
+def _degraded_missing_component_is_required(component: str, component_status: dict[str, object]) -> bool:
+    status = str(component_status.get(component) or "").upper()
+    if status:
+        return status == "SUCCESS"
+    return component in {"paper_card", "formula_cards"}
 
 
 def _find_artifact(job: JobRecord, artifact_type: str) -> WorkspaceArtifact | None:
@@ -233,6 +475,116 @@ def _find_artifact(job: JobRecord, artifact_type: str) -> WorkspaceArtifact | No
         if artifact.artifact_type == artifact_type:
             return artifact
     return None
+
+
+def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dict[str, object]:
+    status_content = understanding_status if isinstance(understanding_status, dict) else {}
+    source_status = _artifact_content_dict(job, "source_status")
+    canonical_status = _artifact_content_dict(job, "canonical_status")
+    claim_evidence = _artifact_content_dict(job, "claim_evidence")
+    passage_index = _artifact_content_dict(job, "passage_index")
+    quality_report = _artifact_content_dict(job, "quality_report")
+    formula_origin, formula_ocr_status = _formula_status_summary(
+        claim_evidence=claim_evidence,
+        passage_index=passage_index,
+    )
+    component_status = status_content.get("component_status", {})
+    source_type = str(source_status.get("source_type", "unknown"))
+    source_resolved = source_status.get("status") == "resolved"
+    m2_ready = canonical_status.get("m2_ready")
+    return {
+        "source_type": source_type,
+        "source_status": source_status.get("status", "unknown"),
+        "verification_status": "verified" if source_resolved else "unverified",
+        "pdf_metadata_check": source_status.get("pdf_metadata_check", "not_available"),
+        "pdf_title_match": source_status.get("pdf_title_match", "not_available"),
+        "can_enter_m2": bool(m2_ready) if m2_ready is not None else source_resolved,
+        "source_confidence": 1.0 if source_resolved else 0.0,
+        "canonicalization_status": canonical_status.get("canonicalization_status", "not_available"),
+        "m2_ready": m2_ready,
+        "degradation_reason": (
+            canonical_status.get("degradation_reason")
+            or "; ".join(source_status.get("degraded_flags", []))
+            or status_content.get("blocking_reason", "")
+        ),
+        "formula_origin": formula_origin,
+        "formula_ocr_status": formula_ocr_status,
+        "evidence_status": _evidence_status(status_content, claim_evidence),
+        "quality_status": _quality_status(quality_report),
+        "component_status": component_status if isinstance(component_status, dict) else {},
+        "allowed_downstream": status_content.get("allowed_downstream", {}),
+    }
+
+
+def _artifact_content_dict(job: JobRecord, artifact_type: str) -> dict[str, object]:
+    artifact = _find_artifact(job, artifact_type)
+    if artifact is None:
+        return {}
+    content = _read_artifact_content(job, artifact.path)
+    return content if isinstance(content, dict) else {}
+
+
+def _formula_status_summary(
+    *,
+    claim_evidence: dict[str, object],
+    passage_index: dict[str, object],
+) -> tuple[str, str]:
+    origins: set[str] = set()
+    ocr_statuses: set[str] = set()
+    claims = claim_evidence.get("claims", [])
+    if isinstance(claims, list):
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+            if claim.get("claim_type") != "FORMULA_CONTEXT":
+                continue
+            origin = str(claim.get("formula_origin") or "").strip()
+            ocr_status = str(claim.get("formula_ocr_status") or "").strip()
+            if origin:
+                origins.add(origin)
+            if ocr_status:
+                ocr_statuses.add(ocr_status)
+
+    passages = passage_index.get("passages", [])
+    if isinstance(passages, list):
+        for passage in passages:
+            if not isinstance(passage, dict):
+                continue
+            for origin in passage.get("formula_origins", []) or []:
+                if origin:
+                    origins.add(str(origin))
+            for ocr_status in passage.get("formula_ocr_statuses", []) or []:
+                if ocr_status:
+                    ocr_statuses.add(str(ocr_status))
+
+    return (
+        ", ".join(sorted(origins)) if origins else "not_applicable",
+        ", ".join(sorted(ocr_statuses)) if ocr_statuses else "not_applicable",
+    )
+
+
+def _evidence_status(status_content: dict[str, object], claim_evidence: dict[str, object]) -> str:
+    component_status = status_content.get("component_status", {})
+    if isinstance(component_status, dict):
+        evidence_component = component_status.get("evidence_pack")
+        if evidence_component:
+            return str(evidence_component)
+    claims = claim_evidence.get("claims", [])
+    if isinstance(claims, list) and claims:
+        return "CLAIMS_AVAILABLE"
+    return "UNKNOWN"
+
+
+def _quality_status(quality_report: dict[str, object]) -> str:
+    findings = quality_report.get("findings", [])
+    if not isinstance(findings, list):
+        return "unknown"
+    effects = {str(f.get("effect", "")).upper() for f in findings if isinstance(f, dict)}
+    if "BLOCK" in effects:
+        return "blocked"
+    if "WARNING" in effects:
+        return "warning"
+    return "pass" if quality_report else "unknown"
 
 
 def _read_artifact_content(job: JobRecord, artifact_path: str) -> object:
@@ -257,18 +609,28 @@ def _resolve_source(
     *,
     resolver: SourceResolver,
     run_dir: Path,
+    title: str,
+    doi: str,
     local_path: str,
     pdf_url: str,
     arxiv_id: str,
     arxiv_url: str,
 ) -> SourceStatus:
-    inputs = [value for value in [local_path, pdf_url, arxiv_id, arxiv_url] if value.strip()]
+    inputs = [value for value in [doi, local_path, pdf_url, arxiv_id, arxiv_url] if value.strip()]
     if len(inputs) != 1:
         return SourceStatus(
             source_type="unknown",
-            original_input="",
+            original_input=title.strip(),
             status="rejected",
             warnings=["UNSUPPORTED_SOURCE"],
+            degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
+        )
+    if doi.strip():
+        return SourceStatus(
+            source_type="doi",
+            original_input=doi.strip(),
+            status="rejected",
+            warnings=["DOI_NOT_IMPLEMENTED"],
             degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
         )
     if local_path.strip():

@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-06-14
+Last updated: 2026-06-15
 
 This file records real engineering status. Mock, fake, or skipped tests do not
 count as module completion. Reports, downloaded PDFs, `.env`, API keys,
@@ -12,6 +12,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 |---|---|
 | NOT_STARTED | No implemented code and no usable design. |
 | DOC_DESIGNED | Engineering contract is documented, but implementation is missing. |
+| NOT_IMPLEMENTED_CONTRACT | API/UI path exists only to report that the feature is not implemented; it must not return fake success data. |
 | IMPLEMENTED | Code exists, but real validation may still be pending. |
 | UNIT_TESTED | Unit or fixture tests exist. |
 | REAL_E2E_VERIFIED | Real end-to-end validation has passed for the claimed scope. |
@@ -32,10 +33,12 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M1 | Marker/MarkItDown/PyMuPDF fallback | implemented | unit/live tested | FALLBACK_ONLY | Review/debug/fallback only; cannot prove primary MinerU stability. |
 | M1 | Direction exploration | not implemented | none | DOC_DESIGNED | Broad landscape/survey planning remains future work. |
 | M1 | Seed expansion | not implemented | none | DOC_DESIGNED | Upstream/downstream graph remains future work. |
-| M2 | Paper deep reading | implemented | unit + real M1/M2 e2e | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Reads M1 bundles, calls real Mimo in full mode, and passes QualityAuditor on selected papers. |
+| M2 | Paper deep reading | implemented | unit + selected-paper live acceptance | PARTIAL_REAL_E2E_VERIFIED | M2 selected-paper live acceptance passed on `2310_08800v2` via `reports/m2_live_acceptance.md`; broad multi-paper and survey live acceptance remain pending. |
 | M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
 | M2 | Survey artifacts | implemented | unit/pipeline fixture | IMPLEMENTED_RULE_BASED | Real survey PDF live acceptance remains pending. |
-| M3 | Paper workspace | partial | component/API fragments | PARTIAL_CODE_NOT_REAL_VALIDATED | Not part of current M1 scope. |
+| M3 | Paper workspace | implemented minimal API/frontend | backend + vitest + build + selected-paper + raw-degraded API/UI live check | PARTIAL_REAL_E2E_VERIFIED | `/parse -> /understanding_status -> /cards` supports configured real LLM entry, existing M2 artifact registration, and strict gating. Selected-paper API/UI loop passed on real M2 artifacts for `2310_08800v2` (`reports/m3_paperworkspace_ui_live.json`): SUCCESS status, paper/formula/teaching cards rendered, and BLOCKED_UNDERSTANDING `/cards` stayed 403. Raw-input DEGRADED API/UI verified (`reports/m3_degraded_ui_live.md`): raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01` both DEGRADED_STRUCTURAL with FORMULA_DERIVATION_BLOCKED, `/cards=200` returns paper_card+teaching_cards only, formula tab shows controlled degradation message with formula_origin/ocr_status, component_status/degradation_reason visible. Product readiness remains pending. |
+| M3 | Direction workspace | explicit not implemented | backend + vitest | NOT_IMPLEMENTED_CONTRACT | API/UI return and display NOT_IMPLEMENTED; no fake search output. |
+| M3 | Seed expansion | explicit not implemented | backend + vitest | NOT_IMPLEMENTED_CONTRACT | API/UI return and display NOT_IMPLEMENTED; no fake seed papers. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
 | M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
 
@@ -155,6 +158,12 @@ Formal M1->M2 handoff must not let Ollama rewrite body structure.
 
 Selected-paper evidence currently includes:
 
+- 2026-06-14 current `scripts/run_live_eval.py` with
+  `RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1`: M1 live
+  status passed, real LLM query planning true, successful sources `arxiv` and
+  `openalex`, 6 candidates, 4 PDF download successes, 1 A_READ. Semantic
+  Scholar rate-limited and Crossref timed out in that run, but the live eval
+  report still passed through the successful source path.
 - `paper_4_unseen` MEMTO: primary MinerU route sample in historical acceptance.
 - `2312_01729v1` EdgeConvFormer: completed M1->M2 handoff with real Mimo in a
   prior selected-paper run. Generated reports should be regenerated before being
@@ -174,19 +183,102 @@ parser stability.
 M2 reads only the M1 artifact bundle. It must not read raw PDF, run its own
 parser, or modify M1-owned immutable evidence fields.
 
-Current M2 real selected-paper validation:
+Current M2 selected-paper live acceptance:
 
-- real M1 canonical bundle input
-- real Mimo provider in full mode
-- QualityAuditor success
-- M1 artifact hashes unchanged after M2 run
-- 2026-06-14 `2310_08800v2` DDMT real run: M1 PASS input -> M2 SUCCESS,
-  real Mimo `mimo-v2.5-pro`, 4 calls, 12,390 total tokens, 7 formula evidence
-  refs, 7 formula cards, formula coverage PASS, QualityAuditor findings empty,
-  M1 artifacts unmodified
+- 2026-06-14 current formal report: `reports/m2_live_acceptance.md`.
+- Positive sample: `2310_08800v2` DDMT real M1 canonical bundle input -> M2
+  `SUCCESS`, real Mimo `mimo-v2.5-pro`, 4 calls, 11,186 total tokens, 21
+  artifacts, 7 formula evidence refs, 7 formula cards, formula coverage PASS,
+  QualityAuditor findings empty, and M1 artifacts unmodified.
+- Failure samples: missing canonical input, `m2_ready=false`, and missing METHOD
+  evidence all enter `BLOCKED_UNDERSTANDING`, write no paper/formula/teaching
+  card artifacts, and do not call the LLM during preflight.
+- Status wording allowed by current evidence: "M2 selected-paper live acceptance
+  passed." This is not broad `REAL_E2E_VERIFIED` for all M2 inputs.
+
+### M2 Raw-Input Status
+
+Raw-input jobs (canonical markdown or PDF submitted through M3 API) currently
+reach `DEGRADED_STRUCTURAL`, not `SUCCESS` and not `BLOCKED_UNDERSTANDING`.
+
+- Raw canonical job: `f2fc0eaaf049`. Status: `DEGRADED_STRUCTURAL`.
+  blocking_reason: `FORMULA_DERIVATION_BLOCKED`.
+  component_status: paper_card=SUCCESS, formula_cards=FAILED,
+  teaching_cards=SUCCESS. `/cards=200`, returns paper_card + teaching_cards.
+- Raw PDF job: `7832b248de01`. Status: `DEGRADED_STRUCTURAL`.
+  Same structure as above.
+
+DEGRADED reason: raw ingestion produces `formula_origin=raw_formula_text`.
+Conservative provenance policy blocks detailed formula derivation when origin
+is `raw_formula_text`, `unknown`, or `unresolved`. This is a deliberate safety
+constraint, not a bug. QualityAuditor FSA-5 was not relaxed.
+
+Raw-input DEGRADED is not broad/full M2 REAL_E2E. It means: M2 pipeline runs
+on raw input, paper and teaching components succeed, but formula derivation is
+blocked by provenance policy.
 
 Known M2 limitation: formula card coverage is all-formula, but detailed symbolic
 derivation is only as strong as M1 LaTeX fidelity and nearby evidence.
+
+## M3 Current Statement
+
+M3 is not complete as a product module. The accurate claim is:
+
+PaperWorkspace has a minimal tested backend/frontend closed loop. The backend
+supports configured real LLM construction through `create_app(...)` or
+`RESEARCHSENSEI_ENABLE_API_LLM`, strict `/cards` gating for SUCCESS,
+DEGRADED_STRUCTURAL, BASELINE_ONLY, BLOCKED_UNDERSTANDING, and FAILED, debug-only
+raw artifact access, DOI rejection as `DOI_NOT_IMPLEMENTED`, and explicit
+DirectionWorkspace/SeedExpansion NOT_IMPLEMENTED contracts.
+
+The frontend now reads `understanding_status` before requesting cards, requests
+cards only for SUCCESS/DEGRADED_STRUCTURAL, hides cards for BASELINE_ONLY and
+BLOCKED_UNDERSTANDING, displays source/canonical/formula/evidence/quality status
+fields, and includes explicit NOT_IMPLEMENTED UI for DirectionWorkspace and
+SeedExpansionPanel.
+
+M3 selected-paper API/UI evidence:
+
+- 2026-06-15 current formal report: `reports/m3_paperworkspace_ui_live.json`.
+- Positive sample: existing real M2 artifacts for `2310_08800v2` registered
+  through `POST /api/v1/documents/parse` -> `GET /understanding_status`
+  returned SUCCESS -> `GET /cards` returned 200 with `paper_card`,
+  `formula_cards`, and `teaching_cards`; Browser validation confirmed the
+  Paper, Formulas, and Teaching tabs rendered user-facing card content and
+  source/canonical/formula/evidence/downstream status rows.
+- Selected-paper job: `a292821c21c2`. `/understanding_status`=SUCCESS,
+  `/cards=200`, paper_card/formula_cards/teaching_cards all rendered.
+- Failure sample: missing METHOD evidence registered through the same API route
+  stayed `BLOCKED_UNDERSTANDING`; `/cards` returned 403 and no explanatory card
+  content was exposed. BLOCKED job: `ded6d0e1ee58`,
+  blocking_reason=MISSING_METHOD_EVIDENCE, `/cards=403`.
+
+M3 raw-input DEGRADED API/UI evidence:
+
+- 2026-06-15 current formal report: `reports/m3_degraded_ui_live.md`.
+- Raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01`: both
+  `DEGRADED_STRUCTURAL` with `FORMULA_DERIVATION_BLOCKED`, `formula_origin` =
+  `raw_formula_text`, `formula_cards` = FAILED.
+- `/cards` returns 200 with `paper_card` + `teaching_cards` only;
+  `missing_components: ["formula_cards"]`; `degraded: true`.
+- Frontend: Formula tab shows controlled degradation message ("公式推导不可用")
+  with degradation_reason, formula_origin, formula_ocr_status; no detailed
+  formula derivation displayed. StatusBanner shows missing_components,
+  component_status.formula_cards=FAILED, degradation_reason,
+  allowed_downstream.advisor_questions=false.
+- New frontend tests: 3 added (19 total), all passing.
+
+M3 caveat: this verifies the selected-paper and raw-input DEGRADED PaperWorkspace
+API/UI handoff. It does not prove broad multi-paper behavior, DirectionWorkspace,
+SeedExpansion, or product readiness.
+
+## Test Status Summary
+
+As of 2026-06-15:
+
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 466 passed, 15 skipped
+- Frontend: `cd frontend && npm test` -> 5 test files, 19 tests passed
+- Frontend build: `cd frontend && npm run build` -> success
 
 ## Hard Rules
 
