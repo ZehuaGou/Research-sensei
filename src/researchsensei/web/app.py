@@ -478,6 +478,8 @@ def _configured_llm_client(
     config_service: ConfigService | None,
 ) -> LLMClient | None:
     """Build the real API LLM client only when explicitly enabled."""
+    service = config_service or ConfigService()
+    config = service.load()
     enabled = (
         _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM")
         if enable_configured_llm is None
@@ -486,8 +488,6 @@ def _configured_llm_client(
     if not enabled:
         return None
 
-    service = config_service or ConfigService()
-    config = service.load()
     actual_provider = provider_name or os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider
     if actual_provider not in config.providers:
         raise RuntimeError(f"Unknown LLM provider for API: {actual_provider}")

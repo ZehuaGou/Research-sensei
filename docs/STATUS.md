@@ -32,7 +32,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M1 | Ollama formula polish | implemented | smoke + selected-paper use | OPTIONAL_IMPLEMENTED | Explicit formula `final_latex` cleanup only; does not rewrite body structure. |
 | M1 | Ollama section refiner | implemented | unit/local compare | OPTIONAL_NOT_DEFAULT | Diagnostic/review path only; default formal handoff remains rule-based. |
 | M1 | Marker/MarkItDown/PyMuPDF fallback | implemented | unit/live tested | FALLBACK_ONLY | Review/debug/fallback only; cannot prove primary MinerU stability. |
-| M1 | Direction exploration | implemented minimal loop + handoff API | unit + arXiv smoke | DEGRADED_SMOKE | Minimal query -> DirectionBundle loop exists with real source adapters, heuristic query plan, candidate cards, reading order, source metrics, strict A_READ_FOR_M2 gate, and `/api/v1/directions/deep_read` handoff to PaperWorkspace. 2026-06-15 arXiv-only smoke for `time series anomaly detection` returned SUCCESS with 3 real candidates, then handoff created job `472ae7b2adc8`; final status was BASELINE_ONLY because API LLM env was not configured. No broad multi-source acceptance or A_READ canonical handoff yet. |
+| M1 | Direction exploration | implemented minimal loop + handoff API | unit + arXiv smoke | DEGRADED_SMOKE | Minimal query -> DirectionBundle loop exists with real source adapters, heuristic query plan, candidate cards, reading order, source metrics, strict A_READ_FOR_M2 gate, and `/api/v1/directions/deep_read` handoff to PaperWorkspace. 2026-06-15 arXiv-only smoke for `time series anomaly detection` returned SUCCESS with 3 real candidates, then Mimo-enabled handoff created job `c09ff92ee955`; final status was DEGRADED_STRUCTURAL with `FORMULA_DERIVATION_BLOCKED`. No broad multi-source acceptance or A_READ canonical handoff yet. |
 | M1 | Seed expansion | not implemented | none | DOC_DESIGNED | Upstream/downstream graph remains future work. |
 | M2 | Paper deep reading | implemented | unit + selected-paper live acceptance | PARTIAL_REAL_E2E_VERIFIED | M2 selected-paper live acceptance passed on `2310_08800v2` via `reports/m2_live_acceptance.md`; broad multi-paper and survey live acceptance remain pending. |
 | M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
@@ -237,6 +237,11 @@ DirectionSearchView rendering of the M1 DirectionBundle, minimal
 `/api/v1/directions/deep_read` handoff for arXiv/PDF candidates, and explicit
 SeedExpansion NOT_IMPLEMENTED contracts.
 
+API LLM configuration now loads `.env` before checking
+`RESEARCHSENSEI_ENABLE_API_LLM`, so `.env` can enable API LLM and choose
+`RESEARCHSENSEI_LLM_PROVIDER=mimo`. Missing keys fail with the missing
+environment variable name only.
+
 The frontend now reads `understanding_status` before requesting cards, requests
 cards only for SUCCESS/DEGRADED_STRUCTURAL, hides cards for BASELINE_ONLY and
 BLOCKED_UNDERSTANDING, displays source/canonical/formula/evidence/quality status
@@ -285,16 +290,17 @@ DirectionWorkspace product behavior, SeedExpansion, or product readiness.
 
 As of 2026-06-15:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 478 passed, 15 skipped
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 482 passed, 15 skipped
 - Frontend: `cd frontend && npm test` -> 5 test files, 27 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
 - M1 Direction Exploration external smoke: arXiv-only query
   `time series anomaly detection` -> SUCCESS, 3 real candidates,
   `can_enter_m2=false` for all because no canonical M2-ready handoff was
-  performed. Handoff smoke selected arXiv `2510.18998`, created job
-  `472ae7b2adc8`, and returned `BASELINE_ONLY` because
-  `RESEARCHSENSEI_ENABLE_API_LLM`, `MIMO_API_KEY`, and `OPENAI_API_KEY` were not
-  set in the environment.
+  performed. With `RESEARCHSENSEI_ENABLE_API_LLM=1`,
+  `RESEARCHSENSEI_LLM_PROVIDER=mimo`, and non-empty `MIMO_API_KEY`, handoff
+  smoke selected arXiv `2510.18998`, created job `c09ff92ee955`, and returned
+  `DEGRADED_STRUCTURAL` with `FORMULA_DERIVATION_BLOCKED`; paper_card and
+  teaching_cards succeeded, formula_cards failed closed.
 
 ## Hard Rules
 
