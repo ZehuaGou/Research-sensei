@@ -64,6 +64,7 @@ class CandidatePaper(SenseiModel):
     verification_reason: str = ""
     verification_confidence: str = "low"
     # M1.4 LLM relevance fields
+    relevance_score: float = 0.0
     rule_relevance_score: float = 0.0
     llm_relevance_score: float = 0.0
     llm_relevance_label: str = ""  # HIGH, MEDIUM, LOW, IRRELEVANT
@@ -202,6 +203,18 @@ class ReadingPlan(SenseiModel):
 class DirectionBundle(SenseiModel):
     """Complete direction analysis bundle."""
 
+    status: str = "UNKNOWN"
+    direction_workspace_status: str = "UNKNOWN"
+    query: str = ""
+    message: str = ""
+    overview: str = ""
+    key_sub_directions: list[dict[str, object]] = Field(default_factory=list)
+    method_families: list[dict[str, object]] = Field(default_factory=list)
+    candidate_cards: list[dict[str, object]] = Field(default_factory=list)
+    recommended_reading_order: list[dict[str, object]] = Field(default_factory=list)
+    deep_read_candidates: list[dict[str, object]] = Field(default_factory=list)
+    source_metrics: list[dict[str, object]] = Field(default_factory=list)
+    seed_expansion_status: str = "NOT_IMPLEMENTED"
     query_plan: QueryPlan
     candidate_pool: CandidatePool
     source_resolution: SourceResolutionResult = Field(default_factory=lambda: SourceResolutionResult(query=""))

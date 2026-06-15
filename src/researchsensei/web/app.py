@@ -10,6 +10,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
 from researchsensei.core.config import ConfigService
+from researchsensei.direction import DirectionExplorationService
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
@@ -37,6 +38,7 @@ def create_app(
     llm_provider: str = "",
     llm_config: LLMConfig | None = None,
     config_service: ConfigService | None = None,
+    direction_service: DirectionExplorationService | None = None,
 ) -> FastAPI:
     app = FastAPI(title="ResearchSensei", version="0.5.0")
     workspace = WorkspaceStore(workspace_root)
@@ -57,6 +59,7 @@ def create_app(
         http_client=http_client,
         max_download_bytes=max_download_bytes,
     )
+    resolved_direction_service = direction_service or DirectionExplorationService()
 
     @app.get("/health")
     def health() -> dict[str, str]:
@@ -291,20 +294,10 @@ def create_app(
     @app.post("/api/v1/directions/search")
     def search_direction(payload: dict[str, object]) -> dict[str, object]:
         query = str(payload.get("query") or "")
-        return {
-            "status": "NOT_IMPLEMENTED",
-            "direction_workspace_status": "NOT_IMPLEMENTED",
-            "query": query,
-            "message": "DirectionWorkspace backend is not implemented yet.",
-            "seed_expansion_status": "NOT_IMPLEMENTED",
-            "papers": [],
-            "warnings": [
-                {
-                    "code": "DIRECTION_WORKSPACE_NOT_IMPLEMENTED",
-                    "message": "Direction search is intentionally not faked.",
-                }
-            ],
-        }
+        bundle = resolved_direction_service.explore(query)
+        response = bundle.model_dump(mode="json")
+        response["papers"] = response.get("candidate_cards", [])
+        return response
 
     @app.post("/api/v1/directions/seed_expansion")
     def seed_expansion(payload: dict[str, object]) -> dict[str, object]:

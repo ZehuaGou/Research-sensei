@@ -90,14 +90,31 @@ def test_parse_doi_returns_not_implemented_source_status(tmp_path: Path) -> None
     assert "DOI_NOT_IMPLEMENTED" in detail["source_status"]["warnings"]
 
 
-def test_direction_and_seed_endpoints_are_explicitly_not_implemented(tmp_path: Path) -> None:
-    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+def test_direction_endpoint_returns_minimal_bundle_and_seed_stays_not_implemented(tmp_path: Path) -> None:
+    from researchsensei.schemas import CandidatePool, DirectionBundle, QueryPlan, ReadingPlan
+
+    class StubDirectionService:
+        def explore(self, query: str) -> DirectionBundle:
+            return DirectionBundle(
+                status="SUCCESS",
+                direction_workspace_status="SUCCESS",
+                query=query,
+                message="fixture",
+                overview="fixture overview",
+                query_plan=QueryPlan(user_query=query, english_query=query),
+                candidate_pool=CandidatePool(query=query),
+                filtered_candidates=CandidatePool(query=query),
+                reading_plan=ReadingPlan(topic=query),
+            )
+
+    client = TestClient(create_app(workspace_root=tmp_path / "workspace", direction_service=StubDirectionService()))  # type: ignore[arg-type]
 
     direction = client.post("/api/v1/directions/search", json={"query": "time series anomaly detection"})
     seed = client.post("/api/v1/directions/seed_expansion", json={"query": "time series anomaly detection"})
 
     assert direction.status_code == 200
-    assert direction.json()["direction_workspace_status"] == "NOT_IMPLEMENTED"
+    assert direction.json()["direction_workspace_status"] == "SUCCESS"
+    assert direction.json()["overview"] == "fixture overview"
     assert direction.json()["papers"] == []
     assert seed.status_code == 200
     assert seed.json()["seed_expansion_status"] == "NOT_IMPLEMENTED"

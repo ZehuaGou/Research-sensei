@@ -15,6 +15,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | NOT_IMPLEMENTED_CONTRACT | API/UI path exists only to report that the feature is not implemented; it must not return fake success data. |
 | IMPLEMENTED | Code exists, but real validation may still be pending. |
 | UNIT_TESTED | Unit or fixture tests exist. |
+| DEGRADED_SMOKE | A narrow live smoke passed, but full acceptance and broad validation remain pending. |
 | REAL_E2E_VERIFIED | Real end-to-end validation has passed for the claimed scope. |
 | PARTIAL_REAL_E2E_VERIFIED | Some modes or selected samples passed real validation; other modes remain pending. |
 | PRODUCTION_READY | Stable enough for routine production use. No current module has this status. |
@@ -31,13 +32,13 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M1 | Ollama formula polish | implemented | smoke + selected-paper use | OPTIONAL_IMPLEMENTED | Explicit formula `final_latex` cleanup only; does not rewrite body structure. |
 | M1 | Ollama section refiner | implemented | unit/local compare | OPTIONAL_NOT_DEFAULT | Diagnostic/review path only; default formal handoff remains rule-based. |
 | M1 | Marker/MarkItDown/PyMuPDF fallback | implemented | unit/live tested | FALLBACK_ONLY | Review/debug/fallback only; cannot prove primary MinerU stability. |
-| M1 | Direction exploration | not implemented | none | DOC_DESIGNED | Broad landscape/survey planning remains future work. |
+| M1 | Direction exploration | implemented minimal loop | unit + arXiv smoke | DEGRADED_SMOKE | Minimal query -> DirectionBundle loop exists with real source adapters, heuristic query plan, candidate cards, reading order, source metrics, and strict A_READ_FOR_M2 gate. 2026-06-15 arXiv-only smoke for `time series anomaly detection` returned SUCCESS with 3 real candidates, but no LLM planner, no PDF download/canonical generation, no direct PaperWorkspace parse trigger, and no broad multi-source acceptance yet. |
 | M1 | Seed expansion | not implemented | none | DOC_DESIGNED | Upstream/downstream graph remains future work. |
 | M2 | Paper deep reading | implemented | unit + selected-paper live acceptance | PARTIAL_REAL_E2E_VERIFIED | M2 selected-paper live acceptance passed on `2310_08800v2` via `reports/m2_live_acceptance.md`; broad multi-paper and survey live acceptance remain pending. |
 | M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
 | M2 | Survey artifacts | implemented | unit/pipeline fixture | IMPLEMENTED_RULE_BASED | Real survey PDF live acceptance remains pending. |
 | M3 | Paper workspace | implemented minimal API/frontend | backend + vitest + build + selected-paper + raw-degraded API/UI live check | PARTIAL_REAL_E2E_VERIFIED | `/parse -> /understanding_status -> /cards` supports configured real LLM entry, existing M2 artifact registration, and strict gating. Selected-paper API/UI loop passed on real M2 artifacts for `2310_08800v2` (`reports/m3_paperworkspace_ui_live.json`): SUCCESS status, paper/formula/teaching cards rendered, and BLOCKED_UNDERSTANDING `/cards` stayed 403. Raw-input DEGRADED API/UI verified (`reports/m3_degraded_ui_live.md`): raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01` both DEGRADED_STRUCTURAL with FORMULA_DERIVATION_BLOCKED, `/cards=200` returns paper_card+teaching_cards only, formula tab shows controlled degradation message with formula_origin/ocr_status, component_status/degradation_reason visible. Product readiness remains pending. |
-| M3 | Direction workspace | explicit not implemented | backend + vitest | NOT_IMPLEMENTED_CONTRACT | API/UI return and display NOT_IMPLEMENTED; no fake search output. |
+| M3 | Direction workspace | minimal render for M1 DirectionBundle | backend + vitest + build | IMPLEMENTED | DirectionSearchView now submits a direction query, displays status/sources/warnings, overview, sub-directions, method families, candidate papers, and reading order. Deep-read actions remain `待接入` unless a real PaperWorkspace job exists. This is not M3 product readiness. |
 | M3 | Seed expansion | explicit not implemented | backend + vitest | NOT_IMPLEMENTED_CONTRACT | API/UI return and display NOT_IMPLEMENTED; no fake seed papers. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
 | M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
@@ -50,9 +51,12 @@ M1 focused acquisition and selected-paper PDF canonical handoff are real
 verified. Current M1 can produce `canonical_paper.md` plus the required M2
 artifact bundle on selected real papers, with MinerU2.5-Pro as the primary
 parser, crop/overlay enforcement, formula provenance, optional guarded Ollama
-formula LaTeX polish, and quality gates. Direction exploration, seed expansion,
-first-class LaTeX/HTML normalization, broad multi-paper MinerU acceptance, and
-production-scale parser stability remain pending.
+formula LaTeX polish, and quality gates. Direction exploration now has a
+minimal unit-tested loop plus a narrow arXiv live smoke, but broad multi-source
+acceptance, LLM-based planning, direct PaperWorkspace handoff from direction
+candidates, seed expansion, first-class LaTeX/HTML normalization, broad
+multi-paper MinerU acceptance, and production-scale parser stability remain
+pending.
 
 The authoritative M1 development contract is
 `docs/development/M1_LITERATURE_SEARCH.md`.
@@ -228,14 +232,15 @@ PaperWorkspace has a minimal tested backend/frontend closed loop. The backend
 supports configured real LLM construction through `create_app(...)` or
 `RESEARCHSENSEI_ENABLE_API_LLM`, strict `/cards` gating for SUCCESS,
 DEGRADED_STRUCTURAL, BASELINE_ONLY, BLOCKED_UNDERSTANDING, and FAILED, debug-only
-raw artifact access, DOI rejection as `DOI_NOT_IMPLEMENTED`, and explicit
-DirectionWorkspace/SeedExpansion NOT_IMPLEMENTED contracts.
+raw artifact access, DOI rejection as `DOI_NOT_IMPLEMENTED`, minimal
+DirectionSearchView rendering of the M1 DirectionBundle, and explicit
+SeedExpansion NOT_IMPLEMENTED contracts.
 
 The frontend now reads `understanding_status` before requesting cards, requests
 cards only for SUCCESS/DEGRADED_STRUCTURAL, hides cards for BASELINE_ONLY and
 BLOCKED_UNDERSTANDING, displays source/canonical/formula/evidence/quality status
-fields, and includes explicit NOT_IMPLEMENTED UI for DirectionWorkspace and
-SeedExpansionPanel.
+fields, renders the minimal M1 Direction Exploration bundle in
+DirectionSearchView, and keeps SeedExpansionPanel explicitly NOT_IMPLEMENTED.
 
 M3 selected-paper API/UI evidence:
 
@@ -266,19 +271,25 @@ M3 raw-input DEGRADED API/UI evidence:
   formula derivation displayed. StatusBanner shows missing_components,
   component_status.formula_cards=FAILED, degradation_reason,
   allowed_downstream.advisor_questions=false.
-- New frontend tests: 3 added (19 total), all passing.
+- M3 raw-input frontend coverage remains in the frontend suite; current total
+  counts are listed in Test Status Summary.
 
 M3 caveat: this verifies the selected-paper and raw-input DEGRADED PaperWorkspace
-API/UI handoff. It does not prove broad multi-paper behavior, DirectionWorkspace,
+API/UI handoff plus a minimal DirectionSearchView render. It does not prove
+broad multi-paper behavior, full DirectionWorkspace product behavior,
 SeedExpansion, or product readiness.
 
 ## Test Status Summary
 
 As of 2026-06-15:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 466 passed, 15 skipped
-- Frontend: `cd frontend && npm test` -> 5 test files, 19 tests passed
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 472 passed, 15 skipped
+- Frontend: `cd frontend && npm test` -> 5 test files, 23 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
+- M1 Direction Exploration external smoke: arXiv-only query
+  `time series anomaly detection` -> SUCCESS, 3 real candidates,
+  `can_enter_m2=false` for all because no PDF download/canonical M2-ready
+  handoff was performed.
 
 ## Hard Rules
 
