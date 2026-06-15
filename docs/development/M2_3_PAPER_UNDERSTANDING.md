@@ -6,7 +6,7 @@
 
 M2 formula card generation is no longer top-K-only. The current full pipeline
 builds a dedicated `formula_evidence_pack.json` from every M1
-`FORMULA_CONTEXT` claim and calls `build_formula_cards_v2()` in bounded batches.
+`FORMULA_CONTEXT` claim and calls `build_formula_cards()` in bounded batches.
 
 Contract:
 
@@ -91,17 +91,17 @@ canonical_paper.md
 
 - `src/researchsensei/m2/` — current M2 rule-based understanding path from M1 artifacts
 - `scripts/m2_run_understanding.py` — CLI entry point that reads an M1 artifact bundle and writes `reports/m2_understanding_<paper_id>/`
-- `src/researchsensei/paper_card.py` — `build_paper_card()` (rule-based baseline)
-- `src/researchsensei/paper_card_v2.py` — v2 LLM builder (fail-closed)
-- `src/researchsensei/formula_card.py` — `build_formula_card()` (rule-based baseline)
-- `src/researchsensei/formula_card_v2.py` — v2 LLM builder (fail-closed)
-- `src/researchsensei/teaching_card.py` — `build_teaching_card()` (rule-based baseline)
-- `src/researchsensei/teaching_card_v2.py` — v2 LLM builder (fail-closed)
+- `src/researchsensei/paper_card_baseline.py` — `build_paper_card()` (rule-based baseline)
+- `src/researchsensei/paper_card.py` — LLM card builder (fail-closed)
+- `src/researchsensei/formula_card_baseline.py` — `build_formula_cards()` (rule-based baseline)
+- `src/researchsensei/formula_card.py` — LLM card builder (fail-closed)
+- `src/researchsensei/teaching_card_baseline.py` — `build_teaching_cards()` (rule-based baseline)
+- `src/researchsensei/teaching_card.py` — LLM card builder (fail-closed)
 - `src/researchsensei/llm/validator.py` — LLM output validators
 - `src/researchsensei/live_eval.py` — opt-in real LLM smoke / live eval helper
 - `src/researchsensei/schemas/llm_output.py` — PaperCardLLMOutput, FormulaCardLLMOutput, TeachingCardLLMOutput
 - `src/researchsensei/schemas/status.py` — UnderstandingStatus, DownstreamGates, EvidencePackSummary
-- `src/researchsensei/ingestion/pipeline.py` — SinglePaperIngestionRunner (v2 path integration)
+- `src/researchsensei/ingestion/pipeline.py` — SinglePaperIngestionRunner (LLM card path integration)
 
 Current M2 rule-based output is not a replacement for the future real-LLM/evidence-pack card pipeline. It establishes the M1 artifact contract, formula grouping behavior, source trace preservation, and risk handling. It writes:
 
@@ -124,7 +124,7 @@ It reads only M1 artifacts and must not mutate M1 latex, bbox, page, parser sour
 | LLM prompt 只能使用 | paper title/metadata, canonical status summary, paper_skeleton, evidence_pack, existing baseline card |
 | 禁止 | 直接整篇论文全文塞入 prompt |
 
-v2 prompt 额外约束：
+LLM prompt 额外约束：
 
 - prompt 中必须列出 Allowed evidence_ref values。
 - LLM 输出的 evidence_ref 必须从 Allowed evidence_ref values 中精确选择一个。
@@ -280,7 +280,7 @@ class SinglePaperIngestionRunner:
 
 | 场景 | 行为 |
 |------|------|
-| LLM client 不存在 | BASELINE_ONLY，不得标记为 v2 understanding |
+| LLM client 不存在 | BASELINE_ONLY，不得标记为 LLM understanding |
 | LLM 调用失败 | BLOCKED_UNDERSTANDING，warning: "LLM_UNAVAILABLE" |
 | LLM 输出 evidence_ref 不存在 | 丢弃，BLOCKED_UNDERSTANDING，warning: "INVALID_EVIDENCE_REF" |
 | LLM 输出无 evidence_ref | 丢弃，BLOCKED_UNDERSTANDING，warning: "MISSING_EVIDENCE_REF" |
@@ -342,7 +342,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 | test_baseline_formula_cards | formula_cards fields populated |
 | test_baseline_teaching_cards | teaching_cards fields populated |
 
-### v2 builder fail-closed 测试
+### LLM card builder fail-closed 测试
 
 | 测试 | 断言 |
 |------|------|
@@ -370,14 +370,14 @@ if not understanding_status.allowed_downstream.advisor_questions:
 | test_unknown_formula_blocks_derivation | unknown origin blocks detailed derivation |
 | test_formula_top_k_only | non-core formula is skipped or summarized |
 
-### Pipeline v2 路径测试
+### Pipeline LLM card path 测试
 
 | 测试 | 断言 |
 |------|------|
 | test_pipeline_accepts_optional_llm_client | no error, status is BASELINE_ONLY |
-| test_pipeline_v2_success_artifacts | SUCCESS → paper_card + formula_cards + teaching_cards + understanding_status + quality_report written |
-| test_pipeline_v2_degraded_artifacts | DEGRADED → teaching_cards not written |
-| test_pipeline_v2_blocked_artifacts | BLOCKED → no card artifacts written |
+| test_pipeline_success_artifacts | SUCCESS → paper_card + formula_cards + teaching_cards + understanding_status + quality_report written |
+| test_pipeline_degraded_artifacts | DEGRADED → teaching_cards not written |
+| test_pipeline_blocked_artifacts | BLOCKED → no card artifacts written |
 | test_blocked_understanding_no_user_facing_content | no paper explanation text in blocked output |
 | test_success_status_for_final_display | status == "SUCCESS", allowed_for_user_display is True |
 | test_m2_real_llm_smoke | opt-in real LLM 生成可解析输出，并验证 evidence_ref 可追溯 |
@@ -395,7 +395,7 @@ if not understanding_status.allowed_downstream.advisor_questions:
 - 无效 evidence_ref → BLOCKED
 - empty evidence_pack → BLOCKED
 - baseline path 输出 BASELINE_ONLY
-- v2 path fail-closed，不 fallback
+- LLM card path fail-closed，不 fallback
 - 真实验收必须使用真实 `canonical_paper.md` 输入（不能只用 synthetic markdown）
 - 真实验收必须真实调用 LLM，生成 paper/formula/teaching cards
 - 真实验收必须通过 QualityAuditor 审计
@@ -409,18 +409,18 @@ if not understanding_status.allowed_downstream.advisor_questions:
 
 ## 15. 当前实现状态
 
-- baseline builders 已实现（paper_card.py, formula_card.py, teaching_card.py）
-- v2 LLM output schema 已实现（schemas/llm_output.py）
-- v2 builders 已实现（paper_card_v2.py, formula_card_v2.py, teaching_card_v2.py）
+- baseline builders 已实现（paper_card_baseline.py, formula_card_baseline.py, teaching_card_baseline.py）
+- LLM output schema 已实现（schemas/llm_output.py）
+- LLM card builders 已实现（paper_card.py, formula_card.py, teaching_card.py）
 - LLM output validator 已实现（llm/validator.py）
-- pipeline v2 path 已接入（SUCCESS / DEGRADED / BLOCKED）
+- LLM card path 已接入（SUCCESS / DEGRADED / BLOCKED）
 - EvidencePack 已实现
 - UnderstandingStatus / DownstreamGates 已实现
 - QualityAuditor 已接入
 - understanding_status.json / quality_report.json 已写入
 - 测试已覆盖：15+ tests
 - Real LLM smoke 已实现 opt-in 入口：`tests_live/test_m2_real_llm_smoke.py` 与 `scripts/run_live_eval.py`
-- v2 prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
+- LLM prompts 已加强 evidence_ref 精确选择约束，防止模型拼接多个 evidence_ref
 - formula_is_core heuristic 已在 EvidencePack 中实现：核心公式按公式长度、核心关键词、section/claim context、helper/where-clause demotion 排序
 - canonical_paper.md 输入、formula_origin 全链路、formula_ocr_status、all-formula coverage 策略已接入 `src/researchsensei/m2/full_pipeline.py`
 
@@ -487,7 +487,7 @@ Status: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance re
 ## 2026-06-14 Implementation Update
 
 - Implemented real evidence-constrained M2 card generation through `src/researchsensei/m2/full_pipeline.py`.
-- Real LLM path uses `build_paper_card_v2`, `build_formula_cards_v2`, and `build_teaching_cards_v2`; all outputs must validate against the exact EvidencePack `evidence_ref` set.
+- Real LLM path uses `build_paper_card`, `build_formula_cards`, and `build_teaching_cards`; all outputs must validate against the exact EvidencePack `evidence_ref` set.
 - Formula evidence now carries M1 provenance into the LLM/card layer: `formula_raw`, `original_latex`, `formula_origin`, `formula_ocr_status`, and `formula_explanation_status`.
 - `validate_formula_cards_llm_output` fails if formula evidence exists but the LLM returns no formula cards.
 - Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.

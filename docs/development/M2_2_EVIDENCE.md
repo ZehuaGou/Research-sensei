@@ -89,7 +89,7 @@ canonical_paper.md
 
 ## 8. Artifact
 
-v2 精读链路新增 3 个 artifact：
+精读链路新增 3 个 artifact：
 
 | artifact | 用途 | schema_version |
 |----------|------|----------------|
@@ -98,7 +98,7 @@ v2 精读链路新增 3 个 artifact：
 | `evidence_index.json` | v1 兼容 wrapper，保留旧字段 | v1（无 schema_version 时默认 v1） |
 
 - `evidence_index.json` 保留 v1 兼容，旧测试可继续读取。
-- `claim_evidence.json` 承载 v2 字段，M2.4 Audit 和 M4 互动式学习读取此文件。
+- `claim_evidence.json` 承载 passage-level 字段，M2.4 Audit 和 M4 互动式学习读取此文件。
 - `passage_index.json` 持久化 passage 构建结果，M2.4 Audit 和前端 evidence 跳转依赖此文件。
 - 旧 artifact 缺少 `schema_version` 时按 v1 读取。
 - additive 字段通过 Pydantic 默认值兼容。
@@ -159,7 +159,7 @@ class ClaimEvidence(SenseiModel):
     evidence_ref: str
     quote_or_summary: str
     confidence: float
-    # v2 新增（可选）
+    # passage-level 字段（可选）
     passage_id: str = ""
     claim_type: str = ""
     semantic_support: str = ""

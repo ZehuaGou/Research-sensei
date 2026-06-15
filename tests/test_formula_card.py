@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from researchsensei.audit.quality_auditor import QualityAuditor
-from researchsensei.formula_card_v2 import build_formula_cards_v2
+from researchsensei.formula_card import build_formula_cards
 from researchsensei.schemas import ArtifactBundle, EvidencePack, EvidencePackItem, PaperSkeleton
 
 
@@ -104,11 +104,11 @@ def _success_status() -> dict:
     }
 
 
-def test_formula_card_v2_blocks_unknown_origin_without_llm_derivation() -> None:
+def test_formula_card_blocks_unknown_origin_without_llm_derivation() -> None:
     client = FailingFormulaLLM()
     pack = EvidencePack(paper_id="paper", items=[_formula_item()])
 
-    bundle = asyncio.run(build_formula_cards_v2(pack, _skeleton(), client))
+    bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
 
     assert client.calls == 0
     card = bundle.formula_cards[0]
@@ -128,14 +128,14 @@ def test_formula_card_v2_blocks_unknown_origin_without_llm_derivation() -> None:
     assert not any(f.code == "FSA-5" for f in report.findings)
 
 
-def test_formula_card_v2_preserves_evidence_origin_over_llm_output() -> None:
+def test_formula_card_preserves_evidence_origin_over_llm_output() -> None:
     client = ScriptedFormulaLLM(origin="source_latex", ocr_status="ocr_success")
     pack = EvidencePack(
         paper_id="paper",
         items=[_formula_item(origin="parser_latex", ocr_status="not_required")],
     )
 
-    bundle = asyncio.run(build_formula_cards_v2(pack, _skeleton(), client))
+    bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
 
     assert client.calls == 1
     card = bundle.formula_cards[0]
@@ -153,7 +153,7 @@ def test_parser_latex_formula_with_evidence_ref_can_keep_detailed_explanation() 
         items=[_formula_item(origin="parser_latex", ocr_status="not_required")],
     )
 
-    bundle = asyncio.run(build_formula_cards_v2(pack, _skeleton(), client))
+    bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
     card = bundle.formula_cards[0]
 
     assert card.formula_origin == "parser_latex"

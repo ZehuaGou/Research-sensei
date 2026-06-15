@@ -461,14 +461,14 @@ EvidencePackSummary:
   truncated_passage_ids: list[str]
 ```
 
-**11. v2 精读链路关键新增 artifact：** passage_index.json, claim_evidence.json, understanding_status.json。
+**11. 精读链路关键新增 artifact：** passage_index.json, claim_evidence.json, understanding_status.json。
 
 ### 16.2 保留的旧共识
 
 1. LLM 三次调用：paper_card, formula_cards, teaching_cards。
 2. EvidencePack 仍然主要是运行时对象。
 3. Audit warning 不阻断，进入 SUCCESS + warnings。
-4. Phase 8-10 迁移方向仍是 baseline_builder + v2_builder，文件名尽量保持兼容。
+4. Phase 8-10 迁移方向仍是 baseline_builder + LLM card builder，文件名尽量保持兼容。
 
 ### 16.3 需要继续讨论的问题
 

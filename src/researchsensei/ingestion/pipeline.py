@@ -10,14 +10,14 @@ from researchsensei.evidence.claim_extractor import build_claim_evidence
 from researchsensei.evidence.evidence_pack import build_evidence_pack
 from researchsensei.evidence.passage_index import build_passage_index
 from researchsensei.evidence.retriever import EvidenceRetriever
+from researchsensei.formula_card_baseline import build_formula_cards as build_formula_cards_baseline
 from researchsensei.formula_card import build_formula_cards
-from researchsensei.formula_card_v2 import build_formula_cards_v2
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
+from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
 from researchsensei.paper_card import build_paper_card
-from researchsensei.paper_card_v2 import build_paper_card_v2
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.parser.adapter import ParserAdapter
 from researchsensei.schemas import (
@@ -34,15 +34,15 @@ from researchsensei.schemas import (
     WorkspaceArtifact,
 )
 from researchsensei.schemas.status import EvidencePackSummary
+from researchsensei.teaching_card_baseline import build_teaching_cards as build_teaching_cards_baseline
 from researchsensei.teaching_card import build_teaching_cards
-from researchsensei.teaching_card_v2 import build_teaching_cards_v2
 from researchsensei.workspace import WorkspaceStore
 
 logger = logging.getLogger(__name__)
 
 
 def _run_async_builder(coro):
-    """Execute an async v2 builder from a sync context.
+    """Execute an async card builder from a sync context.
 
     Raises RuntimeError if already inside an active event loop.
     """
@@ -117,9 +117,9 @@ class SinglePaperIngestionRunner:
 
             if self.llm_client is None:
                 # Baseline path
-                paper_card = build_paper_card(paper_skeleton, evidence_index)
-                formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
-                teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
+                paper_card = build_paper_card_baseline(paper_skeleton, evidence_index)
+                formula_cards = build_formula_cards_baseline(document, evidence_index, paper_skeleton)
+                teaching_cards = build_teaching_cards_baseline(paper_card, formula_cards, paper_skeleton, evidence_index)
                 understanding_status = _build_baseline_understanding_status(actual_job_id)
                 card_artifacts = {
                     "paper_card": paper_card,
@@ -127,7 +127,7 @@ class SinglePaperIngestionRunner:
                     "teaching_cards": teaching_cards,
                 }
             else:
-                # V2 path
+                # LLM card path
                 evidence_pack = build_evidence_pack(claim_evidence, passage_index, EvidenceRetriever())
                 formula_claim_count = sum(
                     1 for claim in claim_evidence.claims
@@ -161,7 +161,7 @@ class SinglePaperIngestionRunner:
                     )
                     card_artifacts = {}
                 else:
-                    card_artifacts, understanding_status = self._run_v2_builders(
+                    card_artifacts, understanding_status = self._run_card_builders(
                         actual_job_id,
                         evidence_pack,
                         formula_evidence_pack,
@@ -235,7 +235,7 @@ class SinglePaperIngestionRunner:
         block_findings = [f for f in quality_report.findings if f.effect == "BLOCK"]
         current_status = understanding_status.status
 
-        # Only override v2 SUCCESS / DEGRADED to BLOCKED
+        # Only override LLM SUCCESS / DEGRADED to BLOCKED
         if block_findings and current_status in ("SUCCESS", "DEGRADED_STRUCTURAL"):
             audit_warnings = _convert_findings_to_warnings(
                 [f for f in quality_report.findings if f.effect == "WARNING"]
@@ -268,7 +268,7 @@ class SinglePaperIngestionRunner:
 
         return quality_report, understanding_status, card_artifacts
 
-    def _run_v2_builders(
+    def _run_card_builders(
         self,
         paper_id: str,
         evidence_pack: EvidencePack,
@@ -278,48 +278,48 @@ class SinglePaperIngestionRunner:
         paper_skeleton,
         evidence_pack_summary: EvidencePackSummary,
     ) -> tuple[dict, UnderstandingStatus]:
-        """Execute v2 builders and return card artifacts + status."""
+        """Execute LLM card builders and return card artifacts + status."""
         llm_client = self.llm_client
         assert llm_client is not None
 
-        # Paper card v2
+        # Paper card
         try:
             paper_card = _run_async_builder(
-                build_paper_card_v2(evidence_pack, paper_skeleton, llm_client)
+                build_paper_card(evidence_pack, paper_skeleton, llm_client)
             )
         except Exception as exc:
-            logger.warning("paper_card_v2 failed: %s", exc)
+            logger.warning("paper_card failed: %s", exc)
             return {}, _build_blocked_status(
                 paper_id,
-                blocking_reason="PAPER_CARD_V2_FAILED",
+                blocking_reason="PAPER_CARD_FAILED",
                 component_status=_component_status(blocked=True, paper_card="FAILED"),
                 evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="V2_BUILDER_FAILED", message=f"paper_card_v2: {exc}")],
+                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"paper_card: {exc}")],
             )
 
-        # Formula cards v2
+        # Formula cards
         try:
             formula_cards = _run_async_builder(
-                build_formula_cards_v2(formula_evidence_pack, paper_skeleton, llm_client)
+                build_formula_cards(formula_evidence_pack, paper_skeleton, llm_client)
             )
         except Exception as exc:
-            logger.warning("formula_cards_v2 failed: %s", exc)
+            logger.warning("formula_cards failed: %s", exc)
             return {}, _build_blocked_status(
                 paper_id,
-                blocking_reason="FORMULA_CARDS_V2_FAILED",
+                blocking_reason="FORMULA_CARDS_FAILED",
                 component_status=_component_status(
                     blocked=True,
                     paper_card="SUCCESS",
                     formula_cards="FAILED",
                 ),
                 evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="V2_BUILDER_FAILED", message=f"formula_cards_v2: {exc}")],
+                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"formula_cards: {exc}")],
             )
 
-        # Teaching cards v2
+        # Teaching cards
         try:
             teaching_cards = _run_async_builder(
-                build_teaching_cards_v2(evidence_pack, paper_card, paper_skeleton, llm_client)
+                build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client)
             )
             # Success
             card_artifacts = {
@@ -347,7 +347,7 @@ class SinglePaperIngestionRunner:
             return card_artifacts, understanding_status
 
         except Exception as exc:
-            logger.warning("teaching_cards_v2 failed: %s", exc)
+            logger.warning("teaching_cards failed: %s", exc)
             # Teaching failure → DEGRADED, but still write paper_card + formula_cards
             card_artifacts = {
                 "paper_card": paper_card,
@@ -357,7 +357,7 @@ class SinglePaperIngestionRunner:
                 paper_id,
                 formula_cards=formula_cards,
                 evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="V2_BUILDER_FAILED", message=f"teaching_cards_v2: {exc}")],
+                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
             )
             return card_artifacts, understanding_status
 

@@ -41,7 +41,7 @@
 - `source_status.json`: Source resolution status
 - `parsed_document.json`: Parsed document blocks
 - `passage_index.json`: Passage-level text index
-- `claim_evidence.json`: Claim evidence v2 (passage-level)
+- `claim_evidence.json`: Claim evidence (passage-level)
 - `evidence_index.json`: Evidence bindings (v1 compatibility wrapper)
 - `paper_skeleton.json`: Paper structure extraction
 - `paper_card.json`: Paper learning card

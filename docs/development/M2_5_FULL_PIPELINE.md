@@ -192,10 +192,10 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 | 测试 | 断言 |
 |------|------|
-| test_v2_success_status | status == "SUCCESS" |
-| test_v2_success_artifact_count | 12 artifacts written |
-| test_v2_success_cards_present | paper_card + formula_cards + teaching_cards written |
-| test_v2_success_user_display | allowed_for_user_display is True |
+| test_success_status | status == "SUCCESS" |
+| test_success_artifact_count | 12 artifacts written |
+| test_success_cards_present | paper_card + formula_cards + teaching_cards written |
+| test_success_user_display | allowed_for_user_display is True |
 
 ### DEGRADED 路径测试
 
@@ -225,7 +225,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 
 | 测试 | 断言 |
 |------|------|
-| test_audit_block_overrides_success | v2 SUCCESS + audit BLOCK → BLOCKED |
+| test_audit_block_overrides_success | LLM SUCCESS + audit BLOCK → BLOCKED |
 | test_audit_block_overrides_degraded | DEGRADED + audit BLOCK → BLOCKED |
 | test_audit_warning_does_not_block | WARNING only → not blocked |
 
@@ -259,7 +259,7 @@ M1 链路由 `DirectionRunner` 编排，详见 M1_LITERATURE_SEARCH.md。
 - ParserAdapter 已接入
 - PassageIndex / ClaimEvidence / EvidencePack 已接入
 - baseline path 已实现
-- v2 path 已实现（SUCCESS / DEGRADED / BLOCKED）
+- LLM card path 已实现（SUCCESS / DEGRADED / BLOCKED）
 - QualityAuditor 已接入
 - understanding_status.json / quality_report.json 已写入
 - DownstreamGates 已实现
@@ -311,7 +311,7 @@ that contains every M1 `FORMULA_CONTEXT` claim.
 The full pipeline must:
 
 - build `formula_evidence_pack.json` from all formula claims
-- call `build_formula_cards_v2()` in bounded batches
+- call `build_formula_cards()` in bounded batches
 - preserve M1 formula identity fields: `formula_id`, page, bbox, origin,
   `equation_number`, `equation_group_id`, `group_order`, crop and overlay paths
 - produce one `formula_cards.json` entry for every formula evidence ref when

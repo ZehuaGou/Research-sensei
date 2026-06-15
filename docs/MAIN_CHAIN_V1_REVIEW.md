@@ -23,12 +23,12 @@
 - ClaimEvidenceV2 / claim_evidence.json 已生成
 - EvidencePack runtime builder 已实现
 - baseline path：BASELINE_ONLY（无 llm_client）
-- v2 path：SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING
+- LLM card path：SUCCESS / DEGRADED_STRUCTURAL / BLOCKED_UNDERSTANDING
 - quality_report.json 已接入所有非 FAILED run
 - understanding_status.json 已接入所有非 FAILED run
-- audit BLOCK 可覆盖 v2 SUCCESS/DEGRADED 为 BLOCKED_UNDERSTANDING
+- audit BLOCK 可覆盖 LLM SUCCESS/DEGRADED 为 BLOCKED_UNDERSTANDING
 - audit WARNING 可写入 UnderstandingStatus.warnings
-- _run_async_builder 处理 sync pipeline 调用 async v2 builders
+- _run_async_builder 处理 sync pipeline 调用 async LLM card builders
 
 ### API
 
@@ -94,7 +94,7 @@
 - 未实现 /quality_report debug endpoint
 - 未实现正式 debug/admin 鉴权
 - Phase 12 未解冻
-- old with_llm builders 仍存在 fallback，但 pipeline v2 不使用它们
+- old with_llm builders 仍存在 fallback，但 current pipeline 不使用它们
 
 ---
 
@@ -128,5 +128,5 @@
 - quality_report 审的是 candidate artifacts（pipeline 写盘前的内存对象），不是 final written artifacts
 - /artifacts 不是普通前端数据入口，是 debug-only raw API
 - Phase 12 不可使用，patterns/drill 标记为"未开放"
-- v2 builders fail-closed，不 fallback
-- old with_llm builders 仍存在 fallback，但 pipeline v2 path 不使用它们
+- LLM card builders fail-closed，不 fallback
+- old with_llm builders 仍存在 fallback，但 current pipeline path 不使用它们

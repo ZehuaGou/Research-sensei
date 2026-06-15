@@ -12,14 +12,14 @@ from researchsensei.audit.quality_auditor import QualityAuditor
 from researchsensei.evidence.claim_extractor import build_claim_evidence
 from researchsensei.evidence.evidence_pack import build_evidence_pack
 from researchsensei.evidence.passage_index import build_passage_index
+from researchsensei.formula_card_baseline import build_formula_cards as build_formula_cards_baseline
 from researchsensei.formula_card import build_formula_cards
-from researchsensei.formula_card_v2 import build_formula_cards_v2
 from researchsensei.grounding import build_evidence_index
 from researchsensei.llm.client import LLMClient
 from researchsensei.m2.artifact_reader import M1ArtifactBundle, M1ArtifactReader
 from researchsensei.m2.survey import build_survey_artifacts
+from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
 from researchsensei.paper_card import build_paper_card
-from researchsensei.paper_card_v2 import build_paper_card_v2
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.schemas import (
     ArtifactBundle,
@@ -37,8 +37,8 @@ from researchsensei.schemas import (
     WarningItem,
 )
 from researchsensei.schemas.status import EvidencePackSummary
+from researchsensei.teaching_card_baseline import build_teaching_cards as build_teaching_cards_baseline
 from researchsensei.teaching_card import build_teaching_cards
-from researchsensei.teaching_card_v2 import build_teaching_cards_v2
 from researchsensei.workspace.store import to_plain_data
 
 
@@ -122,9 +122,9 @@ def run_m2_full_pipeline(
 
     if status is None:
         if llm_client is None:
-            paper_card = build_paper_card(paper_skeleton, evidence_index)
-            formula_cards = build_formula_cards(document, evidence_index, paper_skeleton)
-            teaching_cards = build_teaching_cards(paper_card, formula_cards, paper_skeleton, evidence_index)
+            paper_card = build_paper_card_baseline(paper_skeleton, evidence_index)
+            formula_cards = build_formula_cards_baseline(document, evidence_index, paper_skeleton)
+            teaching_cards = build_teaching_cards_baseline(paper_card, formula_cards, paper_skeleton, evidence_index)
             card_artifacts = {
                 "paper_card": paper_card,
                 "formula_cards": formula_cards,
@@ -473,26 +473,26 @@ def _build_llm_cards(
     llm_client: LLMClient,
 ) -> tuple[dict[str, Any], UnderstandingStatus]:
     try:
-        paper_card = _run_async(build_paper_card_v2(evidence_pack, paper_skeleton, llm_client))
+        paper_card = _run_async(build_paper_card(evidence_pack, paper_skeleton, llm_client))
     except Exception as exc:
         return {}, _blocked_status(
             paper_id,
-            "PAPER_CARD_V2_FAILED",
+            "PAPER_CARD_FAILED",
             evidence_pack_summary,
-            [WarningItem(code="V2_BUILDER_FAILED", message=f"paper_card_v2: {exc}")],
+            [WarningItem(code="CARD_BUILDER_FAILED", message=f"paper_card: {exc}")],
         )
 
     formula_cards: FormulaCardBundle | None = None
     formula_ready = bool(bundle.front_matter.get("m2_ready_for_formula_understanding", True))
     if formula_ready:
         try:
-            formula_cards = _run_async(build_formula_cards_v2(formula_evidence_pack, paper_skeleton, llm_client))
+            formula_cards = _run_async(build_formula_cards(formula_evidence_pack, paper_skeleton, llm_client))
         except Exception as exc:
             return {}, _blocked_status(
                 paper_id,
-                "FORMULA_CARDS_V2_FAILED",
+                "FORMULA_CARDS_FAILED",
                 evidence_pack_summary,
-                [WarningItem(code="V2_BUILDER_FAILED", message=f"formula_cards_v2: {exc}")],
+                [WarningItem(code="CARD_BUILDER_FAILED", message=f"formula_cards: {exc}")],
             )
     else:
         formula_cards = FormulaCardBundle(
@@ -503,14 +503,14 @@ def _build_llm_cards(
         )
 
     try:
-        teaching_cards = _run_async(build_teaching_cards_v2(evidence_pack, paper_card, paper_skeleton, llm_client))
+        teaching_cards = _run_async(build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client))
     except Exception as exc:
         card_artifacts = {"paper_card": paper_card, "formula_cards": formula_cards}
         return card_artifacts, _degraded_status(
             paper_id,
             formula_cards,
             evidence_pack_summary,
-            [WarningItem(code="V2_BUILDER_FAILED", message=f"teaching_cards_v2: {exc}")],
+            [WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
         )
 
     card_artifacts = {

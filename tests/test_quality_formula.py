@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from researchsensei.formula_card import build_formula_cards
+from researchsensei.formula_card_baseline import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
-from researchsensei.paper_card import build_paper_card
+from researchsensei.paper_card_baseline import build_paper_card
 from researchsensei.paper_skeleton import build_paper_skeleton
-from researchsensei.teaching_card import build_teaching_cards
+from researchsensei.teaching_card_baseline import build_teaching_cards
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "quality"
 

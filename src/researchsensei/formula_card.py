@@ -1,15 +1,9 @@
 from __future__ import annotations
 
-import logging
-import re
-
-from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
+from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
-from researchsensei.llm.types import ChatMessage
+from researchsensei.llm.validator import validate_formula_cards_llm_output
 from researchsensei.schemas import (
-    BlockType,
-    DocumentIngestion,
-    EvidenceIndex,
     EvidenceType,
     FormulaCard,
     FormulaCardBundle,
@@ -17,401 +11,433 @@ from researchsensei.schemas import (
     FormulaTerm,
     PaperSkeleton,
 )
-
-logger = logging.getLogger(__name__)
-
-
-def build_formula_cards(
-    document: DocumentIngestion,
-    evidence_index: EvidenceIndex,
-    skeleton: PaperSkeleton,
-) -> FormulaCardBundle:
-    """Build formula cards from parsed document and evidence index (rule-based only)."""
-    formula_blocks = [b for b in document.blocks if b.type == BlockType.FORMULA]
-
-    if not formula_blocks:
-        return FormulaCardBundle(
-            paper_id=document.paper_id,
-            formula_cards=[],
-            warnings=["FORMULA_UNAVAILABLE"],
-            evidence_status=EvidenceType.INSUFFICIENT_EVIDENCE,
-        )
-
-    cards = [_build_single_rule(document, evidence_index, block) for block in formula_blocks]
-    return _build_bundle(document.paper_id, cards)
+from researchsensei.schemas.evidence import EvidencePack, EvidencePackItem
+from researchsensei.schemas.llm_output import FormulaCardLLMOutput, FormulaCardsLLMOutput
 
 
-async def build_formula_cards_with_llm(
-    document: DocumentIngestion,
-    evidence_index: EvidenceIndex,
+FORMULA_CARD_BATCH_SIZE = 5
+DERIVATION_BLOCKED_ORIGINS = {"raw_formula_text", "unknown", "unresolved"}
+
+
+async def build_formula_cards(
+    evidence_pack: EvidencePack,
     skeleton: PaperSkeleton,
     llm_client: LLMClient,
 ) -> FormulaCardBundle:
-    """Build formula cards with LLM enhancement. Falls back to rule-based on failure."""
-    formula_blocks = [b for b in document.blocks if b.type == BlockType.FORMULA]
+    """Build formula cards using an evidence-constrained LLM path.
 
-    if not formula_blocks:
-        return FormulaCardBundle(
-            paper_id=document.paper_id,
-            formula_cards=[],
-            warnings=["FORMULA_UNAVAILABLE"],
-            evidence_status=EvidenceType.INSUFFICIENT_EVIDENCE,
-        )
-
-    cards: list[FormulaCard] = []
-    for block in formula_blocks:
-        try:
-            card = await _build_single_llm(document, evidence_index, skeleton, block, llm_client)
-        except Exception as exc:
-            logger.warning("LLM formula card failed for %s, falling back: %s", block.block_id, exc)
-            card = _build_single_rule(document, evidence_index, block)
-        cards.append(card)
-
-    return _build_bundle(document.paper_id, cards)
-
-
-def _build_bundle(paper_id: str, cards: list[FormulaCard]) -> FormulaCardBundle:
-    """Build a FormulaCardBundle from a list of cards."""
-    return FormulaCardBundle(
-        paper_id=paper_id,
-        formula_cards=cards,
-        evidence_refs=_collect_evidence_refs(cards),
-        confidence=_bundle_confidence(cards),
-        warnings=_collect_warnings(cards),
-        evidence_status=_overall_status(cards),
-    )
-
-
-def _build_single_rule(
-    document: DocumentIngestion,
-    evidence_index: EvidenceIndex,
-    block,
-) -> FormulaCard:
-    """Rule-based formula card: conservative extraction, no LLM."""
-    formula_raw = block.raw_latex or block.text
-    evidence_ref = block.evidence_ref
-    section = block.section
-    nearby = block.text if block.raw_latex else ""
-
-    # Find matching evidence claim
-    matching_claim = None
-    for claim in evidence_index.claims:
-        if claim.block_id == block.block_id:
-            matching_claim = claim
-            break
-
-    evidence_status = matching_claim.evidence_type if matching_claim else EvidenceType.NEEDS_HUMAN_CHECK
-    confidence = matching_claim.confidence if matching_claim else 0.2
-
-    # Extract symbols via regex
-    symbols = _extract_symbols(formula_raw)
-
-    # Extract terms (heuristic: split on +, -, =)
-    terms = _extract_terms(formula_raw)
-
-    # Determine purpose from section context
-    purpose = _infer_purpose(section, nearby)
-
-    warnings: list[str] = []
-    if not nearby:
-        warnings.append("NO_NEARBY_TEXT")
-    if purpose == "UNKNOWN":
-        warnings.append("PURPOSE_UNKNOWN_NEEDS_HUMAN_CHECK")
-        confidence = min(confidence, 0.3)
-
-    return FormulaCard(
-        formula_id=f"{document.paper_id}:eq:{block.block_id}",
-        paper_id=document.paper_id,
-        formula_raw=formula_raw,
-        location=section,
-        purpose=purpose,
-        symbols=symbols,
-        terms=terms,
-        intuition="NEEDS_HUMAN_CHECK",
-        numeric_example="NEEDS_HUMAN_CHECK",
-        what_if_removed="NEEDS_HUMAN_CHECK",
-        weight_sensitivity="NEEDS_HUMAN_CHECK",
-        plain_summary="NEEDS_HUMAN_CHECK",
-        evidence_ref=evidence_ref,
-        evidence_status=evidence_status,
-        confidence=confidence,
-        warnings=warnings,
-    )
-
-
-async def _build_single_llm(
-    document: DocumentIngestion,
-    evidence_index: EvidenceIndex,
-    skeleton: PaperSkeleton,
-    block,
-    llm_client: LLMClient,
-) -> FormulaCard:
-    """LLM-enhanced formula card: uses LLM for explanations within evidence constraints."""
-    rule_card = _build_single_rule(document, evidence_index, block)
-
-    formula_raw = block.raw_latex or block.text
-    nearby = block.text if block.raw_latex else ""
-    evidence_text = _format_evidence_for_prompt(evidence_index, block.block_id)
-
+    LLM failure, invalid JSON, schema validation failure, or invalid
+    evidence_ref raises directly. There is no rule-based fallback here.
+    """
     prompt_builder = PromptBuilder()
-    messages = prompt_builder.build_simple(
-        system=(
-            "你是 ResearchSensei 的公式讲解引擎。\n"
-            "把 LaTeX 公式讲清楚，面向数学基础较弱的用户。\n"
-            "严格约束：\n"
-            "1. 不得生成证据之外的内容\n"
-            "2. 不知道就写 UNKNOWN 或 NEEDS_HUMAN_CHECK\n"
-            "3. 每个解释必须绑定 evidence_ref\n"
-            "4. 不得把数学猜测写成论文事实\n"
-            "输出 JSON 格式。"
-        ),
-        user=f"""公式: {formula_raw[:1000]}
-附近文本: {nearby[:1000]}
-证据: {evidence_text[:2000]}
+    formula_items = _formula_items(evidence_pack)
+    if not formula_items:
+        return FormulaCardBundle(
+            paper_id=skeleton.paper_id,
+            formula_cards=[],
+            confidence=0.0,
+            warnings=["NO_FORMULA_EVIDENCE_IN_PACK"],
+            evidence_status=EvidenceType.INSUFFICIENT_EVIDENCE,
+        )
 
-要求输出 JSON:
+    derivable_items = [
+        item for item in formula_items
+        if not _is_derivation_blocked_formula(item)
+    ]
+    llm_cards: list[FormulaCardLLMOutput] = []
+    warnings: list[str] = []
+    for start in range(0, len(derivable_items), FORMULA_CARD_BATCH_SIZE):
+        batch = derivable_items[start:start + FORMULA_CARD_BATCH_SIZE]
+        batch_pack = EvidencePack(
+            paper_id=evidence_pack.paper_id,
+            items=batch,
+            total_tokens=sum(item.token_count for item in batch),
+        )
+        messages = _build_batch_messages(prompt_builder, skeleton, batch)
+        data = await llm_client.chat_json(messages)
+        output = FormulaCardsLLMOutput.model_validate(data)
+        if output.formula_cards:
+            validate_formula_cards_llm_output(output, batch_pack)
+            llm_cards.extend(output.formula_cards)
+        else:
+            refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
+            warnings.append(f"LLM_EMPTY_FORMULA_BATCH: {refs}")
+
+    return _convert_to_bundle(llm_cards, evidence_pack, skeleton, warnings)
+
+
+def _build_batch_messages(
+    prompt_builder: PromptBuilder,
+    skeleton: PaperSkeleton,
+    formula_items: list[EvidencePackItem],
+):
+    evidence_text = _format_evidence_for_prompt(formula_items)
+    allowed_refs = "\n".join(f"- {item.evidence_ref}" for item in formula_items if item.evidence_ref) or "- NONE"
+    return prompt_builder.build_simple(
+        system=(
+            "You are the ResearchSensei formula-understanding builder.\n"
+            "Use only the supplied formula evidence. Do not infer from outside knowledge.\n"
+            "Each formula_card must cite exactly one allowed evidence_ref.\n"
+            "Preserve formula_id, formula_origin, formula_ocr_status, page, and equation identity from evidence.\n"
+            "Do not output formula_raw; M2 restores exact LaTeX from evidence to avoid invalid JSON escaping.\n"
+            "Never claim parser/OCR/raw formulas are source-level LaTeX.\n"
+            "Return only valid JSON."
+        ),
+        user=f"""Paper title: {skeleton.title}
+
+Formula evidence batch:
+{evidence_text}
+
+Allowed evidence_ref values:
+{allowed_refs}
+
+Constraints:
+- Generate one formula_card for every formula evidence item in this batch.
+- If a formula has insufficient context, still return a degraded card for that formula and write INSUFFICIENT_EVIDENCE in unsupported fields.
+- Choose evidence_ref exactly from the allowed list.
+- Use formula_id/formula_origin/formula_ocr_status exactly as shown in evidence.
+- Do not include formula_raw or raw LaTeX strings in the JSON output.
+- For source_latex, formula_explanation_status should be source_exact.
+- For parser_latex, mineru_latex, or marker_latex, formula_explanation_status should be parser_derived.
+- For ocr_latex, formula_explanation_status should be ocr_derived and confidence should be cautious.
+- For raw_formula_text, unknown, or unresolved origins, do not provide detailed derivation; mark degraded/INSUFFICIENT_EVIDENCE.
+- Use concise Chinese explanations with necessary English/math terms preserved.
+
+Return JSON with this schema:
 {{
-  "purpose": "这个公式在论文中起什么作用",
-  "intuition": "用直觉解释这个公式",
-  "numeric_example": "一个小数字例子",
-  "what_if_removed": "去掉这个公式会怎样",
-  "weight_sensitivity": "关键参数变大变小会怎样",
-  "plain_summary": "一句话人话总结",
-  "symbols": [{{"symbol": "x", "meaning": "输入数据"}}],
-  "terms": [{{"term": "L_rec", "meaning": "重构损失", "encourages": "准确重构", "penalizes": "重构误差", "if_removed": "模型不学习重构"}}],
-  "evidence_ref": "对应的证据引用"
+  "formula_cards": [
+    {{
+      "formula_id": "formula id from evidence",
+      "formula_origin": "origin from evidence",
+      "formula_ocr_status": "ocr status from evidence",
+      "formula_explanation_status": "source_exact | parser_derived | ocr_derived | degraded",
+      "purpose": "what this formula does in the paper",
+      "symbols": [{{"symbol": "x", "meaning": "meaning grounded in evidence"}}],
+      "terms": [{{"term": "loss term", "meaning": "meaning", "encourages": "what it encourages", "penalizes": "what it penalizes", "if_removed": "effect if removed"}}],
+      "intuition": "plain-language intuition",
+      "numeric_example": "small example if evidence supports it, otherwise INSUFFICIENT_EVIDENCE",
+      "what_if_removed": "what likely breaks, or INSUFFICIENT_EVIDENCE",
+      "weight_sensitivity": "effect of changing important weights/terms, or INSUFFICIENT_EVIDENCE",
+      "plain_summary": "one sentence summary",
+      "evidence_ref": "allowed ref"
+    }}
+  ]
 }}""",
     )
 
-    response = await llm_client.chat(messages)
-    try:
-        data = parse_llm_json(response.content)
-    except LLMResponseError:
-        raise
 
-    return _merge_llm_into_card(rule_card, data, evidence_index)
+def _convert_to_bundle(
+    output_cards: list[FormulaCardLLMOutput],
+    evidence_pack: EvidencePack,
+    skeleton: PaperSkeleton,
+    warnings: list[str],
+) -> FormulaCardBundle:
+    """Convert LLM output to FormulaCardBundle."""
+    evidence_by_ref = {item.evidence_ref: item for item in evidence_pack.items if item.evidence_ref}
+    avg_confidence = _avg_confidence(evidence_pack)
+    paper_id = skeleton.paper_id
 
-
-def _merge_llm_into_card(
-    rule_card: FormulaCard,
-    llm_data: dict,
-    evidence_index: EvidenceIndex,
-) -> FormulaCard:
-    """Merge LLM output into rule-based card, enforcing evidence constraints."""
-    valid_refs = {claim.evidence_ref for claim in evidence_index.claims}
-
-    # Validate evidence_ref
-    ref = llm_data.get("evidence_ref", "")
-    if ref and ref not in valid_refs:
-        ref = ""  # LLM hallucinated a ref
-
-    evidence_status = rule_card.evidence_status
-    confidence = rule_card.confidence
-    if ref:
-        matching = next((c for c in evidence_index.claims if c.evidence_ref == ref), None)
-        if matching:
-            evidence_status = matching.evidence_type
-            confidence = matching.confidence
-
-    # Parse symbols from LLM
-    llm_symbols = []
-    for s in llm_data.get("symbols", []):
-        llm_symbols.append(FormulaSymbol(
-            symbol=s.get("symbol", "?"),
-            meaning=s.get("meaning", "UNKNOWN"),
-            evidence_status=evidence_status,
-            confidence=confidence,
+    cards: list[FormulaCard] = []
+    used_refs: set[str] = set()
+    for i, llm_card in enumerate(output_cards):
+        ref = llm_card.evidence_ref if llm_card.evidence_ref in evidence_by_ref else ""
+        evidence = evidence_by_ref.get(ref)
+        if evidence is None:
+            continue
+        if ref in used_refs:
+            warnings.append(f"DUPLICATE_FORMULA_CARD_REF: {ref}")
+            continue
+        used_refs.add(ref)
+        formula_raw = _formula_raw_from_evidence(evidence)
+        formula_origin = _formula_origin_from_evidence(evidence)
+        formula_ocr_status = _formula_ocr_status_from_evidence(evidence, formula_origin)
+        formula_id = evidence.formula_id or f"{paper_id}:eq:v2:{i:03d}"
+        explanation_status = _normalized_explanation_status(
+            llm_card.formula_explanation_status,
+            formula_origin,
+        )
+        confidence = _card_confidence(formula_origin, avg_confidence, explanation_status)
+        if _is_derivation_blocked_origin(formula_origin):
+            cards.append(_fallback_card(evidence, paper_id))
+            warnings.append(f"FORMULA_DERIVATION_BLOCKED_FOR_UNRELIABLE_PROVENANCE: {ref}")
+            continue
+        cards.append(FormulaCard(
+            formula_id=formula_id,
+            paper_id=paper_id,
+            formula_raw=formula_raw,
+            original_latex=formula_raw if formula_origin == "source_latex" else "",
+            formula_origin=formula_origin,
+            formula_ocr_status=formula_ocr_status,
+            formula_explanation_status=explanation_status,
+            formula_page=evidence.formula_page,
+            equation_number=evidence.equation_number,
+            equation_group_id=evidence.equation_group_id,
+            group_order=evidence.group_order,
+            group_crop_path=evidence.group_crop_path,
+            coverage_status="LLM_EXPLAINED",
+            is_core_formula=True,
+            derivation_status=_derivation_status(formula_origin, explanation_status),
+            location=_location(evidence),
+            purpose=llm_card.purpose or "UNKNOWN",
+            symbols=_symbols(llm_card.symbols, confidence),
+            terms=_terms(llm_card.terms, confidence),
+            intuition=llm_card.intuition or "UNKNOWN",
+            numeric_example=llm_card.numeric_example or "UNKNOWN",
+            what_if_removed=llm_card.what_if_removed or "UNKNOWN",
+            weight_sensitivity=llm_card.weight_sensitivity or "UNKNOWN",
+            plain_summary=llm_card.plain_summary or "UNKNOWN",
+            evidence_ref=ref,
+            evidence_status=EvidenceType.SUPPORTED_BY_FORMULA if ref else EvidenceType.UNVERIFIED,
+            confidence=confidence if ref else 0.0,
+            warnings=list(evidence.risk_flags) if evidence else [],
         ))
 
-    # Parse terms from LLM
-    llm_terms = []
-    for t in llm_data.get("terms", []):
-        llm_terms.append(FormulaTerm(
-            term=t.get("term", "?"),
-            meaning=t.get("meaning", "UNKNOWN"),
-            encourages=t.get("encourages", "UNKNOWN"),
-            penalizes=t.get("penalizes", "UNKNOWN"),
-            if_removed=t.get("if_removed", "UNKNOWN"),
-            evidence_status=evidence_status,
-            confidence=confidence,
-        ))
+    for item in evidence_pack.items:
+        if item.claim_type != "FORMULA_CONTEXT" or not item.evidence_ref:
+            continue
+        if item.evidence_ref not in used_refs:
+            cards.append(_fallback_card(item, paper_id))
+            if _is_derivation_blocked_formula(item):
+                warnings.append(
+                    f"FORMULA_DERIVATION_BLOCKED_FOR_UNRELIABLE_PROVENANCE: {item.formula_id or item.evidence_ref}"
+                )
+            else:
+                warnings.append(f"LLM_CARD_MISSING_FOR_FORMULA: {item.formula_id or item.evidence_ref}")
 
-    def _safe_str(val: str, fallback: str) -> str:
-        return val if val and val != "UNKNOWN" else fallback
+    evidence_refs = sorted({c.evidence_ref for c in cards if c.evidence_ref})
+    if _has_derivable_formula_items(evidence_pack) and not output_cards:
+        warnings.append("NO_FORMULA_CARDS_FROM_LLM")
 
-    return rule_card.model_copy(
-        update={
-            "purpose": _safe_str(llm_data.get("purpose", ""), rule_card.purpose),
-            "intuition": _safe_str(llm_data.get("intuition", ""), rule_card.intuition),
-            "numeric_example": _safe_str(llm_data.get("numeric_example", ""), rule_card.numeric_example),
-            "what_if_removed": _safe_str(llm_data.get("what_if_removed", ""), rule_card.what_if_removed),
-            "weight_sensitivity": _safe_str(llm_data.get("weight_sensitivity", ""), rule_card.weight_sensitivity),
-            "plain_summary": _safe_str(llm_data.get("plain_summary", ""), rule_card.plain_summary),
-            "symbols": llm_symbols if llm_symbols else rule_card.symbols,
-            "terms": llm_terms if llm_terms else rule_card.terms,
-            "evidence_ref": ref or rule_card.evidence_ref,
-            "evidence_status": evidence_status,
-            "confidence": confidence,
-        }
+    return FormulaCardBundle(
+        paper_id=paper_id,
+        formula_cards=cards,
+        evidence_refs=evidence_refs,
+        confidence=_bundle_confidence(cards),
+        warnings=warnings,
+        evidence_status=EvidenceType.SUPPORTED_BY_FORMULA if cards else EvidenceType.INSUFFICIENT_EVIDENCE,
     )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def _formula_items(evidence_pack: EvidencePack) -> list[EvidencePackItem]:
+    return [
+        item for item in evidence_pack.items
+        if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
+    ]
 
 
-# Common LaTeX symbols and their typical meanings
-_SYMBOL_KNOWN: dict[str, str] = {
-    "L": "损失函数或优化目标",
-    "lambda": "正则项权重",
-    "alpha": "学习率或权重参数",
-    "beta": "动量或权重参数",
-    "gamma": "衰减系数",
-    "theta": "模型参数",
-    "omega": "权重矩阵或参数",
-    "x": "输入数据",
-    "y": "输出或标签",
-    "z": "隐变量或中间表示",
-    "h": "隐藏层表示",
-    "W": "权重矩阵",
-    "b": "偏置项",
-    "mu": "均值",
-    "sigma": "标准差",
-    "epsilon": "小常数或噪声",
-    "delta": "差值或变化量",
-    "n": "样本数量",
-    "N": "样本总数",
-    "t": "时间步",
-    "T": "总时间步",
-    "d": "维度",
-    "K": "类别数或聚类数",
-    "p": "概率",
-    "q": "概率",
-    "H": "熵",
-    "D": "距离或散度",
-    "E": "期望",
-    "P": "概率分布",
-    "Q": "近似分布",
-    "R": "正则项或奖励",
-    "f": "函数",
-    "g": "函数",
-    "r": "比率或奖励",
-    "v": "值函数",
-    "s": "状态",
-    "a": "动作",
-}
+def _formula_origin_from_evidence(evidence: EvidencePackItem) -> str:
+    return (evidence.formula_origin or "").strip() or "unknown"
 
 
-def _extract_symbols(formula_raw: str) -> list[FormulaSymbol]:
-    """Extract symbols from LaTeX formula via regex."""
-    # Match single-letter variables and common LaTeX commands
-    candidates = set()
+def _formula_ocr_status_from_evidence(evidence: EvidencePackItem, formula_origin: str) -> str:
+    status = (evidence.formula_ocr_status or "").strip()
+    if status:
+        return status
+    if formula_origin == "ocr_latex":
+        return "ocr_status_unknown"
+    if _is_derivation_blocked_origin(formula_origin):
+        return "not_available"
+    return "not_required"
 
-    # Single-letter variables (not in common LaTeX commands)
-    for match in re.finditer(r"(?<![a-zA-Z\\])([a-zA-Z])(?![a-zA-Z])", formula_raw):
-        sym = match.group(1)
-        if sym not in {"d", "e"}:  # Skip common non-symbol letters
-            candidates.add(sym)
 
-    # Greek letters via LaTeX commands
-    for match in re.finditer(r"\\([a-zA-Z]+)", formula_raw):
-        cmd = match.group(1)
-        if cmd in _SYMBOL_KNOWN:
-            candidates.add(cmd)
+def _is_derivation_blocked_formula(item: EvidencePackItem) -> bool:
+    return _is_derivation_blocked_origin(_formula_origin_from_evidence(item))
 
+
+def _is_derivation_blocked_origin(formula_origin: str) -> bool:
+    return formula_origin in DERIVATION_BLOCKED_ORIGINS
+
+
+def _has_derivable_formula_items(evidence_pack: EvidencePack) -> bool:
+    return any(
+        item.claim_type == "FORMULA_CONTEXT"
+        and item.evidence_ref
+        and not _is_derivation_blocked_formula(item)
+        for item in evidence_pack.items
+    )
+
+
+def _formula_raw_from_evidence(evidence: EvidencePackItem | None) -> str:
+    if evidence is None:
+        return ""
+    text = evidence.passage_text
+    marker = "Formula:"
+    if marker in text:
+        return text.split(marker, 1)[1].split("Context before:", 1)[0].strip()
+    return text[:300].strip()
+
+
+def _explanation_status(formula_origin: str) -> str:
+    if formula_origin == "source_latex":
+        return "source_exact"
+    if formula_origin in {"raw_formula_text", "unknown", "unresolved"}:
+        return "degraded"
+    return "parser_derived"
+
+
+def _normalized_explanation_status(candidate: str, formula_origin: str) -> str:
+    candidate = (candidate or "").strip().lower()
+    if formula_origin == "source_latex":
+        return "source_exact"
+    if formula_origin in {"parser_latex", "mineru_latex", "marker_latex"}:
+        return "parser_derived"
+    if formula_origin == "ocr_latex":
+        return "ocr_derived"
+    if _is_derivation_blocked_origin(formula_origin):
+        return "degraded"
+    allowed = {"source_exact", "parser_derived", "ocr_derived", "degraded"}
+    if candidate in allowed:
+        return candidate
+    return _explanation_status(formula_origin)
+
+
+def _derivation_status(formula_origin: str, explanation_status: str) -> str:
+    if formula_origin in {"raw_formula_text", "unknown", "unresolved"} or explanation_status == "degraded":
+        return "blocked"
+    if explanation_status == "source_exact":
+        return "source_grounded"
+    if explanation_status == "ocr_derived":
+        return "ocr_cautious"
+    return "parser_derived"
+
+
+def _card_confidence(formula_origin: str, avg_confidence: float, explanation_status: str) -> float:
+    base = avg_confidence or 0.6
+    if formula_origin == "source_latex":
+        return min(max(base, 0.7), 0.9)
+    if formula_origin in {"parser_latex", "mineru_latex", "marker_latex"}:
+        return min(base, 0.74)
+    if formula_origin == "ocr_latex":
+        return min(base, 0.65)
+    if formula_origin in {"raw_formula_text", "unknown", "unresolved"} or explanation_status == "degraded":
+        return min(base, 0.35)
+    return min(base, 0.5)
+
+
+def _fallback_card(item: EvidencePackItem, paper_id: str) -> FormulaCard:
+    formula_raw = _formula_raw_from_evidence(item)
+    origin = _formula_origin_from_evidence(item)
+    raw_or_unknown = _is_derivation_blocked_origin(origin)
+    warning = "RAW_OR_UNRESOLVED_FORMULA_DERIVATION_BLOCKED" if raw_or_unknown else "LLM_CARD_MISSING"
+    return FormulaCard(
+        formula_id=item.formula_id or item.evidence_ref,
+        paper_id=paper_id,
+        formula_raw=formula_raw,
+        original_latex=formula_raw if origin == "source_latex" else "",
+        formula_origin=origin,
+        formula_ocr_status=_formula_ocr_status_from_evidence(item, origin),
+        formula_explanation_status="degraded" if raw_or_unknown else _explanation_status(origin),
+        formula_page=item.formula_page,
+        equation_number=item.equation_number,
+        equation_group_id=item.equation_group_id,
+        group_order=item.group_order,
+        group_crop_path=item.group_crop_path,
+        coverage_status="SUMMARY_ONLY" if not raw_or_unknown else "BLOCKED_RAW_ONLY",
+        is_core_formula=False,
+        derivation_status="blocked" if raw_or_unknown else "summary_only",
+        location=_location(item),
+        purpose=_fallback_purpose(item, raw_or_unknown),
+        intuition="INSUFFICIENT_EVIDENCE" if raw_or_unknown else "M2 preserved the formula evidence, but the LLM did not return a dedicated explanation for this formula.",
+        numeric_example="INSUFFICIENT_EVIDENCE",
+        what_if_removed="INSUFFICIENT_EVIDENCE",
+        weight_sensitivity="INSUFFICIENT_EVIDENCE",
+        plain_summary=_fallback_summary(item, raw_or_unknown),
+        evidence_ref=item.evidence_ref,
+        evidence_status=EvidenceType.NEEDS_HUMAN_CHECK if raw_or_unknown else EvidenceType.SUPPORTED_BY_FORMULA,
+        confidence=0.0 if raw_or_unknown else 0.45,
+        warnings=list(dict.fromkeys([*item.risk_flags, warning])),
+    )
+
+
+def _fallback_purpose(item: EvidencePackItem, raw_or_unknown: bool) -> str:
+    if raw_or_unknown:
+        return "INSUFFICIENT_EVIDENCE: M1 did not provide reliable LaTeX for downstream derivation."
+    context = item.quote_or_summary or item.passage_text
+    return f"Formula evidence preserved from M1 context: {context[:180].strip() or 'UNKNOWN'}"
+
+
+def _fallback_summary(item: EvidencePackItem, raw_or_unknown: bool) -> str:
+    if raw_or_unknown:
+        return "M2 preserved this formula slot but blocked detailed derivation because only raw/unknown formula text was available."
+    return "M2 preserved this formula slot and provided a summary-only card because the LLM omitted a dedicated card."
+
+
+def _location(item: EvidencePackItem) -> str:
+    parts: list[str] = []
+    if item.formula_page is not None:
+        parts.append(f"page {item.formula_page}")
+    if item.equation_number:
+        parts.append(f"equation {item.equation_number}")
+    if item.equation_group_id:
+        parts.append(f"group {item.equation_group_id}")
+    return ", ".join(parts)
+
+
+def _symbols(values: list[dict], confidence: float) -> list[FormulaSymbol]:
     symbols: list[FormulaSymbol] = []
-    for sym in sorted(candidates):
-        meaning = _SYMBOL_KNOWN.get(sym, "UNKNOWN")
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        symbol = str(value.get("symbol") or "").strip()
+        if not symbol:
+            continue
         symbols.append(FormulaSymbol(
-            symbol=sym,
-            meaning=meaning,
-            evidence_status=EvidenceType.NEEDS_HUMAN_CHECK if meaning == "UNKNOWN" else EvidenceType.REASONABLE_INFERENCE,
-            confidence=0.3 if meaning == "UNKNOWN" else 0.5,
+            symbol=symbol,
+            meaning=str(value.get("meaning") or "UNKNOWN"),
+            evidence_status=EvidenceType.SUPPORTED_BY_FORMULA,
+            confidence=confidence,
         ))
+    return symbols
 
-    return symbols[:10]  # Limit to 10 symbols
 
-
-def _extract_terms(formula_raw: str) -> list[FormulaTerm]:
-    """Extract terms from formula by splitting on +, -, =."""
-    # Simple heuristic: split on top-level operators
-    parts = re.split(r"[+=]", formula_raw)
+def _terms(values: list[dict], confidence: float) -> list[FormulaTerm]:
     terms: list[FormulaTerm] = []
-    for part in parts:
-        term = part.strip()
-        if term and len(term) > 1:
-            terms.append(FormulaTerm(
-                term=term[:100],
-                meaning="UNKNOWN",
-                encourages="UNKNOWN",
-                penalizes="UNKNOWN",
-                if_removed="UNKNOWN",
-                evidence_status=EvidenceType.NEEDS_HUMAN_CHECK,
-                confidence=0.1,
-            ))
-    return terms[:6]  # Limit to 6 terms
-
-
-def _infer_purpose(section: str, nearby: str) -> str:
-    """Infer formula purpose from section context."""
-    section_lower = section.lower()
-    if "method" in section_lower or "approach" in section_lower:
-        return "定义模型的核心优化目标或计算过程"
-    if "experiment" in section_lower or "result" in section_lower:
-        return "用于实验评估或指标计算"
-    if "loss" in nearby.lower() or "objective" in nearby.lower():
-        return "定义损失函数或优化目标"
-    if "attention" in nearby.lower():
-        return "定义注意力计算机制"
-    return "UNKNOWN"
-
-
-def _format_evidence_for_prompt(evidence_index: EvidenceIndex, block_id: str) -> str:
-    """Format relevant evidence for formula prompt."""
-    lines: list[str] = []
-    for claim in evidence_index.claims:
-        if claim.block_id == block_id or claim.evidence_type == EvidenceType.SUPPORTED_BY_FORMULA:
-            lines.append(
-                f"- [{claim.evidence_type.value}] {claim.evidence_ref}: "
-                f"{claim.quote_or_summary[:200]}"
-            )
-    return "\n".join(lines[:10])
-
-
-def _collect_evidence_refs(cards: list[FormulaCard]) -> list[str]:
-    """Collect unique evidence refs from formula cards."""
-    refs: list[str] = []
-    for card in cards:
-        if card.evidence_ref and card.evidence_ref not in refs:
-            refs.append(card.evidence_ref)
-    return refs
-
-
-def _overall_status(cards: list[FormulaCard]) -> EvidenceType:
-    """Determine overall evidence status from all formula cards."""
-    if not cards:
-        return EvidenceType.INSUFFICIENT_EVIDENCE
-    types = {card.evidence_status for card in cards}
-    if EvidenceType.SUPPORTED_BY_FORMULA in types:
-        return EvidenceType.SUPPORTED_BY_FORMULA
-    if EvidenceType.SUPPORTED_BY_TEXT in types:
-        return EvidenceType.SUPPORTED_BY_TEXT
-    if EvidenceType.NEEDS_HUMAN_CHECK in types:
-        return EvidenceType.NEEDS_HUMAN_CHECK
-    return EvidenceType.INSUFFICIENT_EVIDENCE
-
-
-def _collect_warnings(cards: list[FormulaCard]) -> list[str]:
-    """Collect warnings from all formula cards."""
-    warnings: set[str] = set()
-    for card in cards:
-        warnings.update(card.warnings)
-    return sorted(warnings)
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        term = str(value.get("term") or "").strip()
+        if not term:
+            continue
+        terms.append(FormulaTerm(
+            term=term,
+            meaning=str(value.get("meaning") or "UNKNOWN"),
+            encourages=str(value.get("encourages") or "UNKNOWN"),
+            penalizes=str(value.get("penalizes") or "UNKNOWN"),
+            if_removed=str(value.get("if_removed") or "UNKNOWN"),
+            evidence_status=EvidenceType.SUPPORTED_BY_FORMULA,
+            confidence=confidence,
+        ))
+    return terms
 
 
 def _bundle_confidence(cards: list[FormulaCard]) -> float:
-    """Calculate bundle confidence from individual card confidences."""
     if not cards:
         return 0.0
-    return round(sum(c.confidence for c in cards) / len(cards), 2)
+    return round(sum(card.confidence for card in cards) / len(cards), 2)
+
+
+def _avg_confidence(evidence_pack: EvidencePack) -> float:
+    if not evidence_pack.items:
+        return 0.0
+    return round(sum(i.confidence for i in evidence_pack.items) / len(evidence_pack.items), 2)
+
+
+def _format_evidence_for_prompt(items: list[EvidencePackItem]) -> str:
+    lines: list[str] = []
+    for item in items:
+        lines.append(
+            "\n".join(
+                [
+                    f"- evidence_ref: {item.evidence_ref}",
+                    f"  formula_id: {item.formula_id}",
+                    f"  formula_origin: {item.formula_origin or 'unknown'}",
+                    f"  formula_ocr_status: {item.formula_ocr_status or 'not_required'}",
+                    f"  page: {item.formula_page if item.formula_page is not None else 'unknown'}",
+                    f"  equation_number: {item.equation_number or 'unknown'}",
+                    f"  equation_group_id: {item.equation_group_id or 'unknown'}",
+                    f"  group_order: {item.group_order}",
+                    f"  text: {item.passage_text[:500]}",
+                ]
+            )
+        )
+    return "\n".join(lines)

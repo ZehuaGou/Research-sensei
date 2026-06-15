@@ -106,7 +106,7 @@ M2.4 承接 M2.3 的卡片输出，进行质量审计：candidate artifacts + ca
 
 QualityReport 当前审计的是 **candidate artifacts**，即 pipeline 写盘前的内存对象。
 
-当 audit BLOCK v2 SUCCESS / DEGRADED 时：
+当 audit BLOCK LLM SUCCESS / DEGRADED 时：
 - `quality_report.json` 记录 candidate audit finding；
 - final `understanding_status` 改为 `BLOCKED_UNDERSTANDING`；
 - final artifacts **不写** `paper_card` / `formula_cards` / `teaching_cards`；
@@ -303,7 +303,7 @@ paper_terms = title_words | abstract_words
 
 | 测试 | 断言 |
 |------|------|
-| test_audit_block_overrides_success | audit BLOCK → BLOCKED_UNDERSTANDING even if v2 SUCCESS |
+| test_audit_block_overrides_success | audit BLOCK → BLOCKED_UNDERSTANDING even if LLM SUCCESS |
 | test_audit_block_overrides_degraded | audit BLOCK → BLOCKED_UNDERSTANDING even if DEGRADED |
 | test_audit_warning_does_not_block | audit WARNING only → not blocked, warning in warnings |
 | test_quality_report_written | quality_report.json exists after pipeline run |

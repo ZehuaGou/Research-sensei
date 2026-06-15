@@ -112,7 +112,7 @@ def test_m1_output_loadable_by_m2_artifact_reader(tmp_path) -> None:
 
     assert result.quality.status.value == "PASS"
 
-    # Now write the M2 bundle artifacts (same as v2 acceptance script does)
+    # Now write the M2 bundle artifacts (same as acceptance script does)
     _write_m2_artifacts(tmp_path, result)
 
     # M1ArtifactReader should load without error
@@ -161,7 +161,7 @@ def test_formula_slot_has_all_m2_contract_fields(tmp_path) -> None:
 
 
 def _write_m2_artifacts(output_dir: Path, result) -> None:
-    """Write the M2 bundle artifacts that the v2 acceptance script generates."""
+    """Write the M2 bundle artifacts that the acceptance script generates."""
     paper_metadata = {
         "paper_id": "p-m2-contract",
         "title": "M2 Contract Test Paper",

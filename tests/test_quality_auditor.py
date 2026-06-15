@@ -774,17 +774,17 @@ def test_formula_card_coverage_skips_when_m1_formula_understanding_not_ready() -
 def test_auditor_does_not_import_old_builders() -> None:
     import researchsensei.audit.quality_auditor as mod
     source = open(mod.__file__, encoding="utf-8").read()
-    assert "from researchsensei.paper_card import" not in source
-    assert "from researchsensei.formula_card import" not in source
-    assert "from researchsensei.teaching_card import" not in source
+    assert "from researchsensei.paper_card_baseline" not in source
+    assert "from researchsensei.formula_card_baseline" not in source
+    assert "from researchsensei.teaching_card_baseline" not in source
 
 
-def test_auditor_does_not_import_v2_builders() -> None:
+def test_auditor_does_not_import_card_builders() -> None:
     import researchsensei.audit.quality_auditor as mod
     source = open(mod.__file__, encoding="utf-8").read()
-    assert "paper_card_v2" not in source
-    assert "formula_card_v2" not in source
-    assert "teaching_card_v2" not in source
+    assert "from researchsensei.paper_card" not in source
+    assert "from researchsensei.formula_card" not in source
+    assert "from researchsensei.teaching_card" not in source
 
 
 def test_auditor_does_not_write_files(tmp_path) -> None:

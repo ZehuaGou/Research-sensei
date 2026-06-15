@@ -181,7 +181,7 @@ describe('LearningWorkspaceView', () => {
           understanding_status: {
             status: 'DEGRADED_STRUCTURAL',
             blocking_reason: 'TEACHING_CARDS_FAILED',
-            warnings: [{ code: 'V2_BUILDER_FAILED', message: 'teaching_cards_v2 failed' }],
+            warnings: [{ code: 'CARD_BUILDER_FAILED', message: 'teaching_cards failed' }],
             component_status: { paper_card: 'SUCCESS', formula_cards: 'SUCCESS', teaching_cards: 'FAILED' },
             allowed_downstream: { reading_display: true, advisor_questions: false },
           },

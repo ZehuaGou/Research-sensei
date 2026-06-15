@@ -31,7 +31,7 @@ describe('StatusBanner', () => {
       props: {
         status: 'DEGRADED_STRUCTURAL',
         blockingReason: 'TEACHING_CARDS_FAILED',
-        warnings: [{ code: 'V2_BUILDER_FAILED', message: 'teaching cards failed' }],
+        warnings: [{ code: 'CARD_BUILDER_FAILED', message: 'teaching cards failed' }],
         missingComponents: ['teaching_cards'],
         paperWorkspaceStatus: {
           canonicalization_status: 'success',
@@ -46,7 +46,7 @@ describe('StatusBanner', () => {
 
     expect(wrapper.text()).toContain('Degraded understanding')
     expect(wrapper.text()).toContain('missing_components: teaching_cards')
-    expect(wrapper.text()).toContain('V2_BUILDER_FAILED: teaching cards failed')
+    expect(wrapper.text()).toContain('CARD_BUILDER_FAILED: teaching cards failed')
     expect(wrapper.text()).toContain('canonicalization_status')
     expect(wrapper.text()).toContain('degradation_reason')
     expect(wrapper.text()).toContain('formula_origin')

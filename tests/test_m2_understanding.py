@@ -749,7 +749,7 @@ def test_m2_audit_warning_is_preserved_in_understanding_status() -> None:
     assert any(warning.code == "F-11" for warning in updated_status.warnings)
 
 
-def test_single_paper_v2_uses_all_formula_evidence_pack_for_formula_cards(tmp_path: Path) -> None:
+def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path: Path) -> None:
     from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
     from researchsensei.jobs import JobStore
     from researchsensei.schemas import EvidencePack, EvidencePackItem, EvidencePackSummary, PaperSkeleton
@@ -846,7 +846,7 @@ def test_single_paper_v2_uses_all_formula_evidence_pack_for_formula_cards(tmp_pa
         llm_client=client,
     )
 
-    cards, status = runner._run_v2_builders(
+    cards, status = runner._run_card_builders(
         "paper",
         normal_pack,
         formula_pack,

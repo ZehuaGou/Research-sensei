@@ -245,7 +245,7 @@ def test_parse_endpoint_with_injected_llm_can_return_blocked_status(tmp_path: Pa
     assert cards_response.status_code == 403
     detail = cards_response.json()["detail"]
     assert detail["status"] == "BLOCKED_UNDERSTANDING"
-    assert detail["blocking_reason"] == "PAPER_CARD_V2_FAILED"
+    assert detail["blocking_reason"] == "PAPER_CARD_FAILED"
     assert "paper_card" not in detail
 
 
