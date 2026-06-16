@@ -818,3 +818,5 @@ ARIS is a prompt/workflow reference for advisor-style research training and memo
 - 和 M2 understanding_status.downstream_gates 的衔接细节
 - storage strategy：SQLite / JSON artifact / vector DB / hybrid
 - DownstreamGates legacy field name（phase12_patterns / phase12_drill）是否需要重命名
+> M4 is not implemented and is out of scope for current M1/M2/M3 readiness
+> work. `docs/STATUS.md` is authoritative for current project state.

@@ -505,3 +505,6 @@ Status: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance re
 - DownstreamGates 的最终字段是否足够
 - 当前 real LLM smoke 只有一个 synthetic paper 样例，不能代表真实论文质量
 - 当前成本估算依赖价格环境变量；未配置时报告 cost=0，但 token limit 仍生效
+> Current implementation status is authoritative only in `docs/STATUS.md`.
+> Historical status rows in this detailed planning note may be older than the
+> current M1/M2/M3 readiness state.

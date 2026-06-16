@@ -412,3 +412,6 @@ Implemented survey-specific audit codes:
 - "讲得好"的自动检测边界
 - 是否需要人工评估集
 - QualityReport 是否需要脱敏版
+> Current implementation status is authoritative only in `docs/STATUS.md`.
+> Historical status rows in this detailed planning note may be older than the
+> current M1/M2/M3 readiness state.

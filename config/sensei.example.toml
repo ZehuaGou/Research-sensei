@@ -1,3 +1,15 @@
+# Copy this file to config/local.toml for machine-local provider overrides.
+# Keep secrets in .env, not in TOML and never in git.
+#
+# Typical .env for Mimo/Xiaomi-compatible live smoke:
+# RESEARCHSENSEI_ENABLE_API_LLM=1
+# RESEARCHSENSEI_LLM_PROVIDER=mimo
+# MIMO_API_KEY=...
+# UNPAYWALL_EMAIL=you@example.com
+# RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
+# SEMANTIC_SCHOLAR_API_KEY=...
+# OPENAI_COMPATIBLE_API_KEY=...
+
 active_provider = "deepseek"
 
 [providers.deepseek]
@@ -22,6 +34,14 @@ api_key_env = "OPENAI_COMPATIBLE_API_KEY"
 model = "example-model"
 timeout_seconds = 60
 
+[providers.custom]
+kind = "openai_compatible"
+base_url = "https://your-openai-compatible-endpoint.example/v1"
+api_key_env = "OPENAI_COMPATIBLE_API_KEY"
+model = "your-model-name"
+auth_header = "authorization"
+timeout_seconds = 60
+
 [app]
 workspace_dir = "workspace"
 default_learning_mode = "reproducible_2h"
@@ -36,6 +56,7 @@ reload = false
 [search]
 execution = "uvx"
 command = "paper-search"
-sources = ["arxiv"]
-max_results = 10
+sources = ["arxiv", "openalex", "semantic_scholar", "crossref", "dblp", "unpaywall"]
+max_results = 80
 timeout_seconds = 90
+min_citation_count = 0

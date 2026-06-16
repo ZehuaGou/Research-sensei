@@ -1,63 +1,96 @@
-# ResearchSensei / 研读导师 / 读博模拟器
+# ResearchSensei
 
-多能力科研学习与训练系统。帮助用户建立研究方向框架、搜索和筛选论文、可信精读单篇论文、理解公式和方法机制、形成学习卡片、比较多篇论文关系、接受导师式追问训练，并沉淀长期记忆。正式模块为 M1-M5。
+ResearchSensei is a research-reading workflow for moving from a research
+direction to legal paper discovery, full-text acquisition, evidence-backed
+single-paper understanding, and a controlled PaperWorkspace UI.
 
-## 核心设计文档
+`docs/STATUS.md` is the only authoritative status file. Other docs describe
+contracts, design intent, or historical context; when they disagree, update
+`docs/STATUS.md` first and treat it as the source of truth.
 
-- [docs/DESIGN.md](docs/DESIGN.md) — 纲领设计文档、产品定位、三个入口、M1-M5 职责、artifact 链路
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — 开发规范总入口
-- [docs/STATUS.md](docs/STATUS.md) — 模块总控表与当前进度
+## Current Strict Scope
 
-## 模块开发文档
+- M1 covers literature acquisition, Direction Exploration, Seed Expansion, legal
+  full-text discovery, and deep-read handoff into PaperWorkspace.
+- M2 covers evidence-backed paper understanding, passage and claim evidence,
+  formula provenance, quality audit, and card generation.
+- M3 covers API/UI rendering for DirectionSearchView, SeedExpansionPanel, and
+  PaperWorkspace with strict `/cards` gating.
+- M4 interactive tutoring, long-term memory, drills, and advisor chat are not
+  implemented and must not be started during M1/M2/M3 readiness work.
 
-### M1 — Literature Search, Direction Exploration, And Seed Expansion
+Do not claim broad `REAL_E2E` or product readiness unless a real smoke or
+acceptance run proves that exact scope. Mock, fake, skipped, or baseline-only
+results are not real acceptance.
 
-- [docs/development/M1_LITERATURE_SEARCH.md](docs/development/M1_LITERATURE_SEARCH.md) — 搜索规划、多源检索、去重评分、阅读计划、方向框架、seed expansion
+## Setup
 
-### M2 — Single Paper Deep Reading & Survey Deep Reading
-
-- [docs/development/M2_1_PARSER.md](docs/development/M2_1_PARSER.md) — M2.1 文档解析
-- [docs/development/M2_2_EVIDENCE.md](docs/development/M2_2_EVIDENCE.md) — M2.2 证据链路
-- [docs/development/M2_3_PAPER_UNDERSTANDING.md](docs/development/M2_3_PAPER_UNDERSTANDING.md) — M2.3 讲解生成
-- [docs/development/M2_4_AUDIT_QUALITY.md](docs/development/M2_4_AUDIT_QUALITY.md) — M2.4 质量审计
-- [docs/development/M2_5_FULL_PIPELINE.md](docs/development/M2_5_FULL_PIPELINE.md) — M2.5 单篇/方向链路编排
-
-### M3 — API / Frontend (DirectionWorkspace, PaperWorkspace, SeedExpansionPanel)
-
-- [docs/development/M3_FRONTEND_RENDER.md](docs/development/M3_FRONTEND_RENDER.md) — 前端渲染、状态展示、API 规则
-
-### M4 — Interactive Learning & Long-term Memory
-
-- [docs/development/M4_INTERACTIVE_LEARNING.md](docs/development/M4_INTERACTIVE_LEARNING.md) — 选中内容解释、符号与公式解释、导师式追问、研究训练、论文知识库、长期记忆
-
-### M5 — Engineering Reliability
-
-- [docs/development/M5_ENGINEERING_RELIABILITY.md](docs/development/M5_ENGINEERING_RELIABILITY.md) — 真实测试、CI、安全、密钥、成本、工程可靠性
-
-## 辅助文档
-
-- [docs/GLOSSARY.md](docs/GLOSSARY.md) — 术语表
-- [docs/MODULE_CONTRACTS.md](docs/MODULE_CONTRACTS.md) — 模块输入输出契约
-- [docs/REUSE_REPORT.md](docs/REUSE_REPORT.md) — 外部项目复用决策
-- [docs/REVIEW_CHECKLIST.md](docs/REVIEW_CHECKLIST.md) — 提交/验收检查清单
-
-## 历史归档
-
-- [docs/TECHNICAL_DISCUSSION.md](docs/TECHNICAL_DISCUSSION.md) — 历史技术讨论，不作为当前开发依据
-- [docs/MAIN_CHAIN_V1_REVIEW.md](docs/MAIN_CHAIN_V1_REVIEW.md) — 历史封版记录（归档）
-
-## 安装
-
-```bash
+```powershell
 python -m venv .venv
-.venv\Scripts\activate  # Windows
+.venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-## 测试
+Create a local `.env` file when live LLM or external source lookups are needed.
+Never commit `.env`.
 
-```bash
-python -m pytest -q
+```text
+RESEARCHSENSEI_ENABLE_API_LLM=1
+RESEARCHSENSEI_LLM_PROVIDER=mimo
+MIMO_API_KEY=...
+UNPAYWALL_EMAIL=you@example.com
+RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
+SEMANTIC_SCHOLAR_API_KEY=...
+OPENAI_COMPATIBLE_API_KEY=...
 ```
 
-当前验收策略：真实优先。涉及 LLM / 搜索 / PDF / 前后端联调的模块，验收必须跑真实链路。mock/fake/skip 不作为模块完成依据。
+`config/sensei.example.toml` documents the Mimo/Xiaomi-compatible provider and a
+generic OpenAI-compatible provider. Local overrides belong in ignored
+`config/local.toml`.
+
+## Useful Commands
+
+Backend tests:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -q
+```
+
+Frontend tests and build:
+
+```powershell
+cd frontend
+npm test
+npm run build
+```
+
+Literature acquisition smoke:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
+```
+
+M1 -> M2 -> M3 main-chain smoke with Mimo:
+
+```powershell
+$env:RESEARCHSENSEI_ENABLE_API_LLM="1"
+$env:RESEARCHSENSEI_LLM_PROVIDER="mimo"
+.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider mimo
+```
+
+## Documentation Map
+
+- `docs/STATUS.md`: single authoritative project state, evidence, blockers, and
+  next steps.
+- `docs/DEVELOPMENT.md`: development rules and commands.
+- `docs/DESIGN.md`: current architecture overview; not an independent status
+  source.
+- `docs/MODULE_CONTRACTS.md`: module input/output/boundary contracts.
+- `docs/development/M1_LITERATURE_SEARCH.md`: M1 acquisition and direction
+  contract.
+- `docs/development/M2_5_FULL_PIPELINE.md`: M2 full pipeline and gating
+  contract.
+- `docs/development/M3_FRONTEND_RENDER.md`: M3 API/UI gating contract.
+
+Historical docs are retained only for background and must not override
+`docs/STATUS.md`.

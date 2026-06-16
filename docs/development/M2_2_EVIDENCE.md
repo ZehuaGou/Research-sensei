@@ -420,3 +420,6 @@ Evidence from LaTeX source has higher formula fidelity than parser/OCR/reconstru
 - passage 切分的句子边界检测方案
 - ClaimExtractor 的规则复杂度需要实测
 - EvidenceRetriever 二次 validation 规则
+> Current implementation status is authoritative only in `docs/STATUS.md`.
+> Historical status rows in this detailed planning note may be older than the
+> current M1/M2/M3 readiness state.

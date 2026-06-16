@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from scripts.run_main_chain_smoke import _handoff_payload, evaluate_gating, run_main_chain_smoke
+from scripts.run_main_chain_smoke import _handoff_payload, _select_handoff_candidate, evaluate_gating, run_main_chain_smoke
 
 
 class FakeResponse:
@@ -208,6 +208,17 @@ def test_main_chain_smoke_prefers_method_like_candidate_over_foundation() -> Non
 
     assert result["selected_seed_handoff_title"] == "Neural Architecture for Time Series Anomaly Detection"
     assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
+
+
+def test_handoff_candidate_selection_rejects_unrelated_source_backed_paper() -> None:
+    candidate = _select_handoff_candidate(
+        [
+            _seed_paper("1411.4413", "Observation of a rare particle decay", "same_route"),
+        ],
+        query="graph anomaly detection",
+    )
+
+    assert candidate is None
 
 
 def test_main_chain_smoke_blocked_cards_gate() -> None:

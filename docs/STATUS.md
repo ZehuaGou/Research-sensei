@@ -1,439 +1,202 @@
 # ResearchSensei Status
 
-Last updated: 2026-06-16
+Last updated: 2026-06-16.
 
-This file records real engineering status. Mock, fake, or skipped tests do not
-count as module completion. Reports, downloaded PDFs, `.env`, API keys,
-`.venv`, model weights, and generated bundles must not be committed.
+This is the single authoritative status file for ResearchSensei. README,
+DESIGN, DEVELOPMENT, module contracts, development notes, and historical docs
+must not override this file.
 
-## Status Levels
+## Project Goal
 
-| Level | Meaning |
+ResearchSensei is a PhD-style research-reading simulator for the path:
+
+```text
+research direction
+  -> legal multi-source paper discovery
+  -> seed expansion
+  -> source-backed deep_read handoff
+  -> M2 evidence-backed paper understanding
+  -> M3 controlled PaperWorkspace display
+```
+
+Current work is limited to M1/M2/M3 readiness. M4 chat, tutor follow-up,
+long-term memory, drills, and training features are not started.
+
+## Status Vocabulary
+
+| Label | Meaning |
 |---|---|
-| NOT_STARTED | No implemented code and no usable design. |
-| DOC_DESIGNED | Engineering contract is documented, but implementation is missing. |
-| NOT_IMPLEMENTED_CONTRACT | API/UI path exists only to report that the feature is not implemented; it must not return fake success data. |
-| IMPLEMENTED | Code exists, but real validation may still be pending. |
-| UNIT_TESTED | Unit or fixture tests exist. |
-| DEGRADED_SMOKE | A narrow live smoke passed, but full acceptance and broad validation remain pending. |
-| REAL_E2E_VERIFIED | Real end-to-end validation has passed for the claimed scope. |
-| PARTIAL_REAL_E2E_VERIFIED | Some modes or selected samples passed real validation; other modes remain pending. |
-| PRODUCTION_READY | Stable enough for routine production use. No current module has this status. |
+| IMPLEMENTED | Code path exists and has unit/integration coverage. |
+| UNIT_TESTED | Automated tests cover the contract with local/fake dependencies. |
+| DEGRADED_SMOKE | Narrow real smoke ran and produced usable degraded behavior or source warnings. |
+| PARTIAL_REAL_E2E_VERIFIED | A specific real end-to-end path passed; broad scope remains pending. |
+| REAL_E2E_VERIFIED | Real end-to-end validation passed for exactly the claimed broad scope. Avoid unless proven. |
+| BLOCKED_UNDERSTANDING | Evidence/provenance gate failed closed. This is not a config failure by itself. |
+| BASELINE_ONLY | No real LLM understanding. Must not be counted as live LLM acceptance. |
+| DOC_DESIGNED | Contract exists but runtime is not implemented. |
 
-## Module Matrix
+## Strict Module State
 
-| Module | Area | Code Status | Test Status | Real Status | Notes |
-|---|---|---|---|---|---|
-| M1 | Focused acquisition | implemented | live tested | REAL_E2E_VERIFIED | Narrow-query acquisition, verification, relevance judge, source/download gate, and reading-plan path have real validation. |
-| M1 | Source-aware acquisition | implemented | unit/live tested | PARTIAL_REAL_E2E_VERIFIED | arXiv source-first is implemented for API/PaperSourceResolver handoff: `https://arxiv.org/e-print/{id}` is tried before arXiv PDF, source archives are unpacked, main `.tex` is selected, and M2 receives LaTeX with `formula_origin=source_latex` when available. PDF remains fallback. 2026-06-16 Mimo smoke verified source-first on narrow arXiv candidates only; broad source acceptance remains pending. |
-| M1 | Literature acquisition/fulltext discovery | implemented | unit + six-query live smoke | DEGRADED_SMOKE | `scripts/run_literature_acquisition_smoke.py` now audits real multi-source search and legal fulltext discovery across arXiv, OpenAlex, Semantic Scholar, Crossref, DBLP, and Unpaywall. Six 2026-06-16 live smoke queries each attempted 6 sources and retained metadata-only high-value papers with `needs_user_upload=true`. This proves broader coverage than arXiv-only samples, but remains narrow smoke evidence, not broad M1 REAL_E2E. |
-| M1 | PDF canonical pipeline | implemented | unit + selected-paper real tests | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Current M1 can generate M2-readable canonical bundles when regenerated with current code and all gates pass. |
-| M1 | MinerU2.5-Pro primary parser | implemented | unit + selected-paper real tests | PARTIAL_REAL_E2E_VERIFIED | Primary PDF parser via `mineru-vl-utils`; broad multi-paper acceptance remains pending. |
-| M1 | Quality gate | implemented | unit + acceptance enforced | REAL_E2E_VERIFIED | Blocks crop/overlay gaps, source mismatch, section pollution, raw-only formula dense outputs, and repeated/hallucinated text. |
-| M1 | Ollama formula polish | implemented | smoke + selected-paper use | OPTIONAL_IMPLEMENTED | Explicit formula `final_latex` cleanup only; does not rewrite body structure. |
-| M1 | Ollama section refiner | implemented | unit/local compare | OPTIONAL_NOT_DEFAULT | Diagnostic/review path only; default formal handoff remains rule-based. |
-| M1 | Marker/MarkItDown/PyMuPDF fallback | implemented | unit/live tested | FALLBACK_ONLY | Review/debug/fallback only; cannot prove primary MinerU stability. |
-| M1 | Direction exploration | implemented minimal loop + handoff API | unit + arXiv smoke | DEGRADED_SMOKE | Minimal query -> DirectionBundle loop exists with real source adapters, heuristic query plan, candidate cards, reading order, source metrics, strict A_READ_FOR_M2 gate, and `/api/v1/directions/deep_read` handoff to PaperWorkspace. 2026-06-15 arXiv-only smoke for `time series anomaly detection` returned SUCCESS with 3 real candidates, then Mimo-enabled handoff created job `c09ff92ee955`; final status was DEGRADED_STRUCTURAL with `FORMULA_DERIVATION_BLOCKED`. No broad multi-source acceptance or A_READ canonical handoff yet. |
-| M1 | Seed expansion | implemented minimal loop | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | `/api/v1/directions/seed_expansion` accepts seed title/arXiv/DOI/URL/candidate payloads and returns upstream, downstream, same-route, survey, follow-up, and expansion-order fields from real paper-source adapters. Relations are explicitly weak query/title-similarity relations with `citation_graph_verified=false`; no citation graph is faked. 2026-06-15 smoke for seed arXiv `2510.18998` returned DEGRADED with 17 candidates: upstream=5, downstream=3, same-route=6, surveys=3. Degradation was due to Semantic Scholar 429 and Crossref timeouts. No broad Seed Expansion acceptance yet. |
-| M2 | Paper deep reading | implemented | unit + selected-paper live acceptance | PARTIAL_REAL_E2E_VERIFIED | M2 selected-paper live acceptance passed on `2310_08800v2` via `reports/m2_live_acceptance.md`; broad multi-paper and survey live acceptance remain pending. |
-| M2 | Formula card generation | implemented | unit + real e2e | IMPLEMENTED_ALL_FORMULA_COVERAGE | Formula provenance is preserved; every M1 formula evidence ref gets an explained, summary-only, or blocked card; advanced symbolic derivation remains evidence-bounded. |
-| M2 | Survey artifacts | implemented | unit/pipeline fixture | IMPLEMENTED_RULE_BASED | Real survey PDF live acceptance remains pending. |
-| M3 | Paper workspace | implemented minimal API/frontend | backend + vitest + build + selected-paper + raw-degraded API/UI live check | PARTIAL_REAL_E2E_VERIFIED | `/parse -> /understanding_status -> /cards` supports configured real LLM entry, existing M2 artifact registration, and strict gating. Selected-paper API/UI loop passed on real M2 artifacts for `2310_08800v2` (`reports/m3_paperworkspace_ui_live.json`): SUCCESS status, paper/formula/teaching cards rendered, and BLOCKED_UNDERSTANDING `/cards` stayed 403. Raw-input DEGRADED API/UI verified (`reports/m3_degraded_ui_live.md`): raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01` both DEGRADED_STRUCTURAL with FORMULA_DERIVATION_BLOCKED, `/cards=200` returns paper_card+teaching_cards only, formula tab shows controlled degradation message with formula_origin/ocr_status, component_status/degradation_reason visible. Product readiness remains pending. |
-| M3 | Direction workspace | minimal render + PaperWorkspace handoff | backend + vitest + build + arXiv smoke | DEGRADED_SMOKE | DirectionSearchView now submits a direction query, displays status/sources/warnings, overview, sub-directions, method families, candidate papers, and reading order. Candidates with arXiv/PDF source show `准备精读`, call `/api/v1/directions/deep_read`, and route to `/learn/{job_id}` on success. DOI remains `DOI_NOT_IMPLEMENTED`; unavailable sources fail closed. This is not M3 product readiness. |
-| M3 | Seed expansion | minimal render + PaperWorkspace handoff | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | SeedExpansionPanel accepts typed seed input or a selected Direction candidate, displays grouped seed-expansion papers with relation reason/confidence/source/verification/can_enter_m2, shows DEGRADED/EMPTY_RESULT states, and calls existing `/api/v1/directions/deep_read` for source-backed expansion papers. This is not product-ready SeedExpansion. |
-| M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
-| M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
-| M5 | Main-chain smoke script | implemented | unit + batch Mimo smoke | PARTIAL_REAL_E2E_VERIFIED | `scripts/run_main_chain_smoke.py` exercises direction search -> seed expansion -> deep_read handoff -> understanding_status -> cards gating through local API handlers and now reports selected input type, source strategy, source metrics, fallback, returned components, and formula origin summary. 2026-06-16 real Mimo source-first batch includes one narrow PASS (`time series anomaly detection`, job `e6162aaf98e4`, SUCCESS, `/cards=200`, source_latex) plus DEGRADED/BLOCKED/FAIL cases. This is narrow main-chain evidence, not broad REAL_E2E and not product-ready. |
+| Module | Surface | Current state | Evidence | Strict judgement |
+|---|---|---|---|---|
+| M1 | Focused acquisition / selected-paper canonical handoff | implemented | selected real-paper acceptance | Narrow verified only. Direction and Seed were separate gaps and are now minimal loops, not full M1 completion. |
+| M1 | Multi-source literature acquisition | implemented | source metrics + legal full-text smoke | DEGRADED_SMOKE. arXiv, OpenAlex, Semantic Scholar, Crossref, DBLP, and Unpaywall participate; not broad M1 REAL_E2E. |
+| M1 | arXiv source-first | implemented | source/e-print handoff smoke | PARTIAL_REAL_E2E_VERIFIED for narrow arXiv candidates. Source/e-print is preferred over PDF; fallback stays explicit. |
+| M1 | Direction Exploration | implemented minimal loop | backend + frontend tests + source smoke | DEGRADED_SMOKE. Returns overview, sub-directions, method families, candidates, source metrics, and reading order. |
+| M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
+| M1 | DOI deep_read | explicit failure | API tests | DOI-only handoff remains `DOI_NOT_IMPLEMENTED`; DOI can still help legal full-text lookup through Unpaywall/OpenAlex. |
+| M2 | Selected-paper paper understanding | implemented | `2310_08800v2` live acceptance | PARTIAL_REAL_E2E_VERIFIED only for selected paper. |
+| M2 | Raw/source handoff understanding | implemented fail-closed | Mimo source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. Not broad REAL_E2E. |
+| M2 | Formula provenance/FSA-5 | implemented strict gate | unit + smoke | Unknown/weak formula origin cannot produce detailed derivation; source_latex improves but does not bypass audit. |
+| M3 | PaperWorkspace | implemented minimal API/UI | selected-paper SUCCESS + raw/handoff DEGRADED/BLOCKED UI/API checks | PARTIAL_REAL_E2E_VERIFIED for narrow paths, not product-ready. |
+| M3 | DirectionSearchView | implemented minimal UI | vitest + handoff smoke | DEGRADED_SMOKE. Shows source readiness and calls deep_read for source-backed candidates. |
+| M3 | SeedExpansionPanel | implemented minimal UI | vitest + seed smoke | DEGRADED_SMOKE. Shows grouped relations and can call deep_read. |
+| M4 | Interactive tutoring/memory/drills | not implemented | none | Do not start in current readiness work. |
 
-## M1 Current Statement
+## M1 Acquisition And Full-Text Evidence
 
-M1 is not "all modes complete." The accurate claim is:
+Current acquisition stack:
 
-M1 focused acquisition and selected-paper PDF canonical handoff are real
-verified. Current M1 can produce `canonical_paper.md` plus the required M2
-artifact bundle on selected real papers, with MinerU2.5-Pro as the primary
-parser, crop/overlay enforcement, formula provenance, optional guarded Ollama
-formula LaTeX polish, and quality gates. Direction exploration now has a
-minimal unit-tested loop, a minimal PaperWorkspace handoff API, and a six-query
-multi-source literature acquisition/fulltext discovery smoke. Seed expansion
-now has a minimal unit-tested loop plus a narrow DEGRADED external-source
-smoke. Broad M1 REAL_E2E remains pending: verified citation-graph expansion,
-LLM-based planning, A_READ canonical handoff from direction candidates, broad
-LaTeX/HTML normalization beyond arXiv source-first, broad multi-paper MinerU
-acceptance, production-scale parser stability, Semantic Scholar rate-limit
-handling with a key, and Unpaywall DOI fulltext lookup with a configured email
-are not complete.
+| Source/tool | Runtime status | Current role | Full-text capability | Strict note |
+|---|---|---|---|---|
+| arXiv | invoked | search, metadata, source/e-print, PDF | source_ready/pdf_ready | Source-first is implemented and preferred over PDF. |
+| OpenAlex | invoked | search, DOI, OA location metadata | OA PDF/landing metadata | Contributes DOI/OA data; not every DOI has legal full text. |
+| Semantic Scholar | invoked | search, citation/reference metadata, openAccessPdf | OA PDF metadata | 429/rate limits degrade source only. |
+| Crossref | invoked | DOI/venue/publisher/year metadata | metadata-only | Never treated as fulltext-ready by itself. |
+| DBLP | invoked | CS venue metadata discovery | metadata-only | Helps discovery/venue, not download. |
+| Unpaywall | invoked when email configured | DOI -> legal OA location | publisher/repository OA PDF or landing | Requires `UNPAYWALL_EMAIL` or `RESEARCHSENSEI_CONTACT_EMAIL`. |
+| local upload | implemented | fallback for valuable metadata-only papers | user-provided PDF/canonical | Required when legal full text cannot be fetched automatically. |
 
-The authoritative M1 development contract is
-`docs/development/M1_LITERATURE_SEARCH.md`.
+Latest local Unpaywall/contact email check: `.env` is ignored, configured
+locally, and must not be committed. Logs may show only masked email/domain.
 
-## M1 Canonical Pipeline
+## Recent Real Smoke Evidence
 
-Formal selected-paper pipeline:
+These are narrow evidence records, not product readiness.
 
-```text
-source PDF
-  -> MinerU25ProAdapter
-  -> CanonicalDocumentBlock normalization
-  -> PDF bbox text repair for suspicious non-formula body blocks
-  -> RuleBasedStructureRefiner
-  -> optional Ollama formula LaTeX validator
-  -> CanonicalBuilder
-  -> M1QualityGate
-  -> visual audit and M2 artifact bundle
+### Literature acquisition smoke after Unpaywall email
+
+Command shape:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "<query>" --max-results 80 --download-top-n 10
 ```
 
-Required M2 bundle:
+Latest 2026-06-16 smoke after configuring Unpaywall/contact email:
 
-- `canonical_paper.md`
-- `document_blocks.json`
-- `formula_slots.json`
-- `formula_slots.md`
-- `paper_metadata.json`
-- `quality_report.md`
-- `performance_report.json`
-- `visual_audit/`
+| Query | Verdict | Attempted sources | Total | Non-arXiv | DOI | Legal fulltext | source_ready | pdf_ready | metadata_only | Unpaywall success/failure | Top failures |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---|
+| time series anomaly detection | PASS | 6 | 260 | 180 | 182 | 116 | 86 | 30 | 144 | 96/86 | Unpaywall no OA location, no legal OA fulltext, not found |
+| graph anomaly detection | PASS | 6 | 244 | 165 | 182 | 111 | 84 | 27 | 133 | 90/92 | Unpaywall no OA location, no legal OA fulltext, not found |
+| multivariate time series imputation | PASS | 6 | 59 | 44 | 44 | 28 | 17 | 11 | 31 | 19/25 | Unpaywall no OA location, no legal OA fulltext |
+| graph neural network anomaly detection | PASS | 6 | 165 | 163 | 163 | 49 | 10 | 39 | 115 | 70/93 | Unpaywall no OA location, no legal OA fulltext, not found |
 
-Required formula handoff fields:
+This proves Unpaywall and non-arXiv legal fulltext discovery work in a narrow
+smoke. It does not prove broad M1 REAL_E2E. Metadata-only papers remain visible
+instead of being discarded.
 
-- `formula_id`
-- `block_id`
-- `page`
-- `section`
-- `final_latex`
-- `equation_number`
-- `equation_group_id`
-- `group_order`
-- `group_crop_path`
-- `nearby_text_before`
-- `nearby_text_after`
-- `risk_flags`
-- `final_origin`
-- `block_source`
+### Main-chain and deep_read evidence
 
-## M1 Gates
+| Path | Job | Result | Cards | Components | Strict note |
+|---|---|---|---|---|---|
+| selected paper `2310_08800v2` | `a292821c21c2` | SUCCESS | 200 | paper/formula/teaching | Selected-paper M2/M3 evidence only. |
+| negative selected-paper gate | `ded6d0e1ee58` | BLOCKED_UNDERSTANDING, `MISSING_METHOD_EVIDENCE` | 403 | none | Correct fail-closed gate. |
+| raw Mimo handoff | `c09ff92ee955` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Mimo entered chain; formula component degraded. |
+| main-chain source-first Mimo | `e6162aaf98e4` | SUCCESS | 200 | paper + formula + teaching | Narrow PASS with source_latex evidence; not broad REAL_E2E. |
+| non-arXiv OA PDF deep_read | `8cba4345fee7` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Legal OA PDF handoff works; formula provenance remains weaker than source_latex. |
 
-M1 must fail or block M2 entry when:
+Latest 2026-06-16 Mimo main-chain smoke:
 
-- `canonical_paper.md` cannot be produced
-- `m2_ready=false`
-- `canonical_quality_status=FAIL`
-- source/title identity is inconsistent
-- formula bbox/crop/overlay is missing in formal mode
-- formulas are all assigned to Abstract in a method paper
-- Introduction/Method/Experiments are contaminated by References entries
-- References content appears as Introduction or Method
-- severe repeated/hallucinated parser text is present
-- selected parser is obviously wrong
+| Query | Job | Selected paper | Input | Final status | Blocking reason | Cards | Components | Verdict | Strict note |
+|---|---|---|---|---|---|---:|---|---|---|
+| time series anomaly detection | `522e67e371e2` | `2007.14254`, Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Mimo was enabled; arXiv source downloaded; formula origin summary showed `source_latex`, but formula cards failed audit/generation so cards stayed blocked. |
+| graph anomaly detection | `a58dbf082252` | `2212.05478`, Mul-GAD: a semi-supervised graph anomaly detection framework via aggregating multi-view information | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Smoke selector now avoids unrelated source-backed papers; Mimo was enabled and gate failed closed on formula cards. |
 
-M1 may be degraded but still paper-readable when:
+## M2/M3 Gating Rules
 
-- some sparse formulas lack LaTeX but body text is faithful
-- non-critical warnings are explicit in front matter/reports
-- formulas are not ready for downstream formula understanding but paper text can
-  still support evidence extraction
+- SUCCESS: `/cards=200`; paper, formula, and teaching cards expected.
+- DEGRADED_STRUCTURAL: `/cards=200`; only successful components returned.
+- BLOCKED_UNDERSTANDING: `/cards=403`.
+- BASELINE_ONLY: `/cards=403`.
+- FAILED: `/cards=403`.
+- SUCCESS with missing required card artifact: `/cards=409`.
+- `/artifacts` remains debug/admin oriented.
 
-Dense raw-only formula rule:
+BLOCKED_UNDERSTANDING due to `MISSING_METHOD_EVIDENCE` or audit findings is
+evidence gate fail-closed, not a configuration failure. BASELINE_ONLY during an
+LLM-enabled smoke is a failure unless the smoke intentionally used `--skip-llm`.
+
+## Configuration For Future Runs
+
+Local `.env` example:
 
 ```text
-if formula_count >= 5 and latex_count == 0:
-  canonical_quality_status = DEGRADED
-  m2_ready_for_formula_understanding = false
+RESEARCHSENSEI_ENABLE_API_LLM=1
+RESEARCHSENSEI_LLM_PROVIDER=mimo
+MIMO_API_KEY=...
+UNPAYWALL_EMAIL=you@example.com
+RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
+SEMANTIC_SCHOLAR_API_KEY=...
+OPENAI_COMPATIBLE_API_KEY=...
 ```
 
-`raw_formula_text` must not masquerade as LaTeX.
+`config/sensei.example.toml` includes Mimo and generic OpenAI-compatible
+provider placeholders. For Xiaomi or another weaker OpenAI-compatible model,
+set provider base URL, model, and API key env in ignored `config/local.toml` or
+use the generic provider template. Do not lower evidence gates for weaker model
+output.
 
-## Ollama Status
+LLM JSON handling is fail-closed: malformed JSON or schema mismatch must become
+explicit component failure/degradation, not accepted evidence.
 
-Ollama section refinement and Ollama formula polish are separate paths.
+## Largest Current Shortfalls
 
-Formula polish:
+1. Broad M1 REAL_E2E is still missing: coverage is smoke-level, not systematic
+   benchmark acceptance.
+2. DOI-only deep_read remains `DOI_NOT_IMPLEMENTED`; DOI helps lookup but cannot
+   by itself start M2.
+3. Semantic Scholar can rate-limit; source-level degradation is handled, but
+   broader retry/backoff policy remains limited.
+4. Formula cards still degrade on non-source_latex or weak provenance.
+5. Main-chain positive evidence is narrow; source-first success is promising but
+   not broad reliability.
+6. M4 remains not implemented by design.
 
-- explicit only: `--enable-ollama-latex`
-- currently intended model: local `qwen3.5:4b`
-- uses formula/group crop visual evidence
-- preserves page, bbox, crop, overlay, parser source, and equation tags
-- rejects malformed JSON, low confidence, over-expanded group answers, left-hand
-  side changes, and relation operand changes
+## Next Priority Order
 
-Section refinement:
+1. Improve DOI-to-legal-fulltext-to-deep_read handoff without paywall bypass.
+2. Build a small tracked acceptance fixture list for M1 acquisition coverage,
+   but do not commit downloaded papers.
+3. Expand source_latex canonical extraction coverage and formula provenance
+   tests.
+4. Add more real main-chain smoke samples across domains and record only scoped
+   evidence.
+5. Keep frontend status rendering aligned with `/understanding_status` and
+   `/cards` gating.
 
-- optional/default off
-- review/heavy diagnostics only
-- must not modify LaTeX, bbox, page, source identity, or paper metadata
+## Weak-Model Handoff Guide
 
-Formal M1->M2 handoff must not let Ollama rewrite body structure.
+If a weaker model or Xiaomi/Mimo-compatible model continues this project:
 
-## Selected-Paper Validation
+1. Read this file first.
+2. Run backend tests.
+3. Run one literature acquisition smoke.
+4. If Mimo/API key exists, run one main-chain smoke.
+5. Treat all failures literally; do not patch around gates.
+6. Make only small, source-local fixes.
+7. Update this file with exact command, job ID, status, cards code, components,
+   and strict scope.
+8. Do not create new report files.
+9. Do not start M4.
 
-Selected-paper evidence currently includes:
+## Required Regression Commands
 
-- 2026-06-14 current `scripts/run_live_eval.py` with
-  `RUN_LIVE_TESTS=1 RUN_LLM_TESTS=1 RESEARCHSENSEI_LIVE_EVAL=1`: M1 live
-  status passed, real LLM query planning true, successful sources `arxiv` and
-  `openalex`, 6 candidates, 4 PDF download successes, 1 A_READ. Semantic
-  Scholar rate-limited and Crossref timed out in that run, but the live eval
-  report still passed through the successful source path.
-- `paper_4_unseen` MEMTO: primary MinerU route sample in historical acceptance.
-- `2312_01729v1` EdgeConvFormer: completed M1->M2 handoff with real Mimo in a
-  prior selected-paper run. Generated reports should be regenerated before being
-  treated as current formal evidence.
-- `2310_08800v2` DDMT: regenerated on 2026-06-14 with current M1, PDF bbox text
-  repair, crop/overlay enforcement, optional Ollama formula polish, and manual
-  PDF-vs-canonical audit. Result: PASS, `m2_ready=true`,
-  `m2_ready_for_formula_understanding=true`, 7 formulas, 7 LaTeX, 7 crops, 7
-  overlays, no repeated hallucinated text, and no arXiv/page/CID/Unknown
-  pollution. M2 diagnostic and full real Mimo handoff both succeeded.
+```powershell
+.venv\Scripts\python.exe -m pytest -q
+cd frontend
+npm test
+npm run build
+```
 
-This proves selected-paper handoff quality. It does not prove broad multi-paper
-parser stability.
-
-## M2 Handoff Status
-
-M2 reads only the M1 artifact bundle. It must not read raw PDF, run its own
-parser, or modify M1-owned immutable evidence fields.
-
-Current M2 selected-paper live acceptance:
-
-- 2026-06-14 current formal report: `reports/m2_live_acceptance.md`.
-- Positive sample: `2310_08800v2` DDMT real M1 canonical bundle input -> M2
-  `SUCCESS`, real Mimo `mimo-v2.5-pro`, 4 calls, 11,186 total tokens, 21
-  artifacts, 7 formula evidence refs, 7 formula cards, formula coverage PASS,
-  QualityAuditor findings empty, and M1 artifacts unmodified.
-- Failure samples: missing canonical input, `m2_ready=false`, and missing METHOD
-  evidence all enter `BLOCKED_UNDERSTANDING`, write no paper/formula/teaching
-  card artifacts, and do not call the LLM during preflight.
-- Status wording allowed by current evidence: "M2 selected-paper live acceptance
-  passed." This is not broad `REAL_E2E_VERIFIED` for all M2 inputs.
-
-### M2 Raw-Input Status
-
-Raw-input jobs (canonical markdown or PDF submitted through M3 API) currently
-reach `DEGRADED_STRUCTURAL`, not `SUCCESS` and not `BLOCKED_UNDERSTANDING`.
-
-- Raw canonical job: `f2fc0eaaf049`. Status: `DEGRADED_STRUCTURAL`.
-  blocking_reason: `FORMULA_DERIVATION_BLOCKED`.
-  component_status: paper_card=SUCCESS, formula_cards=FAILED,
-  teaching_cards=SUCCESS. `/cards=200`, returns paper_card + teaching_cards.
-- Raw PDF job: `7832b248de01`. Status: `DEGRADED_STRUCTURAL`.
-  Same structure as above.
-
-DEGRADED reason: raw ingestion produces `formula_origin=raw_formula_text`.
-Conservative provenance policy blocks detailed formula derivation when origin
-is `raw_formula_text`, `unknown`, or `unresolved`. This is a deliberate safety
-constraint, not a bug. QualityAuditor FSA-5 was not relaxed.
-
-Raw-input DEGRADED is not broad/full M2 REAL_E2E. It means: M2 pipeline runs
-on raw input, paper and teaching components succeed, but formula derivation is
-blocked by provenance policy.
-
-Known M2 limitation: formula card coverage is all-formula, but detailed symbolic
-derivation is only as strong as M1 LaTeX fidelity and nearby evidence.
-
-## M3 Current Statement
-
-M3 is not complete as a product module. The accurate claim is:
-
-PaperWorkspace has a minimal tested backend/frontend closed loop. The backend
-supports configured real LLM construction through `create_app(...)` or
-`RESEARCHSENSEI_ENABLE_API_LLM`, strict `/cards` gating for SUCCESS,
-DEGRADED_STRUCTURAL, BASELINE_ONLY, BLOCKED_UNDERSTANDING, and FAILED, debug-only
-raw artifact access, DOI rejection as `DOI_NOT_IMPLEMENTED`, minimal
-DirectionSearchView rendering of the M1 DirectionBundle, minimal
-`/api/v1/directions/deep_read` handoff for arXiv/PDF candidates, and minimal
-SeedExpansion API/UI contracts.
-
-API LLM configuration now loads `.env` before checking
-`RESEARCHSENSEI_ENABLE_API_LLM`, so `.env` can enable API LLM and choose
-`RESEARCHSENSEI_LLM_PROVIDER=mimo`. Missing keys fail with the missing
-environment variable name only.
-
-The frontend now reads `understanding_status` before requesting cards, requests
-cards only for SUCCESS/DEGRADED_STRUCTURAL, hides cards for BASELINE_ONLY and
-BLOCKED_UNDERSTANDING, displays source/canonical/formula/evidence/quality status
-fields, renders the minimal M1 Direction Exploration bundle in
-DirectionSearchView, lets source-backed candidates prepare a PaperWorkspace job,
-and lets SeedExpansionPanel run minimal seed expansion plus PaperWorkspace
-handoff for source-backed expansion papers.
-
-M3 selected-paper API/UI evidence:
-
-- 2026-06-15 current formal report: `reports/m3_paperworkspace_ui_live.json`.
-- Positive sample: existing real M2 artifacts for `2310_08800v2` registered
-  through `POST /api/v1/documents/parse` -> `GET /understanding_status`
-  returned SUCCESS -> `GET /cards` returned 200 with `paper_card`,
-  `formula_cards`, and `teaching_cards`; Browser validation confirmed the
-  Paper, Formulas, and Teaching tabs rendered user-facing card content and
-  source/canonical/formula/evidence/downstream status rows.
-- Selected-paper job: `a292821c21c2`. `/understanding_status`=SUCCESS,
-  `/cards=200`, paper_card/formula_cards/teaching_cards all rendered.
-- Failure sample: missing METHOD evidence registered through the same API route
-  stayed `BLOCKED_UNDERSTANDING`; `/cards` returned 403 and no explanatory card
-  content was exposed. BLOCKED job: `ded6d0e1ee58`,
-  blocking_reason=MISSING_METHOD_EVIDENCE, `/cards=403`.
-
-M3 raw-input DEGRADED API/UI evidence:
-
-- 2026-06-15 current formal report: `reports/m3_degraded_ui_live.md`.
-- Raw canonical job `f2fc0eaaf049` and raw PDF job `7832b248de01`: both
-  `DEGRADED_STRUCTURAL` with `FORMULA_DERIVATION_BLOCKED`, `formula_origin` =
-  `raw_formula_text`, `formula_cards` = FAILED.
-- `/cards` returns 200 with `paper_card` + `teaching_cards` only;
-  `missing_components: ["formula_cards"]`; `degraded: true`.
-- Frontend: Formula tab shows controlled degradation message ("公式推导不可用")
-  with degradation_reason, formula_origin, formula_ocr_status; no detailed
-  formula derivation displayed. StatusBanner shows missing_components,
-  component_status.formula_cards=FAILED, degradation_reason,
-  allowed_downstream.advisor_questions=false.
-- M3 raw-input frontend coverage remains in the frontend suite; current total
-  counts are listed in Test Status Summary.
-
-M3 caveat: this verifies the selected-paper and raw-input DEGRADED PaperWorkspace
-API/UI handoff plus a minimal DirectionSearchView render and arXiv-to-job
-handoff smoke plus a minimal SeedExpansionPanel/API DEGRADED smoke. It does not
-prove broad multi-paper behavior, full DirectionWorkspace product behavior,
-verified citation-graph SeedExpansion, or product readiness.
-
-Main-chain smoke status:
-
-- `scripts/run_main_chain_smoke.py` now provides a manual M1 -> M2 -> M3 API
-  smoke path: direction query -> `/api/v1/directions/search` -> arXiv
-  candidate -> `/api/v1/directions/seed_expansion` -> source-backed expansion
-  candidate -> `/api/v1/directions/deep_read` -> `/understanding_status` ->
-  `/cards` gating.
-- The script supports `--query`, `--provider`, `--max-candidates`,
-  `--skip-llm`, and `--workspace`; it prints a console summary only and does
-  not write reports. It now reports selected input type (`arxiv_source`,
-  `arxiv_pdf`, `external_pdf`, or `metadata_only`), source strategy
-  (`source_first`, `pdf_fallback`, `pdf_direct`, or `metadata_only`), direction
-  and seed source metrics, fallback reason, returned card components, and
-  formula origin summary.
-- If API LLM is not enabled or the provider key is missing, the script runs a
-  no-LLM smoke and expects `BASELINE_ONLY` plus `/cards=403`. That validates
-  structural API/gating behavior only.
-- 2026-06-16 source-first implementation: arXiv handoff now tries
-  `https://arxiv.org/e-print/{id}` before PDF, writes `source/` and
-  `source_manifest.json`, chooses the main `.tex` by `\documentclass` then
-  largest `.tex`, and sends the selected `.tex` into M2. LaTeX source ingestion
-  preserves headings, METHOD/experiments sections, display equations, and
-  `formula_origin=source_latex`; source failures fall back to PDF with explicit
-  warning/fallback metadata. QualityAuditor/FSA-5 was not relaxed.
-- 2026-06-16 real Mimo source-first smoke matrix:
-  `time series anomaly detection` -> job `e6162aaf98e4`, selected
-  `arxiv_source`, source_strategy=`source_first`, source downloaded=true,
-  final status `SUCCESS`, `/cards=200`, components `formula_cards`,
-  `paper_card`, `teaching_cards`, formula_origin=`source_latex`, verdict PASS.
-  Direction metrics: arXiv=8, OpenAlex=8, Crossref=8; Semantic Scholar 429.
-- `multivariate time series imputation` -> job `0aacd009a71d`, selected
-  `external_pdf`, source_strategy=`pdf_direct`, final status
-  `DEGRADED_STRUCTURAL`, blocking_reason=`FORMULA_DERIVATION_BLOCKED`,
-  `/cards=200`, components `paper_card`, `teaching_cards`,
-  formula_origin=`raw_formula_text`, verdict DEGRADED_PASS. arXiv search
-  mostly timed out/rate-limited; OpenAlex/Crossref supplied candidates.
-- `diffusion models for time series imputation` -> job `775dc879b70b`,
-  selected `external_pdf`, source_strategy=`pdf_direct`, handoff failed with
-  `PDF_DOWNLOAD_FAILED` on an ACM PDF 403; no cards were returned, verdict FAIL.
-- `transformer time series anomaly detection` -> job `98af1c0974cb`, selected
-  `arxiv_source`, source_strategy=`source_first`, source downloaded=true,
-  final status `BLOCKED_UNDERSTANDING`, blocking_reason=`FORMULA_CARDS_FAILED`,
-  `/cards=403`, components `[]`, formula_origin=`source_latex`, verdict
-  DEGRADED_PASS. This is LLM formula-card timeout/block behavior, not a source
-  configuration failure.
-- Current strict claim: source-first arXiv handoff has narrow real evidence and
-  multi-source metrics show arXiv/OpenAlex/Semantic Scholar/Crossref are
-  attempted. One query reached full SUCCESS with source_latex formulas. Other
-  queries still degrade, block, or fail because external APIs rate-limit,
-  external PDFs fail, or LLM formula generation times out. This is not broad M1,
-  broad M2, M3 product readiness, or M4.
-
-M1 literature acquisition/fulltext discovery status:
-
-- 2026-06-16 implementation adds `FullTextResolver`, `DBLPAdapter`, expanded
-  `CandidatePaper` fulltext fields, DirectionSearchView fulltext status fields,
-  and `scripts/run_literature_acquisition_smoke.py`. The script prints console
-  summaries only and does not write reports.
-- Legal fulltext priority is: arXiv source/e-print, arXiv PDF, OpenAlex or
-  Unpaywall OA PDF, Semantic Scholar `openAccessPdf`, publisher/repository PDF,
-  explicit fulltext HTML such as ar5iv, manual user upload, then metadata-only.
-  Ordinary DOI/publisher landing pages are not treated as fulltext.
-- arXiv IDs can now be derived from legal arXiv landing/PDF URLs returned by
-  OpenAlex/Semantic Scholar/DBLP before selecting fulltext, so those non-arXiv
-  discoveries can still use arXiv source-first when the URL proves an arXiv ID.
-- Metadata-only high-value candidates are retained with `needs_user_upload=true`
-  and `can_deep_read=false`; they are not hidden and not mislabelled as
-  fulltext-ready.
-- External tool audit:
-
-| source/tool | current status | invoked by | query/fulltext method | fulltext capability | current failure/bottleneck |
-|---|---|---|---|---|---|
-| arXiv | active | `ArxivAdapter`, `FullTextResolver`, source resolver | Atom search, e-print, PDF | source_ready/pdf_ready | Works in smoke; source may fall back to PDF if e-print is unavailable. |
-| OpenAlex | active | `OpenAlexAdapter` | `pyalex.Works.search` | DOI, OA PDF metadata, arXiv landing/PDF discovery | Works; some records are metadata-only without Unpaywall email. |
-| Semantic Scholar | active but rate-limited | `SemanticScholarAdapter` | Graph API search with `openAccessPdf` | OA PDF and arXiv IDs when API responds | 429 in most smoke queries without higher-rate key; search degrades rather than failing whole query. |
-| Crossref | active metadata + PDF-link extraction | `CrossrefAdapter` | Crossref Works query | DOI/venue/year, occasional legal PDF links | Mostly metadata-only; no fulltext unless links expose legal PDF. |
-| DBLP | active metadata discovery | `DBLPAdapter` | DBLP publication API | DOI/arXiv/venue discovery only | Metadata-only by design; one smoke query timed out, later queries returned results. |
-| Unpaywall | implemented but env-blocked | `FullTextResolver` | DOI lookup via Unpaywall API | Legal OA PDF/landing lookup | `UNPAYWALL_EMAIL` / `RESEARCHSENSEI_CONTACT_EMAIL` missing in smoke, so DOI OA lookup did not run. |
-| ar5iv/html | guarded fallback | `FullTextResolver` | explicit ar5iv URL from arXiv ID | html_ready only for known fulltext HTML | Not selected when arXiv source/PDF is available. |
-| paper-search | configured only | `config/local.toml`, examples | not invoked by runtime M1 service | unknown | Present in config/docs, not currently called by DirectionExplorationService or smoke script. |
-| gpt-researcher / scholar / serp/browser search | not implemented | none | none | none | No runtime adapter found. |
-| local upload PDF | active fallback | `/api/v1/documents/parse`, source resolver | user-provided file/path | pdf/local source | Manual recovery path, not automatic literature search. |
-
-- 2026-06-16 six-query live smoke matrix:
-
-| query | attempted sources | total | non-arXiv | legal fulltext | source_ready | pdf_ready | metadata_only | top failure reasons |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| time series anomaly detection | 6 | 58 | 38 | 26 | 20 | 6 | 32 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429, DBLP timeout |
-| multivariate time series imputation | 6 | 63 | 48 | 20 | 15 | 5 | 43 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
-| graph anomaly detection | 6 | 73 | 53 | 25 | 20 | 5 | 48 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
-| diffusion models for time series imputation | 6 | 45 | 41 | 22 | 18 | 4 | 23 | `UNPAYWALL_EMAIL_MISSING`; Semantic Scholar returned 20 after retry |
-| transformer time series anomaly detection | 6 | 53 | 52 | 9 | 4 | 5 | 44 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
-| graph neural network anomaly detection | 6 | 54 | 52 | 12 | 7 | 5 | 42 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429, one arXiv source fallback |
-
-- Minimum smoke thresholds passed: every query attempted at least 4 sources,
-  all six attempted 6 sources, all six total candidates were >= 30, all six
-  non-arXiv candidate counts were >= 10, all six legal fulltext counts were >=
-  5, metadata-only candidates remained visible, and failure reasons were
-  explicit.
-- Strict status: this is DEGRADED_SMOKE / partial acquisition evidence. It is
-  not broad M1 REAL_E2E, not broad M2 evidence, not M3 product readiness, and
-  not M4.
-
-## Test Status Summary
-
-As of 2026-06-16:
-
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 516 passed, 15 skipped
-- Frontend: `cd frontend && npm test` -> 5 test files, 33 tests passed
-- Frontend build: `cd frontend && npm run build` -> success
-- M1 Literature acquisition/fulltext smoke: six real queries listed above. All
-  passed the minimum acquisition coverage thresholds, with Semantic Scholar and
-  Unpaywall limitations recorded as degraded source behavior.
-- M1 Direction Exploration external smoke: arXiv-only query
-  `time series anomaly detection` -> SUCCESS, 3 real candidates,
-  `can_enter_m2=false` for all because no canonical M2-ready handoff was
-  performed. With `RESEARCHSENSEI_ENABLE_API_LLM=1`,
-  `RESEARCHSENSEI_LLM_PROVIDER=mimo`, and non-empty `MIMO_API_KEY`, handoff
-  smoke selected arXiv `2510.18998`, created job `c09ff92ee955`, and returned
-  `DEGRADED_STRUCTURAL` with `FORMULA_DERIVATION_BLOCKED`; paper_card and
-  teaching_cards succeeded, formula_cards failed closed.
-- M1 Seed Expansion external smoke: seed arXiv `2510.18998` via
-  `/api/v1/directions/seed_expansion` -> DEGRADED, 17 real-source candidates,
-  upstream=5, downstream=3, same-route=6, surveys=3. Semantic Scholar rate
-  limited and Crossref timed out in part of the run. Relations remain weak
-  query/title-similarity relations, not verified citation graph edges.
-- M1->M2->M3 source-first main-chain smoke: `time series anomaly detection`
-  with Mimo -> job `e6162aaf98e4`, selected input `arxiv_source`,
-  source_strategy=`source_first`, final status `SUCCESS`, `/cards=200`, all
-  card components returned, formula_origin=`source_latex`. This is narrow
-  PARTIAL_REAL_E2E evidence only.
-
-## Hard Rules
-
-- No reports, PDFs, `.env`, API keys, `.venv`, model weights, cache directories,
-  or downloaded sources in commits.
-- Parser success on one paper is not broad parser acceptance.
-- Fallback parser success is not primary MinerU success.
-- M1 cannot pass a raw PDF directly to M2. M2 input is the canonical M1 bundle.
-- Live validation failures are failures, not skips, when claiming completed
-  live behavior.
-- Heavy parser/Ollama runs may be manual/nightly, but completion claims must
-  name exactly what real run passed.
+Live smokes are optional when keys/network are unavailable, but missing key or
+network must be reported as not live-verified.

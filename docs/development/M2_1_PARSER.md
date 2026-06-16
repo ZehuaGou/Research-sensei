@@ -457,7 +457,7 @@ Parser additionally preserves:
 - reference_clusters
 - historical_or_chronological_sections
 
-Status: NOT_IMPLEMENTED
+Status: FUTURE_SURVEY_SCOPE; not part of current M1/M2/M3 readiness evidence.
 
 ## 16. 当前未解决问题
 
@@ -466,3 +466,6 @@ Status: NOT_IMPLEMENTED
 - 重依赖隔离策略（Docling/MinerU 的依赖不污染主项目）
 - ParserAdapter 接口是否需要 `supports()` 还是只靠构造函数选择
 - CanonicalPaperReader 是否沿用 ParserAdapter 抽象，还是独立 `CanonicalInputReader` 接口
+> Current implementation status is authoritative only in `docs/STATUS.md`.
+> Historical status rows in this detailed planning note may be older than the
+> current M1/M2/M3 readiness state.

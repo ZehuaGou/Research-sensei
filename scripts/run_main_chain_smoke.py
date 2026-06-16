@@ -12,6 +12,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from starlette.testclient import TestClient  # noqa: E402
 
@@ -125,7 +129,7 @@ def run_main_chain_smoke(
     warnings.extend(_warnings(direction_response))
     warnings.extend(_warnings(seed_response))
     seed_candidates = _seed_candidates(seed_response)
-    handoff_candidate = _select_handoff_candidate(seed_candidates[:max(1, max_candidates)])
+    handoff_candidate = _select_handoff_candidate(seed_candidates[:max(1, max_candidates)], query=query)
     if not handoff_candidate:
         return _fail(
             query=query,
@@ -364,9 +368,10 @@ def _seed_candidates(seed_response: dict[str, Any]) -> list[dict[str, Any]]:
     return unique
 
 
-def _select_handoff_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _select_handoff_candidate(candidates: list[dict[str, Any]], *, query: str = "") -> dict[str, Any] | None:
+    query_terms = _query_terms(query)
     scored = [
-        (_handoff_candidate_score(candidate), index, candidate)
+        (_handoff_candidate_score(candidate, query_terms=query_terms), index, candidate)
         for index, candidate in enumerate(candidates)
         if _has_handoff_source(candidate)
     ]
@@ -380,10 +385,16 @@ def _has_handoff_source(candidate: dict[str, Any]) -> bool:
     return bool(_candidate_arxiv_id(candidate) or _candidate_arxiv_url(candidate) or candidate.get("pdf_url"))
 
 
-def _handoff_candidate_score(candidate: dict[str, Any]) -> int:
+def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str] | None = None) -> int:
     title = str(candidate.get("title") or "").lower()
+    title_terms = _query_terms(title)
     relation_type = str(candidate.get("relation_type") or "").lower()
     score = 0
+    if query_terms:
+        overlap = query_terms & title_terms
+        score += 5 * len(overlap)
+        if not overlap:
+            score -= 20
     if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
         score += 3
     if _candidate_arxiv_id(candidate):
@@ -425,6 +436,34 @@ def _handoff_candidate_score(candidate: dict[str, Any]) -> int:
     score += sum(1 for term in positive_terms if term in title)
     score -= 5 * sum(1 for term in negative_terms if term in title)
     return score
+
+
+def _query_terms(text: str) -> set[str]:
+    stopwords = {
+        "with",
+        "from",
+        "using",
+        "based",
+        "paper",
+        "model",
+        "models",
+        "method",
+        "methods",
+        "for",
+        "the",
+        "and",
+        "of",
+        "in",
+        "on",
+        "to",
+        "a",
+        "an",
+    }
+    return {
+        token
+        for token in re.findall(r"[a-z0-9]+", text.lower())
+        if len(token) >= 4 and token not in stopwords
+    }
 
 
 def _candidate_arxiv_id(candidate: dict[str, Any]) -> str:
