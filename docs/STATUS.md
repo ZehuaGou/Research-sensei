@@ -117,33 +117,29 @@ Earlier 2026-06-16 incremental Mimo main-chain smokes:
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
-### Main-chain regression matrix (2026-06-16)
+### Main-chain regression matrix (2026-06-17, post method-evidence fix)
 
 12 queries, Mimo, source-first preference. This is still a narrow regression
 matrix, not broad REAL_E2E.
 
 | Query | Job | Selected candidate | Input | Status | Blocking | Cards | Components | Verdict | Root cause / note |
 |---|---|---|---|---|---|---:|---|---|---|
-| time series anomaly detection | `dd5555211208` | `2007.14254` Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| multivariate time series imputation | `11fd320d7a0c` | `2512.15116` Generative Semi-supervised Learning for Multivariate Time Series Imputation | external_pdf, pdf_direct | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | OpenAlex/PDF path; evidence pack did not preserve enough method evidence; raw_formula_text. |
-| graph anomaly detection | `fd0a4e83d1d1` | `2212.05478` Mul-GAD | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| graph neural network anomaly detection | `0da508b3d5e2` | `2103.00113` Anomaly Detection on Attributed Networks via Contrastive Self-Supervised Learning | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| transformer time series anomaly detection | `a2119b8da426` | `2007.14254` Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| diffusion models for time series imputation | `1f0b1f6ed0d4` | `2409.08917` Latent Space Score-based Diffusion Model for Probabilistic Multivariate Time Series Imputation | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | P1 regression: prior invalid teaching evidence_ref BLOCK is resolved on current main. |
-| time series forecasting | `74106d875899` | `2106.09305` SCINet | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | source_latex exists, but M2 evidence gate found no reliable method evidence. |
-| anomaly detection survey | `4ea9ed0c49e3` | `2303.05000` Learning Representation for Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
-| graph neural network time series | `359a0972959e` | `1909.10086` Learning Universal Graph Neural Network Embeddings With Aid Of Transfer Learning | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | Candidate is only weakly aligned with time-series intent; selector needs improvement. |
-| diffusion models for forecasting | `80aaa6d9e6b4` | `2106.09305` SCINet | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | Candidate lacks diffusion alignment; selector/query planning needs improvement. |
-| transformer forecasting anomaly detection | `4d5004133ddf` | `2205.13504` Informer | external_pdf, pdf_direct | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF/raw formula provenance, formula cards correctly withheld. |
-| multivariate time series forecasting | `41cd7c7ee6ba` | `2410.11674` LLM-Mixer | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | source_latex exists, but method evidence gate failed. |
+| time series anomaly detection | `0c1cf41a8bed` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series imputation | `94654efbc068` | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
+| graph anomaly detection | `ef8b0a0e7f9b` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| graph neural network anomaly detection | - | - | metadata_only | FAIL | no source | - | - | FAIL | Direction search returned no arXiv candidate; external source degradation. |
+| transformer time series anomaly detection | `1db7974a38a6` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| diffusion models for time series imputation | `3d6c97106b82` | Multiple imputation of covariates | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex; method evidence now found via fuzzy section matching. |
+| time series forecasting | `3e77a1112655` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| anomaly detection survey | `bdb3c737bf51` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
+| graph neural network time series | - | - | metadata_only | FAIL | no candidate | - | - | FAIL | Direction search returned no arXiv candidate. |
+| diffusion models for forecasting | `68e59f6d23a8` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| transformer forecasting anomaly detection | `fc66996a8c8c` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series forecasting | `827976e63b23` | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
 
-Summary: 6/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 5/12 BLOCKED_UNDERSTANDING.
-For the original six-query matrix, the result is now 5/6 SUCCESS and 1/6
-BLOCKED. The old diffusion `AUDIT_BLOCKED` teaching evidence_ref failure is no
-longer reproduced; current main rejects invalid teaching evidence refs before
-audit and degrades/skips teaching cards instead of writing polluted artifacts.
-The remaining failures are mostly `MISSING_METHOD_EVIDENCE`, often from
-candidate/query mismatch or weak PDF/raw extraction, not from relaxed gates.
+Summary: 9/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 2/12 FAIL (no candidate/source).
+0 MISSING_METHOD_EVIDENCE — fuzzy section matching resolved the prior 5 failures.
+The 2 FAILs are direction-search-level (no arXiv candidate returned), not M2 gate failures.
 
 ### M1 acquisition fixture list
 

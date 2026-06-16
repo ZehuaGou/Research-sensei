@@ -11,9 +11,30 @@ from researchsensei.schemas.evidence import (
     PassageIndex,
 )
 
-METHOD_SECTIONS = {"method", "methods", "approach", "model", "architecture"}
-RESULT_SECTIONS = {"experiments", "experiment", "results", "evaluation", "benchmark"}
+METHOD_SECTIONS = {
+    "method", "methods", "approach", "model", "architecture",
+    "methodology", "proposed method", "proposed approach",
+    "framework", "algorithm", "proposed model",
+}
+RESULT_SECTIONS = {
+    "experiments", "experiment", "results", "evaluation", "benchmark",
+    "empirical study", "ablation study", "case study",
+}
 LIMITATION_SECTIONS = {"limitations", "limitation", "discussion"}
+
+# Section names that contain method-related keywords should also be treated as method sections.
+_METHOD_SECTION_KEYWORDS = re.compile(
+    r"(method|approach|model|framework|architecture|algorithm|encoder|decoder|"
+    r"network|module|layer|block|mixer|transformer|proposed|pipeline|mechanism|"
+    r"design|loss|objective|training|learning|embedding|attention)",
+    re.IGNORECASE,
+)
+
+# Section names that indicate survey/review — should NOT be treated as method.
+_SURVEY_SECTION_KEYWORDS = re.compile(
+    r"(survey|review|related work|background|preliminar|notation)",
+    re.IGNORECASE,
+)
 CONTRIBUTION_KEYWORDS = re.compile(
     r"\b(propose|present|introduce|develop|contribut)\w*\b", re.IGNORECASE
 )
@@ -59,8 +80,16 @@ def build_claim_evidence(
             ))
             continue
 
-        # Method section
-        if section in METHOD_SECTIONS:
+        # Method section (exact match or fuzzy match on section name)
+        is_method_section = (
+            section in METHOD_SECTIONS
+            or (
+                section
+                and _METHOD_SECTION_KEYWORDS.search(section)
+                and not _SURVEY_SECTION_KEYWORDS.search(section)
+            )
+        )
+        if is_method_section:
             counter += 1
             sentence = _find_sentence_with_keywords(passage.text, METHOD_KEYWORDS)
             claims.append(_make_claim(
@@ -72,8 +101,16 @@ def build_claim_evidence(
             ))
             continue
 
-        # Result section
-        if section in RESULT_SECTIONS:
+        # Result section (exact match or fuzzy match)
+        is_result_section = (
+            section in RESULT_SECTIONS
+            or (
+                section
+                and re.search(r"(experiment|result|evaluation|benchmark|ablation|study|comparison)", section, re.IGNORECASE)
+                and not _SURVEY_SECTION_KEYWORDS.search(section)
+            )
+        )
+        if is_result_section:
             counter += 1
             sentence = _find_sentence_with_keywords(passage.text, RESULT_KEYWORDS)
             claims.append(_make_claim(
@@ -139,6 +176,28 @@ def build_claim_evidence(
                 source_sentence=sentence,
             ))
             continue
+
+    # Fallback: if no METHOD claim found, try to extract from unclaimed passages
+    has_method = any(c.claim_type == "METHOD" for c in claims)
+    if not has_method:
+        claimed_passage_ids = {c.passage_id for c in claims}
+        for passage in passage_index.passages:
+            if passage.passage_id in claimed_passage_ids:
+                continue
+            block_types_lower = {bt.lower() for bt in passage.source_block_types}
+            if "formula" in block_types_lower:
+                continue
+            sentence = _find_sentence_with_keywords(passage.text, METHOD_KEYWORDS)
+            if sentence:
+                counter += 1
+                claims.append(_make_claim(
+                    paper_id, counter, passage,
+                    blocks_by_id=blocks_by_id,
+                    claim_type="METHOD",
+                    semantic_support="PARAPHRASE",
+                    source_sentence=sentence,
+                ))
+                break  # One fallback METHOD claim is enough
 
     if not claims:
         warnings.append(

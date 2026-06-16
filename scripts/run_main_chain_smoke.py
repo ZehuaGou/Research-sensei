@@ -405,7 +405,7 @@ def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str]
         "same_route": 5,
         "downstream": 4,
         "upstream": 1,
-        "survey": -8,
+        "survey": -12,
     }
     score += relation_bonus.get(relation_type, 0)
     positive_terms = [
@@ -421,6 +421,15 @@ def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str]
         "imputation",
         "detection",
         "forecasting",
+        "network",
+        "encoder",
+        "decoder",
+        "attention",
+        "diffusion",
+        "graph",
+        "time series",
+        "anomaly",
+        "prediction",
     ]
     negative_terms = [
         "survey",
@@ -432,6 +441,8 @@ def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str]
         "role in",
         "benchmarking",
         "comparison",
+        "comprehensive",
+        "taxonomy",
     ]
     score += sum(1 for term in positive_terms if term in title)
     score -= 5 * sum(1 for term in negative_terms if term in title)
@@ -445,10 +456,6 @@ def _query_terms(text: str) -> set[str]:
         "using",
         "based",
         "paper",
-        "model",
-        "models",
-        "method",
-        "methods",
         "for",
         "the",
         "and",
@@ -462,7 +469,7 @@ def _query_terms(text: str) -> set[str]:
     return {
         token
         for token in re.findall(r"[a-z0-9]+", text.lower())
-        if len(token) >= 4 and token not in stopwords
+        if len(token) >= 3 and token not in stopwords
     }
 
 
