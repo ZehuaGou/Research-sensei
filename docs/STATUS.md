@@ -117,6 +117,21 @@ Latest 2026-06-16 Mimo main-chain smoke:
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | — | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
+### Main-chain regression matrix (2026-06-16)
+
+6 queries, Mimo, source-first preference:
+
+| Query | Job | Input | Status | Blocking | Cards | Components | Verdict | Strict note |
+|---|---|---|---|---|---:|---|---|---|
+| time series anomaly detection | `81a65e5e724f` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
+| multivariate time series imputation | `3552320b2d9c` | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
+| graph anomaly detection | `a9e52b524e9d` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
+| graph neural network anomaly detection | `4e97444bb950` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
+| transformer time series anomaly detection | `3df86e22c204` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
+| diffusion models for time series imputation | `17d668eedc58` | arxiv_source, source_first | BLOCKED_UNDERSTANDING | AUDIT_BLOCKED | 403 | none | DEGRADED_PASS | Audit F-2: teaching card evidence_ref not in evidence sources; correct fail-closed. |
+
+Summary: 4/6 SUCCESS, 1/6 DEGRADED (PDF fallback formula provenance), 1/6 BLOCKED (audit caught invalid evidence_ref). source_latex path is repeatable across time-series and graph domains. Failures are correct gate behavior, not code bugs.
+
 ## M2/M3 Gating Rules
 
 - SUCCESS: `/cards=200`; paper, formula, and teaching cards expected.
