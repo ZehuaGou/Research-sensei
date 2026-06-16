@@ -206,6 +206,9 @@ def test_smoke_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
 
     assert result["total_candidates"] == 1
     assert result["metadata_only_count"] == 1
+    assert result["metadata_only_after_unpaywall_count"] == 0
+    assert result["selected_fulltext_source_counts"] == {"metadata_only": 1}
+    assert result["oa_pdf_found_count"] == 0
     assert result["top_candidates"][0]["needs_user_upload"] is True
     assert result["top_candidates"][0]["can_deep_read"] is False
     assert result["verdict"] == "DEGRADED_PASS"

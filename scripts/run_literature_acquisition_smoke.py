@@ -130,6 +130,7 @@ def _summary(
     warnings: list[str],
 ) -> dict[str, Any]:
     status_counts = Counter(candidate.fulltext_status for candidate in candidates)
+    selected_source_counts = Counter(candidate.selected_fulltext_source or "metadata_only" for candidate in candidates)
     failure_counts = Counter(
         candidate.fulltext_failure_reason
         for candidate in candidates
@@ -155,7 +156,15 @@ def _summary(
         "pdf_ready_count": status_counts.get("pdf_ready", 0),
         "html_ready_count": status_counts.get("html_ready", 0),
         "metadata_only_count": status_counts.get("metadata_only", 0),
+        "metadata_only_after_unpaywall_count": sum(1 for candidate in candidates if candidate.doi and candidate.fulltext_status == "metadata_only"),
         "failed_count": status_counts.get("failed", 0),
+        "selected_fulltext_source_counts": dict(selected_source_counts.most_common()),
+        "oa_pdf_found_count": sum(
+            selected_source_counts.get(source, 0)
+            for source in ("openalex_oa_pdf", "semantic_scholar_oa_pdf", "publisher_oa_pdf", "repository_pdf")
+        ),
+        "repository_pdf_count": selected_source_counts.get("repository_pdf", 0),
+        "publisher_oa_count": selected_source_counts.get("publisher_oa_pdf", 0),
         "failure_reasons": dict(failure_counts.most_common(8)),
         "warnings": warnings,
     }
