@@ -93,7 +93,7 @@ def test_direction_handoff_source_unavailable_returns_explicit_failure(tmp_path:
     assert detail["source_status"]["status"] == "rejected"
 
 
-def test_direction_handoff_doi_returns_not_implemented(tmp_path: Path) -> None:
+def test_direction_handoff_doi_returns_no_legal_oa(tmp_path: Path) -> None:
     client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
 
     response = client.post(
@@ -103,9 +103,8 @@ def test_direction_handoff_doi_returns_not_implemented(tmp_path: Path) -> None:
 
     assert response.status_code == 400
     detail = response.json()["detail"]
-    assert detail["status"] == "DOI_NOT_IMPLEMENTED"
-    assert detail["source_status"]["source_type"] == "doi"
-    assert "DOI_NOT_IMPLEMENTED" in detail["source_status"]["warnings"]
+    assert detail["status"] == "NO_LEGAL_OA_FULLTEXT_FOUND"
+    assert detail["doi"] == "10.1145/example"
 
 
 def test_direction_handoff_pdf_download_failure_is_explicit(tmp_path: Path) -> None:
@@ -157,6 +156,131 @@ def test_direction_handoff_preserves_cards_gating(tmp_path: Path) -> None:
 
     assert cards_response.status_code == 403
     assert cards_response.json()["detail"]["status"] == "BASELINE_ONLY"
+
+
+class UnpaywallOaHttpClient:
+    """Simulates Unpaywall returning an OA PDF location."""
+
+    def __init__(self, pdf_content: bytes) -> None:
+        self.pdf_content = pdf_content
+        self.urls: list[str] = []
+
+    def get(self, url: str, **kwargs):
+        self.urls.append(url)
+        if "api.unpaywall.org" in url:
+            return _unpaywall_response(pdf_url="https://repo.example.org/paper.pdf")
+        # PDF download
+        return StubHttpResponse(self.pdf_content, url=url)
+
+
+class UnpaywallLandingOnlyHttpClient:
+    """Simulates Unpaywall returning only a landing page, no PDF."""
+
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+
+    def get(self, url: str, **kwargs):
+        self.urls.append(url)
+        if "api.unpaywall.org" in url:
+            return _unpaywall_response(landing_url="https://publisher.example.org/paper")
+        return StubHttpResponse(b"", content_type="text/html", url=url)
+
+
+class UnpaywallNotFoundHttpClient:
+    """Simulates Unpaywall returning 404 for a DOI."""
+
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+
+    def get(self, url: str, **kwargs):
+        self.urls.append(url)
+        if "api.unpaywall.org" in url:
+            resp = StubHttpResponse(b"not found")
+            resp.status_code = 404
+            return resp
+        return StubHttpResponse(b"", url=url)
+
+
+class _unpaywall_response:
+    """Minimal Unpaywall API response."""
+
+    def __init__(self, pdf_url: str = "", landing_url: str = "") -> None:
+        self.status_code = 200
+        location = {}
+        if pdf_url:
+            location["url_for_pdf"] = pdf_url
+        if landing_url:
+            location["url_for_landing_page"] = landing_url
+        self._data = {
+            "best_oa_location": location if location else None,
+            "oa_locations": [location] if location else [],
+        }
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict:
+        return self._data
+
+
+def test_direction_doi_only_unpaywall_oa_pdf_creates_job(tmp_path: Path) -> None:
+    http_client = UnpaywallOaHttpClient(_sample_pdf_bytes())
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            http_client=http_client,
+        )
+    )
+
+    response = client.post(
+        "/api/v1/directions/deep_read",
+        json={"candidate": {"title": "DOI OA Paper", "doi": "10.1145/example"}},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["handoff_status"] == "JOB_CREATED"
+    assert data["job_id"]
+    assert data["source_status"]["source_type"] == "pdf_url"
+    assert any("unpaywall" in u for u in http_client.urls)
+
+
+def test_direction_doi_only_unpaywall_not_found_returns_error(tmp_path: Path) -> None:
+    http_client = UnpaywallNotFoundHttpClient()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            http_client=http_client,
+        )
+    )
+
+    response = client.post(
+        "/api/v1/directions/deep_read",
+        json={"candidate": {"title": "DOI Not Found", "doi": "10.9999/notfound"}},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["status"] == "NO_LEGAL_OA_FULLTEXT_FOUND"
+
+
+def test_direction_doi_only_landing_only_returns_error(tmp_path: Path) -> None:
+    http_client = UnpaywallLandingOnlyHttpClient()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            http_client=http_client,
+        )
+    )
+
+    response = client.post(
+        "/api/v1/directions/deep_read",
+        json={"candidate": {"title": "DOI Landing Only", "doi": "10.1145/landing"}},
+    )
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["status"] == "NO_LEGAL_OA_FULLTEXT_FOUND"
 
 
 def _sample_pdf_bytes() -> bytes:

@@ -44,7 +44,7 @@ long-term memory, drills, and training features are not started.
 | M1 | arXiv source-first | implemented | source/e-print handoff smoke | PARTIAL_REAL_E2E_VERIFIED for narrow arXiv candidates. Source/e-print is preferred over PDF; fallback stays explicit. |
 | M1 | Direction Exploration | implemented minimal loop | backend + frontend tests + source smoke | DEGRADED_SMOKE. Returns overview, sub-directions, method families, candidates, source metrics, and reading order. |
 | M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
-| M1 | DOI deep_read | explicit failure | API tests | DOI-only handoff remains `DOI_NOT_IMPLEMENTED`; DOI can still help legal full-text lookup through Unpaywall/OpenAlex. |
+| M1 | DOI deep_read | implemented via Unpaywall | API + Mimo smoke | DOI-only handoff resolves through Unpaywall to legal OA PDF when available; returns `NO_LEGAL_OA_FULLTEXT_FOUND` when no OA PDF exists. Not broad REAL_E2E. |
 | M2 | Selected-paper paper understanding | implemented | `2310_08800v2` live acceptance | PARTIAL_REAL_E2E_VERIFIED only for selected paper. |
 | M2 | Raw/source handoff understanding | implemented fail-closed | Mimo source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. Not broad REAL_E2E. |
 | M2 | Formula provenance/FSA-5 | implemented strict gate | unit + smoke | Unknown/weak formula origin cannot produce detailed derivation; source_latex improves but does not bypass audit. |
@@ -104,6 +104,7 @@ instead of being discarded.
 | raw Mimo handoff | `c09ff92ee955` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Mimo entered chain; formula component degraded. |
 | main-chain source-first Mimo | `e6162aaf98e4` | SUCCESS | 200 | paper + formula + teaching | Narrow PASS with source_latex evidence; not broad REAL_E2E. |
 | non-arXiv OA PDF deep_read | `8cba4345fee7` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Legal OA PDF handoff works; formula provenance remains weaker than source_latex. |
+| DOI-only Unpaywall OA deep_read | `b28134b4496c` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | DOI `10.1038/s41586-021-03819-2` resolved via Unpaywall to legal OA PDF; Mimo M2 ran; formula provenance degraded for non-arXiv PDF. |
 
 Latest 2026-06-16 Mimo main-chain smoke:
 

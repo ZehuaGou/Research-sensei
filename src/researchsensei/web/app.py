@@ -9,13 +9,14 @@ import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from starlette.concurrency import run_in_threadpool
 
+from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import ConfigService
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.types import LLMConfig
-from researchsensei.schemas import JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
+from researchsensei.schemas import CandidatePaper, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.source_resolver import SourceResolver
 from researchsensei.workspace import WorkspaceStore
 
@@ -57,6 +58,10 @@ def create_app(
     )
     resolver = SourceResolver(
         allowed_roots=allowed_local_roots if allowed_local_roots is not None else [workspace.root],
+        http_client=http_client,
+        max_download_bytes=max_download_bytes,
+    )
+    fulltext_resolver = FullTextResolver(
         http_client=http_client,
         max_download_bytes=max_download_bytes,
     )
@@ -307,6 +312,37 @@ def create_app(
         title, doi, pdf_url, arxiv_id, arxiv_url = _direction_handoff_inputs(candidate)
         job_id = uuid.uuid4().hex[:12]
         run_dir = workspace.new_run_dir(job_id)
+
+        # DOI-only path: resolve DOI -> legal OA PDF via FullTextResolver
+        if doi and not pdf_url and not arxiv_id and not arxiv_url:
+            resolved_pdf_url, resolve_error = _resolve_doi_to_legal_pdf(
+                fulltext_resolver, doi, title,
+            )
+            if resolved_pdf_url:
+                pdf_url = resolved_pdf_url
+                doi = ""
+            else:
+                job = _record_failed_source_job(
+                    workspace, jobs, job_id, run_dir,
+                    SourceStatus(
+                        source_type="doi",
+                        original_input=doi,
+                        status="rejected",
+                        warnings=[resolve_error],
+                        degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
+                    ),
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "status": "NO_LEGAL_OA_FULLTEXT_FOUND",
+                        "handoff_status": "NO_LEGAL_OA_FULLTEXT_FOUND",
+                        "job_id": job.job_id,
+                        "message": _doi_failure_message(resolve_error),
+                        "doi": doi,
+                    },
+                )
+
         source_status = _resolve_source(
             resolver=resolver,
             run_dir=run_dir,
@@ -556,6 +592,14 @@ def _direction_failure_status(source_status: SourceStatus) -> str:
         return "PDF_DOWNLOAD_FAILED"
     if "INVALID_ARXIV_ID" in warnings or "UNSUPPORTED_SOURCE" in warnings:
         return "SOURCE_UNAVAILABLE"
+    if "UNPAYWALL_EMAIL_MISSING" in warnings:
+        return "NO_LEGAL_OA_FULLTEXT_FOUND"
+    if "UNPAYWALL_NOT_FOUND" in warnings:
+        return "NO_LEGAL_OA_FULLTEXT_FOUND"
+    if "UNPAYWALL_NO_OA_LOCATION" in warnings:
+        return "NO_LEGAL_OA_FULLTEXT_FOUND"
+    if "UNPAYWALL_LANDING_ONLY" in warnings:
+        return "NO_LEGAL_OA_FULLTEXT_FOUND"
     if source_status.status in {"rejected", "failed"}:
         return "SOURCE_UNAVAILABLE"
     return "BLOCKED"
@@ -569,6 +613,49 @@ def _direction_failure_message(status: str, source_status: SourceStatus) -> str:
     if status == "SOURCE_UNAVAILABLE":
         return "No supported full-text source is available for this direction candidate."
     return "; ".join(source_status.warnings) or "Direction candidate handoff was blocked."
+
+
+def _resolve_doi_to_legal_pdf(
+    fulltext_resolver: FullTextResolver,
+    doi: str,
+    title: str,
+) -> tuple[str, str]:
+    """Resolve DOI to a legal OA PDF URL via FullTextResolver.
+
+    Returns (pdf_url, error). If pdf_url is non-empty, it is a legal OA PDF.
+    If pdf_url is empty, error describes why resolution failed.
+    """
+    candidate = CandidatePaper(
+        paper_id=doi,
+        title=title,
+        doi=doi,
+    )
+    resolved, _metrics = fulltext_resolver.resolve(candidate, download=False)
+    if resolved.can_deep_read and resolved.selected_fulltext_url:
+        source = resolved.selected_fulltext_source or ""
+        # Only accept actual PDF sources, not landing pages or HTML
+        if source.endswith("_pdf") or "pdf" in source.lower():
+            return resolved.selected_fulltext_url, ""
+        if resolved.selected_fulltext_url.lower().endswith(".pdf"):
+            return resolved.selected_fulltext_url, ""
+        # Landing page or HTML-only — not suitable for deep_read parse
+        return "", "UNPAYWALL_LANDING_ONLY"
+    reason = resolved.fulltext_failure_reason or "NO_LEGAL_OA_FULLTEXT_FOUND"
+    return "", reason
+
+
+def _doi_failure_message(error: str) -> str:
+    if error == "UNPAYWALL_EMAIL_MISSING":
+        return "Unpaywall email is not configured. Set UNPAYWALL_EMAIL or RESEARCHSENSEI_CONTACT_EMAIL."
+    if error == "UNPAYWALL_NOT_FOUND":
+        return "DOI was not found in Unpaywall. Try providing a PDF URL or arXiv ID."
+    if error == "UNPAYWALL_NO_OA_LOCATION":
+        return "No legal open-access location found for this DOI. Try providing a PDF URL or arXiv ID."
+    if error == "UNPAYWALL_LANDING_ONLY":
+        return "Only a landing page was found for this DOI, not a downloadable PDF. Try providing a PDF URL."
+    if error == "DOI_MISSING":
+        return "DOI is empty or invalid."
+    return "No legal open-access full text found for this DOI. Try providing a PDF URL or arXiv ID."
 
 
 def _job_understanding_status(job: JobRecord) -> dict[str, object]:
