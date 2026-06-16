@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from scripts.run_main_chain_smoke import evaluate_gating, run_main_chain_smoke
+from scripts.run_main_chain_smoke import _handoff_payload, evaluate_gating, run_main_chain_smoke
 
 
 class FakeResponse:
@@ -62,9 +62,11 @@ class FakeClient:
                     _seed_paper("2401.00002", "Foundation Paper", "upstream"),
                 ],
                 "downstream_papers": [
-                    _seed_paper("2401.00003", "Follow-up Paper", "downstream"),
+                    _seed_paper("2401.00003", "Follow-up Method Paper", "downstream"),
                 ],
-                "same_route_papers": [],
+                "same_route_papers": [
+                    _seed_paper("2401.00004", "Neural Architecture for Time Series Anomaly Detection", "same_route"),
+                ],
                 "related_surveys": [],
             })
         if url == "/api/v1/directions/deep_read":
@@ -122,11 +124,11 @@ def test_main_chain_smoke_success_cards_gate() -> None:
 
     assert result["final_verdict"] == "PASS"
     assert result["selected_candidate_arxiv_id"] == "2401.00001"
-    assert result["selected_seed_handoff_arxiv_id"] == "2401.00002"
+    assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
     assert result["seed_expansion_group_counts"] == {
         "upstream": 1,
         "downstream": 1,
-        "same_route": 0,
+        "same_route": 1,
         "surveys": 0,
     }
     assert result["returned_card_components"] == ["formula_cards", "paper_card", "teaching_cards"]
@@ -153,6 +155,24 @@ def test_main_chain_smoke_degraded_cards_gate_only_success_components() -> None:
     assert result["cards_status_code"] == 200
     assert "formula_cards" not in result["returned_card_components"]
     assert any("SEED_SOURCE_FAILED" in warning for warning in result["warnings"])
+
+
+def test_main_chain_smoke_prefers_method_like_candidate_over_foundation() -> None:
+    client = FakeClient(
+        final_status="DEGRADED_STRUCTURAL",
+        cards_status_code=200,
+        cards_payload={"cards": {"paper_card": {}, "teaching_cards": {}}},
+    )
+
+    result = run_main_chain_smoke(
+        client,
+        query="time series anomaly detection",
+        max_candidates=5,
+        llm_enabled=True,
+    )
+
+    assert result["selected_seed_handoff_title"] == "Neural Architecture for Time Series Anomaly Detection"
+    assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
 
 
 def test_main_chain_smoke_blocked_cards_gate() -> None:
@@ -204,3 +224,14 @@ def test_llm_enabled_baseline_only_fails() -> None:
 
     assert verdict == "FAIL"
     assert "LLM was enabled" in reasons[0]
+
+
+def test_handoff_payload_drops_unsupported_old_arxiv_id_when_pdf_exists() -> None:
+    payload = _handoff_payload({
+        "title": "Old arXiv paper",
+        "arxiv_id": "9807001",
+        "pdf_url": "https://example.test/paper.pdf",
+    })
+
+    assert payload["arxiv_id"] == ""
+    assert payload["pdf_url"] == "https://example.test/paper.pdf"

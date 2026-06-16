@@ -114,6 +114,8 @@ class SinglePaperIngestionRunner:
             claim_evidence = build_claim_evidence(document, passage_index)
             evidence_index = build_evidence_index(document)
             paper_skeleton = build_paper_skeleton(document, evidence_index)
+            evidence_pack: EvidencePack | None = None
+            formula_evidence_pack: EvidencePack | None = None
 
             if self.llm_client is None:
                 # Baseline path
@@ -205,6 +207,8 @@ class SinglePaperIngestionRunner:
             understanding_status,
             card_artifacts,
             quality_report,
+            evidence_pack=evidence_pack,
+            formula_evidence_pack=formula_evidence_pack,
         )
 
     def _run_audit(
@@ -374,6 +378,8 @@ class SinglePaperIngestionRunner:
         understanding_status: UnderstandingStatus,
         card_artifacts: dict,
         quality_report: QualityReport,
+        evidence_pack: EvidencePack | None = None,
+        formula_evidence_pack: EvidencePack | None = None,
     ) -> JobRecord:
         """Write all artifacts and update job."""
         source_status_path = run_dir / "source_status.json"
@@ -382,6 +388,8 @@ class SinglePaperIngestionRunner:
         claim_evidence_path = run_dir / "claim_evidence.json"
         evidence_path = run_dir / "evidence_index.json"
         skeleton_path = run_dir / "paper_skeleton.json"
+        evidence_pack_path = run_dir / "evidence_pack.json"
+        formula_evidence_pack_path = run_dir / "formula_evidence_pack.json"
         understanding_status_path = run_dir / "understanding_status.json"
         quality_report_path = run_dir / "quality_report.json"
 
@@ -402,6 +410,14 @@ class SinglePaperIngestionRunner:
             WorkspaceArtifact(artifact_type="evidence_index", path=str(evidence_path)),
             WorkspaceArtifact(artifact_type="paper_skeleton", path=str(skeleton_path)),
         ]
+
+        if evidence_pack is not None:
+            self.workspace.write_json(evidence_pack_path, evidence_pack)
+            artifacts.append(WorkspaceArtifact(artifact_type="evidence_pack", path=str(evidence_pack_path)))
+
+        if formula_evidence_pack is not None:
+            self.workspace.write_json(formula_evidence_pack_path, formula_evidence_pack)
+            artifacts.append(WorkspaceArtifact(artifact_type="formula_evidence_pack", path=str(formula_evidence_pack_path)))
 
         # Write card artifacts if available
         if "paper_card" in card_artifacts:

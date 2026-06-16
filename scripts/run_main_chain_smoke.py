@@ -137,7 +137,7 @@ def run_main_chain_smoke(
         )
 
     handoff_response = _request_json(
-        client.post("/api/v1/directions/deep_read", json={"candidate": handoff_candidate}),
+        client.post("/api/v1/directions/deep_read", json={"candidate": _handoff_payload(handoff_candidate)}),
         "deep read handoff",
     )
     job_id = str(handoff_response.get("job_id") or "")
@@ -296,24 +296,71 @@ def _seed_candidates(seed_response: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _select_handoff_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for candidate in candidates:
-        if _has_handoff_source(candidate) and (
-            candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True
-        ):
-            return candidate
-    for candidate in candidates:
-        if _has_handoff_source(candidate):
-            return candidate
-    return None
+    scored = [
+        (_handoff_candidate_score(candidate), index, candidate)
+        for index, candidate in enumerate(candidates)
+        if _has_handoff_source(candidate)
+    ]
+    if not scored:
+        return None
+    scored.sort(key=lambda item: (item[0], -item[1]), reverse=True)
+    return scored[0][2] if scored[0][0] > 0 else None
 
 
 def _has_handoff_source(candidate: dict[str, Any]) -> bool:
-    return bool(candidate.get("arxiv_id") or candidate.get("arxiv_url") or candidate.get("pdf_url"))
+    return bool(_candidate_arxiv_id(candidate) or _candidate_arxiv_url(candidate) or candidate.get("pdf_url"))
+
+
+def _handoff_candidate_score(candidate: dict[str, Any]) -> int:
+    title = str(candidate.get("title") or "").lower()
+    relation_type = str(candidate.get("relation_type") or "").lower()
+    score = 0
+    if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
+        score += 3
+    if _candidate_arxiv_id(candidate):
+        score += 5
+    elif candidate.get("pdf_url"):
+        score += 3
+    relation_bonus = {
+        "same_route": 5,
+        "downstream": 4,
+        "upstream": 1,
+        "survey": -8,
+    }
+    score += relation_bonus.get(relation_type, 0)
+    positive_terms = [
+        "method",
+        "approach",
+        "model",
+        "framework",
+        "architecture",
+        "algorithm",
+        "learning",
+        "neural",
+        "transformer",
+        "imputation",
+        "detection",
+        "forecasting",
+    ]
+    negative_terms = [
+        "survey",
+        "review",
+        "foundation model",
+        "foundational model",
+        "foundational models",
+        "perspective",
+        "role in",
+        "benchmarking",
+        "comparison",
+    ]
+    score += sum(1 for term in positive_terms if term in title)
+    score -= 5 * sum(1 for term in negative_terms if term in title)
+    return score
 
 
 def _candidate_arxiv_id(candidate: dict[str, Any]) -> str:
     explicit = str(candidate.get("arxiv_id") or "").strip()
-    if explicit:
+    if explicit and _is_supported_arxiv_id(explicit):
         return explicit
     for key in ("arxiv_url", "url", "landing_url", "paper_url", "pdf_url"):
         value = str(candidate.get(key) or "")
@@ -321,6 +368,28 @@ def _candidate_arxiv_id(candidate: dict[str, Any]) -> str:
         if match:
             return match.group(1).removesuffix(".pdf")
     return ""
+
+
+def _candidate_arxiv_url(candidate: dict[str, Any]) -> str:
+    for key in ("arxiv_url", "url", "landing_url", "paper_url"):
+        value = str(candidate.get(key) or "")
+        if _candidate_arxiv_id({key: value}):
+            return value
+    return ""
+
+
+def _handoff_payload(candidate: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "title": candidate.get("title") or "",
+        "doi": candidate.get("doi") or "",
+        "arxiv_id": _candidate_arxiv_id(candidate),
+        "arxiv_url": _candidate_arxiv_url(candidate),
+        "pdf_url": candidate.get("pdf_url") or "",
+    }
+
+
+def _is_supported_arxiv_id(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?", value.strip()))
 
 
 def _warnings(response: dict[str, Any]) -> list[str]:

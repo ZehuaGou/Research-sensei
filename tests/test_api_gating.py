@@ -170,6 +170,7 @@ def test_parse_endpoint_with_injected_llm_can_return_success_cards(tmp_path: Pat
     llm = ScriptedApiLLM()
     client = TestClient(create_app(workspace_root=tmp_path / "workspace", llm_client=llm))
     job_id = _parse_method_sample(client)
+    run_dir = tmp_path / "workspace" / "runs" / job_id
 
     status_response = client.get(f"/api/v1/jobs/{job_id}/understanding_status")
     assert status_response.status_code == 200
@@ -186,6 +187,13 @@ def test_parse_endpoint_with_injected_llm_can_return_success_cards(tmp_path: Pat
     assert "teaching_cards" in cards_data["cards"]
     assert cards_data["paper_workspace_status"]["quality_status"] == "pass"
     assert llm.calls == 2
+
+    job_response = client.get(f"/api/v1/jobs/{job_id}")
+    artifact_types = {artifact["artifact_type"] for artifact in job_response.json()["artifacts"]}
+    assert "evidence_pack" in artifact_types
+    assert "formula_evidence_pack" in artifact_types
+    evidence_pack = json.loads((run_dir / "evidence_pack.json").read_text(encoding="utf-8"))
+    assert any(item["claim_type"] == "METHOD" for item in evidence_pack["items"])
 
 
 def test_parse_endpoint_with_injected_llm_can_return_degraded_cards(tmp_path: Path) -> None:
