@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_teaching_cards_llm_output
 from researchsensei.schemas import (
     EvidenceType,
@@ -39,50 +40,37 @@ async def build_teaching_cards(
 
     messages = prompt_builder.build_simple(
         system=(
-            "You are the ResearchSensei teaching-card builder.\n"
-            "Teach from intuition to minimal formula to small example.\n"
-            "Use only the supplied evidence pack and paper card.\n"
+            "You are a teaching card builder. Use only the supplied evidence.\n"
             "Every teaching card must cite exactly one allowed evidence_ref.\n"
-            "Return only valid compact JSON with no markdown and no literal newlines inside string values."
+            "Return only valid compact JSON. No markdown fences."
         ),
-        user=f"""Paper title: {skeleton.title}
+        user=f"""Paper: {skeleton.title}
 
-Concepts to teach:
+Concepts:
 {chr(10).join(concepts) if concepts else 'None'}
 
-Evidence Pack:
+Evidence:
 {evidence_text}
 
-Allowed evidence_ref values:
+Allowed refs:
 {allowed_refs}
 
-Constraints:
-- Choose evidence_ref exactly from Allowed evidence_ref values.
-- Generate at most 2 teaching_cards.
-- Keep each text field concise: title <= 30 Chinese characters, each explanation <= 90 Chinese characters.
-- Do not concatenate multiple evidence refs.
-- Do not invent background not present in evidence.
-- Use concise Chinese explanations with necessary English/math terms preserved.
-- If evidence is insufficient, do not generate that teaching_card.
+Rules:
+- evidence_ref from allowed list only. Max 2 teaching_cards.
+- Title <= 30 chars, explanations <= 90 chars. Chinese with English math terms.
+- INSUFFICIENT_EVIDENCE for unsupported fields.
 
-Return JSON with this schema:
-{{
-  "teaching_cards": [
-    {{
-      "target_type": "concept",
-      "title": "teaching title",
-      "human_explanation": "plain-language explanation",
-      "analogy_explanation": "simple analogy grounded in the evidence",
-      "minimal_formula_explanation": "minimal math explanation if supported, otherwise INSUFFICIENT_EVIDENCE",
-      "numeric_example": "small numeric example if supported, otherwise INSUFFICIENT_EVIDENCE",
-      "paper_role_explanation": "why this concept matters in the paper",
-      "evidence_ref": "allowed ref"
-    }}
-  ]
-}}""",
+JSON: {{"teaching_cards": [{{"target_type":"concept","title":"","human_explanation":"","analogy_explanation":"","minimal_formula_explanation":"","numeric_example":"","paper_role_explanation":"","evidence_ref":""}}]}}""",
     )
 
-    data = await llm_client.chat_json(messages)
+    teaching_config = LLMConfig(
+        temperature=0.2,
+        max_tokens=4096,
+        json_mode=True,
+        timeout=180.0,
+        max_retries=1,
+    )
+    data = await llm_client.chat_json(messages, config=teaching_config)
     output = TeachingCardsLLMOutput.model_validate(data)
     validate_teaching_cards_llm_output(output, evidence_pack)
 
@@ -160,9 +148,9 @@ def _overall_status(cards: list[TeachingCard]) -> EvidenceType:
 
 def _format_evidence_for_prompt(evidence_pack: EvidencePack) -> str:
     lines: list[str] = []
-    for item in evidence_pack.items[:20]:
+    for item in evidence_pack.items[:15]:
         lines.append(
-            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:300]}"
+            f"- [{item.claim_type}] {item.evidence_ref}: {item.passage_text[:200]}"
         )
     return "\n".join(lines)
 

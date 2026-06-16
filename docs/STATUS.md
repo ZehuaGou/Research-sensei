@@ -46,7 +46,7 @@ long-term memory, drills, and training features are not started.
 | M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
 | M1 | DOI deep_read | implemented via Unpaywall | API + Mimo smoke | DOI-only handoff resolves through Unpaywall to legal OA PDF when available; returns `NO_LEGAL_OA_FULLTEXT_FOUND` when no OA PDF exists. Not broad REAL_E2E. |
 | M2 | Selected-paper paper understanding | implemented | `2310_08800v2` live acceptance | PARTIAL_REAL_E2E_VERIFIED only for selected paper. |
-| M2 | Raw/source handoff understanding | implemented fail-closed | Mimo source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. Not broad REAL_E2E. |
+| M2 | Raw/source handoff understanding | implemented fail-closed | Mimo source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. Main-chain source_latex now achieves SUCCESS with all three card types. Not broad REAL_E2E. |
 | M2 | Formula provenance/FSA-5 | implemented strict gate | unit + smoke | Unknown/weak formula origin cannot produce detailed derivation; source_latex improves but does not bypass audit. |
 | M3 | PaperWorkspace | implemented minimal API/UI | selected-paper SUCCESS + raw/handoff DEGRADED/BLOCKED UI/API checks | PARTIAL_REAL_E2E_VERIFIED for narrow paths, not product-ready. |
 | M3 | DirectionSearchView | implemented minimal UI | vitest + handoff smoke | DEGRADED_SMOKE. Shows source readiness and calls deep_read for source-backed candidates. |
@@ -106,6 +106,7 @@ instead of being discarded.
 | non-arXiv OA PDF deep_read | `8cba4345fee7` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Legal OA PDF handoff works; formula provenance remains weaker than source_latex. |
 | DOI-only Unpaywall OA deep_read | `b28134b4496c` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | DOI `10.1038/s41586-021-03819-2` resolved via Unpaywall to legal OA PDF; Mimo M2 ran; formula provenance degraded for non-arXiv PDF. |
 | main-chain source_latex formula success | `cb59b58dbe55` | DEGRADED_STRUCTURAL, `TEACHING_CARDS_FAILED` | 200 | paper + formula | source_latex formula cards now succeed; 18 formula cards with source_latex origin; teaching cards failed separately. |
+| main-chain full SUCCESS | `73ddb4607b6b` | SUCCESS | 200 | paper + formula + teaching | All three card types succeed with source_latex origin; narrow PASS, not broad REAL_E2E. |
 
 Latest 2026-06-16 Mimo main-chain smoke:
 
@@ -114,6 +115,7 @@ Latest 2026-06-16 Mimo main-chain smoke:
 | time series anomaly detection | `522e67e371e2` | `2007.14254`, Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Mimo was enabled; arXiv source downloaded; formula origin summary showed `source_latex`, but formula cards failed audit/generation so cards stayed blocked. |
 | graph anomaly detection | `a58dbf082252` | `2212.05478`, Mul-GAD: a semi-supervised graph anomaly detection framework via aggregating multi-view information | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Smoke selector now avoids unrelated source-backed papers; Mimo was enabled and gate failed closed on formula cards. |
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
+| time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | — | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
 ## M2/M3 Gating Rules
 

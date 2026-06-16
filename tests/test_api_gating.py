@@ -107,13 +107,16 @@ class ScriptedApiLLM:
 
 
 def _first_allowed_ref(prompt: str) -> str:
-    tail = prompt.split("Allowed evidence_ref values:", 1)[-1]
-    for line in tail.splitlines():
-        line = line.strip()
-        if line.startswith("- "):
-            value = line[2:].strip()
-            if value and value != "NONE":
-                return value
+    # Try both old and new prompt formats
+    for separator in ["Allowed evidence_ref values:", "Allowed refs:"]:
+        if separator in prompt:
+            tail = prompt.split(separator, 1)[-1]
+            for line in tail.splitlines():
+                line = line.strip()
+                if line.startswith("- "):
+                    value = line[2:].strip()
+                    if value and value != "NONE":
+                        return value
     raise AssertionError("No allowed evidence_ref in prompt")
 
 
