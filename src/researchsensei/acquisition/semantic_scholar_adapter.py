@@ -23,12 +23,16 @@ class SemanticScholarAdapter:
     """Semantic Scholar adapter using httpx REST API with proxy support.
 
     Uses httpx with trust_env=True so HTTP_PROXY/HTTPS_PROXY are respected.
-    Supports SEMANTIC_SCHOLAR_API_KEY for higher rate limits.
+    Supports SEMANTIC_SCHOLAR_API_KEY, or S2_API_KEY as a compatibility alias,
+    for higher rate limits.
     """
 
     def __init__(self, *, timeout: float = 15.0) -> None:
         self.timeout = timeout
-        self.api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+        self.api_key = (
+            os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
+            or os.getenv("S2_API_KEY", "").strip()
+        )
 
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
         """Search Semantic Scholar with retry/backoff on 429/503."""

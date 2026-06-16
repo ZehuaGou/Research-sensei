@@ -47,7 +47,8 @@ SEARCH_SOURCE_ORDER = ["arxiv", "openalex", "semantic_scholar", "crossref", "dbl
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Smoke-test ResearchSensei M1 literature acquisition and legal full-text discovery.")
-    parser.add_argument("--query", required=True)
+    parser.add_argument("--query", default="")
+    parser.add_argument("--fixture", default="", help="JSON fixture list of acquisition queries and minimum expectations.")
     parser.add_argument("--max-results", type=int, default=20)
     parser.add_argument("--download-top-n", type=int, default=5)
     parser.add_argument(
@@ -61,16 +62,81 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    result = run_literature_acquisition_smoke(
-        query=args.query,
-        max_results=args.max_results,
-        download_top_n=args.download_top_n,
-        sources=_parse_sources(args.sources),
-        workspace=Path(args.workspace),
-    )
+    if args.fixture:
+        result = run_literature_acquisition_fixture(
+            fixture_path=Path(args.fixture),
+            max_results=args.max_results,
+            download_top_n=args.download_top_n,
+            sources=_parse_sources(args.sources),
+            workspace=Path(args.workspace),
+        )
+    else:
+        if not args.query:
+            raise SystemExit("ERROR: --query is required unless --fixture is provided.")
+        result = run_literature_acquisition_smoke(
+            query=args.query,
+            max_results=args.max_results,
+            download_top_n=args.download_top_n,
+            sources=_parse_sources(args.sources),
+            workspace=Path(args.workspace),
+        )
     print("ResearchSensei literature acquisition smoke summary")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["verdict"] in {"PASS", "DEGRADED_PASS"} else 2
+
+
+def run_literature_acquisition_fixture(
+    *,
+    fixture_path: Path,
+    max_results: int,
+    download_top_n: int,
+    sources: list[str],
+    workspace: Path,
+    adapters: dict[str, SearchAdapter] | None = None,
+    fulltext_resolver: FullTextResolver | None = None,
+) -> dict[str, Any]:
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+    rows = payload.get("queries", payload if isinstance(payload, list) else [])
+    if not isinstance(rows, list) or not rows:
+        raise ValueError(f"Fixture {fixture_path} has no queries")
+
+    results: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError(f"Fixture {fixture_path} contains a non-object row")
+        query = str(row.get("query") or "").strip()
+        if not query:
+            raise ValueError(f"Fixture {fixture_path} row is missing query")
+        result = run_literature_acquisition_smoke(
+            query=query,
+            max_results=int(row.get("max_results") or max_results),
+            download_top_n=int(row.get("download_top_n") or download_top_n),
+            sources=sources,
+            workspace=workspace,
+            adapters=adapters,
+            fulltext_resolver=fulltext_resolver,
+        )
+        failures = _fixture_expectation_failures(result, row)
+        results.append({
+            "query": query,
+            "verdict": result["verdict"],
+            "total_candidates": result["total_candidates"],
+            "non_arxiv_candidates": result["non_arxiv_candidates"],
+            "legal_fulltext_count": result["legal_fulltext_count"],
+            "source_ready_count": result["source_ready_count"],
+            "attempted_sources": result["attempted_sources"],
+            "expectation_failures": failures,
+            "notes": row.get("notes", ""),
+        })
+
+    any_failures = any(item["expectation_failures"] for item in results)
+    any_hard_fail = any(item["verdict"] == "FAIL" for item in results)
+    return {
+        "fixture": str(fixture_path),
+        "query_count": len(results),
+        "results": results,
+        "verdict": "FAIL" if any_failures or any_hard_fail else "PASS",
+    }
 
 
 def run_literature_acquisition_smoke(
@@ -212,6 +278,30 @@ def _verdict(summary: dict[str, Any]) -> str:
     if summary["legal_fulltext_count"] <= 0:
         return "DEGRADED_PASS"
     return "PASS" if summary["source_ready_count"] or summary["pdf_ready_count"] else "DEGRADED_PASS"
+
+
+def _fixture_expectation_failures(result: dict[str, Any], row: dict[str, Any]) -> list[str]:
+    checks = {
+        "min_total_candidates": "total_candidates",
+        "min_non_arxiv": "non_arxiv_candidates",
+        "min_legal_fulltext": "legal_fulltext_count",
+        "min_source_ready": "source_ready_count",
+    }
+    failures: list[str] = []
+    for expected_key, result_key in checks.items():
+        if expected_key not in row:
+            continue
+        actual = int(result.get(result_key) or 0)
+        expected = int(row.get(expected_key) or 0)
+        if actual < expected:
+            failures.append(f"{result_key}={actual} < {expected}")
+    expected_sources = row.get("expected_attempted_sources") or []
+    if isinstance(expected_sources, list):
+        attempted = set(result.get("attempted_sources") or [])
+        missing = [str(source) for source in expected_sources if str(source) not in attempted]
+        if missing:
+            failures.append(f"missing attempted sources: {', '.join(missing)}")
+    return failures
 
 
 def _metric(source: str, attempted: bool, success: bool, count: int, started: float, error: str) -> dict[str, Any]:

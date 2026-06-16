@@ -8,6 +8,7 @@
 # UNPAYWALL_EMAIL=you@example.com
 # RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
 # SEMANTIC_SCHOLAR_API_KEY=...
+# S2_API_KEY=...  # optional alias for SEMANTIC_SCHOLAR_API_KEY
 # OPENAI_COMPATIBLE_API_KEY=...
 
 active_provider = "deepseek"

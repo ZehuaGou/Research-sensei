@@ -543,8 +543,9 @@ def test_m2_full_pipeline_blocks_llm_path_without_method_evidence(tmp_path: Path
 
 
 class ScriptedM2LLMClient:
-    def __init__(self) -> None:
+    def __init__(self, *, teaching_ref: str = "demo_paper:b_text") -> None:
         self.calls = 0
+        self.teaching_ref = teaching_ref
 
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
@@ -577,7 +578,7 @@ class ScriptedM2LLMClient:
                         "minimal_formula_explanation": "softmax(QK^T/sqrt(d))V",
                         "numeric_example": "INSUFFICIENT_EVIDENCE",
                         "paper_role_explanation": "它是方法部分的核心计算模块。",
-                        "evidence_ref": "demo_paper:b_text",
+                        "evidence_ref": self.teaching_ref,
                     }
                 ]
             }
@@ -628,6 +629,38 @@ def test_m2_full_pipeline_llm_path_preserves_formula_origin_and_passes_audit(tmp
     assert "LLM_CARD_MISSING" in second["warnings"]
     quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
     assert not [finding for finding in quality["findings"] if finding["effect"] == "BLOCK"]
+
+
+def test_m2_full_pipeline_invalid_teaching_ref_degrades_before_audit_pollution(tmp_path: Path) -> None:
+    from researchsensei.m2.full_pipeline import run_m2_full_pipeline
+
+    input_dir = _write_m1_bundle(tmp_path / "m1")
+    output_dir = tmp_path / "m2_invalid_teaching"
+    client = ScriptedM2LLMClient(teaching_ref="demo_paper:missing_ref")
+
+    result = run_m2_full_pipeline(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        llm_client=client,
+        llm_metadata={"provider": "scripted", "model": "scripted"},
+    )
+
+    assert result.status.status == "DEGRADED_STRUCTURAL"
+    assert result.status.blocking_reason == "PARTIAL_M2_OUTPUT"
+    assert result.status.component_status["paper_card"] == "SUCCESS"
+    assert result.status.component_status["formula_cards"] == "SUCCESS"
+    assert result.status.component_status["teaching_cards"] == "FAILED"
+    assert any("not in EvidencePack" in warning.message for warning in result.status.warnings)
+    assert (output_dir / "paper_card.json").exists()
+    assert (output_dir / "formula_cards.json").exists()
+    assert not (output_dir / "teaching_cards.json").exists()
+
+    quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
+    assert not [
+        finding
+        for finding in quality["findings"]
+        if finding["code"] == "F-2" and finding["effect"] == "BLOCK"
+    ]
 
 
 def test_m2_audit_warning_is_preserved_in_understanding_status() -> None:

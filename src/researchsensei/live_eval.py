@@ -235,7 +235,8 @@ def run_m1_live_search(
         max_download_bytes=80 * 1024 * 1024,
     )
     verifier = CandidateVerifier(
-        s2_api_key=os.getenv("SEMANTIC_SCHOLAR_API_KEY", ""),
+        s2_api_key=os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
+        or os.getenv("S2_API_KEY", ""),
     )
     relevance_judge = RelevanceJudge(
         llm_client=llm_client,
@@ -561,7 +562,13 @@ def _redact_report(value: Any) -> Any:
 
 def _redact_secret_like_text(value: str) -> str:
     redacted = value
-    for secret_name in ("DEEPSEEK_API_KEY", "MIMO_API_KEY", "OPENAI_COMPATIBLE_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"):
+    for secret_name in (
+        "DEEPSEEK_API_KEY",
+        "MIMO_API_KEY",
+        "OPENAI_COMPATIBLE_API_KEY",
+        "SEMANTIC_SCHOLAR_API_KEY",
+        "S2_API_KEY",
+    ):
         secret = os.getenv(secret_name, "")
         if secret:
             redacted = redacted.replace(secret, "[REDACTED]")

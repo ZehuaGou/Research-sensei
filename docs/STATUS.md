@@ -61,7 +61,7 @@ Current acquisition stack:
 |---|---|---|---|---|
 | arXiv | invoked | search, metadata, source/e-print, PDF | source_ready/pdf_ready | Source-first is implemented and preferred over PDF. |
 | OpenAlex | invoked | search, DOI, OA location metadata | OA PDF/landing metadata | Contributes DOI/OA data; not every DOI has legal full text. |
-| Semantic Scholar | invoked | search, citation/reference metadata, openAccessPdf | OA PDF metadata | 429/rate limits degrade source only. |
+| Semantic Scholar | invoked | search, citation/reference metadata, openAccessPdf | OA PDF metadata | `SEMANTIC_SCHOLAR_API_KEY` or `S2_API_KEY` enables x-api-key; 429/rate limits degrade source only. |
 | Crossref | invoked | DOI/venue/publisher/year metadata | metadata-only | Never treated as fulltext-ready by itself. |
 | DBLP | invoked | CS venue metadata discovery | metadata-only | Helps discovery/venue, not download. |
 | Unpaywall | invoked when email configured | DOI -> legal OA location | publisher/repository OA PDF or landing | Requires `UNPAYWALL_EMAIL` or `RESEARCHSENSEI_CONTACT_EMAIL`. |
@@ -108,29 +108,67 @@ instead of being discarded.
 | main-chain source_latex formula success | `cb59b58dbe55` | DEGRADED_STRUCTURAL, `TEACHING_CARDS_FAILED` | 200 | paper + formula | source_latex formula cards now succeed; 18 formula cards with source_latex origin; teaching cards failed separately. |
 | main-chain full SUCCESS | `73ddb4607b6b` | SUCCESS | 200 | paper + formula + teaching | All three card types succeed with source_latex origin; narrow PASS, not broad REAL_E2E. |
 
-Latest 2026-06-16 Mimo main-chain smoke:
+Earlier 2026-06-16 incremental Mimo main-chain smokes:
 
 | Query | Job | Selected paper | Input | Final status | Blocking reason | Cards | Components | Verdict | Strict note |
 |---|---|---|---|---|---|---:|---|---|---|
 | time series anomaly detection | `522e67e371e2` | `2007.14254`, Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Mimo was enabled; arXiv source downloaded; formula origin summary showed `source_latex`, but formula cards failed audit/generation so cards stayed blocked. |
 | graph anomaly detection | `a58dbf082252` | `2212.05478`, Mul-GAD: a semi-supervised graph anomaly detection framework via aggregating multi-view information | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED_PASS | Smoke selector now avoids unrelated source-backed papers; Mimo was enabled and gate failed closed on formula cards. |
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
-| time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | — | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
+| time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
 ### Main-chain regression matrix (2026-06-16)
 
-6 queries, Mimo, source-first preference:
+12 queries, Mimo, source-first preference. This is still a narrow regression
+matrix, not broad REAL_E2E.
 
-| Query | Job | Input | Status | Blocking | Cards | Components | Verdict | Strict note |
-|---|---|---|---|---|---:|---|---|---|
-| time series anomaly detection | `81a65e5e724f` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
-| multivariate time series imputation | `3552320b2d9c` | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
-| graph anomaly detection | `a9e52b524e9d` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
-| graph neural network anomaly detection | `4e97444bb950` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
-| transformer time series anomaly detection | `3df86e22c204` | arxiv_source, source_first | SUCCESS | — | 200 | paper+formula+teaching | PASS | source_latex; all cards succeed. |
-| diffusion models for time series imputation | `17d668eedc58` | arxiv_source, source_first | BLOCKED_UNDERSTANDING | AUDIT_BLOCKED | 403 | none | DEGRADED_PASS | Audit F-2: teaching card evidence_ref not in evidence sources; correct fail-closed. |
+| Query | Job | Selected candidate | Input | Status | Blocking | Cards | Components | Verdict | Root cause / note |
+|---|---|---|---|---|---|---:|---|---|---|
+| time series anomaly detection | `dd5555211208` | `2007.14254` Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series imputation | `11fd320d7a0c` | `2512.15116` Generative Semi-supervised Learning for Multivariate Time Series Imputation | external_pdf, pdf_direct | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | OpenAlex/PDF path; evidence pack did not preserve enough method evidence; raw_formula_text. |
+| graph anomaly detection | `fd0a4e83d1d1` | `2212.05478` Mul-GAD | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| graph neural network anomaly detection | `0da508b3d5e2` | `2103.00113` Anomaly Detection on Attributed Networks via Contrastive Self-Supervised Learning | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| transformer time series anomaly detection | `a2119b8da426` | `2007.14254` Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| diffusion models for time series imputation | `1f0b1f6ed0d4` | `2409.08917` Latent Space Score-based Diffusion Model for Probabilistic Multivariate Time Series Imputation | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | P1 regression: prior invalid teaching evidence_ref BLOCK is resolved on current main. |
+| time series forecasting | `74106d875899` | `2106.09305` SCINet | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | source_latex exists, but M2 evidence gate found no reliable method evidence. |
+| anomaly detection survey | `4ea9ed0c49e3` | `2303.05000` Learning Representation for Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
+| graph neural network time series | `359a0972959e` | `1909.10086` Learning Universal Graph Neural Network Embeddings With Aid Of Transfer Learning | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | Candidate is only weakly aligned with time-series intent; selector needs improvement. |
+| diffusion models for forecasting | `80aaa6d9e6b4` | `2106.09305` SCINet | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | Candidate lacks diffusion alignment; selector/query planning needs improvement. |
+| transformer forecasting anomaly detection | `4d5004133ddf` | `2205.13504` Informer | external_pdf, pdf_direct | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF/raw formula provenance, formula cards correctly withheld. |
+| multivariate time series forecasting | `41cd7c7ee6ba` | `2410.11674` LLM-Mixer | arxiv_source, source_first | BLOCKED_UNDERSTANDING | MISSING_METHOD_EVIDENCE | 403 | none | source_latex exists, but method evidence gate failed. |
 
-Summary: 4/6 SUCCESS, 1/6 DEGRADED (PDF fallback formula provenance), 1/6 BLOCKED (audit caught invalid evidence_ref). source_latex path is repeatable across time-series and graph domains. Failures are correct gate behavior, not code bugs.
+Summary: 6/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 5/12 BLOCKED_UNDERSTANDING.
+For the original six-query matrix, the result is now 5/6 SUCCESS and 1/6
+BLOCKED. The old diffusion `AUDIT_BLOCKED` teaching evidence_ref failure is no
+longer reproduced; current main rejects invalid teaching evidence refs before
+audit and degrades/skips teaching cards instead of writing polluted artifacts.
+The remaining failures are mostly `MISSING_METHOD_EVIDENCE`, often from
+candidate/query mismatch or weak PDF/raw extraction, not from relaxed gates.
+
+### M1 acquisition fixture list
+
+Tracked fixture: `tests/fixtures/m1_acquisition_queries.json`.
+
+`scripts/run_literature_acquisition_smoke.py` supports:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --fixture tests/fixtures/m1_acquisition_queries.json --max-results 80 --download-top-n 10
+```
+
+The fixture stores query names and minimum expectations only: total candidates,
+non-arXiv candidates, legal fulltext, source_ready, and attempted sources. It
+does not store downloaded papers, PDFs, source archives, or cache.
+
+### DOI / non-arXiv OA PDF handoff smoke
+
+Three non-arXiv legal OA PDF candidates were tested through the existing
+`deep_read` handoff. Results are intentionally strict:
+
+| DOI / source | PDF source | Job | Result | Cards | Components | Note |
+|---|---|---|---|---:|---|---|
+| `10.1109/access.2022.3211306`, IEEE Access | publisher_oa_pdf | `81c0f2c087c4` | PDF_DOWNLOAD_FAILED | - | none | IEEE returned HTTP 418 / download blocked; no fake fallback. |
+| `10.1007/jhep08(2021)080`, Springer | publisher_oa_pdf | `c85a3ff4470f` | PDF_DOWNLOAD_FAILED | - | none | Remote host reset connection. |
+| `10.1186/s40649-019-0069-y`, SpringerOpen | publisher_oa_pdf | `2aac21d39092` | BLOCKED_UNDERSTANDING, MISSING_METHOD_EVIDENCE | 403 | none | Legal OA PDF downloaded and entered M2; review-style paper lacked method evidence for PaperWorkspace cards. |
 
 ## M2/M3 Gating Rules
 
@@ -157,6 +195,7 @@ MIMO_API_KEY=...
 UNPAYWALL_EMAIL=you@example.com
 RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
 SEMANTIC_SCHOLAR_API_KEY=...
+S2_API_KEY=...
 OPENAI_COMPATIBLE_API_KEY=...
 ```
 
@@ -173,10 +212,13 @@ explicit component failure/degradation, not accepted evidence.
 
 1. Broad M1 REAL_E2E is still missing: coverage is smoke-level, not systematic
    benchmark acceptance.
-2. DOI-only deep_read remains `DOI_NOT_IMPLEMENTED`; DOI helps lookup but cannot
-   by itself start M2.
-3. Semantic Scholar can rate-limit; source-level degradation is handled, but
-   broader retry/backoff policy remains limited.
+2. DOI-only deep_read is narrowly implemented through Unpaywall/legal OA PDF
+   lookup, but broad DOI acceptance is not verified. Non-arXiv PDFs frequently
+   degrade or block because of raw formula provenance, download failures, or
+   missing method evidence.
+3. Semantic Scholar can rate-limit; `SEMANTIC_SCHOLAR_API_KEY` and `S2_API_KEY`
+   are supported, source-level degradation is handled, but broad caching/backoff
+   still needs hardening.
 4. Formula cards still degrade on non-source_latex or weak provenance.
 5. Main-chain positive evidence is narrow; source-first success is promising but
    not broad reliability.
@@ -184,13 +226,14 @@ explicit component failure/degradation, not accepted evidence.
 
 ## Next Priority Order
 
-1. Improve DOI-to-legal-fulltext-to-deep_read handoff without paywall bypass.
-2. Build a small tracked acceptance fixture list for M1 acquisition coverage,
-   but do not commit downloaded papers.
-3. Expand source_latex canonical extraction coverage and formula provenance
-   tests.
-4. Add more real main-chain smoke samples across domains and record only scoped
-   evidence.
+1. Improve candidate selection/query planning for forecasting and mixed-intent
+   queries so source-backed handoff papers better match the requested direction.
+2. Improve PDF/non-arXiv evidence extraction so method passages survive into
+   evidence_pack without relaxing `MISSING_METHOD_EVIDENCE` gates.
+3. Expand DOI-to-legal-fulltext-to-deep_read acceptance across known OA
+   publishers; keep failures explicit.
+4. Add polite Semantic Scholar cache/backoff to reduce repeated 429s in matrix
+   smokes.
 5. Keep frontend status rendering aligned with `/understanding_status` and
    `/cards` gating.
 

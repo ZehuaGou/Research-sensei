@@ -3,10 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from researchsensei.acquisition import FullTextResolver
+from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarAdapter
 from researchsensei.schemas import CandidatePaper
 from researchsensei.selection import SelectionService
 
-from scripts.run_literature_acquisition_smoke import run_literature_acquisition_smoke
+from scripts.run_literature_acquisition_smoke import run_literature_acquisition_fixture, run_literature_acquisition_smoke
 
 
 class StubResponse:
@@ -232,3 +233,47 @@ def test_semantic_scholar_429_does_not_fail_entire_smoke(tmp_path: Path) -> None
     assert result["source_metrics"]["semantic_scholar"]["failure_count"] == 1
     assert "ACQUISITION_FAILED:semantic_scholar" in result["warnings"][0]
     assert result["verdict"] == "PASS"
+
+
+def test_acquisition_fixture_mode_checks_minimum_expectations(tmp_path: Path) -> None:
+    fixture = tmp_path / "fixture.json"
+    fixture.write_text(
+        """
+        {
+          "queries": [
+            {
+              "query": "time series anomaly detection",
+              "min_total_candidates": 1,
+              "min_non_arxiv": 0,
+              "min_legal_fulltext": 1,
+              "min_source_ready": 1,
+              "expected_attempted_sources": ["arxiv"]
+            }
+          ]
+        }
+        """,
+        encoding="utf-8",
+    )
+
+    result = run_literature_acquisition_fixture(
+        fixture_path=fixture,
+        max_results=5,
+        download_top_n=0,
+        sources=["arxiv"],
+        workspace=tmp_path / "workspace",
+        adapters={"arxiv": StaticAdapter([paper(source="arxiv", sources=["arxiv"], arxiv_id="2401.00001")])},
+        fulltext_resolver=FullTextResolver(unpaywall_email=""),
+    )
+
+    assert result["verdict"] == "PASS"
+    assert result["query_count"] == 1
+    assert result["results"][0]["expectation_failures"] == []
+
+
+def test_semantic_scholar_api_key_alias_is_supported(monkeypatch) -> None:
+    monkeypatch.delenv("SEMANTIC_SCHOLAR_API_KEY", raising=False)
+    monkeypatch.setenv("S2_API_KEY", "alias-key")
+
+    adapter = SemanticScholarAdapter()
+
+    assert adapter.api_key == "alias-key"

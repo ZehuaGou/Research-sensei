@@ -26,7 +26,7 @@ It is not responsible for M4 tutoring, long-term memory, or drills.
 | Direction Exploration | DEGRADED_SMOKE | Returns overview, sub-directions, method families, candidates, reading order, source metrics, and handoff metadata. |
 | Seed Expansion | DEGRADED_SMOKE | Returns upstream/downstream/same-route/survey/follow-up groups; weak relation claims are explicitly marked weak when citation graph is not verified. |
 | Legal full-text discovery | DEGRADED_SMOKE | arXiv, OpenAlex, Semantic Scholar, Crossref, DBLP, and Unpaywall participate; metadata-only papers stay visible with `needs_user_upload=true`. |
-| deep_read handoff | DEGRADED_SMOKE / partial real | Source-backed candidates can create PaperWorkspace jobs. DOI-only handoff remains explicit `DOI_NOT_IMPLEMENTED`. |
+| deep_read handoff | DEGRADED_SMOKE / partial real | Source-backed candidates can create PaperWorkspace jobs. DOI-only handoff is narrowly implemented through Unpaywall/legal OA PDF when available; broad DOI acceptance remains pending. |
 
 ## Source And Full-Text Priority
 
