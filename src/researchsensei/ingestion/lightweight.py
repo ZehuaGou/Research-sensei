@@ -63,6 +63,14 @@ class LightweightIngestionService:
             parser_name = "markdown_text" if suffix == ".md" else "plain_text"
         elif suffix == ".tex":
             text = source.read_text(encoding="utf-8", errors="ignore")
+            # Resolve \input{} commands. Check both the file's directory and
+            # common extracted-source subdirectories (source/extracted/).
+            resolve_dirs = [source.parent]
+            extracted = source.parent / "source" / "extracted"
+            if extracted.is_dir():
+                resolve_dirs.append(extracted)
+            for resolve_dir in resolve_dirs:
+                text = _resolve_latex_inputs(text, resolve_dir)
             parser_name = "latex_source_lightweight"
         elif suffix == ".pdf":
             text, pdf_warnings, degraded = self._extract_pdf_text(source)
@@ -434,3 +442,33 @@ def _split_paragraphs(text: str) -> list[str]:
         if paragraph:
             paragraphs.append(paragraph)
     return paragraphs
+
+
+def _resolve_latex_inputs(text: str, source_dir: Path, depth: int = 0) -> str:
+    """Resolve \\input{} and \\include{} commands in LaTeX source.
+
+    Reads included .tex files from the same directory and replaces the
+    commands with their content. Limited to 5 levels of nesting to avoid
+    infinite recursion.
+    """
+    if depth > 5:
+        return text
+
+    def replace_input(match: re.Match) -> str:
+        filename = match.group(1).strip()
+        if not filename.endswith(".tex"):
+            filename = filename + ".tex"
+        included_path = source_dir / filename
+        if included_path.exists() and included_path.is_file():
+            try:
+                included_text = included_path.read_text(encoding="utf-8", errors="ignore")
+                # Recursively resolve nested inputs
+                return _resolve_latex_inputs(included_text, included_path.parent, depth + 1)
+            except OSError:
+                return match.group(0)
+        return match.group(0)
+
+    # Match \input{filename} and \include{filename}
+    text = re.sub(r"\\input\{([^{}]+)\}", replace_input, text)
+    text = re.sub(r"\\include\{([^{}]+)\}", replace_input, text)
+    return text

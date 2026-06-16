@@ -761,7 +761,7 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
 
         async def chat_json(self, messages, *, config=None):
             text = "\n".join(message.content for message in messages)
-            if "Formula evidence batch" in text:
+            if "Formula evidence" in text and "formula_cards" in text:
                 refs = [
                     line.split(":", 1)[1].strip()
                     for line in text.splitlines()
@@ -858,7 +858,7 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
 
     formula_cards = cards["formula_cards"].formula_cards
     assert status.status == "SUCCESS"
-    assert [len(batch) for batch in client.formula_prompt_refs] == [5, 2]
+    assert [len(batch) for batch in client.formula_prompt_refs] == [3, 3, 1]
     assert len(formula_cards) == 7
     assert {card.formula_id for card in formula_cards} == {f"formula_{i:03d}" for i in range(1, 8)}
     assert all(card.coverage_status == "SUMMARY_ONLY" for card in formula_cards)

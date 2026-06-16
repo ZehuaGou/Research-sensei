@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_formula_cards_llm_output
 from researchsensei.schemas import (
     EvidenceType,
@@ -15,7 +16,7 @@ from researchsensei.schemas.evidence import EvidencePack, EvidencePackItem
 from researchsensei.schemas.llm_output import FormulaCardLLMOutput, FormulaCardsLLMOutput
 
 
-FORMULA_CARD_BATCH_SIZE = 5
+FORMULA_CARD_BATCH_SIZE = 3
 DERIVATION_BLOCKED_ORIGINS = {"raw_formula_text", "unknown", "unresolved"}
 
 
@@ -54,14 +55,28 @@ async def build_formula_cards(
             total_tokens=sum(item.token_count for item in batch),
         )
         messages = _build_batch_messages(prompt_builder, skeleton, batch)
-        data = await llm_client.chat_json(messages)
-        output = FormulaCardsLLMOutput.model_validate(data)
-        if output.formula_cards:
-            validate_formula_cards_llm_output(output, batch_pack)
-            llm_cards.extend(output.formula_cards)
-        else:
+        # Use a longer timeout for formula cards — they require more processing
+        formula_config = LLMConfig(
+            temperature=0.2,
+            max_tokens=4096,
+            json_mode=True,
+            timeout=180.0,
+            max_retries=1,
+        )
+        try:
+            data = await llm_client.chat_json(messages, config=formula_config)
+            output = FormulaCardsLLMOutput.model_validate(data)
+            if output.formula_cards:
+                validate_formula_cards_llm_output(output, batch_pack)
+                llm_cards.extend(output.formula_cards)
+            else:
+                refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
+                warnings.append(f"LLM_EMPTY_FORMULA_BATCH: {refs}")
+        except Exception as exc:
             refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
-            warnings.append(f"LLM_EMPTY_FORMULA_BATCH: {refs}")
+            warnings.append(f"LLM_FORMULA_BATCH_FAILED: {refs}: {type(exc).__name__}: {str(exc)[:100]}")
+            # Continue to next batch instead of failing entirely
+            continue
 
     return _convert_to_bundle(llm_cards, evidence_pack, skeleton, warnings)
 
@@ -75,54 +90,27 @@ def _build_batch_messages(
     allowed_refs = "\n".join(f"- {item.evidence_ref}" for item in formula_items if item.evidence_ref) or "- NONE"
     return prompt_builder.build_simple(
         system=(
-            "You are the ResearchSensei formula-understanding builder.\n"
-            "Use only the supplied formula evidence. Do not infer from outside knowledge.\n"
+            "You are a formula card builder. Use only the supplied evidence.\n"
             "Each formula_card must cite exactly one allowed evidence_ref.\n"
-            "Preserve formula_id, formula_origin, formula_ocr_status, page, and equation identity from evidence.\n"
-            "Do not output formula_raw; M2 restores exact LaTeX from evidence to avoid invalid JSON escaping.\n"
-            "Never claim parser/OCR/raw formulas are source-level LaTeX.\n"
-            "Return only valid JSON."
+            "Preserve formula_id, formula_origin, formula_ocr_status from evidence.\n"
+            "Do not output formula_raw. Return only valid JSON."
         ),
-        user=f"""Paper title: {skeleton.title}
+        user=f"""Paper: {skeleton.title}
 
-Formula evidence batch:
+Formula evidence:
 {evidence_text}
 
 Allowed evidence_ref values:
 {allowed_refs}
 
-Constraints:
-- Generate one formula_card for every formula evidence item in this batch.
-- If a formula has insufficient context, still return a degraded card for that formula and write INSUFFICIENT_EVIDENCE in unsupported fields.
-- Choose evidence_ref exactly from the allowed list.
-- Use formula_id/formula_origin/formula_ocr_status exactly as shown in evidence.
-- Do not include formula_raw or raw LaTeX strings in the JSON output.
-- For source_latex, formula_explanation_status should be source_exact.
-- For parser_latex, mineru_latex, or marker_latex, formula_explanation_status should be parser_derived.
-- For ocr_latex, formula_explanation_status should be ocr_derived and confidence should be cautious.
-- For raw_formula_text, unknown, or unresolved origins, do not provide detailed derivation; mark degraded/INSUFFICIENT_EVIDENCE.
-- Use concise Chinese explanations with necessary English/math terms preserved.
+Rules:
+- One formula_card per evidence item. evidence_ref from allowed list only.
+- Keep formula_id/formula_origin/formula_ocr_status from evidence.
+- No formula_raw in output. Use concise Chinese with English math terms.
+- source_latex -> source_exact; parser_latex -> parser_derived; raw/unknown -> INSUFFICIENT_EVIDENCE.
 
-Return JSON with this schema:
-{{
-  "formula_cards": [
-    {{
-      "formula_id": "formula id from evidence",
-      "formula_origin": "origin from evidence",
-      "formula_ocr_status": "ocr status from evidence",
-      "formula_explanation_status": "source_exact | parser_derived | ocr_derived | degraded",
-      "purpose": "what this formula does in the paper",
-      "symbols": [{{"symbol": "x", "meaning": "meaning grounded in evidence"}}],
-      "terms": [{{"term": "loss term", "meaning": "meaning", "encourages": "what it encourages", "penalizes": "what it penalizes", "if_removed": "effect if removed"}}],
-      "intuition": "plain-language intuition",
-      "numeric_example": "small example if evidence supports it, otherwise INSUFFICIENT_EVIDENCE",
-      "what_if_removed": "what likely breaks, or INSUFFICIENT_EVIDENCE",
-      "weight_sensitivity": "effect of changing important weights/terms, or INSUFFICIENT_EVIDENCE",
-      "plain_summary": "one sentence summary",
-      "evidence_ref": "allowed ref"
-    }}
-  ]
-}}""",
+JSON schema:
+{{"formula_cards": [{{"formula_id":"","formula_origin":"","formula_ocr_status":"","formula_explanation_status":"","purpose":"","symbols":[{{"symbol":"","meaning":""}}],"terms":[{{"term":"","meaning":"","encourages":"","penalizes":"","if_removed":""}}],"intuition":"","numeric_example":"","what_if_removed":"","weight_sensitivity":"","plain_summary":"","evidence_ref":""}}]}}""",
     )
 
 
@@ -436,7 +424,7 @@ def _format_evidence_for_prompt(items: list[EvidencePackItem]) -> str:
                     f"  equation_number: {item.equation_number or 'unknown'}",
                     f"  equation_group_id: {item.equation_group_id or 'unknown'}",
                     f"  group_order: {item.group_order}",
-                    f"  text: {item.passage_text[:500]}",
+                    f"  text: {item.passage_text[:300]}",
                 ]
             )
         )
