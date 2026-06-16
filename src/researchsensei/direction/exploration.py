@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, OpenAlexAdapter, SemanticScholarAdapter
+from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, DBLPAdapter, FullTextResolver, OpenAlexAdapter, SemanticScholarAdapter
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
@@ -40,6 +40,7 @@ class DirectionExplorationService:
         selection_service: SelectionService | None = None,
         verifier: CandidateVerifier | None = None,
         source_resolver: PaperSourceResolver | None = None,
+        fulltext_resolver: FullTextResolver | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = 8,
         max_verify_candidates: int = 12,
@@ -50,11 +51,13 @@ class DirectionExplorationService:
             "openalex": OpenAlexAdapter(),
             "semantic_scholar": SemanticScholarAdapter(timeout=12.0),
             "crossref": CrossrefAdapter(),
+            "dblp": DBLPAdapter(timeout=12.0),
         }
         self.sources = sources or list(self.adapters.keys())
         self.selection_service = selection_service or SelectionService()
         self.verifier = verifier or CandidateVerifier(timeout_seconds=8.0)
         self.source_resolver = source_resolver or PaperSourceResolver(network_enabled=False)
+        self.fulltext_resolver = fulltext_resolver or FullTextResolver(timeout_seconds=12.0)
         self.max_results_per_source = max_results_per_source
         self.max_verify_candidates = max_verify_candidates
         self.source_download_dir = Path(source_download_dir) if source_download_dir else None
@@ -81,12 +84,14 @@ class DirectionExplorationService:
         )
         deduplicated = self.selection_service.deduplicate(candidates)
         verified = self._verify(deduplicated)
+        fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(verified, download_top_n=0)
+        source_metrics = [*source_metrics, *fulltext_metrics]
         source_resolution = self.source_resolver.resolve_many(
             search_query,
-            verified,
+            fulltext_enriched,
             download_dir=self.source_download_dir,
         )
-        resolved = self._apply_source_resolution(verified, source_resolution)
+        resolved = self._apply_source_resolution(fulltext_enriched, source_resolution)
         reading_plan = self.selection_service.build_reading_plan(query_plan, resolved)
         card_candidates = _candidate_cards_from_reading_plan(reading_plan)
         filtered_candidates = self.selection_service.build_candidate_pool(
@@ -509,12 +514,23 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "venue": paper.venue,
             "source": paper.source,
             "sources": paper.sources,
+            "discovery_sources": paper.sources,
+            "source_ids": paper.source_ids,
             "url": paper.url or paper.landing_url or paper.pdf_url,
             "landing_url": paper.landing_url,
             "arxiv_url": _arxiv_url(paper),
             "doi": paper.doi,
             "arxiv_id": paper.arxiv_id,
             "pdf_url": paper.pdf_url,
+            "candidate_pdf_urls": paper.candidate_pdf_urls,
+            "candidate_source_urls": paper.candidate_source_urls,
+            "candidate_html_urls": paper.candidate_html_urls,
+            "selected_fulltext_source": paper.selected_fulltext_source,
+            "selected_fulltext_url": paper.selected_fulltext_url,
+            "fulltext_status": paper.fulltext_status,
+            "fulltext_failure_reason": paper.fulltext_failure_reason,
+            "can_deep_read": paper.can_deep_read,
+            "needs_user_upload": paper.needs_user_upload,
             "relevance_score": item.scoring_breakdown.relevance_score,
             "weighted_score": item.scoring_breakdown.weighted_total,
             "verification_status": paper.verification_status.value,
@@ -623,12 +639,14 @@ def _arxiv_url(paper: CandidatePaper) -> str:
 
 
 def _can_prepare_deep_read(paper: CandidatePaper) -> bool:
-    return bool(paper.arxiv_id or paper.pdf_url or _arxiv_url(paper))
+    return bool(paper.can_deep_read or paper.arxiv_id or paper.pdf_url or _arxiv_url(paper))
 
 
 def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if _can_prepare_deep_read(paper):
         return ""
+    if paper.fulltext_failure_reason:
+        return paper.fulltext_failure_reason
     if paper.doi:
         return "DOI handoff is not implemented yet."
     return "No arXiv ID, arXiv URL, or PDF URL is available for this candidate."

@@ -45,6 +45,7 @@ SOURCE_RELIABILITY = {
     "openalex": 0.9,
     "arxiv": 0.78,
     "crossref": 0.74,
+    "dblp": 0.72,
 }
 
 _DOI_PREFIXES = ("https://doi.org/", "http://doi.org/", "doi:")
@@ -452,6 +453,9 @@ class SelectionService:
             "sources": sources,
             "source_ids": source_ids,
             "raw_source_metadata": raw,
+            "candidate_pdf_urls": _unique([*keep.candidate_pdf_urls, *dup.candidate_pdf_urls, keep.pdf_url, dup.pdf_url]),
+            "candidate_source_urls": _unique([*keep.candidate_source_urls, *dup.candidate_source_urls, keep.source_url, dup.source_url]),
+            "candidate_html_urls": _unique([*keep.candidate_html_urls, *dup.candidate_html_urls]),
             "open_access": bool(keep.open_access or dup.open_access),
             "pdf_available": bool(keep.pdf_available or dup.pdf_available or keep.pdf_url or dup.pdf_url),
             "pdf_downloaded": bool(keep.pdf_downloaded or dup.pdf_downloaded),

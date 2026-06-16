@@ -87,8 +87,25 @@ function setHandoffState(paper: Record<string, any>, state: { loading?: boolean;
   }
 }
 
+function discoverySourcesText(paper: Record<string, any>) {
+  const sources = paper.discovery_sources || paper.sources
+  if (Array.isArray(sources) && sources.length) return sources.join(', ')
+  return paper.source || 'unknown'
+}
+
+function fulltextPdfUrl(paper: Record<string, any>) {
+  if (paper.pdf_url) return paper.pdf_url
+  if (paper.fulltext_status === 'pdf_ready' && paper.selected_fulltext_url) return paper.selected_fulltext_url
+  return ''
+}
+
 function hasDeepReadSource(paper: Record<string, any>) {
-  return Boolean(paper.arxiv_id || paper.arxiv_url || paper.pdf_url)
+  return Boolean(
+    paper.can_deep_read ||
+    paper.arxiv_id ||
+    paper.arxiv_url ||
+    fulltextPdfUrl(paper)
+  )
 }
 
 function deepReadLabel(paper: Record<string, any>) {
@@ -129,7 +146,7 @@ async function openDeepRead(paper: Record<string, any>) {
           doi: paper.doi || '',
           arxiv_id: paper.arxiv_id || '',
           arxiv_url: paper.arxiv_url || paper.url || paper.landing_url || '',
-          pdf_url: paper.pdf_url || '',
+          pdf_url: fulltextPdfUrl(paper),
         },
       }),
     })
@@ -284,7 +301,14 @@ async function openDeepRead(paper: Record<string, any>) {
             <div class="text-xs" style="color: var(--text-secondary);">canonical: {{ paper.canonicalization_status }}</div>
             <div class="text-xs" style="color: var(--text-secondary);">m2_ready: {{ paper.m2_ready ? 'true' : 'false' }}</div>
             <div class="text-xs" style="color: var(--text-secondary);">priority: {{ paper.priority }}</div>
+            <div class="text-xs" style="color: var(--text-secondary);">discovery: {{ discoverySourcesText(paper) }}</div>
+            <div class="text-xs" style="color: var(--text-secondary);">fulltext: {{ paper.fulltext_status || 'metadata_only' }}</div>
+            <div class="text-xs" style="color: var(--text-secondary);">deep_read: {{ paper.can_deep_read ? 'true' : 'false' }}</div>
+            <div class="text-xs" style="color: var(--text-secondary);">upload: {{ paper.needs_user_upload ? 'needed' : 'not_needed' }}</div>
           </div>
+          <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="text-xs mt-3" style="color: var(--text-muted);" data-testid="fulltext-note">
+            Full text: {{ paper.selected_fulltext_source || 'metadata_only' }} {{ paper.fulltext_failure_reason ? `- ${paper.fulltext_failure_reason}` : '' }}
+          </p>
           <p v-if="!paper.can_enter_m2" class="text-xs mt-3" style="color: var(--text-muted);" data-testid="m2-readiness-note">
             M2 gate: {{ paper.m2_unavailable_reason || paper.risk_note || 'Not cleared until source download and canonical validation finish.' }}
           </p>

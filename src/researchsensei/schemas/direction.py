@@ -50,6 +50,15 @@ class CandidatePaper(SenseiModel):
     citation_count: int | None = None
     pdf_url: str = ""
     source_url: str = ""
+    candidate_pdf_urls: list[str] = Field(default_factory=list)
+    candidate_source_urls: list[str] = Field(default_factory=list)
+    candidate_html_urls: list[str] = Field(default_factory=list)
+    selected_fulltext_source: str = ""
+    selected_fulltext_url: str = ""
+    fulltext_status: str = "metadata_only"
+    fulltext_failure_reason: str = ""
+    can_deep_read: bool = False
+    needs_user_upload: bool = True
     code_url: str = ""
     open_access: bool = False
     pdf_available: bool = False

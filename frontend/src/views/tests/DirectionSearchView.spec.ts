@@ -30,10 +30,20 @@ function directionResponse(overrides: Record<string, any> = {}) {
         year: 2024,
         venue: 'NeurIPS',
         source: 'arxiv',
+        sources: ['arxiv', 'openalex'],
+        discovery_sources: ['arxiv', 'openalex'],
         url: 'https://arxiv.org/abs/2401.00001',
         doi: '',
         arxiv_id: '2401.00001',
         arxiv_url: 'https://arxiv.org/abs/2401.00001',
+        candidate_pdf_urls: ['https://arxiv.org/pdf/2401.00001.pdf'],
+        candidate_source_urls: ['https://arxiv.org/e-print/2401.00001'],
+        selected_fulltext_source: 'arxiv_source',
+        selected_fulltext_url: 'https://arxiv.org/e-print/2401.00001',
+        fulltext_status: 'source_ready',
+        fulltext_failure_reason: '',
+        can_deep_read: true,
+        needs_user_upload: false,
         relevance_score: 0.82,
         verification_status: 'verified',
         source_confidence: 'high',
@@ -143,6 +153,10 @@ describe('DirectionSearchView', () => {
     expect(card.text()).toContain('pdf: available')
     expect(card.text()).toContain('canonical: not_attempted')
     expect(card.text()).toContain('m2_ready: false')
+    expect(card.text()).toContain('discovery: arxiv, openalex')
+    expect(card.text()).toContain('fulltext: source_ready')
+    expect(card.text()).toContain('deep_read: true')
+    expect(card.text()).toContain('upload: not_needed')
   })
 
   it('shows prepare deep-read when candidate has a supported source', async () => {
@@ -256,6 +270,12 @@ describe('DirectionSearchView', () => {
           arxiv_id: '',
           arxiv_url: '',
           pdf_url: '',
+          selected_fulltext_source: '',
+          selected_fulltext_url: '',
+          fulltext_status: 'metadata_only',
+          fulltext_failure_reason: 'NO_LEGAL_OA_FULLTEXT_FOUND',
+          can_deep_read: false,
+          needs_user_upload: true,
           relevance_score: 0.51,
           verification_status: 'unverified',
           source_confidence: 'low',

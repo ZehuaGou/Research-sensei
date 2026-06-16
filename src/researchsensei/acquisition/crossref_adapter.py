@@ -27,6 +27,7 @@ class CrossrefAdapter:
         year = _year(row)
         venue = _first(row.get("container-title"))
         url = str(row.get("URL") or "")
+        pdf_url = _pdf_url(row)
         return CandidatePaper(
             paper_id=doi or url or _stable_id(title),
             title=title,
@@ -39,7 +40,10 @@ class CrossrefAdapter:
             url=url,
             landing_url=url,
             doi=doi,
+            pdf_url=pdf_url,
             abstract=str(row.get("abstract") or ""),
+            open_access=bool(pdf_url),
+            pdf_available=bool(pdf_url),
             source_confidence="medium" if doi else "low",
             metadata_confidence="medium" if doi and title else "low",
             raw_source_metadata={
@@ -48,6 +52,7 @@ class CrossrefAdapter:
                 "type": row.get("type"),
                 "publisher": row.get("publisher"),
                 "is-referenced-by-count": row.get("is-referenced-by-count"),
+                "link": row.get("link") or [],
             },
         )
 
@@ -67,6 +72,17 @@ def _year(row: dict) -> int | None:
             except (TypeError, ValueError):
                 return None
     return None
+
+
+def _pdf_url(row: dict) -> str:
+    for link in row.get("link") or []:
+        if not isinstance(link, dict):
+            continue
+        url = str(link.get("URL") or "")
+        content_type = str(link.get("content-type") or "")
+        if url and ("pdf" in content_type.lower() or url.lower().endswith(".pdf")):
+            return url
+    return ""
 
 
 def _stable_id(title: str) -> str:

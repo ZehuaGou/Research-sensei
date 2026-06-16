@@ -26,6 +26,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 |---|---|---|---|---|---|
 | M1 | Focused acquisition | implemented | live tested | REAL_E2E_VERIFIED | Narrow-query acquisition, verification, relevance judge, source/download gate, and reading-plan path have real validation. |
 | M1 | Source-aware acquisition | implemented | unit/live tested | PARTIAL_REAL_E2E_VERIFIED | arXiv source-first is implemented for API/PaperSourceResolver handoff: `https://arxiv.org/e-print/{id}` is tried before arXiv PDF, source archives are unpacked, main `.tex` is selected, and M2 receives LaTeX with `formula_origin=source_latex` when available. PDF remains fallback. 2026-06-16 Mimo smoke verified source-first on narrow arXiv candidates only; broad source acceptance remains pending. |
+| M1 | Literature acquisition/fulltext discovery | implemented | unit + six-query live smoke | DEGRADED_SMOKE | `scripts/run_literature_acquisition_smoke.py` now audits real multi-source search and legal fulltext discovery across arXiv, OpenAlex, Semantic Scholar, Crossref, DBLP, and Unpaywall. Six 2026-06-16 live smoke queries each attempted 6 sources and retained metadata-only high-value papers with `needs_user_upload=true`. This proves broader coverage than arXiv-only samples, but remains narrow smoke evidence, not broad M1 REAL_E2E. |
 | M1 | PDF canonical pipeline | implemented | unit + selected-paper real tests | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Current M1 can generate M2-readable canonical bundles when regenerated with current code and all gates pass. |
 | M1 | MinerU2.5-Pro primary parser | implemented | unit + selected-paper real tests | PARTIAL_REAL_E2E_VERIFIED | Primary PDF parser via `mineru-vl-utils`; broad multi-paper acceptance remains pending. |
 | M1 | Quality gate | implemented | unit + acceptance enforced | REAL_E2E_VERIFIED | Blocks crop/overlay gaps, source mismatch, section pollution, raw-only formula dense outputs, and repeated/hallucinated text. |
@@ -53,14 +54,15 @@ verified. Current M1 can produce `canonical_paper.md` plus the required M2
 artifact bundle on selected real papers, with MinerU2.5-Pro as the primary
 parser, crop/overlay enforcement, formula provenance, optional guarded Ollama
 formula LaTeX polish, and quality gates. Direction exploration now has a
-minimal unit-tested loop plus a narrow arXiv live smoke and a minimal
-PaperWorkspace handoff API. Seed expansion now has a minimal unit-tested loop
-plus a narrow DEGRADED external-source smoke, but broad multi-source acceptance,
-verified citation-graph expansion, LLM-based planning, A_READ canonical handoff
-from direction candidates, broad LaTeX/HTML normalization beyond the narrow
-arXiv source-first path, broad
-multi-paper MinerU acceptance, and production-scale parser stability remain
-pending.
+minimal unit-tested loop, a minimal PaperWorkspace handoff API, and a six-query
+multi-source literature acquisition/fulltext discovery smoke. Seed expansion
+now has a minimal unit-tested loop plus a narrow DEGRADED external-source
+smoke. Broad M1 REAL_E2E remains pending: verified citation-graph expansion,
+LLM-based planning, A_READ canonical handoff from direction candidates, broad
+LaTeX/HTML normalization beyond arXiv source-first, broad multi-paper MinerU
+acceptance, production-scale parser stability, Semantic Scholar rate-limit
+handling with a key, and Unpaywall DOI fulltext lookup with a configured email
+are not complete.
 
 The authoritative M1 development contract is
 `docs/development/M1_LITERATURE_SEARCH.md`.
@@ -344,13 +346,67 @@ Main-chain smoke status:
   external PDFs fail, or LLM formula generation times out. This is not broad M1,
   broad M2, M3 product readiness, or M4.
 
+M1 literature acquisition/fulltext discovery status:
+
+- 2026-06-16 implementation adds `FullTextResolver`, `DBLPAdapter`, expanded
+  `CandidatePaper` fulltext fields, DirectionSearchView fulltext status fields,
+  and `scripts/run_literature_acquisition_smoke.py`. The script prints console
+  summaries only and does not write reports.
+- Legal fulltext priority is: arXiv source/e-print, arXiv PDF, OpenAlex or
+  Unpaywall OA PDF, Semantic Scholar `openAccessPdf`, publisher/repository PDF,
+  explicit fulltext HTML such as ar5iv, manual user upload, then metadata-only.
+  Ordinary DOI/publisher landing pages are not treated as fulltext.
+- arXiv IDs can now be derived from legal arXiv landing/PDF URLs returned by
+  OpenAlex/Semantic Scholar/DBLP before selecting fulltext, so those non-arXiv
+  discoveries can still use arXiv source-first when the URL proves an arXiv ID.
+- Metadata-only high-value candidates are retained with `needs_user_upload=true`
+  and `can_deep_read=false`; they are not hidden and not mislabelled as
+  fulltext-ready.
+- External tool audit:
+
+| source/tool | current status | invoked by | query/fulltext method | fulltext capability | current failure/bottleneck |
+|---|---|---|---|---|---|
+| arXiv | active | `ArxivAdapter`, `FullTextResolver`, source resolver | Atom search, e-print, PDF | source_ready/pdf_ready | Works in smoke; source may fall back to PDF if e-print is unavailable. |
+| OpenAlex | active | `OpenAlexAdapter` | `pyalex.Works.search` | DOI, OA PDF metadata, arXiv landing/PDF discovery | Works; some records are metadata-only without Unpaywall email. |
+| Semantic Scholar | active but rate-limited | `SemanticScholarAdapter` | Graph API search with `openAccessPdf` | OA PDF and arXiv IDs when API responds | 429 in most smoke queries without higher-rate key; search degrades rather than failing whole query. |
+| Crossref | active metadata + PDF-link extraction | `CrossrefAdapter` | Crossref Works query | DOI/venue/year, occasional legal PDF links | Mostly metadata-only; no fulltext unless links expose legal PDF. |
+| DBLP | active metadata discovery | `DBLPAdapter` | DBLP publication API | DOI/arXiv/venue discovery only | Metadata-only by design; one smoke query timed out, later queries returned results. |
+| Unpaywall | implemented but env-blocked | `FullTextResolver` | DOI lookup via Unpaywall API | Legal OA PDF/landing lookup | `UNPAYWALL_EMAIL` / `RESEARCHSENSEI_CONTACT_EMAIL` missing in smoke, so DOI OA lookup did not run. |
+| ar5iv/html | guarded fallback | `FullTextResolver` | explicit ar5iv URL from arXiv ID | html_ready only for known fulltext HTML | Not selected when arXiv source/PDF is available. |
+| paper-search | configured only | `config/local.toml`, examples | not invoked by runtime M1 service | unknown | Present in config/docs, not currently called by DirectionExplorationService or smoke script. |
+| gpt-researcher / scholar / serp/browser search | not implemented | none | none | none | No runtime adapter found. |
+| local upload PDF | active fallback | `/api/v1/documents/parse`, source resolver | user-provided file/path | pdf/local source | Manual recovery path, not automatic literature search. |
+
+- 2026-06-16 six-query live smoke matrix:
+
+| query | attempted sources | total | non-arXiv | legal fulltext | source_ready | pdf_ready | metadata_only | top failure reasons |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| time series anomaly detection | 6 | 58 | 38 | 26 | 20 | 6 | 32 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429, DBLP timeout |
+| multivariate time series imputation | 6 | 63 | 48 | 20 | 15 | 5 | 43 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
+| graph anomaly detection | 6 | 73 | 53 | 25 | 20 | 5 | 48 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
+| diffusion models for time series imputation | 6 | 45 | 41 | 22 | 18 | 4 | 23 | `UNPAYWALL_EMAIL_MISSING`; Semantic Scholar returned 20 after retry |
+| transformer time series anomaly detection | 6 | 53 | 52 | 9 | 4 | 5 | 44 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429 |
+| graph neural network anomaly detection | 6 | 54 | 52 | 12 | 7 | 5 | 42 | `UNPAYWALL_EMAIL_MISSING`, Semantic Scholar 429, one arXiv source fallback |
+
+- Minimum smoke thresholds passed: every query attempted at least 4 sources,
+  all six attempted 6 sources, all six total candidates were >= 30, all six
+  non-arXiv candidate counts were >= 10, all six legal fulltext counts were >=
+  5, metadata-only candidates remained visible, and failure reasons were
+  explicit.
+- Strict status: this is DEGRADED_SMOKE / partial acquisition evidence. It is
+  not broad M1 REAL_E2E, not broad M2 evidence, not M3 product readiness, and
+  not M4.
+
 ## Test Status Summary
 
 As of 2026-06-16:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 507 passed, 15 skipped
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 516 passed, 15 skipped
 - Frontend: `cd frontend && npm test` -> 5 test files, 33 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
+- M1 Literature acquisition/fulltext smoke: six real queries listed above. All
+  passed the minimum acquisition coverage thresholds, with Semantic Scholar and
+  Unpaywall limitations recorded as degraded source behavior.
 - M1 Direction Exploration external smoke: arXiv-only query
   `time series anomaly detection` -> SUCCESS, 3 real candidates,
   `can_enter_m2=false` for all because no canonical M2-ready handoff was
