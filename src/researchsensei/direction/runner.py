@@ -349,9 +349,10 @@ class DirectionRunner:
                 updated.append(candidate)
                 continue
             pdf_downloaded = resolved.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+            source_downloaded = bool(resolved.has_valid_deep_reading_source and resolved.local_path and resolved.sha256)
             pdf_available = bool(candidate.pdf_url or resolved.pdf_url)
-            can_enter_m2 = bool(pdf_downloaded and resolved.local_path and resolved.sha256)
-            source_confidence = "high" if pdf_downloaded else ("medium" if pdf_available else candidate.source_confidence)
+            can_enter_m2 = source_downloaded
+            source_confidence = "high" if source_downloaded else ("medium" if pdf_available else candidate.source_confidence)
             metadata_confidence = candidate.metadata_confidence
             if source_confidence == "high" and metadata_confidence == "low":
                 metadata_confidence = "medium"
@@ -367,6 +368,9 @@ class DirectionRunner:
                         "source_priority": resolved.source_priority,
                         "preferred_m2_input": resolved.preferred_m2_input,
                         "has_valid_deep_reading_source": resolved.has_valid_deep_reading_source,
+                        "latex_source_available": resolved.latex_source_available,
+                        "latex_source_downloaded": resolved.latex_source_downloaded,
+                        "latex_main_file": resolved.latex_main_file,
                         "metadata_only": not resolved.has_valid_deep_reading_source,
                         "source_confidence": source_confidence,
                         "metadata_confidence": metadata_confidence,

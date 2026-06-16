@@ -80,6 +80,50 @@ We minimize L = L_rec + lambda L_graph to model sensor dependencies.
     assert formula_items[0].formula_ocr_status == "not_available"
 
 
+def test_latex_source_preserves_sections_and_source_latex_formula_origin(tmp_path: Path) -> None:
+    path = tmp_path / "paper.tex"
+    path.write_text(
+        r"""
+\documentclass{article}
+\title{Tiny Source Paper}
+\begin{document}
+\begin{abstract}
+We study time series anomaly detection.
+\end{abstract}
+\section{Methodology}
+Our approach uses a reconstruction model for sensor streams.
+\begin{equation}
+L = L_{rec} + \lambda L_{graph}
+\end{equation}
+\section{Experiments}
+We evaluate on benchmark datasets.
+\end{document}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    doc = LightweightIngestionService().ingest_path(path, paper_id="paper-tex")
+
+    assert doc.parser_name == "latex_source_lightweight"
+    assert any(block.type == BlockType.HEADING and block.section == "method" for block in doc.blocks)
+    assert any(block.type == BlockType.HEADING and block.section == "experiments" for block in doc.blocks)
+    formula_blocks = [block for block in doc.blocks if block.type == BlockType.FORMULA]
+    assert formula_blocks
+    assert formula_blocks[0].formula_origin == "source_latex"
+    assert formula_blocks[0].formula_ocr_status == "not_required"
+
+    passage_index = build_passage_index(doc)
+    formula_passages = [
+        passage for passage in passage_index.passages
+        if "formula" in {kind.lower() for kind in passage.source_block_types}
+    ]
+    assert formula_passages[0].formula_origins == ["source_latex"]
+
+    claim_evidence = build_claim_evidence(doc, passage_index)
+    formula_claims = [claim for claim in claim_evidence.claims if claim.claim_type == "FORMULA_CONTEXT"]
+    assert formula_claims[0].formula_origin == "source_latex"
+
+
 def test_ingests_txt_and_detects_chinese_language(tmp_path: Path) -> None:
     path = tmp_path / "paper.txt"
     path.write_text("摘要\n这是一个时间序列异常检测方法。\n方法\n我们使用重构误差。", encoding="utf-8")

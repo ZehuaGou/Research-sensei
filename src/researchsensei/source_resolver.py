@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import gzip
 import hashlib
+import io
+import json
 import logging
 import re
 import shutil
+import tarfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
@@ -23,8 +28,17 @@ from researchsensei.schemas import (
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf"}
+SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf", ".tex"}
 PDF_BYTES = b"%PDF"
+GZIP_BYTES = b"\x1f\x8b"
+
+
+@dataclass(frozen=True)
+class LatexSourceMaterialization:
+    main_tex: Path | None
+    selection_reason: str
+    extracted_files: list[Path]
+    warnings: list[str]
 
 
 class PaperSourceResolver:
@@ -65,11 +79,11 @@ class PaperSourceResolver:
         actual_download_dir = Path(download_dir).resolve() if download_dir else self.download_dir
         items = [self.resolve_one(candidate, download_dir=actual_download_dir) for candidate in candidates]
         warnings: list[WarningItem] = []
-        if any(item.status != PaperSourceStatus.RESOLVED_PDF_DOWNLOADED for item in items):
+        if any(not item.has_valid_deep_reading_source for item in items):
             warnings.append(
                 WarningItem(
                     code="PARTIAL_SOURCE_RESOLUTION",
-                    message="Some candidates were not downloaded as validated PDFs.",
+                    message="Some candidates were not resolved to validated full-text sources.",
                 )
             )
         return SourceResolutionResult(query=query, items=items, warnings=warnings)
@@ -107,6 +121,16 @@ class PaperSourceResolver:
             source_url = self.arxiv_to_source_url(paper.arxiv_id)
             landing_url = landing_url or self.arxiv_to_abs_url(paper.arxiv_id)
             source_type = PaperSourceType.ARXIV_SOURCE
+            if self.network_enabled and (download_dir or self.download_dir):
+                source_result = self._download_arxiv_source_result(
+                    paper,
+                    source_url=source_url,
+                    pdf_url=pdf_url,
+                    landing_url=landing_url,
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
+                if source_result is not None:
+                    return source_result
 
         if pdf_url:
             if self.network_enabled and (download_dir or self.download_dir):
@@ -320,6 +344,61 @@ class PaperSourceResolver:
             metadata={"resolution_strategy": "download_failed"},
         )
 
+    def _download_arxiv_source_result(
+        self,
+        paper: CandidatePaper,
+        *,
+        source_url: str,
+        pdf_url: str,
+        landing_url: str,
+        download_dir: Path,
+    ) -> ResolvedPaperSource | None:
+        if not paper.arxiv_id or not source_url:
+            return None
+        paper_dir = download_dir / _safe_name(paper.paper_id or paper.title)
+        paper_dir.mkdir(parents=True, exist_ok=True)
+        resolver = SourceResolver(
+            http_client=self.http_client,
+            timeout_seconds=self.timeout_seconds,
+            max_download_bytes=self.max_download_bytes,
+        )
+        status = resolver._resolve_arxiv_source(
+            arxiv_id=paper.arxiv_id,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            run_dir=paper_dir,
+        )
+        if status is None:
+            return None
+        source_path = Path(status.resolved_path)
+        content = source_path.read_bytes()
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.RESOLVED,
+            source_type=PaperSourceType.ARXIV_SOURCE,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            landing_url=landing_url,
+            download_status="downloaded",
+            content_type=status.content_type or "text/x-tex",
+            file_size=source_path.stat().st_size,
+            sha256=hashlib.sha256(content).hexdigest(),
+            local_path=str(source_path),
+            warnings=[WarningItem(code=warning, message=warning) for warning in status.warnings],
+            metadata={
+                "resolution_strategy": "downloaded_arxiv_source",
+                "source_manifest_path": status.source_manifest_path,
+                "source_dir": status.source_dir,
+            },
+            source_priority=SourcePriority.LATEX_SOURCE,
+            preferred_m2_input="latex_source",
+            has_valid_deep_reading_source=True,
+            latex_source_available=True,
+            latex_source_downloaded=True,
+            latex_main_file=status.latex_main_file,
+            latex_source_path=status.latex_source_path,
+        )
+
     def _base_result(
         self,
         paper: CandidatePaper,
@@ -342,6 +421,13 @@ class PaperSourceResolver:
         pdf_metadata_check: str = "",
         pdf_title_match: str = "",
         pdf_metadata_warning: str = "",
+        source_priority: SourcePriority | None = None,
+        preferred_m2_input: str = "",
+        has_valid_deep_reading_source: bool | None = None,
+        latex_source_available: bool = False,
+        latex_source_downloaded: bool = False,
+        latex_main_file: str = "",
+        latex_source_path: str = "",
     ) -> ResolvedPaperSource:
         has_valid_pdf = bool(
             status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
@@ -349,8 +435,9 @@ class PaperSourceResolver:
             and sha256
             and file_size > 0
         )
-        source_priority = SourcePriority.PDF if has_valid_pdf else SourcePriority.METADATA_ONLY
-        preferred_m2_input = "pdf" if has_valid_pdf else "none"
+        actual_source_priority = source_priority or (SourcePriority.PDF if has_valid_pdf else SourcePriority.METADATA_ONLY)
+        actual_preferred_m2_input = preferred_m2_input or ("pdf" if has_valid_pdf else "none")
+        actual_valid_source = has_valid_deep_reading_source if has_valid_deep_reading_source is not None else has_valid_pdf
         return ResolvedPaperSource(
             paper_id=paper.paper_id,
             title=paper.title,
@@ -374,9 +461,13 @@ class PaperSourceResolver:
             pdf_metadata_check=pdf_metadata_check,
             pdf_title_match=pdf_title_match,
             pdf_metadata_warning=pdf_metadata_warning,
-            source_priority=source_priority,
-            preferred_m2_input=preferred_m2_input,
-            has_valid_deep_reading_source=has_valid_pdf,
+            source_priority=actual_source_priority,
+            preferred_m2_input=actual_preferred_m2_input,
+            has_valid_deep_reading_source=actual_valid_source,
+            latex_source_available=latex_source_available,
+            latex_source_downloaded=latex_source_downloaded,
+            latex_main_file=latex_main_file,
+            latex_source_path=latex_source_path,
         )
 
     @staticmethod
@@ -405,6 +496,7 @@ class SourceResolver:
         self.http_client = http_client or httpx.Client()
         self.timeout_seconds = timeout_seconds
         self.max_download_bytes = max_download_bytes
+        self._last_arxiv_source_fallback = ""
 
     def resolve_upload(self, source_path: str | Path, *, original_filename: str, content_type: str = "") -> SourceStatus:
         path = Path(source_path)
@@ -460,6 +552,12 @@ class SourceResolver:
             status="resolved",
             content_type=_content_type_for_suffix(suffix),
             size_bytes=target.stat().st_size,
+            source_strategy="local_path",
+            source_priority="latex_source" if suffix == ".tex" else ("pdf" if suffix == ".pdf" else "low_confidence_text"),
+            preferred_m2_input="latex_source" if suffix == ".tex" else ("pdf" if suffix == ".pdf" else "text"),
+            latex_source_available=suffix == ".tex",
+            latex_source_path=str(target) if suffix == ".tex" else "",
+            latex_main_file=str(target) if suffix == ".tex" else "",
         )
 
     def resolve_pdf_url(self, pdf_url: str, run_dir: str | Path) -> SourceStatus:
@@ -521,10 +619,15 @@ class SourceResolver:
             status="resolved",
             content_type=content_type or "application/pdf",
             size_bytes=target.stat().st_size,
+            pdf_url=pdf_url,
+            source_strategy="pdf_direct",
+            source_priority="pdf",
+            preferred_m2_input="pdf",
         )
 
     def resolve_arxiv_id(self, arxiv_id: str, run_dir: str | Path) -> SourceStatus:
         pdf_url = self.arxiv_to_pdf_url(arxiv_id=arxiv_id)
+        source_url = self.arxiv_to_source_url(arxiv_id=arxiv_id)
         if not pdf_url:
             return _status(
                 source_type="arxiv_id",
@@ -533,11 +636,27 @@ class SourceResolver:
                 warnings=["INVALID_ARXIV_ID"],
                 degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
             )
+        source_status = self._resolve_arxiv_source(arxiv_id=arxiv_id, source_url=source_url, pdf_url=pdf_url, run_dir=run_dir)
+        if source_status is not None:
+            return source_status
         status = self.resolve_pdf_url(pdf_url, run_dir)
-        return status.model_copy(update={"source_type": "arxiv_id", "original_input": arxiv_id})
+        fallback = self._last_arxiv_source_fallback or status.fallback_used or "source_unavailable"
+        return status.model_copy(
+            update={
+                "source_type": "arxiv_pdf",
+                "original_input": arxiv_id,
+                "source_url": source_url,
+                "pdf_url": pdf_url,
+                "source_strategy": "pdf_fallback" if status.status == "resolved" else "source_first_failed",
+                "fallback_used": fallback,
+                "warnings": _unique_warnings(["ARXIV_SOURCE_UNAVAILABLE", fallback, *status.warnings]),
+            }
+        )
 
     def resolve_arxiv_url(self, arxiv_url: str, run_dir: str | Path) -> SourceStatus:
         pdf_url = self.arxiv_to_pdf_url(arxiv_url=arxiv_url)
+        arxiv_id = self.arxiv_id_from_url(arxiv_url)
+        source_url = self.arxiv_to_source_url(arxiv_id=arxiv_id) if arxiv_id else ""
         if not pdf_url:
             return _status(
                 source_type="arxiv_url",
@@ -546,8 +665,102 @@ class SourceResolver:
                 warnings=["INVALID_ARXIV_ID"],
                 degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
             )
+        if arxiv_id:
+            source_status = self._resolve_arxiv_source(arxiv_id=arxiv_id, source_url=source_url, pdf_url=pdf_url, run_dir=run_dir)
+            if source_status is not None:
+                return source_status.model_copy(update={"original_input": arxiv_url})
         status = self.resolve_pdf_url(pdf_url, run_dir)
-        return status.model_copy(update={"source_type": "arxiv_url", "original_input": arxiv_url})
+        fallback = self._last_arxiv_source_fallback or status.fallback_used or "source_unavailable"
+        return status.model_copy(
+            update={
+                "source_type": "arxiv_pdf",
+                "original_input": arxiv_url,
+                "source_url": source_url,
+                "pdf_url": pdf_url,
+                "source_strategy": "pdf_fallback" if status.status == "resolved" else "source_first_failed",
+                "fallback_used": fallback,
+                "warnings": _unique_warnings(["ARXIV_SOURCE_UNAVAILABLE", fallback, *status.warnings]),
+            }
+        )
+
+    def _resolve_arxiv_source(
+        self,
+        *,
+        arxiv_id: str,
+        source_url: str,
+        pdf_url: str,
+        run_dir: str | Path,
+    ) -> SourceStatus | None:
+        if not source_url:
+            self._last_arxiv_source_fallback = "source_unavailable"
+            return None
+        self._last_arxiv_source_fallback = ""
+        try:
+            response = self.http_client.get(source_url, timeout=self.timeout_seconds, follow_redirects=True)
+            response.raise_for_status()
+        except Exception as exc:
+            logger.info("arXiv source download failed for %s, falling back to PDF: %s", arxiv_id, exc)
+            self._last_arxiv_source_fallback = "source_unavailable"
+            return None
+
+        content = response.content
+        content_length = int(response.headers.get("content-length") or len(content))
+        content_type = response.headers.get("content-type", "")
+        if content_length > self.max_download_bytes or len(content) > self.max_download_bytes:
+            logger.warning("arXiv source %s exceeds configured size limit; falling back to PDF.", arxiv_id)
+            self._last_arxiv_source_fallback = "source_unavailable"
+            return None
+        if not content or content.startswith(PDF_BYTES) or "pdf" in content_type.lower():
+            logger.info("arXiv source endpoint for %s did not return LaTeX source; falling back to PDF.", arxiv_id)
+            self._last_arxiv_source_fallback = "source_unavailable"
+            return None
+
+        source_dir = Path(run_dir) / "source"
+        source_dir.mkdir(parents=True, exist_ok=True)
+        raw_name = "source.tar.gz" if (content.startswith(GZIP_BYTES) or "gzip" in content_type.lower()) else "source.tex"
+        raw_path = source_dir / raw_name
+        raw_path.write_bytes(content)
+
+        materialize_result = materialize_latex_source(content, source_dir=source_dir)
+        main_tex = materialize_result.main_tex
+        manifest_path = source_dir / "source_manifest.json"
+        manifest = {
+            "arxiv_id": arxiv_id,
+            "source_url": source_url,
+            "pdf_url": pdf_url,
+            "raw_path": str(raw_path),
+            "source_dir": str(source_dir),
+            "main_tex": str(main_tex) if main_tex else "",
+            "main_tex_selection_reason": materialize_result.selection_reason,
+            "extracted_files": [str(path) for path in materialize_result.extracted_files],
+            "warnings": materialize_result.warnings,
+            "strategy": "source_first",
+        }
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        if main_tex is None:
+            logger.info("arXiv source for %s did not expose a usable .tex file; falling back to PDF.", arxiv_id)
+            self._last_arxiv_source_fallback = "source_parse_failed"
+            return None
+
+        return SourceStatus(
+            source_type="arxiv_source",
+            original_input=arxiv_id,
+            resolved_path=str(main_tex),
+            status="resolved",
+            warnings=materialize_result.warnings,
+            content_type="text/x-tex",
+            size_bytes=main_tex.stat().st_size,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            source_dir=str(source_dir),
+            source_manifest_path=str(manifest_path),
+            source_strategy="source_first",
+            source_priority="latex_source",
+            preferred_m2_input="latex_source",
+            latex_source_available=True,
+            latex_source_path=str(main_tex),
+            latex_main_file=str(main_tex),
+        )
 
     @staticmethod
     def arxiv_to_pdf_url(*, arxiv_id: str = "", arxiv_url: str = "") -> str:
@@ -565,6 +778,31 @@ class SourceResolver:
         if path.startswith("pdf/"):
             clean = path.removeprefix("pdf/").removesuffix(".pdf")
             return f"https://arxiv.org/pdf/{clean}.pdf" if _is_valid_arxiv_id(clean) else ""
+        if path.startswith("e-print/"):
+            clean = path.removeprefix("e-print/")
+            return f"https://arxiv.org/pdf/{clean}.pdf" if _is_valid_arxiv_id(clean) else ""
+        return ""
+
+    @staticmethod
+    def arxiv_to_source_url(*, arxiv_id: str = "", arxiv_url: str = "") -> str:
+        clean = _clean_arxiv_id(arxiv_id) if arxiv_id else SourceResolver.arxiv_id_from_url(arxiv_url)
+        return f"https://arxiv.org/e-print/{clean}" if _is_valid_arxiv_id(clean) else ""
+
+    @staticmethod
+    def arxiv_id_from_url(arxiv_url: str) -> str:
+        parsed = urlparse(arxiv_url)
+        if parsed.netloc.lower() != "arxiv.org":
+            return ""
+        path = parsed.path.strip("/")
+        if path.startswith("abs/"):
+            clean = path.removeprefix("abs/")
+            return clean if _is_valid_arxiv_id(clean) else ""
+        if path.startswith("pdf/"):
+            clean = path.removeprefix("pdf/").removesuffix(".pdf")
+            return clean if _is_valid_arxiv_id(clean) else ""
+        if path.startswith("e-print/"):
+            clean = path.removeprefix("e-print/")
+            return clean if _is_valid_arxiv_id(clean) else ""
         return ""
 
     def _is_allowed(self, path: Path) -> bool:
@@ -589,6 +827,12 @@ def _status(
     resolved_path: str = "",
     content_type: str = "",
     size_bytes: int = 0,
+    source_url: str = "",
+    pdf_url: str = "",
+    source_strategy: str = "",
+    source_priority: str = "",
+    preferred_m2_input: str = "",
+    fallback_used: str = "",
 ) -> SourceStatus:
     return SourceStatus(
         source_type=source_type,
@@ -599,11 +843,21 @@ def _status(
         degraded_flags=degraded_flags,
         content_type=content_type,
         size_bytes=size_bytes,
+        source_url=source_url,
+        pdf_url=pdf_url,
+        source_strategy=source_strategy,
+        source_priority=source_priority,
+        preferred_m2_input=preferred_m2_input,
+        fallback_used=fallback_used,
     )
 
 
 def _is_valid_arxiv_id(value: str) -> bool:
     return bool(re.fullmatch(r"\d{4}\.\d{4,5}(?:v\d+)?", value))
+
+
+def _clean_arxiv_id(value: str) -> str:
+    return value.strip().removeprefix("arXiv:").removeprefix("arxiv:")
 
 
 def _doi_url(doi: str) -> str:
@@ -621,7 +875,95 @@ def _content_type_for_suffix(suffix: str) -> str:
         ".md": "text/markdown",
         ".txt": "text/plain",
         ".pdf": "application/pdf",
+        ".tex": "text/x-tex",
     }.get(suffix, "")
+
+
+def materialize_latex_source(content: bytes, *, source_dir: Path) -> LatexSourceMaterialization:
+    """Write/extract arXiv e-print content and locate the safest main tex file."""
+
+    extracted_dir = source_dir / "extracted"
+    extracted_dir.mkdir(parents=True, exist_ok=True)
+    warnings: list[str] = []
+    extracted_files: list[Path] = []
+
+    try:
+        with tarfile.open(fileobj=io.BytesIO(content), mode="r:*") as archive:
+            for member in archive.getmembers():
+                if not member.isfile():
+                    continue
+                member_name = member.name.replace("\\", "/").lstrip("/")
+                if ".." in Path(member_name).parts:
+                    warnings.append(f"SKIPPED_UNSAFE_SOURCE_MEMBER:{member.name}")
+                    continue
+                target = (extracted_dir / member_name).resolve()
+                try:
+                    target.relative_to(extracted_dir.resolve())
+                except ValueError:
+                    warnings.append(f"SKIPPED_UNSAFE_SOURCE_MEMBER:{member.name}")
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                fileobj = archive.extractfile(member)
+                if fileobj is None:
+                    continue
+                data = fileobj.read()
+                target.write_bytes(data)
+                extracted_files.append(target)
+    except tarfile.TarError:
+        extracted_files.extend(_write_non_tar_latex_source(content, extracted_dir, warnings))
+
+    main_tex, reason = select_latex_main_file(extracted_dir)
+    if main_tex is None:
+        warnings.append("LATEX_MAIN_NOT_FOUND")
+    return LatexSourceMaterialization(
+        main_tex=main_tex,
+        selection_reason=reason,
+        extracted_files=extracted_files,
+        warnings=warnings,
+    )
+
+
+def _write_non_tar_latex_source(content: bytes, extracted_dir: Path, warnings: list[str]) -> list[Path]:
+    data = content
+    if content.startswith(GZIP_BYTES):
+        try:
+            data = gzip.decompress(content)
+        except OSError:
+            warnings.append("SOURCE_GZIP_DECOMPRESS_FAILED")
+            data = content
+    target = extracted_dir / "source.tex"
+    target.write_bytes(data)
+    return [target]
+
+
+def select_latex_main_file(source_dir: str | Path) -> tuple[Path | None, str]:
+    root = Path(source_dir)
+    tex_files = [path for path in root.rglob("*.tex") if path.is_file()]
+    if not tex_files:
+        return None, "no_tex_files"
+
+    documentclass_matches: list[Path] = []
+    for path in tex_files:
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if "\\documentclass" in text:
+            documentclass_matches.append(path)
+    if documentclass_matches:
+        documentclass_matches.sort(key=lambda path: path.stat().st_size, reverse=True)
+        return documentclass_matches[0], "documentclass"
+
+    tex_files.sort(key=lambda path: path.stat().st_size, reverse=True)
+    return tex_files[0], "largest_tex"
+
+
+def _unique_warnings(values: list[str]) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        if value and value not in result:
+            result.append(value)
+    return result
 
 
 def _safe_name(value: str) -> str:

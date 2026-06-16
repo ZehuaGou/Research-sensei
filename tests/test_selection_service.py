@@ -217,6 +217,37 @@ def test_dedup_merges_metadata_from_duplicate() -> None:
     assert result[0].pdf_url == "http://pdf"
 
 
+def test_dedup_preserves_sources_and_source_ids_from_duplicates() -> None:
+    service = SelectionService()
+    candidates = [
+        _make_paper_full(
+            "Time Series Anomaly Detection",
+            doi="10.1234/abc",
+            source="arxiv",
+            sources=["arxiv"],
+            source_ids={"arxiv": "2401.00001"},
+            arxiv_id="2401.00001",
+            pdf_url="https://arxiv.org/pdf/2401.00001.pdf",
+        ),
+        _make_paper_full(
+            "Time-Series Anomaly Detection!",
+            doi="10.1234/ABC",
+            source="openalex",
+            sources=["openalex"],
+            source_ids={"openalex": "W123"},
+            landing_url="https://openalex.org/W123",
+        ),
+    ]
+
+    result = service.deduplicate(candidates)
+
+    assert len(result) == 1
+    assert result[0].sources == ["arxiv", "openalex"]
+    assert result[0].source_ids == {"arxiv": "2401.00001", "openalex": "W123"}
+    assert result[0].arxiv_id == "2401.00001"
+    assert result[0].landing_url == "https://openalex.org/W123"
+
+
 def test_dedup_empty_list() -> None:
     service = SelectionService()
 

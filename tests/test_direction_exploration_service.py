@@ -143,6 +143,27 @@ def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:
     assert any("ACQUISITION_FAILED:openalex" in warning for warning in bundle.warnings)
 
 
+def test_direction_source_metrics_include_all_attempted_sources() -> None:
+    service = _service(
+        {
+            "arxiv": StaticAdapter([_candidate()]),
+            "openalex": StaticAdapter([_candidate(source="openalex", sources=["openalex"], paper_id="openalex-1")]),
+            "semantic_scholar": FailingAdapter(),
+            "crossref": StaticAdapter([]),
+        },
+        sources=["arxiv", "openalex", "semantic_scholar", "crossref"],
+    )
+
+    bundle = service.explore("time series anomaly detection")
+    metrics_by_source = {metric["source"]: metric for metric in bundle.source_metrics}
+
+    assert set(metrics_by_source) == {"arxiv", "openalex", "semantic_scholar", "crossref"}
+    assert metrics_by_source["arxiv"]["attempted"] is True
+    assert metrics_by_source["openalex"]["count"] == 1
+    assert metrics_by_source["semantic_scholar"]["success"] is False
+    assert metrics_by_source["crossref"]["success"] is True
+
+
 def test_empty_source_results_return_empty_result() -> None:
     service = _service({"arxiv": StaticAdapter([])})
 

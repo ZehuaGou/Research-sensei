@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import io
+import tarfile
 from pathlib import Path
 
 from starlette.testclient import TestClient
@@ -33,13 +35,23 @@ class PdfHttpClient:
         return StubHttpResponse(self.content, url=url)
 
 
+class ArxivSourceHttpClient:
+    def __init__(self, source_content: bytes) -> None:
+        self.source_content = source_content
+        self.urls: list[str] = []
+
+    def get(self, url: str, **kwargs) -> StubHttpResponse:
+        self.urls.append(url)
+        return StubHttpResponse(self.source_content, content_type="application/x-gzip", url=url)
+
+
 class FailingHttpClient:
     def get(self, url: str, **kwargs) -> StubHttpResponse:
         raise RuntimeError("network unavailable")
 
 
 def test_direction_arxiv_candidate_handoff_creates_job(tmp_path: Path) -> None:
-    http_client = PdfHttpClient(_sample_pdf_bytes())
+    http_client = ArxivSourceHttpClient(_sample_latex_source_tar())
     client = TestClient(create_app(workspace_root=tmp_path / "workspace", http_client=http_client))
 
     response = client.post(
@@ -57,9 +69,11 @@ def test_direction_arxiv_candidate_handoff_creates_job(tmp_path: Path) -> None:
     data = response.json()
     assert data["handoff_status"] == "JOB_CREATED"
     assert data["job_id"]
-    assert data["source_status"]["source_type"] == "arxiv_id"
+    assert data["source_status"]["source_type"] == "arxiv_source"
+    assert data["source_status"]["preferred_m2_input"] == "latex_source"
+    assert data["source_status"]["latex_source_available"] is True
     assert data["understanding_status"]["status"] == "BASELINE_ONLY"
-    assert http_client.urls == ["https://arxiv.org/pdf/2401.00001.pdf"]
+    assert http_client.urls == ["https://arxiv.org/e-print/2401.00001"]
 
     status_response = client.get(f"/api/v1/jobs/{data['job_id']}/understanding_status")
     assert status_response.status_code == 200
@@ -165,3 +179,29 @@ def _sample_pdf_bytes() -> bytes:
     data = doc.tobytes()
     doc.close()
     return data
+
+
+def _sample_latex_source_tar() -> bytes:
+    latex = r"""
+\documentclass{article}
+\title{Time Series Anomaly Detection with Transformers}
+\begin{document}
+\begin{abstract}
+We study anomaly detection for multivariate time series.
+\end{abstract}
+\section{Methodology}
+Our method uses attention and reconstruction losses.
+\begin{equation}
+L = L_{rec} + \lambda L_{attn}
+\end{equation}
+\section{Experiments}
+We evaluate on benchmark datasets and report strong F1.
+\end{document}
+"""
+    buffer = io.BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        data = latex.encode("utf-8")
+        info = tarfile.TarInfo("main.tex")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    return buffer.getvalue()

@@ -20,7 +20,7 @@ from researchsensei.source_resolver import SourceResolver
 from researchsensei.workspace import WorkspaceStore
 
 
-SUPPORTED_PARSE_SUFFIXES = {".md", ".txt", ".pdf"}
+SUPPORTED_PARSE_SUFFIXES = {".md", ".txt", ".pdf", ".tex"}
 
 
 def _debug_enabled() -> bool:
@@ -611,6 +611,12 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     return {
         "source_type": source_type,
         "source_status": source_status.get("status", "unknown"),
+        "source_strategy": source_status.get("source_strategy", ""),
+        "source_priority": source_status.get("source_priority", ""),
+        "preferred_m2_input": source_status.get("preferred_m2_input", ""),
+        "latex_source_available": source_status.get("latex_source_available", False),
+        "latex_source_path": source_status.get("latex_source_path", ""),
+        "fallback_used": source_status.get("fallback_used", ""),
         "verification_status": "verified" if source_resolved else "unverified",
         "pdf_metadata_check": source_status.get("pdf_metadata_check", "not_available"),
         "pdf_title_match": source_status.get("pdf_title_match", "not_available"),

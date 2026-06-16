@@ -22,9 +22,31 @@ SECTION_ALIASES = {
     "conclusion": "conclusion",
     "结论": "conclusion",
 }
+SECTION_ALIASES.update(
+    {
+        "methodology": "method",
+        "approach": "method",
+        "model": "method",
+        "framework": "method",
+        "architecture": "method",
+        "proposed method": "method",
+        "the proposed method": "method",
+        "evaluation": "experiments",
+        "experimental results": "experiments",
+    }
+)
 
 FORMULA_PATTERN = re.compile(
     r"(?P<formula>\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[^.;\n]+|\\mathcal\{[^}]+\}\s*=\s*[^.;\n]+)"
+)
+
+LATEX_TOKEN_PATTERN = re.compile(
+    r"\\begin\{abstract\}(?P<abstract>.*?)\\end\{abstract\}"
+    r"|\\(?P<section_cmd>section|subsection|subsubsection)\*?\{(?P<section_title>[^{}]+)\}"
+    r"|\\begin\{(?P<env>equation\*?|align\*?|alignat\*?|gather\*?|multline\*?)\}(?P<env_body>.*?)\\end\{(?P=env)\}"
+    r"|\\\[(?P<bracket_body>.*?)\\\]"
+    r"|\$\$(?P<display_body>.*?)\$\$",
+    re.DOTALL,
 )
 
 
@@ -39,6 +61,9 @@ class LightweightIngestionService:
         if suffix in {".md", ".txt"}:
             text = source.read_text(encoding="utf-8")
             parser_name = "markdown_text" if suffix == ".md" else "plain_text"
+        elif suffix == ".tex":
+            text = source.read_text(encoding="utf-8", errors="ignore")
+            parser_name = "latex_source_lightweight"
         elif suffix == ".pdf":
             text, pdf_warnings, degraded = self._extract_pdf_text(source)
             warnings.extend(pdf_warnings)
@@ -60,7 +85,7 @@ class LightweightIngestionService:
                 blocks=[],
             )
 
-        doc = self._ingest_text(actual_paper_id, text)
+        doc = self._ingest_latex(actual_paper_id, text) if suffix == ".tex" else self._ingest_text(actual_paper_id, text)
         return doc.model_copy(
             update={
                 "source_path": str(source),
@@ -97,6 +122,144 @@ class LightweightIngestionService:
         if not pages:
             return "", [WarningItem(code="PDF_TEXT_EMPTY", message="PDF parser returned empty text.")], True
         return "\n\n".join(pages), [], False
+
+    def _ingest_latex(self, paper_id: str, text: str) -> DocumentIngestion:
+        cleaned = _strip_latex_comments(text)
+        detected_language = self._detect_language(cleaned)
+        blocks: list[DocumentBlock] = []
+        warnings: list[WarningItem] = []
+        offset = 0
+        paragraph_count = 0
+        heading_count = 0
+        formula_count = 0
+        current_section = "full_text"
+        seen_sections: set[str] = set()
+
+        title_match = re.search(r"\\title\{(?P<title>.*?)\}", cleaned, re.DOTALL)
+        if title_match:
+            title = _latex_to_plain(title_match.group("title"))
+            if title:
+                blocks.append(
+                    DocumentBlock(
+                        block_id="title001",
+                        type=BlockType.TITLE,
+                        section="title",
+                        text=title,
+                        normalized_text=" ".join(title.lower().split()),
+                        evidence_ref=f"{paper_id}:title001",
+                        block_source="latex_source",
+                    )
+                )
+
+        def add_heading(section: str, raw_title: str = "") -> None:
+            nonlocal heading_count, offset, current_section
+            current_section = section
+            seen_sections.add(section)
+            heading_count += 1
+            text_value = raw_title or section
+            block_id = f"h{heading_count:03d}"
+            blocks.append(
+                DocumentBlock(
+                    block_id=block_id,
+                    type=BlockType.HEADING,
+                    section=section,
+                    text=text_value,
+                    normalized_text=section,
+                    offset_start=offset,
+                    offset_end=offset + len(text_value),
+                    evidence_ref=f"{paper_id}:{block_id}",
+                    block_source="latex_source",
+                )
+            )
+            offset += len(text_value) + 1
+
+        def add_paragraphs(raw_segment: str) -> None:
+            nonlocal paragraph_count, offset
+            plain = _latex_to_plain(raw_segment)
+            for paragraph in _split_paragraphs(plain):
+                paragraph_count += 1
+                block_id = f"b{paragraph_count:03d}"
+                block_type = BlockType.ABSTRACT if current_section == "abstract" else BlockType.PARAGRAPH
+                blocks.append(
+                    DocumentBlock(
+                        block_id=block_id,
+                        type=block_type,
+                        section=current_section,
+                        text=paragraph,
+                        normalized_text=" ".join(paragraph.lower().split()),
+                        offset_start=offset,
+                        offset_end=offset + len(paragraph),
+                        evidence_ref=f"{paper_id}:{block_id}",
+                        block_source="latex_source",
+                        section_confidence="high",
+                    )
+                )
+                offset += len(paragraph) + 1
+
+        def add_formula(raw_formula: str) -> None:
+            nonlocal formula_count, offset
+            formula = raw_formula.strip()
+            if not formula:
+                return
+            formula_count += 1
+            block_id = f"eq{formula_count:03d}"
+            blocks.append(
+                DocumentBlock(
+                    block_id=block_id,
+                    type=BlockType.FORMULA,
+                    section=current_section,
+                    text=formula,
+                    raw_latex=formula,
+                    evidence_ref=f"{paper_id}:{block_id}",
+                    formula_id=f"source_latex_formula_{formula_count:03d}",
+                    formula_latex=formula,
+                    formula_origin="source_latex",
+                    formula_ocr_status="not_required",
+                    formula_explanation_status="available",
+                    equation_group_id=f"source_latex_group_{formula_count:03d}",
+                    group_order=formula_count,
+                    block_source="latex_source",
+                    parse_quality_status="source_latex",
+                )
+            )
+            offset += len(formula) + 1
+
+        cursor = 0
+        for match in LATEX_TOKEN_PATTERN.finditer(cleaned):
+            add_paragraphs(cleaned[cursor:match.start()])
+            cursor = match.end()
+
+            if match.group("abstract") is not None:
+                add_heading("abstract", "Abstract")
+                add_paragraphs(match.group("abstract") or "")
+                continue
+
+            section_title = match.group("section_title")
+            if section_title is not None:
+                plain_title = _latex_to_plain(section_title)
+                add_heading(self._section_from_title(plain_title), plain_title)
+                continue
+
+            formula = match.group("env_body") or match.group("bracket_body") or match.group("display_body") or ""
+            add_formula(formula)
+
+        add_paragraphs(cleaned[cursor:])
+
+        if formula_count == 0:
+            warnings.append(WarningItem(code="FORMULA_UNAVAILABLE", message="No LaTeX display formula was detected."))
+        if "method" not in seen_sections:
+            warnings.append(WarningItem(code="METHOD_SECTION_MISSING", message="No method section was detected."))
+        if "experiments" not in seen_sections:
+            warnings.append(
+                WarningItem(code="EXPERIMENT_SECTION_MISSING", message="No experiment/results section was detected.")
+            )
+
+        return DocumentIngestion(
+            paper_id=paper_id,
+            detected_language=detected_language,
+            warnings=warnings,
+            blocks=blocks,
+        )
 
     def _ingest_text(self, paper_id: str, text: str) -> DocumentIngestion:
         detected_language = self._detect_language(text)
@@ -215,6 +378,20 @@ class LightweightIngestionService:
             return lower.replace(" ", "_")
         return ""
 
+    def _section_from_title(self, title: str) -> str:
+        lower = " ".join(title.lower().split()).strip(":")
+        if lower in SECTION_ALIASES:
+            return SECTION_ALIASES[lower]
+        if any(term in lower for term in ("method", "methodology", "approach", "architecture", "framework", "proposed model")):
+            return "method"
+        if any(term in lower for term in ("experiment", "result", "evaluation", "benchmark")):
+            return "experiments"
+        if "abstract" in lower:
+            return "abstract"
+        if "intro" in lower:
+            return "introduction"
+        return lower.replace(" ", "_") or "full_text"
+
     def _detect_language(self, text: str) -> str:
         if not text:
             return "unknown"
@@ -224,3 +401,36 @@ class LightweightIngestionService:
         if zh_count:
             return "mixed"
         return "en"
+
+
+def _strip_latex_comments(text: str) -> str:
+    lines: list[str] = []
+    for line in text.splitlines():
+        lines.append(re.sub(r"(?<!\\)%.*$", "", line))
+    return "\n".join(lines)
+
+
+def _latex_to_plain(text: str) -> str:
+    value = text
+    value = re.sub(r"\\(cite|citep|citet|ref|eqref|label|url)\*?(?:\[[^\]]*\])?\{[^{}]*\}", " ", value)
+    value = re.sub(r"\\(begin|end)\{[^{}]*\}", " ", value)
+    for _ in range(4):
+        updated = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?\{([^{}]*)\}", r"\1", value)
+        if updated == value:
+            break
+        value = updated
+    value = re.sub(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])?", " ", value)
+    value = value.replace("~", " ").replace("$", " ")
+    value = re.sub(r"[{}]", " ", value)
+    value = re.sub(r"[ \t]+", " ", value)
+    value = re.sub(r"\n{3,}", "\n\n", value)
+    return value.strip()
+
+
+def _split_paragraphs(text: str) -> list[str]:
+    paragraphs = []
+    for chunk in re.split(r"\n\s*\n", text):
+        paragraph = " ".join(line.strip() for line in chunk.splitlines() if line.strip()).strip()
+        if paragraph:
+            paragraphs.append(paragraph)
+    return paragraphs

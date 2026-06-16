@@ -104,6 +104,7 @@ def run_main_chain_smoke(
         client.post("/api/v1/directions/search", json={"query": query}),
         "direction search",
     )
+    direction_source_metrics = direction_response.get("source_metrics") or []
     direction_papers = _papers(direction_response)[:max(1, max_candidates)]
     direction_candidate = _select_arxiv_candidate(direction_papers)
     if not direction_candidate:
@@ -114,6 +115,7 @@ def run_main_chain_smoke(
             stage="direction_search",
             message="No arXiv candidate was returned by direction search.",
             warnings=warnings + _warnings(direction_response),
+            source_metrics=direction_source_metrics,
         )
 
     seed_response = _request_json(
@@ -136,10 +138,28 @@ def run_main_chain_smoke(
             warnings=warnings,
         )
 
-    handoff_response = _request_json(
-        client.post("/api/v1/directions/deep_read", json={"candidate": _handoff_payload(handoff_candidate)}),
-        "deep read handoff",
-    )
+    handoff_raw_response = client.post("/api/v1/directions/deep_read", json={"candidate": _handoff_payload(handoff_candidate)})
+    handoff_response = _safe_json(handoff_raw_response)
+    if handoff_raw_response.status_code >= 400:
+        detail = handoff_response.get("detail") if isinstance(handoff_response, dict) else {}
+        if not isinstance(detail, dict):
+            detail = handoff_response
+        source_status = detail.get("source_status") if isinstance(detail.get("source_status"), dict) else {}
+        return _fail(
+            query=query,
+            llm_enabled=llm_enabled,
+            llm_mode_note=llm_mode_note,
+            stage="deep_read",
+            message=str(detail.get("message") or detail.get("status") or "Deep-read handoff failed."),
+            selected_candidate=handoff_candidate,
+            seed_response=seed_response,
+            warnings=warnings,
+            source_metrics=direction_source_metrics,
+            handoff_job_id=str(detail.get("job_id") or ""),
+            selected_input_type=_selected_input_type(source_status),
+            source_strategy=_source_strategy(source_status),
+        )
+    source_status = handoff_response.get("source_status") if isinstance(handoff_response.get("source_status"), dict) else {}
     job_id = str(handoff_response.get("job_id") or "")
     if not job_id:
         return _fail(
@@ -151,12 +171,16 @@ def run_main_chain_smoke(
             selected_candidate=handoff_candidate,
             seed_response=seed_response,
             warnings=warnings,
+            source_metrics=direction_source_metrics,
         )
 
     status_response = _request_json(client.get(f"/api/v1/jobs/{job_id}/understanding_status"), "understanding status")
     understanding_status = status_response.get("understanding_status") or {}
     if not isinstance(understanding_status, dict):
         understanding_status = {}
+    paper_workspace_status = status_response.get("paper_workspace_status") or {}
+    if not isinstance(paper_workspace_status, dict):
+        paper_workspace_status = {}
     final_status = str(understanding_status.get("status") or "")
 
     cards_raw_response = client.get(f"/api/v1/jobs/{job_id}/cards")
@@ -179,15 +203,24 @@ def run_main_chain_smoke(
         "llm_mode_note": llm_mode_note,
         "selected_candidate_title": str(direction_candidate.get("title") or ""),
         "selected_candidate_arxiv_id": _candidate_arxiv_id(direction_candidate),
+        "selected_candidate_sources": _candidate_sources(direction_candidate),
         "selected_seed_handoff_title": str(handoff_candidate.get("title") or ""),
         "selected_seed_handoff_arxiv_id": _candidate_arxiv_id(handoff_candidate),
+        "selected_seed_handoff_sources": _candidate_sources(handoff_candidate),
+        "selected_input_type": _selected_input_type(source_status),
+        "source_strategy": _source_strategy(source_status),
+        "arxiv_source_downloaded": bool(source_status.get("latex_source_available") or source_status.get("latex_source_path")),
+        "fallback_used": source_status.get("fallback_used", ""),
         "seed_expansion_status": seed_response.get("seed_expansion_status") or seed_response.get("status") or "",
         "seed_expansion_group_counts": seed_group_counts(seed_response),
+        "direction_source_metrics": _source_metrics_by_source(direction_source_metrics),
+        "seed_source_metrics": _seed_metrics_by_source(seed_response.get("source_metrics") or []),
         "handoff_job_id": job_id,
         "final_understanding_status": final_status,
         "blocking_reason": understanding_status.get("blocking_reason", ""),
         "cards_status_code": cards_status_code,
         "returned_card_components": returned_components,
+        "formula_origin_summary": _formula_origin_summary(paper_workspace_status),
         "warnings": warnings,
         "final_verdict": final_verdict,
         "verdict_reasons": verdict_reasons,
@@ -257,6 +290,42 @@ def seed_group_counts(seed_response: dict[str, Any]) -> dict[str, int]:
         "same_route": len(seed_response.get("same_route_papers") or []),
         "surveys": len(seed_response.get("related_surveys") or []),
     }
+
+
+def _source_metrics_by_source(metrics: Any) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    if not isinstance(metrics, list):
+        return result
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            continue
+        source = str(metric.get("source") or "unknown")
+        result[source] = {
+            "attempted": bool(metric.get("attempted")),
+            "success": bool(metric.get("success")),
+            "count": int(metric.get("count") or 0),
+            "latency_ms": int(metric.get("latency_ms") or 0),
+            "error": str(metric.get("error") or ""),
+        }
+    return result
+
+
+def _seed_metrics_by_source(metrics: Any) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    if not isinstance(metrics, list):
+        return result
+    for metric in metrics:
+        if not isinstance(metric, dict):
+            continue
+        source = str(metric.get("source") or "unknown")
+        bucket = result.setdefault(source, {"attempted": False, "success_count": 0, "failure_count": 0, "count": 0})
+        bucket["attempted"] = bool(bucket["attempted"] or metric.get("attempted"))
+        if metric.get("success"):
+            bucket["success_count"] = int(bucket["success_count"]) + 1
+        else:
+            bucket["failure_count"] = int(bucket["failure_count"]) + 1
+        bucket["count"] = int(bucket["count"]) + int(metric.get("count") or 0)
+    return result
 
 
 def print_summary(result: dict[str, Any]) -> None:
@@ -364,7 +433,7 @@ def _candidate_arxiv_id(candidate: dict[str, Any]) -> str:
         return explicit
     for key in ("arxiv_url", "url", "landing_url", "paper_url", "pdf_url"):
         value = str(candidate.get(key) or "")
-        match = re.search(r"arxiv\.org/(?:abs|pdf)/([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?)", value)
+        match = re.search(r"arxiv\.org/(?:abs|pdf|e-print)/([0-9]{4}\.[0-9]{4,5}(?:v[0-9]+)?)", value)
         if match:
             return match.group(1).removesuffix(".pdf")
     return ""
@@ -376,6 +445,57 @@ def _candidate_arxiv_url(candidate: dict[str, Any]) -> str:
         if _candidate_arxiv_id({key: value}):
             return value
     return ""
+
+
+def _candidate_sources(candidate: dict[str, Any]) -> list[str]:
+    sources = candidate.get("sources")
+    if isinstance(sources, list):
+        return [str(source) for source in sources if source]
+    source = str(candidate.get("source") or "")
+    return [source] if source else []
+
+
+def _selected_input_type(source_status: dict[str, Any]) -> str:
+    source_type = str(source_status.get("source_type") or "")
+    if source_type == "arxiv_source":
+        return "arxiv_source"
+    if source_type == "arxiv_pdf":
+        return "arxiv_pdf"
+    if source_type == "pdf_url":
+        return "external_pdf"
+    if source_type == "doi":
+        return "metadata_only"
+    return source_type or "unknown"
+
+
+def _source_strategy(source_status: dict[str, Any]) -> str:
+    explicit = str(source_status.get("source_strategy") or "")
+    if explicit:
+        return explicit
+    selected = _selected_input_type(source_status)
+    if selected == "arxiv_source":
+        return "source_first"
+    if selected == "arxiv_pdf":
+        return "pdf_fallback"
+    if selected == "external_pdf":
+        return "pdf_direct"
+    return "metadata_only"
+
+
+def _formula_origin_summary(paper_workspace_status: dict[str, Any]) -> dict[str, Any]:
+    summary = paper_workspace_status.get("formula_origin_summary")
+    if isinstance(summary, dict):
+        return summary
+    origin = str(paper_workspace_status.get("formula_origin") or "")
+    ocr = str(paper_workspace_status.get("formula_ocr_status") or "")
+    result: dict[str, Any] = {}
+    if origin:
+        result["origins"] = origin
+    if ocr:
+        result["ocr_statuses"] = ocr
+    if result:
+        return result
+    return {}
 
 
 def _handoff_payload(candidate: dict[str, Any]) -> dict[str, Any]:
@@ -438,6 +558,10 @@ def _fail(
     warnings: list[str],
     selected_candidate: dict[str, Any] | None = None,
     seed_response: dict[str, Any] | None = None,
+    source_metrics: Any = None,
+    handoff_job_id: str = "",
+    selected_input_type: str = "unknown",
+    source_strategy: str = "metadata_only",
 ) -> dict[str, Any]:
     return {
         "query": query,
@@ -447,9 +571,13 @@ def _fail(
         "message": message,
         "selected_candidate_title": str((selected_candidate or {}).get("title") or ""),
         "selected_candidate_arxiv_id": str((selected_candidate or {}).get("arxiv_id") or ""),
+        "selected_candidate_sources": _candidate_sources(selected_candidate or {}),
+        "selected_input_type": selected_input_type,
+        "source_strategy": source_strategy,
+        "direction_source_metrics": _source_metrics_by_source(source_metrics),
         "seed_expansion_status": (seed_response or {}).get("seed_expansion_status") or (seed_response or {}).get("status") or "",
         "seed_expansion_group_counts": seed_group_counts(seed_response or {}),
-        "handoff_job_id": "",
+        "handoff_job_id": handoff_job_id,
         "final_understanding_status": "",
         "cards_status_code": 0,
         "returned_card_components": [],

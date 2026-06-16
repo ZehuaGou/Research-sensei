@@ -25,7 +25,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | Module | Area | Code Status | Test Status | Real Status | Notes |
 |---|---|---|---|---|---|
 | M1 | Focused acquisition | implemented | live tested | REAL_E2E_VERIFIED | Narrow-query acquisition, verification, relevance judge, source/download gate, and reading-plan path have real validation. |
-| M1 | Source-aware acquisition | implemented | unit/live tested | IMPLEMENTED | Source priority is implemented; PDF route is the current selected-paper canonical route. |
+| M1 | Source-aware acquisition | implemented | unit/live tested | PARTIAL_REAL_E2E_VERIFIED | arXiv source-first is implemented for API/PaperSourceResolver handoff: `https://arxiv.org/e-print/{id}` is tried before arXiv PDF, source archives are unpacked, main `.tex` is selected, and M2 receives LaTeX with `formula_origin=source_latex` when available. PDF remains fallback. 2026-06-16 Mimo smoke verified source-first on narrow arXiv candidates only; broad source acceptance remains pending. |
 | M1 | PDF canonical pipeline | implemented | unit + selected-paper real tests | REAL_E2E_VERIFIED_ON_SELECTED_PAPERS | Current M1 can generate M2-readable canonical bundles when regenerated with current code and all gates pass. |
 | M1 | MinerU2.5-Pro primary parser | implemented | unit + selected-paper real tests | PARTIAL_REAL_E2E_VERIFIED | Primary PDF parser via `mineru-vl-utils`; broad multi-paper acceptance remains pending. |
 | M1 | Quality gate | implemented | unit + acceptance enforced | REAL_E2E_VERIFIED | Blocks crop/overlay gaps, source mismatch, section pollution, raw-only formula dense outputs, and repeated/hallucinated text. |
@@ -42,7 +42,7 @@ count as module completion. Reports, downloaded PDFs, `.env`, API keys,
 | M3 | Seed expansion | minimal render + PaperWorkspace handoff | backend + vitest + build + narrow smoke | DEGRADED_SMOKE | SeedExpansionPanel accepts typed seed input or a selected Direction candidate, displays grouped seed-expansion papers with relation reason/confidence/source/verification/can_enter_m2, shows DEGRADED/EMPTY_RESULT states, and calls existing `/api/v1/directions/deep_read` for source-backed expansion papers. This is not product-ready SeedExpansion. |
 | M4 | Interactive learning | not implemented | none | DOC_DESIGNED | Not part of current M1 scope. |
 | M5 | Reliability | partial infra | partial | PARTIAL_INFRA | Real-test rules exist; production hardening remains pending. |
-| M5 | Main-chain smoke script | implemented | unit + batch Mimo smoke | DEGRADED_SMOKE | `scripts/run_main_chain_smoke.py` exercises direction search -> seed expansion -> deep_read handoff -> understanding_status -> cards gating through local API handlers. Core logic is unit-tested with fake clients and does not run live network/LLM inside pytest. 2026-06-16 real Mimo batch confirmed Mimo enters the main chain. Best current positive smoke: query `time series anomaly detection`, job `79e78b5d6609`, final status `DEGRADED_STRUCTURAL`, blocking_reason=`FORMULA_DERIVATION_BLOCKED`, `/cards=200`, returned `paper_card` and `teaching_cards`. This is narrow DEGRADED smoke only, not REAL_E2E and not product-ready. |
+| M5 | Main-chain smoke script | implemented | unit + batch Mimo smoke | PARTIAL_REAL_E2E_VERIFIED | `scripts/run_main_chain_smoke.py` exercises direction search -> seed expansion -> deep_read handoff -> understanding_status -> cards gating through local API handlers and now reports selected input type, source strategy, source metrics, fallback, returned components, and formula origin summary. 2026-06-16 real Mimo source-first batch includes one narrow PASS (`time series anomaly detection`, job `e6162aaf98e4`, SUCCESS, `/cards=200`, source_latex) plus DEGRADED/BLOCKED/FAIL cases. This is narrow main-chain evidence, not broad REAL_E2E and not product-ready. |
 
 ## M1 Current Statement
 
@@ -57,7 +57,8 @@ minimal unit-tested loop plus a narrow arXiv live smoke and a minimal
 PaperWorkspace handoff API. Seed expansion now has a minimal unit-tested loop
 plus a narrow DEGRADED external-source smoke, but broad multi-source acceptance,
 verified citation-graph expansion, LLM-based planning, A_READ canonical handoff
-from direction candidates, first-class LaTeX/HTML normalization, broad
+from direction candidates, broad LaTeX/HTML normalization beyond the narrow
+arXiv source-first path, broad
 multi-paper MinerU acceptance, and production-scale parser stability remain
 pending.
 
@@ -300,55 +301,54 @@ Main-chain smoke status:
   `/cards` gating.
 - The script supports `--query`, `--provider`, `--max-candidates`,
   `--skip-llm`, and `--workspace`; it prints a console summary only and does
-  not write reports.
+  not write reports. It now reports selected input type (`arxiv_source`,
+  `arxiv_pdf`, `external_pdf`, or `metadata_only`), source strategy
+  (`source_first`, `pdf_fallback`, `pdf_direct`, or `metadata_only`), direction
+  and seed source metrics, fallback reason, returned card components, and
+  formula origin summary.
 - If API LLM is not enabled or the provider key is missing, the script runs a
   no-LLM smoke and expects `BASELINE_ONLY` plus `/cards=403`. That validates
   structural API/gating behavior only.
-- 2026-06-16 manual run with `--provider mimo` did not enable LLM because
-  `RESEARCHSENSEI_ENABLE_API_LLM` was not enabled. Result:
-  DEGRADED_PASS, job `dba63377572d`, final status `BASELINE_ONLY`,
-  seed expansion status DEGRADED, group counts upstream=6, downstream=6,
-  same-route=6, surveys=3, `/cards=403`. This is not Mimo LLM handoff evidence.
-- 2026-06-16 real Mimo main-chain smoke used
-  `RESEARCHSENSEI_ENABLE_API_LLM=1`, `RESEARCHSENSEI_LLM_PROVIDER=mimo`, and a
-  non-empty `MIMO_API_KEY`. Result: DEGRADED_PASS, job `efcfc45dde61`,
-  final status `BLOCKED_UNDERSTANDING`, blocking_reason=`MISSING_METHOD_EVIDENCE`,
-  `/cards=403`, returned card components `[]`. Mimo entered the main chain; this
-  is evidence gate fail-closed, not configuration failure. It is not REAL_E2E
-  and not product-ready.
-- 2026-06-16 batch Mimo smoke results before selector hardening:
-  `time series anomaly detection` -> job `1409dc382b62`,
-  `BLOCKED_UNDERSTANDING`, `MISSING_METHOD_EVIDENCE`, `/cards=403`;
-  `multivariate time series imputation` -> job `1019eb8e3ee1`,
-  `BLOCKED_UNDERSTANDING`, `MISSING_METHOD_EVIDENCE`, `/cards=403`;
-  `graph anomaly detection` -> FAIL before handoff because arXiv search timed
-  out and no arXiv candidate was returned; `time series forecasting foundation
-  model` -> job `e31a6a0559b1`, `DEGRADED_STRUCTURAL`,
-  `FORMULA_DERIVATION_BLOCKED`, `/cards=200`, returned `paper_card` and
-  `teaching_cards`.
-- MISSING_METHOD_EVIDENCE root-cause classification: jobs using arXiv
-  `2412.19286` selected a foundation/perspective benchmark paper with no method
-  section, so `claim_evidence` had no METHOD claim. Job `1019eb8e3ee1` used an
-  AAAI PDF whose extracted content stopped at abstract/introduction/related
-  work, so method passages were not available. This is fail-closed evidence
-  behavior, not a QualityAuditor/FSA-5 change.
-- Main-chain smoke hardening: candidate selection now prefers source-backed,
-  method-like same-route/downstream papers and avoids survey/foundation/
-  perspective titles; unsupported old arXiv IDs no longer override a usable PDF
-  URL. The API runner also writes the real LLM-path `evidence_pack.json` and
-  `formula_evidence_pack.json` artifacts it already uses for gating.
-- Post-fix Mimo smoke: `time series anomaly detection` -> job `79e78b5d6609`,
-  `DEGRADED_STRUCTURAL`, `FORMULA_DERIVATION_BLOCKED`, `/cards=200`, returned
-  `paper_card` and `teaching_cards`, verdict DEGRADED_PASS. Re-run of
-  `time series forecasting foundation model` no longer failed on unsupported
-  old arXiv ID, but selected job `5011848c9ae1` still blocked with
-  `MISSING_METHOD_EVIDENCE`.
+- 2026-06-16 source-first implementation: arXiv handoff now tries
+  `https://arxiv.org/e-print/{id}` before PDF, writes `source/` and
+  `source_manifest.json`, chooses the main `.tex` by `\documentclass` then
+  largest `.tex`, and sends the selected `.tex` into M2. LaTeX source ingestion
+  preserves headings, METHOD/experiments sections, display equations, and
+  `formula_origin=source_latex`; source failures fall back to PDF with explicit
+  warning/fallback metadata. QualityAuditor/FSA-5 was not relaxed.
+- 2026-06-16 real Mimo source-first smoke matrix:
+  `time series anomaly detection` -> job `e6162aaf98e4`, selected
+  `arxiv_source`, source_strategy=`source_first`, source downloaded=true,
+  final status `SUCCESS`, `/cards=200`, components `formula_cards`,
+  `paper_card`, `teaching_cards`, formula_origin=`source_latex`, verdict PASS.
+  Direction metrics: arXiv=8, OpenAlex=8, Crossref=8; Semantic Scholar 429.
+- `multivariate time series imputation` -> job `0aacd009a71d`, selected
+  `external_pdf`, source_strategy=`pdf_direct`, final status
+  `DEGRADED_STRUCTURAL`, blocking_reason=`FORMULA_DERIVATION_BLOCKED`,
+  `/cards=200`, components `paper_card`, `teaching_cards`,
+  formula_origin=`raw_formula_text`, verdict DEGRADED_PASS. arXiv search
+  mostly timed out/rate-limited; OpenAlex/Crossref supplied candidates.
+- `diffusion models for time series imputation` -> job `775dc879b70b`,
+  selected `external_pdf`, source_strategy=`pdf_direct`, handoff failed with
+  `PDF_DOWNLOAD_FAILED` on an ACM PDF 403; no cards were returned, verdict FAIL.
+- `transformer time series anomaly detection` -> job `98af1c0974cb`, selected
+  `arxiv_source`, source_strategy=`source_first`, source downloaded=true,
+  final status `BLOCKED_UNDERSTANDING`, blocking_reason=`FORMULA_CARDS_FAILED`,
+  `/cards=403`, components `[]`, formula_origin=`source_latex`, verdict
+  DEGRADED_PASS. This is LLM formula-card timeout/block behavior, not a source
+  configuration failure.
+- Current strict claim: source-first arXiv handoff has narrow real evidence and
+  multi-source metrics show arXiv/OpenAlex/Semantic Scholar/Crossref are
+  attempted. One query reached full SUCCESS with source_latex formulas. Other
+  queries still degrade, block, or fail because external APIs rate-limit,
+  external PDFs fail, or LLM formula generation times out. This is not broad M1,
+  broad M2, M3 product readiness, or M4.
 
 ## Test Status Summary
 
 As of 2026-06-16:
 
-- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 499 passed, 15 skipped
+- Backend: `.venv\Scripts\python.exe -m pytest -q` -> 507 passed, 15 skipped
 - Frontend: `cd frontend && npm test` -> 5 test files, 33 tests passed
 - Frontend build: `cd frontend && npm run build` -> success
 - M1 Direction Exploration external smoke: arXiv-only query
@@ -364,6 +364,11 @@ As of 2026-06-16:
   upstream=5, downstream=3, same-route=6, surveys=3. Semantic Scholar rate
   limited and Crossref timed out in part of the run. Relations remain weak
   query/title-similarity relations, not verified citation graph edges.
+- M1->M2->M3 source-first main-chain smoke: `time series anomaly detection`
+  with Mimo -> job `e6162aaf98e4`, selected input `arxiv_source`,
+  source_strategy=`source_first`, final status `SUCCESS`, `/cards=200`, all
+  card components returned, formula_origin=`source_latex`. This is narrow
+  PARTIAL_REAL_E2E evidence only.
 
 ## Hard Rules
 

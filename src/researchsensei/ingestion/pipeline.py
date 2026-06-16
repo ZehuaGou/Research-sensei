@@ -454,11 +454,18 @@ class SinglePaperIngestionRunner:
         copied_source: Path,
     ) -> SourceStatus:
         if source_status is not None:
+            update_fields = {
+                "resolved_path": str(copied_source),
+                "size_bytes": copied_source.stat().st_size,
+            }
+            if source_status.preferred_m2_input == "latex_source" or copied_source.suffix.lower() == ".tex":
+                update_fields.update({
+                    "latex_source_path": str(copied_source),
+                    "latex_main_file": str(copied_source),
+                    "latex_source_available": True,
+                })
             return source_status.model_copy(
-                update={
-                    "resolved_path": str(copied_source),
-                    "size_bytes": copied_source.stat().st_size,
-                }
+                update=update_fields
             )
         return SourceStatus(
             source_type="upload",
@@ -474,6 +481,7 @@ class SinglePaperIngestionRunner:
             ".md": "text/markdown",
             ".txt": "text/plain",
             ".pdf": "application/pdf",
+            ".tex": "text/x-tex",
         }.get(path.suffix.lower(), "")
 
 

@@ -23,12 +23,14 @@ class FakeClient:
         cards_payload: dict[str, Any],
         seed_status: str = "SUCCESS",
         seed_warnings: list[str] | None = None,
+        handoff_failure: dict[str, Any] | None = None,
     ) -> None:
         self.final_status = final_status
         self.cards_status_code = cards_status_code
         self.cards_payload = cards_payload
         self.seed_status = seed_status
         self.seed_warnings = seed_warnings or []
+        self.handoff_failure = handoff_failure
         self.requests: list[tuple[str, str, dict[str, Any] | None]] = []
 
     def post(self, url: str, *, json: dict[str, Any]) -> FakeResponse:
@@ -37,6 +39,12 @@ class FakeClient:
             return FakeResponse({
                 "status": "SUCCESS",
                 "warnings": [],
+                "source_metrics": [
+                    {"source": "arxiv", "attempted": True, "success": True, "count": 1, "latency_ms": 10, "error": ""},
+                    {"source": "openalex", "attempted": True, "success": True, "count": 1, "latency_ms": 11, "error": ""},
+                    {"source": "semantic_scholar", "attempted": True, "success": True, "count": 0, "latency_ms": 12, "error": ""},
+                    {"source": "crossref", "attempted": True, "success": True, "count": 0, "latency_ms": 13, "error": ""},
+                ],
                 "papers": [
                     {
                         "paper_id": "p1",
@@ -47,6 +55,7 @@ class FakeClient:
                         "paper_id": "2401.00001",
                         "title": "Time Series Anomaly Detection with Transformers",
                         "source": "arxiv",
+                        "sources": ["arxiv", "openalex"],
                         "arxiv_id": "2401.00001",
                         "arxiv_url": "https://arxiv.org/abs/2401.00001",
                         "pdf_url": "https://arxiv.org/pdf/2401.00001.pdf",
@@ -58,6 +67,10 @@ class FakeClient:
                 "status": self.seed_status,
                 "seed_expansion_status": self.seed_status,
                 "warnings": self.seed_warnings,
+                "source_metrics": [
+                    {"relation_type": "same_route", "source": "arxiv", "attempted": True, "success": True, "count": 1, "latency_ms": 20, "error": ""},
+                    {"relation_type": "same_route", "source": "openalex", "attempted": True, "success": False, "count": 0, "latency_ms": 21, "error": "rate limited"},
+                ],
                 "upstream_papers": [
                     _seed_paper("2401.00002", "Foundation Paper", "upstream"),
                 ],
@@ -70,7 +83,18 @@ class FakeClient:
                 "related_surveys": [],
             })
         if url == "/api/v1/directions/deep_read":
-            return FakeResponse({"handoff_status": "JOB_CREATED", "job_id": "job-123"})
+            if self.handoff_failure is not None:
+                return FakeResponse({"detail": self.handoff_failure}, status_code=400)
+            return FakeResponse({
+                "handoff_status": "JOB_CREATED",
+                "job_id": "job-123",
+                "source_status": {
+                    "source_type": "arxiv_source",
+                    "source_strategy": "source_first",
+                    "preferred_m2_input": "latex_source",
+                    "latex_source_available": True,
+                },
+            })
         raise AssertionError(f"unexpected POST {url}")
 
     def get(self, url: str) -> FakeResponse:
@@ -86,6 +110,10 @@ class FakeClient:
                         "formula_cards": "SUCCESS" if self.final_status == "SUCCESS" else "FAILED",
                         "teaching_cards": "SUCCESS" if self.final_status in {"SUCCESS", "DEGRADED_STRUCTURAL"} else "BASELINE",
                     },
+                },
+                "paper_workspace_status": {
+                    "formula_origin": "source_latex",
+                    "formula_ocr_status": "not_required",
                 },
             })
         if url == "/api/v1/jobs/job-123/cards":
@@ -124,7 +152,14 @@ def test_main_chain_smoke_success_cards_gate() -> None:
 
     assert result["final_verdict"] == "PASS"
     assert result["selected_candidate_arxiv_id"] == "2401.00001"
+    assert result["selected_candidate_sources"] == ["arxiv", "openalex"]
     assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
+    assert result["selected_input_type"] == "arxiv_source"
+    assert result["source_strategy"] == "source_first"
+    assert result["arxiv_source_downloaded"] is True
+    assert result["direction_source_metrics"]["arxiv"]["count"] == 1
+    assert result["seed_source_metrics"]["openalex"]["failure_count"] == 1
+    assert result["formula_origin_summary"]["origins"] == "source_latex"
     assert result["seed_expansion_group_counts"] == {
         "upstream": 1,
         "downstream": 1,
@@ -191,6 +226,32 @@ def test_main_chain_smoke_blocked_cards_gate() -> None:
 
     assert result["final_verdict"] == "DEGRADED_PASS"
     assert result["cards_status_code"] == 403
+
+
+def test_main_chain_smoke_handoff_failure_returns_fail_summary() -> None:
+    client = FakeClient(
+        final_status="",
+        cards_status_code=0,
+        cards_payload={},
+        handoff_failure={
+            "status": "PDF_DOWNLOAD_FAILED",
+            "job_id": "failed-job",
+            "message": "PDF download failed for the direction candidate.",
+            "source_status": {"source_type": "pdf_url"},
+        },
+    )
+
+    result = run_main_chain_smoke(
+        client,
+        query="multivariate time series imputation",
+        max_candidates=5,
+        llm_enabled=True,
+    )
+
+    assert result["final_verdict"] == "FAIL"
+    assert result["handoff_job_id"] == "failed-job"
+    assert result["selected_input_type"] == "external_pdf"
+    assert result["message"] == "PDF download failed for the direction candidate."
 
 
 def test_main_chain_smoke_no_llm_baseline_is_degraded_pass() -> None:
