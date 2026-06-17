@@ -18,6 +18,8 @@ config/local.toml
 /outputs/
 /reports/
 /artifacts/
+/cache/
+/.cache/
 /tmp/
 .tmp_pytest*/
 .tmp_debug_m1/

@@ -171,7 +171,11 @@ class DirectionExplorationService:
                     queries_to_search.append(variant)
             queries_to_search = queries_to_search[:4]
 
-        for source in self.sources:
+        for source_idx, source in enumerate(self.sources):
+            # Polite delay between sources to avoid burst rate-limiting
+            if source_idx > 0:
+                time.sleep(1.0)
+
             adapter = self.adapters.get(source)
             if adapter is None:
                 warnings.append(f"ACQUISITION_FAILED:{source}: adapter not configured")
@@ -190,7 +194,11 @@ class DirectionExplorationService:
             total_latency = 0
             source_error = ""
             adapter_responded = False
-            for q in queries_to_search:
+            rate_limited = False
+            for q_idx, q in enumerate(queries_to_search):
+                # Polite delay between variants
+                if q_idx > 0:
+                    time.sleep(0.5)
                 started = time.perf_counter()
                 try:
                     results = adapter.search(q, max_results=self.max_results_per_source)
@@ -205,6 +213,9 @@ class DirectionExplorationService:
                 except Exception as exc:
                     latency_ms = int((time.perf_counter() - started) * 1000)
                     total_latency += latency_ms
+                    is_rate_limit = "429" in str(exc) or "rate" in str(exc).lower()
+                    if is_rate_limit:
+                        rate_limited = True
                     logger.warning("Direction acquisition failed for %s (%s): %s", source, q[:40], exc)
                     source_error = f"{type(exc).__name__}: {str(exc)[:160]}"
                     search_log.append(f"{source}: failed '{q[:40]}' ({type(exc).__name__})")
@@ -218,6 +229,7 @@ class DirectionExplorationService:
                     "count": len(source_candidates),
                     "latency_ms": total_latency,
                     "error": "",
+                    "rate_limited": rate_limited,
                 })
             else:
                 warning = f"ACQUISITION_FAILED:{source}: {source_error}" if source_error else f"ACQUISITION_FAILED:{source}: no results"
@@ -229,6 +241,7 @@ class DirectionExplorationService:
                     "count": 0,
                     "latency_ms": total_latency,
                     "error": source_error or "no results",
+                    "rate_limited": rate_limited,
                 })
 
         return candidates, warnings, search_log, source_metrics

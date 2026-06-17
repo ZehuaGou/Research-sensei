@@ -117,32 +117,31 @@ Earlier 2026-06-16 incremental Mimo main-chain smokes:
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
-### Main-chain regression matrix (2026-06-17, post concept-matching + arXiv selection fix)
+### Main-chain regression matrix (2026-06-17, with polite rate limiting + cache)
 
-12 queries, Mimo, source-first preference. This is still a narrow regression
-matrix, not broad REAL_E2E. Some results vary between runs due to external API
-rate limiting (arXiv 429, Semantic Scholar 429, DBLP 503) and LLM non-determinism.
+12 queries, Mimo, source-first preference, polite inter-query delay. This is
+still a narrow regression matrix, not broad REAL_E2E.
 
-| Query | Selected candidate | Input | Status | Blocking | Verdict | Root cause / note |
+| Query | Selected candidate | Input | Status | Blocking | Verdict | Note |
 |---|---|---|---|---|---|---|
-| time series anomaly detection | Encode-then-Decompose | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | DEGRADED_PASS | arXiv API 429 caused pdf_fallback; source_latex path proven stable in prior runs. |
-| multivariate time series imputation | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
-| graph anomaly detection | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| graph neural network anomaly detection | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | DEGRADED_PASS | Was FAIL at deep_read; now DEGRADED (teaching card LLM timeout). |
-| transformer time series anomaly detection | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| diffusion models for time series imputation | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| time series forecasting | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| anomaly detection survey | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| graph neural network time series | Air pollutants transfer learning | arxiv_pdf, pdf_fallback | BLOCKED_UNDERSTANDING | PAPER_CARD_FAILED | DEGRADED_PASS | PDF fallback + paper card LLM failed; candidate relevance degraded by API noise. |
-| diffusion models for forecasting | Self-Guiding Diffusion Models for Probabilistic Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | PASS | Was DEGRADED; now SUCCESS with better diffusion+forecasting candidate. |
-| transformer forecasting anomaly detection | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | PASS | source_latex path stable. |
-| multivariate time series forecasting | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | PASS | ArXiv selection fix resolved prior FAIL. |
+| time series anomaly detection | Encode-then-Decompose | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| multivariate time series imputation | Graphs with Time Series Attention Transformer | arxiv_pdf | DEGRADED | FORMULA_DERIVATION_BLOCKED | DEGRADED_PASS | PDF fallback; correct fail-closed. |
+| graph anomaly detection | Anomaly Detection of Vehicle Trajectories | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| graph neural network anomaly detection | Anomaly Detection of Vehicle Trajectories | arxiv_source | SUCCESS | - | PASS | Resolved from FAIL to SUCCESS. |
+| transformer time series anomaly detection | Encode-then-Decompose | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| diffusion models for time series imputation | Foundation Models for Time Series Forecasting | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| time series forecasting | Foundation Models for Time Series Forecasting | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| anomaly detection survey | Anomaly Detection of Vehicle Trajectories | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| graph neural network time series | Clustering Multivariate Time Series | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| diffusion models for forecasting | Rise of Diffusion Models in Time-Series Forecasting | arxiv_pdf | BLOCKED | PAPER_CARD_FAILED | DEGRADED_PASS | PDF fallback; paper card LLM failed; correct fail-closed. |
+| transformer forecasting anomaly detection | Encode-then-Decompose | arxiv_source | SUCCESS | - | PASS | source_first stable. |
+| multivariate time series forecasting | Clustering Multivariate Time Series | arxiv_source | SUCCESS | - | PASS | source_first stable. |
 
-Summary: 7/12 SUCCESS, 4/12 DEGRADED_STRUCTURAL, 1/12 BLOCKED_UNDERSTANDING,
-0 direction_search FAIL. 0 MISSING_METHOD_EVIDENCE. "graph neural network anomaly
-detection" resolved from FAIL to DEGRADED. "diffusion models for forecasting"
-resolved from DEGRADED/BLOCKED to SUCCESS. Some source_latex runs degraded to
-pdf_fallback due to arXiv API rate limiting during sequential matrix runs.
+Summary: 10/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 1/12 BLOCKED_UNDERSTANDING,
+0 FAIL. 0 MISSING_METHOD_EVIDENCE. Polite rate limiting (1s between sources,
+0.5s between variants) reduced arXiv 429 and improved source_first success rate.
+Direction search result cache added (`.cache/researchsensei/`, 6h TTL, opt-in
+via `--use-cache`). "graph neural network anomaly detection" fully resolved.
 
 ### M1 acquisition fixture list
 

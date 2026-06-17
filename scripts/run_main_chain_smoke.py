@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -51,6 +53,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--max-candidates", type=int, default=10)
     parser.add_argument("--skip-llm", action="store_true")
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "main_chain_smoke"))
+    parser.add_argument("--use-cache", action="store_true", help="Use cached direction search results when available.")
+    parser.add_argument("--refresh-cache", action="store_true", help="Force refresh cache even if valid entry exists.")
+    parser.add_argument("--cache-dir", default=str(ROOT / ".cache" / "researchsensei"), help="Cache directory for direction search results.")
     return parser.parse_args(argv)
 
 
@@ -70,6 +75,9 @@ def main(argv: list[str] | None = None) -> int:
         max_candidates=args.max_candidates,
         llm_enabled=bool(llm_mode["enabled"]),
         llm_mode_note=str(llm_mode["note"]),
+        cache_dir=args.cache_dir,
+        use_cache=args.use_cache,
+        refresh_cache=args.refresh_cache,
     )
     print_summary(result)
     return 0 if result["final_verdict"] in {"PASS", "DEGRADED_PASS"} else 2
@@ -102,12 +110,32 @@ def run_main_chain_smoke(
     max_candidates: int,
     llm_enabled: bool,
     llm_mode_note: str = "",
+    cache_dir: str = "",
+    use_cache: bool = False,
+    refresh_cache: bool = False,
 ) -> dict[str, Any]:
     warnings: list[str] = []
-    direction_response = _request_json(
-        client.post("/api/v1/directions/search", json={"query": query}),
-        "direction search",
-    )
+    cache_hit = False
+
+    # Try cache first
+    if use_cache and cache_dir and not refresh_cache:
+        cached = read_cache(cache_dir, query)
+        if cached:
+            direction_response = cached
+            cache_hit = True
+            warnings.append("CACHE_HIT:direction_search")
+        else:
+            warnings.append("CACHE_MISS:direction_search")
+
+    if not cache_hit:
+        direction_response = _request_json(
+            client.post("/api/v1/directions/search", json={"query": query}),
+            "direction search",
+        )
+        # Write to cache if enabled
+        if use_cache and cache_dir:
+            write_cache(cache_dir, query, direction_response)
+
     direction_source_metrics = direction_response.get("source_metrics") or []
     direction_papers = _papers(direction_response)
     # Search all direction papers for the best arXiv candidate (don't truncate
@@ -221,6 +249,7 @@ def run_main_chain_smoke(
         "query": query,
         "llm_enabled": llm_enabled,
         "llm_mode_note": llm_mode_note,
+        "cache_hit": cache_hit,
         "selected_candidate_title": str(direction_candidate.get("title") or ""),
         "selected_candidate_arxiv_id": _candidate_arxiv_id(direction_candidate),
         "selected_candidate_sources": _candidate_sources(direction_candidate),
@@ -769,6 +798,64 @@ def _fail(
 
 def _env_truthy(name: str) -> bool:
     return os.getenv(name, "").lower() in {"1", "true", "yes", "on"}
+
+
+# ---------------------------------------------------------------------------
+# Direction search cache
+# ---------------------------------------------------------------------------
+
+_CACHE_TTL_SECONDS = 3600 * 6  # 6 hours
+
+
+def _cache_key(query: str) -> str:
+    return hashlib.sha256(query.strip().lower().encode()).hexdigest()[:16]
+
+
+def _cache_path(cache_dir: str, query: str) -> Path:
+    return Path(cache_dir) / f"dir_{_cache_key(query)}.json"
+
+
+def read_cache(cache_dir: str, query: str) -> dict[str, Any] | None:
+    """Read cached direction search result if valid."""
+    path = _cache_path(cache_dir, query)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        ts = float(data.get("_cache_ts", 0))
+        if time.time() - ts > _CACHE_TTL_SECONDS:
+            return None
+        return data
+    except Exception:
+        return None
+
+
+def write_cache(cache_dir: str, query: str, data: dict[str, Any]) -> None:
+    """Write direction search result to cache. Only stores metadata, not PDFs."""
+    path = _cache_path(cache_dir, query)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # Sanitize: remove any large content fields
+    sanitized = _sanitize_for_cache(data)
+    sanitized["_cache_ts"] = time.time()
+    sanitized["_cache_query"] = query
+    path.write_text(json.dumps(sanitized, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _sanitize_for_cache(data: dict[str, Any]) -> dict[str, Any]:
+    """Remove sensitive/large fields from cached data."""
+    sanitized = dict(data)
+    # Remove fields that could contain large content
+    for key in ("pdf_content", "source_text", "latex_source", "llm_output", "raw_response"):
+        sanitized.pop(key, None)
+    # Truncate large nested objects
+    for key in ("papers", "candidate_cards", "upstream_papers", "downstream_papers"):
+        if key in sanitized and isinstance(sanitized[key], list):
+            sanitized[key] = [
+                {k: v for k, v in item.items() if k not in ("pdf_content", "source_text")}
+                if isinstance(item, dict) else item
+                for item in sanitized[key]
+            ]
+    return sanitized
 
 
 if __name__ == "__main__":
