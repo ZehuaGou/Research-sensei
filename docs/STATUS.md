@@ -117,29 +117,29 @@ Earlier 2026-06-16 incremental Mimo main-chain smokes:
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
-### Main-chain regression matrix (2026-06-17, post method-evidence fix)
+### Main-chain regression matrix (2026-06-17, post query-expansion fix)
 
 12 queries, Mimo, source-first preference. This is still a narrow regression
 matrix, not broad REAL_E2E.
 
 | Query | Job | Selected candidate | Input | Status | Blocking | Cards | Components | Verdict | Root cause / note |
 |---|---|---|---|---|---|---:|---|---|---|
-| time series anomaly detection | `0c1cf41a8bed` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| multivariate time series imputation | `94654efbc068` | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
-| graph anomaly detection | `ef8b0a0e7f9b` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| graph neural network anomaly detection | - | - | metadata_only | FAIL | no source | - | - | FAIL | Direction search returned no arXiv candidate; external source degradation. |
-| transformer time series anomaly detection | `1db7974a38a6` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| diffusion models for time series imputation | `3d6c97106b82` | Multiple imputation of covariates | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex; method evidence now found via fuzzy section matching. |
-| time series forecasting | `3e77a1112655` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| anomaly detection survey | `bdb3c737bf51` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
-| graph neural network time series | - | - | metadata_only | FAIL | no candidate | - | - | FAIL | Direction search returned no arXiv candidate. |
-| diffusion models for forecasting | `68e59f6d23a8` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| transformer forecasting anomaly detection | `fc66996a8c8c` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| multivariate time series forecasting | `827976e63b23` | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| time series anomaly detection | `38921d9ec1d9` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series imputation | `5f8786ee5fe0` | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
+| graph anomaly detection | `8282c92fa34e` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| graph neural network anomaly detection | - | - | direction found, seed no source-backed | FAIL | seed no source | - | - | FAIL | Direction search now finds candidates (query expansion works); seed expansion fails to find source-backed handoff candidate. |
+| transformer time series anomaly detection | `af9045d017b2` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| diffusion models for time series imputation | `80625e5ba7b7` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| time series forecasting | `f01b320dd58e` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| anomaly detection survey | `7c17a18946ba` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
+| graph neural network time series | `bcfcc16f4eb0` | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | Query expansion ("gnn time series") now finds candidates. |
+| diffusion models for forecasting | `8b9186140881` | Rise of Diffusion Models in Time-Series Forecasting | arxiv_pdf, pdf_fallback | BLOCKED_UNDERSTANDING | PAPER_CARD_FAILED | 403 | none | DEGRADED_PASS | PDF fallback; paper card LLM failed; correct fail-closed. |
+| transformer forecasting anomaly detection | `ff8786c40452` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series forecasting | - | - | metadata_only | FAIL | no candidate | - | - | FAIL | Direction search returned no arXiv candidate even with expansion. |
 
-Summary: 9/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 2/12 FAIL (no candidate/source).
-0 MISSING_METHOD_EVIDENCE — fuzzy section matching resolved the prior 5 failures.
-The 2 FAILs are direction-search-level (no arXiv candidate returned), not M2 gate failures.
+Summary: 9/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 1/12 BLOCKED_UNDERSTANDING, 1/12 FAIL.
+0 MISSING_METHOD_EVIDENCE. 1 FAIL improved from direction_search to seed_expansion level.
+Query expansion (GNN/time-series/anomaly synonyms + decomposed terms) resolved 1 prior FAIL.
 
 ### M1 acquisition fixture list
 

@@ -110,7 +110,7 @@ def run_main_chain_smoke(
     )
     direction_source_metrics = direction_response.get("source_metrics") or []
     direction_papers = _papers(direction_response)[:max(1, max_candidates)]
-    direction_candidate = _select_arxiv_candidate(direction_papers)
+    direction_candidate = _select_arxiv_candidate(direction_papers, query=query)
     if not direction_candidate:
         return _fail(
             query=query,
@@ -342,14 +342,25 @@ def _papers(response: dict[str, Any]) -> list[dict[str, Any]]:
     return [paper for paper in papers if isinstance(paper, dict)]
 
 
-def _select_arxiv_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _select_arxiv_candidate(candidates: list[dict[str, Any]], *, query: str = "") -> dict[str, Any] | None:
+    """Select the best arXiv candidate, preferring query-relevant papers."""
+    arxiv_candidates = []
     for candidate in candidates:
-        if candidate.get("arxiv_id"):
-            return candidate
-    for candidate in candidates:
-        if _candidate_arxiv_id(candidate):
-            return candidate
-    return None
+        arxiv_id = candidate.get("arxiv_id") or _candidate_arxiv_id(candidate)
+        if arxiv_id:
+            arxiv_candidates.append(candidate)
+    if not arxiv_candidates:
+        return None
+    if not query or len(arxiv_candidates) == 1:
+        return arxiv_candidates[0]
+    # Score by query relevance
+    query_terms = _query_terms(query)
+    scored = [
+        (_handoff_candidate_score(c, query_terms=query_terms), i, c)
+        for i, c in enumerate(arxiv_candidates)
+    ]
+    scored.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+    return scored[0][2]
 
 
 def _seed_candidates(seed_response: dict[str, Any]) -> list[dict[str, Any]]:

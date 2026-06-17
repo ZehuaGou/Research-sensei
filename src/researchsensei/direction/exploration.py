@@ -74,7 +74,10 @@ class DirectionExplorationService:
 
         query_plan = build_heuristic_query_plan(query)
         search_query = query_plan.english_query or query_plan.direction_en or query_plan.user_query
-        candidates, warnings, search_log, source_metrics = self._acquire(search_query)
+        candidates, warnings, search_log, source_metrics = self._acquire(
+            search_query,
+            query_variants=query_plan.query_variants,
+        )
         raw_pool = self.selection_service.build_candidate_pool(
             query=search_query,
             candidates=candidates,
@@ -151,54 +154,79 @@ class DirectionExplorationService:
     def _acquire(
         self,
         query: str,
+        *,
+        query_variants: list[str] | None = None,
     ) -> tuple[list[CandidatePaper], list[str], list[str], list[dict[str, object]]]:
         candidates: list[CandidatePaper] = []
         warnings: list[str] = []
         search_log: list[str] = []
         source_metrics: list[dict[str, object]] = []
 
+        # Build the set of queries to search: primary + expanded variants
+        queries_to_search = [query]
+        if query_variants:
+            for variant in query_variants:
+                if variant and variant.lower() != query.lower():
+                    queries_to_search.append(variant)
+
         for source in self.sources:
-            started = time.perf_counter()
             adapter = self.adapters.get(source)
             if adapter is None:
-                latency_ms = int((time.perf_counter() - started) * 1000)
                 warnings.append(f"ACQUISITION_FAILED:{source}: adapter not configured")
                 source_metrics.append({
                     "source": source,
                     "attempted": True,
                     "success": False,
                     "count": 0,
-                    "latency_ms": latency_ms,
+                    "latency_ms": 0,
                     "error": "adapter not configured",
                 })
                 search_log.append(f"{source}: failed (adapter missing)")
                 continue
-            try:
-                results = adapter.search(query, max_results=self.max_results_per_source)
-                candidates.extend(results)
-                latency_ms = int((time.perf_counter() - started) * 1000)
-                search_log.append(f"{source}: searched ({len(results)} results)")
+
+            source_candidates: list[CandidatePaper] = []
+            total_latency = 0
+            source_error = ""
+            adapter_responded = False
+            for q in queries_to_search:
+                started = time.perf_counter()
+                try:
+                    results = adapter.search(q, max_results=self.max_results_per_source)
+                    source_candidates.extend(results)
+                    adapter_responded = True
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    total_latency += latency_ms
+                    search_log.append(f"{source}: searched '{q[:60]}' ({len(results)} results)")
+                    # If query returned results, skip remaining variants for this source
+                    if results:
+                        break
+                except Exception as exc:
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    total_latency += latency_ms
+                    logger.warning("Direction acquisition failed for %s (%s): %s", source, q[:40], exc)
+                    source_error = f"{type(exc).__name__}: {str(exc)[:160]}"
+                    search_log.append(f"{source}: failed '{q[:40]}' ({type(exc).__name__})")
+
+            if adapter_responded:
+                candidates.extend(source_candidates)
                 source_metrics.append({
                     "source": source,
                     "attempted": True,
                     "success": True,
-                    "count": len(results),
-                    "latency_ms": latency_ms,
+                    "count": len(source_candidates),
+                    "latency_ms": total_latency,
                     "error": "",
                 })
-            except Exception as exc:
-                latency_ms = int((time.perf_counter() - started) * 1000)
-                logger.warning("Direction acquisition failed for %s: %s", source, exc)
-                warning = f"ACQUISITION_FAILED:{source}: {type(exc).__name__}: {str(exc)[:160]}"
+            else:
+                warning = f"ACQUISITION_FAILED:{source}: {source_error}" if source_error else f"ACQUISITION_FAILED:{source}: no results"
                 warnings.append(warning)
-                search_log.append(f"{source}: failed ({type(exc).__name__})")
                 source_metrics.append({
                     "source": source,
                     "attempted": True,
                     "success": False,
                     "count": 0,
-                    "latency_ms": latency_ms,
-                    "error": f"{type(exc).__name__}: {str(exc)[:200]}",
+                    "latency_ms": total_latency,
+                    "error": source_error or "no results",
                 })
 
         return candidates, warnings, search_log, source_metrics
@@ -400,13 +428,19 @@ def _related_terms(direction: str) -> list[str]:
     lower = direction.lower()
     terms: list[str] = []
     if "time series" in lower:
-        terms += ["temporal", "sequence", "forecasting", "representation learning"]
+        terms += ["temporal", "sequence", "forecasting", "representation learning", "multivariate", "imputation"]
     if "anomaly" in lower:
-        terms += ["outlier detection", "novelty detection", "industrial monitoring"]
+        terms += ["outlier detection", "novelty detection", "industrial monitoring", "abnormal detection"]
     if "imputation" in lower:
         terms += ["missing data", "masking", "diffusion", "probabilistic"]
     if "graph" in lower:
-        terms += ["gnn", "graph representation", "node anomaly", "temporal graph"]
+        terms += ["gnn", "graph representation", "node anomaly", "temporal graph", "spatio-temporal", "graph neural network"]
+    if "forecasting" in lower:
+        terms += ["prediction", "time series", "forecast"]
+    if "transformer" in lower:
+        terms += ["attention", "self-attention", "transformer model"]
+    if "diffusion" in lower:
+        terms += ["score-based", "generative", "denoising"]
     return _unique(terms)
 
 
@@ -447,13 +481,47 @@ def _default_sub_directions(direction: str) -> list[str]:
 
 def _query_variants(direction: str) -> list[str]:
     base = direction.lower()
-    return _unique([
+    variants = [
         base,
         f"{base} survey",
         f"{base} review",
         f"{base} benchmark",
         f"{base} state of the art",
-    ])
+    ]
+    # Add abbreviation variants for compound queries
+    _ABBREVS = {
+        "graph neural network": "gnn",
+        "graph neural networks": "gnn",
+        "anomaly detection": "anomaly detection",
+        "time series": "time series",
+        "natural language processing": "nlp",
+        "convolutional neural network": "cnn",
+        "recurrent neural network": "rnn",
+        "long short-term memory": "lstm",
+        "generative adversarial network": "gan",
+        "variational autoencoder": "vae",
+        "diffusion model": "diffusion",
+        "diffusion models": "diffusion",
+        "transformer model": "transformer",
+        "foundation model": "foundation model",
+    }
+    # Expand compound query with abbreviations
+    expanded = base
+    for full, abbrev in _ABBREVS.items():
+        if full in expanded:
+            expanded_variant = expanded.replace(full, abbrev)
+            if expanded_variant != expanded:
+                variants.append(expanded_variant)
+    # Add decomposed term pairs for very compound queries
+    tokens = [t for t in re.split(r"[^a-z0-9]+", base) if len(t) >= 3]
+    if len(tokens) >= 3:
+        # Try pairs of key terms
+        key_terms = [t for t in tokens if t not in {"for", "the", "and", "of", "in", "on", "to", "with", "from", "using", "based", "models", "methods"}]
+        if len(key_terms) >= 2:
+            variants.append(" ".join(key_terms[:2]))
+            if len(key_terms) >= 3:
+                variants.append(" ".join(key_terms[:3]))
+    return _unique(variants)
 
 
 def _overview(query_plan: QueryPlan, count: int, status: str) -> str:
