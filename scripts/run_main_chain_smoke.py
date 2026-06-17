@@ -438,10 +438,10 @@ def _candidate_relevance_score(candidate: dict[str, Any], *, query_terms: set[st
         if not overlap:
             score -= 20
 
-    # Required concept coverage for compound queries
+    # Required concept coverage for compound queries (phrase-level matching)
     if query_terms:
         required = _required_concepts(query_terms)
-        covered = sum(1 for concept_set in required if title_terms & concept_set)
+        covered = sum(1 for concept_set in required if _title_covers_concept(title, concept_set))
         if len(required) >= 2 and covered < 2:
             score -= 15  # Penalize papers that miss most required concepts
         elif len(required) >= 2:
@@ -515,6 +515,34 @@ def _required_concepts(query_terms: set[str]) -> list[set[str]]:
     if not concepts:
         concepts = [{t} for t in query_terms]
     return concepts
+
+
+def _title_covers_concept(title: str, concept_set: set[str]) -> bool:
+    """Check if a title covers a concept using phrase-level matching.
+
+    Unlike simple term overlap, this requires that the concept terms appear
+    as a contiguous phrase in the title — not just as isolated words.
+    """
+    phrase_concepts = {
+        frozenset({"time", "series"}): "time series",
+        frozenset({"time", "temporal"}): "temporal",
+        frozenset({"graph", "neural", "network"}): "graph neural network",
+        frozenset({"graph", "gnn"}): "gnn",
+        frozenset({"anomaly", "detection"}): "anomaly detection",
+        frozenset({"diffusion", "model"}): "diffusion",
+        frozenset({"diffusion", "models"}): "diffusion",
+        frozenset({"transformer", "model"}): "transformer",
+    }
+    for key_terms, phrase in phrase_concepts.items():
+        if key_terms.issubset(concept_set) and phrase in title:
+            return True
+    # For single-word concepts (like "forecasting"), check word boundary
+    title_words = set(re.findall(r"[a-z0-9]+", title.lower()))
+    # Only match single-word concepts, not multi-word ones
+    single_concepts = {t for t in concept_set if len(concept_set) == 1}
+    if single_concepts:
+        return bool(title_words & single_concepts)
+    return False
 
 
 def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str] | None = None) -> int:
