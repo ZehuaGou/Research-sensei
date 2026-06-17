@@ -130,6 +130,20 @@ def run_main_chain_smoke(
     warnings.extend(_warnings(seed_response))
     seed_candidates = _seed_candidates(seed_response)
     handoff_candidate = _select_handoff_candidate(seed_candidates[:max(1, max_candidates)], query=query)
+
+    # Fallback: if seed expansion found no source-backed handoff, try the
+    # direction candidate itself if it has a handoff source.
+    if not handoff_candidate and _has_handoff_source(direction_candidate):
+        handoff_candidate = direction_candidate
+        warnings.append("SEED_EXPANSION_FALLBACK_TO_DIRECTION_CANDIDATE")
+
+    if not handoff_candidate:
+        # Second fallback: try the best direction paper with any source (including DOI)
+        best_dir = _select_best_source_candidate(direction_papers, query=query)
+        if best_dir:
+            handoff_candidate = best_dir
+            warnings.append("DIRECTION_CANDIDATE_FALLBACK_BEST_SOURCE")
+
     if not handoff_candidate:
         return _fail(
             query=query,
@@ -343,7 +357,7 @@ def _papers(response: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _select_arxiv_candidate(candidates: list[dict[str, Any]], *, query: str = "") -> dict[str, Any] | None:
-    """Select the best arXiv candidate, preferring query-relevant papers."""
+    """Select the best arXiv candidate, preferring query-relevant method papers over surveys."""
     arxiv_candidates = []
     for candidate in candidates:
         arxiv_id = candidate.get("arxiv_id") or _candidate_arxiv_id(candidate)
@@ -353,14 +367,27 @@ def _select_arxiv_candidate(candidates: list[dict[str, Any]], *, query: str = ""
         return None
     if not query or len(arxiv_candidates) == 1:
         return arxiv_candidates[0]
-    # Score by query relevance
     query_terms = _query_terms(query)
     scored = [
-        (_handoff_candidate_score(c, query_terms=query_terms), i, c)
+        (_candidate_relevance_score(c, query_terms=query_terms), i, c)
         for i, c in enumerate(arxiv_candidates)
     ]
     scored.sort(key=lambda x: (x[0], -x[1]), reverse=True)
     return scored[0][2]
+
+
+def _select_best_source_candidate(candidates: list[dict[str, Any]], *, query: str = "") -> dict[str, Any] | None:
+    """Select the best candidate with any source (arxiv, pdf_url, doi), preferring relevance."""
+    query_terms = _query_terms(query)
+    scored = [
+        (_candidate_relevance_score(c, query_terms=query_terms), i, c)
+        for i, c in enumerate(candidates)
+        if _has_handoff_source(c) or c.get("doi")
+    ]
+    if not scored:
+        return None
+    scored.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+    return scored[0][2] if scored[0][0] > 0 else None
 
 
 def _seed_candidates(seed_response: dict[str, Any]) -> list[dict[str, Any]]:
@@ -396,7 +423,100 @@ def _has_handoff_source(candidate: dict[str, Any]) -> bool:
     return bool(_candidate_arxiv_id(candidate) or _candidate_arxiv_url(candidate) or candidate.get("pdf_url"))
 
 
+def _candidate_relevance_score(candidate: dict[str, Any], *, query_terms: set[str] | None = None) -> int:
+    """Score a candidate for query relevance, heavily penalizing surveys."""
+    title = str(candidate.get("title") or "").lower()
+    title_terms = _query_terms(title)
+    score = 0
+
+    # Query term overlap (core signal)
+    if query_terms:
+        overlap = query_terms & title_terms
+        score += 5 * len(overlap)
+        if not overlap:
+            score -= 20
+
+    # Required concept coverage for compound queries
+    if query_terms:
+        required = _required_concepts(query_terms)
+        covered = sum(1 for concept_set in required if title_terms & concept_set)
+        if len(required) >= 2 and covered < 2:
+            score -= 15  # Penalize papers that miss most required concepts
+        elif len(required) >= 2:
+            score += 3 * covered  # Bonus for covering multiple concepts
+
+    # Survey penalty (very strong — surveys are bad seeds)
+    is_survey = _is_survey_like(title)
+    if is_survey:
+        score -= 25
+
+    # Source readiness
+    if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
+        score += 3
+    if _candidate_arxiv_id(candidate):
+        score += 5
+    elif candidate.get("pdf_url"):
+        score += 3
+
+    # Relation type
+    relation_type = str(candidate.get("relation_type") or "").lower()
+    relation_bonus = {"same_route": 5, "downstream": 4, "upstream": 1, "survey": -12}
+    score += relation_bonus.get(relation_type, 0)
+
+    # Positive/negative title terms
+    positive_terms = [
+        "method", "approach", "model", "framework", "architecture", "algorithm",
+        "learning", "neural", "transformer", "imputation", "detection", "forecasting",
+        "network", "encoder", "decoder", "attention", "diffusion", "graph",
+        "time series", "anomaly", "prediction", "temporal", "spatial",
+    ]
+    negative_terms = [
+        "survey", "review", "foundation model", "foundational model",
+        "foundational models", "perspective", "role in", "benchmarking",
+        "comparison", "comprehensive", "taxonomy",
+    ]
+    score += sum(1 for term in positive_terms if term in title)
+    score -= 5 * sum(1 for term in negative_terms if term in title)
+    return score
+
+
+def _is_survey_like(title: str) -> bool:
+    """Check if a title looks like a survey/review paper."""
+    survey_indicators = ["survey", "review", "a survey", "comprehensive", "taxonomy", "overview"]
+    return any(ind in title for ind in survey_indicators)
+
+
+def _required_concepts(query_terms: set[str]) -> list[set[str]]:
+    """Extract required concept groups from query terms for compound query coverage."""
+    concepts: list[set[str]] = []
+    # Graph/GNN concepts
+    graph_terms = {"graph", "gnn", "neural", "network"} & query_terms
+    if graph_terms:
+        concepts.append(graph_terms)
+    # Time series concepts
+    ts_terms = {"time", "series", "temporal", "forecasting", "imputation"} & query_terms
+    if ts_terms:
+        concepts.append(ts_terms)
+    # Anomaly/detection concepts
+    anomaly_terms = {"anomaly", "detection", "outlier"} & query_terms
+    if anomaly_terms:
+        concepts.append(anomaly_terms)
+    # Diffusion concepts
+    diffusion_terms = {"diffusion", "score", "denoising"} & query_terms
+    if diffusion_terms:
+        concepts.append(diffusion_terms)
+    # Transformer concepts
+    transformer_terms = {"transformer", "attention"} & query_terms
+    if transformer_terms:
+        concepts.append(transformer_terms)
+    # If no specific groups matched, treat each term as its own concept
+    if not concepts:
+        concepts = [{t} for t in query_terms]
+    return concepts
+
+
 def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str] | None = None) -> int:
+    """Score a handoff candidate (seed expansion papers)."""
     title = str(candidate.get("title") or "").lower()
     title_terms = _query_terms(title)
     relation_type = str(candidate.get("relation_type") or "").lower()
@@ -406,54 +526,27 @@ def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str]
         score += 5 * len(overlap)
         if not overlap:
             score -= 20
+    # Survey penalty
+    if _is_survey_like(title):
+        score -= 25
     if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
         score += 3
     if _candidate_arxiv_id(candidate):
         score += 5
     elif candidate.get("pdf_url"):
         score += 3
-    relation_bonus = {
-        "same_route": 5,
-        "downstream": 4,
-        "upstream": 1,
-        "survey": -12,
-    }
+    relation_bonus = {"same_route": 5, "downstream": 4, "upstream": 1, "survey": -12}
     score += relation_bonus.get(relation_type, 0)
     positive_terms = [
-        "method",
-        "approach",
-        "model",
-        "framework",
-        "architecture",
-        "algorithm",
-        "learning",
-        "neural",
-        "transformer",
-        "imputation",
-        "detection",
-        "forecasting",
-        "network",
-        "encoder",
-        "decoder",
-        "attention",
-        "diffusion",
-        "graph",
-        "time series",
-        "anomaly",
-        "prediction",
+        "method", "approach", "model", "framework", "architecture", "algorithm",
+        "learning", "neural", "transformer", "imputation", "detection", "forecasting",
+        "network", "encoder", "decoder", "attention", "diffusion", "graph",
+        "time series", "anomaly", "prediction", "temporal", "spatial",
     ]
     negative_terms = [
-        "survey",
-        "review",
-        "foundation model",
-        "foundational model",
-        "foundational models",
-        "perspective",
-        "role in",
-        "benchmarking",
-        "comparison",
-        "comprehensive",
-        "taxonomy",
+        "survey", "review", "foundation model", "foundational model",
+        "foundational models", "perspective", "role in", "benchmarking",
+        "comparison", "comprehensive", "taxonomy",
     ]
     score += sum(1 for term in positive_terms if term in title)
     score -= 5 * sum(1 for term in negative_terms if term in title)

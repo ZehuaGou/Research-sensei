@@ -117,29 +117,30 @@ Earlier 2026-06-16 incremental Mimo main-chain smokes:
 | time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
-### Main-chain regression matrix (2026-06-17, post query-expansion fix)
+### Main-chain regression matrix (2026-06-17, post seed-expansion fallback fix)
 
 12 queries, Mimo, source-first preference. This is still a narrow regression
 matrix, not broad REAL_E2E.
 
 | Query | Job | Selected candidate | Input | Status | Blocking | Cards | Components | Verdict | Root cause / note |
 |---|---|---|---|---|---|---:|---|---|---|
-| time series anomaly detection | `38921d9ec1d9` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| multivariate time series imputation | `5f8786ee5fe0` | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
-| graph anomaly detection | `8282c92fa34e` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| graph neural network anomaly detection | - | - | direction found, seed no source-backed | FAIL | seed no source | - | - | FAIL | Direction search now finds candidates (query expansion works); seed expansion fails to find source-backed handoff candidate. |
-| transformer time series anomaly detection | `af9045d017b2` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| diffusion models for time series imputation | `80625e5ba7b7` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| time series forecasting | `f01b320dd58e` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| anomaly detection survey | `7c17a18946ba` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
-| graph neural network time series | `bcfcc16f4eb0` | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | Query expansion ("gnn time series") now finds candidates. |
-| diffusion models for forecasting | `8b9186140881` | Rise of Diffusion Models in Time-Series Forecasting | arxiv_pdf, pdf_fallback | BLOCKED_UNDERSTANDING | PAPER_CARD_FAILED | 403 | none | DEGRADED_PASS | PDF fallback; paper card LLM failed; correct fail-closed. |
-| transformer forecasting anomaly detection | `ff8786c40452` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
-| multivariate time series forecasting | - | - | metadata_only | FAIL | no candidate | - | - | FAIL | Direction search returned no arXiv candidate even with expansion. |
+| time series anomaly detection | `6917d8924d83` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series imputation | `2d56eca00ba9` | Graphs with Time Series Attention Transformer | arxiv_pdf, pdf_fallback | DEGRADED_STRUCTURAL | FORMULA_DERIVATION_BLOCKED | 200 | paper+teaching | DEGRADED_PASS | PDF fallback; formula provenance degraded; correct fail-closed. |
+| graph anomaly detection | `53bba65e09a5` | Graph Anomaly Detection in Time Series: A Survey | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | Seed expansion fallback to direction candidate. |
+| graph neural network anomaly detection | `ec699db453e3` | Learning Representation for Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | Seed expansion fallback resolved prior FAIL. |
+| transformer time series anomaly detection | `e3612b19579f` | Encode-then-Decompose | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| diffusion models for time series imputation | `11147266052f` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| time series forecasting | `2df3ead88e76` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| anomaly detection survey | `30af7cd881fb` | Anomaly Detection of Vehicle Trajectories | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path works despite survey-like query. |
+| graph neural network time series | - | - | metadata_only | FAIL | no candidate | - | - | FAIL | Direction search returned no arXiv candidate even with expansion; Semantic Scholar 429 + DBLP 503 degraded results. |
+| diffusion models for forecasting | `be5e2ae9e0de` | Rise of Diffusion Models in Time-Series Forecasting | arxiv_pdf, pdf_fallback | BLOCKED_UNDERSTANDING | PAPER_CARD_FAILED | 403 | none | DEGRADED_PASS | PDF fallback; paper card LLM failed; correct fail-closed. |
+| transformer forecasting anomaly detection | `f7f87e0bc7de` | Foundation Models for Time Series Forecasting | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
+| multivariate time series forecasting | `a018f4b59d30` | Clustering Multivariate Time Series | arxiv_source, source_first | SUCCESS | - | 200 | paper+formula+teaching | PASS | source_latex path stable. |
 
-Summary: 9/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 1/12 BLOCKED_UNDERSTANDING, 1/12 FAIL.
-0 MISSING_METHOD_EVIDENCE. 1 FAIL improved from direction_search to seed_expansion level.
-Query expansion (GNN/time-series/anomaly synonyms + decomposed terms) resolved 1 prior FAIL.
+Summary: 10/12 SUCCESS, 1/12 DEGRADED_STRUCTURAL, 1/12 BLOCKED_UNDERSTANDING, 0/12 FAIL
+(except 1 direction_search FAIL for graph neural network time series).
+0 MISSING_METHOD_EVIDENCE. Survey penalty and seed-expansion fallback resolved
+prior "graph neural network anomaly detection" FAIL.
 
 ### M1 acquisition fixture list
 
