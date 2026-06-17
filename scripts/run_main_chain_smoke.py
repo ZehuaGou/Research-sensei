@@ -109,7 +109,9 @@ def run_main_chain_smoke(
         "direction search",
     )
     direction_source_metrics = direction_response.get("source_metrics") or []
-    direction_papers = _papers(direction_response)[:max(1, max_candidates)]
+    direction_papers = _papers(direction_response)
+    # Search all direction papers for the best arXiv candidate (don't truncate
+    # before selection — arXiv papers may be ranked after OpenAlex results).
     direction_candidate = _select_arxiv_candidate(direction_papers, query=query)
     if not direction_candidate:
         return _fail(

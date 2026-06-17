@@ -162,12 +162,14 @@ class DirectionExplorationService:
         search_log: list[str] = []
         source_metrics: list[dict[str, object]] = []
 
-        # Build the set of queries to search: primary + expanded variants
+        # Build the set of queries to search: primary + a few expanded variants.
+        # Limit to 4 total to avoid rate-limiting external APIs.
         queries_to_search = [query]
         if query_variants:
             for variant in query_variants:
                 if variant and variant.lower() != query.lower():
                     queries_to_search.append(variant)
+            queries_to_search = queries_to_search[:4]
 
         for source in self.sources:
             adapter = self.adapters.get(source)
@@ -512,16 +514,80 @@ def _query_variants(direction: str) -> list[str]:
             expanded_variant = expanded.replace(full, abbrev)
             if expanded_variant != expanded:
                 variants.append(expanded_variant)
+    # Add semantic reformulations for compound queries
+    variants.extend(_semantic_variants(base))
     # Add decomposed term pairs for very compound queries
     tokens = [t for t in re.split(r"[^a-z0-9]+", base) if len(t) >= 3]
     if len(tokens) >= 3:
-        # Try pairs of key terms
         key_terms = [t for t in tokens if t not in {"for", "the", "and", "of", "in", "on", "to", "with", "from", "using", "based", "models", "methods"}]
         if len(key_terms) >= 2:
             variants.append(" ".join(key_terms[:2]))
             if len(key_terms) >= 3:
                 variants.append(" ".join(key_terms[:3]))
     return _unique(variants)
+
+
+def _semantic_variants(query: str) -> list[str]:
+    """Generate semantic reformulations for compound queries that are too strict."""
+    variants: list[str] = []
+    has_graph = "graph" in query or "gnn" in query
+    has_time = "time series" in query or "temporal" in query
+    has_neural = "neural" in query or "gnn" in query
+
+    # Graph + time series compound queries
+    if has_graph and has_time:
+        variants.extend([
+            "graph neural networks for time series",
+            "temporal graph neural network",
+            "spatio-temporal graph neural network",
+            "graph neural network forecasting time series",
+            "gnn for time series",
+            "graph neural network time series analysis",
+        ])
+    if has_graph and "anomaly" in query:
+        variants.extend([
+            "graph neural network anomaly detection",
+            "gnn anomaly detection",
+            "graph-based anomaly detection",
+        ])
+    if has_graph and has_time and "anomaly" in query:
+        variants.extend([
+            "graph neural network anomaly detection time series",
+            "gnn anomaly detection time series",
+            "temporal graph anomaly detection",
+        ])
+
+    # Diffusion + time series
+    if "diffusion" in query and has_time:
+        variants.extend([
+            "diffusion model time series",
+            "score-based diffusion time series",
+            "diffusion model for time series",
+        ])
+
+    # Transformer + time series
+    if "transformer" in query and has_time:
+        variants.extend([
+            "transformer for time series",
+            "attention-based time series",
+            "time series transformer",
+        ])
+
+    # Forecasting + multivariate
+    if "forecasting" in query and "multivariate" in query:
+        variants.extend([
+            "multivariate time series forecasting",
+            "multivariate time series prediction",
+            "time series forecasting multivariate",
+            "multivariate forecasting deep learning",
+        ])
+    elif "forecasting" in query and has_time:
+        variants.extend([
+            "time series forecasting",
+            "time series prediction",
+        ])
+
+    return variants
 
 
 def _overview(query_plan: QueryPlan, count: int, status: str) -> str:
