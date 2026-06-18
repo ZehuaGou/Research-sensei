@@ -212,7 +212,7 @@ def test_smoke_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
     assert result["oa_pdf_found_count"] == 0
     assert result["top_candidates"][0]["needs_user_upload"] is True
     assert result["top_candidates"][0]["can_deep_read"] is False
-    assert result["verdict"] == "DEGRADED_PASS"
+    assert result["verdict"] == "DEGRADED"
 
 
 def test_semantic_scholar_429_does_not_fail_entire_smoke(tmp_path: Path) -> None:

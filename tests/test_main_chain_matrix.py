@@ -65,7 +65,7 @@ def sample_degraded_row() -> dict:
         "cards_code": 200,
         "components": ["paper_card", "teaching_cards"],
         "formula_origin_summary": {"origins": "pdf_ocr", "ocr_statuses": "ocr_needed"},
-        "verdict": "DEGRADED_PASS",
+        "verdict": "DEGRADED",
         "cache_hit": False,
         "source_metrics": {"arxiv": 1, "openalex": 1, "crossref": 1},
         "failure_root_cause": "degraded_formula_derivation_blocked:FORMULA_DERIVATION_BLOCKED",
@@ -94,7 +94,7 @@ def sample_paper_card_failed_row() -> dict:
         "cards_code": 403,
         "components": [],
         "formula_origin_summary": {},
-        "verdict": "DEGRADED_PASS",
+        "verdict": "BLOCKED",
         "cache_hit": False,
         "source_metrics": {"arxiv": 1, "semantic_scholar": 1},
         "failure_root_cause": "blocked:PAPER_CARD_FAILED",
@@ -249,7 +249,7 @@ class TestSkipOnFail:
             {"query": "q1", "verdict": "FAIL", "final_status": ""},
             {"query": "q2", "verdict": "PASS", "final_status": "SUCCESS"},
         ]
-        passed = sum(1 for r in rows if r["verdict"] in ("PASS", "DEGRADED_PASS"))
+        passed = sum(1 for r in rows if r["verdict"] == "PASS")
         failed = sum(1 for r in rows if r["verdict"] == "FAIL")
         assert passed == 1
         assert failed == 1
@@ -339,12 +339,12 @@ class TestFailureRootCauseClassification:
         assert matrix._classify_failure_root_cause(result) == "direction_search_failed"
 
     def test_classify_degraded_blocked(self):
-        result = {"final_verdict": "DEGRADED_PASS", "final_understanding_status": "BLOCKED_UNDERSTANDING", "blocking_reason": "PAPER_CARD_FAILED"}
+        result = {"final_verdict": "BLOCKED", "final_understanding_status": "BLOCKED_UNDERSTANDING", "blocking_reason": "PAPER_CARD_FAILED"}
         assert matrix._classify_failure_root_cause(result) == "blocked:PAPER_CARD_FAILED"
 
     def test_classify_degraded_formula_blocked(self):
         result = {
-            "final_verdict": "DEGRADED_PASS",
+            "final_verdict": "DEGRADED",
             "final_understanding_status": "DEGRADED_STRUCTURAL",
             "blocking_reason": "FORMULA_DERIVATION_BLOCKED",
             "returned_card_components": ["paper_card", "teaching_cards"],

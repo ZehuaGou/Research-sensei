@@ -185,7 +185,7 @@ def test_main_chain_smoke_degraded_cards_gate_only_success_components() -> None:
         llm_enabled=True,
     )
 
-    assert result["final_verdict"] == "DEGRADED_PASS"
+    assert result["final_verdict"] == "DEGRADED"
     assert result["final_understanding_status"] == "DEGRADED_STRUCTURAL"
     assert result["cards_status_code"] == 200
     assert "formula_cards" not in result["returned_card_components"]
@@ -235,7 +235,7 @@ def test_main_chain_smoke_blocked_cards_gate() -> None:
         llm_enabled=True,
     )
 
-    assert result["final_verdict"] == "DEGRADED_PASS"
+    assert result["final_verdict"] == "BLOCKED"
     assert result["cards_status_code"] == 403
 
 
@@ -265,7 +265,7 @@ def test_main_chain_smoke_handoff_failure_returns_fail_summary() -> None:
     assert result["message"] == "PDF download failed for the direction candidate."
 
 
-def test_main_chain_smoke_no_llm_baseline_is_degraded_pass() -> None:
+def test_main_chain_smoke_no_llm_baseline_is_degraded() -> None:
     client = FakeClient(
         final_status="BASELINE_ONLY",
         cards_status_code=403,
@@ -280,7 +280,7 @@ def test_main_chain_smoke_no_llm_baseline_is_degraded_pass() -> None:
         llm_mode_note="MIMO_API_KEY is missing; running no-LLM smoke and expecting BASELINE_ONLY.",
     )
 
-    assert result["final_verdict"] == "DEGRADED_PASS"
+    assert result["final_verdict"] == "DEGRADED"
     assert result["llm_enabled"] is False
     assert result["final_understanding_status"] == "BASELINE_ONLY"
 

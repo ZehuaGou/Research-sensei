@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     print("ResearchSensei literature acquisition smoke summary")
     print(json.dumps(result, ensure_ascii=False, indent=2))
-    return 0 if result["verdict"] in {"PASS", "DEGRADED_PASS"} else 2
+    return 0 if result["verdict"] == "PASS" else 2
 
 
 def run_literature_acquisition_fixture(
@@ -274,8 +274,8 @@ def _verdict(summary: dict[str, Any]) -> str:
     if summary["total_candidates"] <= 0:
         return "FAIL"
     if summary["legal_fulltext_count"] <= 0:
-        return "DEGRADED_PASS"
-    return "PASS" if summary["source_ready_count"] or summary["pdf_ready_count"] else "DEGRADED_PASS"
+        return "DEGRADED"
+    return "PASS" if summary["source_ready_count"] or summary["pdf_ready_count"] else "DEGRADED"
 
 
 def _fixture_expectation_failures(result: dict[str, Any], row: dict[str, Any]) -> list[str]:

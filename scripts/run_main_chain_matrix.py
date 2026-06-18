@@ -85,9 +85,10 @@ def _classify_failure_root_cause(row: dict[str, Any]) -> str:
             return "llm_not_configured"
         return f"pipeline_failed:{stage or status}"
 
-    if verdict == "DEGRADED_PASS":
-        if status == "BLOCKED_UNDERSTANDING":
-            return f"blocked:{blocking}"
+    if verdict == "BLOCKED":
+        return f"blocked:{blocking}"
+
+    if verdict == "DEGRADED":
         if status == "DEGRADED_STRUCTURAL":
             components = row.get("returned_card_components", [])
             if "paper_card" not in components:
@@ -222,7 +223,9 @@ def _build_summary(
     total_time_s: float,
     llm_mode: dict[str, object],
 ) -> dict[str, Any]:
-    passed = sum(1 for r in rows if r["verdict"] in ("PASS", "DEGRADED_PASS"))
+    passed = sum(1 for r in rows if r["verdict"] == "PASS")
+    degraded = sum(1 for r in rows if r["verdict"] == "DEGRADED")
+    blocked = sum(1 for r in rows if r["verdict"] == "BLOCKED")
     failed = sum(1 for r in rows if r["verdict"] == "FAIL")
     success_count = sum(1 for r in rows if r["final_status"] == "SUCCESS")
     degraded_count = sum(1 for r in rows if r["final_status"] == "DEGRADED_STRUCTURAL")
@@ -246,6 +249,8 @@ def _build_summary(
         "cache_hits": cache_hits,
         "total_queries": len(rows),
         "passed": passed,
+        "degraded": degraded,
+        "blocked": blocked,
         "failed": failed,
         "final_status_breakdown": {
             "SUCCESS": success_count,
@@ -282,13 +287,13 @@ def print_table(summary: dict[str, Any]) -> None:
         tag = "C" if row.get("cache_hit") else " "
         print(f"{i+1:>3}  {verdict:<16}  {status:<24}  {cards:<5}  {strategy:<16}  {rc:<32}  {tag} {query}")
     print("-" * 120)
-    print(f"  PASS: {summary['passed']}  FAIL: {summary['failed']}  "
-          f"cache_hits: {summary['cache_hits']}/{summary['total_queries']}  "
-          f"total_time: {summary['total_time_seconds']}s")
-    print(f"  SUCCESS={summary['final_status_breakdown']['SUCCESS']}  "
-          f"DEGRADED={summary['final_status_breakdown']['DEGRADED_STRUCTURAL']}  "
-          f"BLOCKED={summary['final_status_breakdown']['BLOCKED_UNDERSTANDING']}  "
-          f"BASELINE={summary['final_status_breakdown']['BASELINE_ONLY']}")
+    d = summary["final_status_breakdown"]
+    print(f"  PASS={summary['passed']}  DEGRADED={summary.get('degraded', 0)}  BLOCKED={summary.get('blocked', 0)}  FAIL={summary['failed']}  "
+          f"cache_hits={summary['cache_hits']}/{summary['total_queries']}  "
+          f"total_time={summary['total_time_seconds']}s")
+    print(f"  SUCCESS={d['SUCCESS']}  DEGRADED_STRUCTURAL={d['DEGRADED_STRUCTURAL']}  "
+          f"BLOCKED_UNDERSTANDING={d['BLOCKED_UNDERSTANDING']}  "
+          f"BASELINE={d['BASELINE_ONLY']}")
     if summary.get("failure_root_cause_breakdown"):
         print(f"  Root causes: {summary['failure_root_cause_breakdown']}")
     print()

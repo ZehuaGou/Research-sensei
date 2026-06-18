@@ -86,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         refresh_cache=args.refresh_cache,
     )
     print_summary(result)
-    return 0 if result["final_verdict"] in {"PASS", "DEGRADED_PASS"} else 2
+    return 0 if result["final_verdict"] == "PASS" else 2
 
 
 def resolve_llm_mode(*, provider: str, skip_llm: bool) -> dict[str, object]:
@@ -300,7 +300,7 @@ def evaluate_gating(
             reasons.append(f"no-LLM smoke expected BASELINE_ONLY, got {final_status}")
         if cards_status_code != 403:
             reasons.append(f"BASELINE_ONLY cards endpoint must be 403, got {cards_status_code}")
-        return ("DEGRADED_PASS" if not reasons else "FAIL", reasons)
+        return ("DEGRADED" if not reasons else "FAIL", reasons)
 
     if final_status == "BASELINE_ONLY":
         reasons.append("LLM was enabled, but final status is BASELINE_ONLY; likely API LLM configuration failed.")
@@ -328,12 +328,12 @@ def evaluate_gating(
             reasons.append(f"DEGRADED cards returned non-success components: {non_success}")
         if not returned_components:
             reasons.append("DEGRADED cards returned no successful components")
-        return ("DEGRADED_PASS" if not reasons else "FAIL", reasons)
+        return ("DEGRADED" if not reasons else "FAIL", reasons)
 
     if final_status == "BLOCKED_UNDERSTANDING":
         if cards_status_code != 403:
             reasons.append(f"BLOCKED_UNDERSTANDING cards endpoint must be 403, got {cards_status_code}")
-        return ("DEGRADED_PASS" if not reasons else "FAIL", reasons)
+        return ("BLOCKED" if not reasons else "FAIL", reasons)
 
     return "FAIL", [f"unhandled final status: {final_status}"]
 
