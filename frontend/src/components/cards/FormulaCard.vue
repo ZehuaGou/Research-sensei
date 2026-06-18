@@ -54,14 +54,14 @@ async function renderFormula() {
       </div>
     </div>
 
-    <!-- Symbol Table -->
-    <div v-if="card.symbols?.length" class="px-6 py-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">符号含义</div>
+    <!-- Term Table (uses FormulaTerm: term/meaning/encourages/penalizes/if_removed) -->
+    <div v-if="card.terms?.length" class="px-6 py-4">
+      <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">项含义</div>
       <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border-subtle);">
         <table class="w-full text-[12px]">
           <thead>
             <tr style="background: var(--bg-secondary);">
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">符号</th>
+              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">项</th>
               <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">含义</th>
               <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">鼓励</th>
               <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">惩罚</th>
@@ -69,12 +69,12 @@ async function renderFormula() {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="s in card.symbols" :key="s.symbol" class="border-t" style="border-color: var(--border-subtle);">
-              <td class="px-3 py-2 font-mono font-medium" style="color: var(--accent);">{{ s.symbol }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ s.meaning }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ s.encourages || '-' }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ s.penalizes || '-' }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ s.if_removed || '-' }}</td>
+            <tr v-for="t in card.terms" :key="t.term" class="border-t" style="border-color: var(--border-subtle);">
+              <td class="px-3 py-2 font-mono font-medium" style="color: var(--accent);">{{ t.term }}</td>
+              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.meaning }}</td>
+              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.encourages || '-' }}</td>
+              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.penalizes || '-' }}</td>
+              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.if_removed || '-' }}</td>
             </tr>
           </tbody>
         </table>
