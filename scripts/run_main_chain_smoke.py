@@ -22,8 +22,11 @@ if hasattr(sys.stderr, "reconfigure"):
 from starlette.testclient import TestClient  # noqa: E402
 
 from researchsensei.core.config import ConfigService  # noqa: E402
+from researchsensei.core.env_loader import load_runtime_env  # noqa: E402
 from researchsensei.web.app import create_app  # noqa: E402
 
+
+_load_result = load_runtime_env(suppress_errors=True)
 
 SUCCESS_STATUSES = {"SUCCESS", "DEGRADED_STRUCTURAL", "BLOCKED_UNDERSTANDING"}
 CARD_COMPONENTS = {"paper_card", "formula_cards", "teaching_cards"}
@@ -61,6 +64,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    env_loaded = load_runtime_env(suppress_errors=True)
+    if env_loaded:
+        print(f"[env] loaded from .env: {env_loaded}")
     llm_mode = resolve_llm_mode(provider=args.provider, skip_llm=args.skip_llm)
     client = TestClient(
         create_app(

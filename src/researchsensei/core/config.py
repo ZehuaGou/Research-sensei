@@ -5,8 +5,9 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from dotenv import dotenv_values
 from pydantic import BaseModel, ConfigDict, Field
+
+from researchsensei.core.env_loader import load_runtime_env
 
 
 class ConfigModel(BaseModel):
@@ -88,11 +89,7 @@ class ConfigService:
         )
 
     def _load_env(self) -> None:
-        if not self.env_path.exists():
-            return
-        for key, value in dotenv_values(self.env_path).items():
-            if value is not None and key not in os.environ:
-                os.environ[key] = value
+        load_runtime_env(env_path=self.env_path, suppress_errors=True)
 
     def _read_toml(self) -> dict[str, Any]:
         path = self.config_path if self.config_path.exists() else self.example_path

@@ -17,15 +17,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from researchsensei.core.config import ConfigService  # noqa: E402
+from researchsensei.core.env_loader import load_runtime_env  # noqa: E402
 
 
-try:
-    ConfigService().load()
-except Exception:
-    # Smoke output reports source-level failures later; local config/env loading
-    # must not prevent source adapters from running with explicit environment.
-    pass
+load_runtime_env(suppress_errors=True)
 
 from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, DBLPAdapter, FullTextResolver, OpenAlexAdapter, SemanticScholarAdapter  # noqa: E402
 from researchsensei.schemas import CandidatePaper  # noqa: E402
@@ -62,6 +57,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    env_loaded = load_runtime_env(suppress_errors=True)
+    if env_loaded:
+        print(f"[env] loaded from .env: {env_loaded}")
     if args.fixture:
         result = run_literature_acquisition_fixture(
             fixture_path=Path(args.fixture),

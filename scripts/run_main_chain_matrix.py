@@ -19,7 +19,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 from starlette.testclient import TestClient
 
-from researchsensei.core.config import ConfigService
+from researchsensei.core.env_loader import load_runtime_env
 from researchsensei.web.app import create_app
 
 # Import smoke functions — import the module, not individual names
@@ -296,6 +296,9 @@ def print_table(summary: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+    env_loaded = load_runtime_env(suppress_errors=True)
+    if env_loaded:
+        print(f"[env] loaded from .env: {env_loaded}")
     summary = run_matrix(args)
 
     # Print table
