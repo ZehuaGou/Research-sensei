@@ -206,50 +206,6 @@ output.
 LLM JSON handling is fail-closed: malformed JSON or schema mismatch must become
 explicit component failure/degradation, not accepted evidence.
 
-## Largest Current Shortfalls
-
-1. Broad M1 REAL_E2E is still missing: coverage is smoke-level, not systematic
-   benchmark acceptance.
-2. DOI-only deep_read is narrowly implemented through Unpaywall/legal OA PDF
-   lookup, but broad DOI acceptance is not verified. Non-arXiv PDFs frequently
-   degrade or block because of raw formula provenance, download failures, or
-   missing method evidence.
-3. Semantic Scholar can rate-limit; `SEMANTIC_SCHOLAR_API_KEY` and `S2_API_KEY`
-   are supported, source-level degradation is handled, but broad caching/backoff
-   still needs hardening.
-4. Formula cards still degrade on non-source_latex or weak provenance.
-5. Main-chain positive evidence is narrow; source-first success is promising but
-   not broad reliability.
-6. M4 remains not implemented by design.
-
-## Next Priority Order
-
-1. Improve candidate selection/query planning for forecasting and mixed-intent
-   queries so source-backed handoff papers better match the requested direction.
-2. Improve PDF/non-arXiv evidence extraction so method passages survive into
-   evidence_pack without relaxing `MISSING_METHOD_EVIDENCE` gates.
-3. Expand DOI-to-legal-fulltext-to-deep_read acceptance across known OA
-   publishers; keep failures explicit.
-4. Add polite Semantic Scholar cache/backoff to reduce repeated 429s in matrix
-   smokes.
-5. Keep frontend status rendering aligned with `/understanding_status` and
-   `/cards` gating.
-
-## Weak-Model Handoff Guide
-
-If a weaker model or Xiaomi/Mimo-compatible model continues this project:
-
-1. Read this file first.
-2. Run backend tests.
-3. Run one literature acquisition smoke.
-4. If Mimo/API key exists, run one main-chain smoke.
-5. Treat all failures literally; do not patch around gates.
-6. Make only small, source-local fixes.
-7. Update this file with exact command, job ID, status, cards code, components,
-   and strict scope.
-8. Do not create new report files.
-9. Do not start M4.
-
 ## Repeatable Main-Chain Regression Matrix
 
 `scripts/run_main_chain_matrix.py` is the repeatable acceptance tool for the

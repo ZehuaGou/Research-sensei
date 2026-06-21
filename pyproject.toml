@@ -39,6 +39,7 @@ external = [
 testpaths = ["tests", "tests_live"]
 pythonpath = [".", "src"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 python_files = ["test_*.py"]
 markers = [
   "live: real external service tests",
@@ -47,8 +48,6 @@ markers = [
   "slow: slow tests",
 ]
 addopts = [
-  "--ignore=legacy_tests",
-  "--ignore=tests_e2e",
 ]
 filterwarnings = [
   "ignore:Using `httpx` with `starlette.testclient` is deprecated:Warning",

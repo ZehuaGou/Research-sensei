@@ -402,7 +402,7 @@ def _is_excluded_scan_path(path: Path, root: Path, excluded_files: set[Path]) ->
     if any(resolved == excluded.resolve() for excluded in excluded_files):
         return True
     parts = {part.lower() for part in path.relative_to(root).parts}
-    return bool({"tests", "legacy_tests", "__pycache__"} & parts)
+    return bool({"tests", "__pycache__"} & parts)
 
 
 def _line_number(text: str, pattern: str) -> int:
