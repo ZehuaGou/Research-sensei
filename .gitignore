@@ -9,9 +9,14 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .mypy_cache/
+.agents/
+.codex/
+.superpowers/
+.vscode/
 .env
 .env.*
 !.env.example
+docs/LAST_CODEX_OUTPUT.md
 config/local.toml
 /workspace/
 /runs/
