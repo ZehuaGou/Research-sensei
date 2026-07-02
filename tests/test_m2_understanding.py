@@ -654,6 +654,13 @@ def test_m2_paper_card_failure_falls_back_to_evidence_pack(tmp_path: Path) -> No
     assert result.status.component_status["evidence_pack"] == "SUCCESS"
     assert (output_dir / "paper_card.json").exists()
 
+    quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
+    assert not [
+        finding
+        for finding in quality["findings"]
+        if finding["code"] == "F-8" and finding["effect"] == "BLOCK"
+    ]
+
 
 def test_m2_full_pipeline_invalid_teaching_ref_falls_back_without_audit_pollution(tmp_path: Path) -> None:
     from researchsensei.m2.full_pipeline import run_m2_full_pipeline

@@ -48,12 +48,32 @@ engine, or full drill generator.
 - Semantic Scholar search now has in-process successful-response caching and a
   shared polite throttle. Existing retry/backoff and source-level degradation
   behavior remain fail-closed.
+- arXiv retry exhaustion now preserves whether the last retry reason was rate
+  limiting, service unavailable, or network error, so Direction/Seed stop
+  repeat query variants for a failing source instead of amplifying 429/503
+  pressure.
+- The main-chain matrix runner now isolates each query in a subprocess with a
+  hard per-query timeout, records `query_timeout` rows, keeps running later
+  queries, stores `handoff_job_id` in JSON rows, and treats BLOCKED rows as real
+  results rather than "no rows produced".
+- M2/M4 card generation now supports `RESEARCHSENSEI_LLM_CARD_TIMEOUT_SECONDS`
+  plus smoke/matrix CLI overrides. This lets live validation fail closed within
+  a bounded time instead of waiting on 300-second card calls.
+- Paper-card LLM/fallback raw-copy handling was tightened: raw evidence copies
+  are summarized before quality audit when they can be detected from the
+  evidence pack or in-memory claim evidence. The F-8 auditor remains strict.
 - DOI/Unpaywall coverage now includes DOI URL normalization and secondary OA
   PDF locations from `oa_locations`.
-- Validation for this checkpoint: `pytest` = 603 passed / 15 skipped;
-  targeted hardening tests = 69 passed; `npm test` = 52 passed; `npm run build`
+- Validation for this checkpoint: `pytest` = 619 passed / 15 skipped;
+  targeted hardening tests = 132 passed; `npm test` = 52 passed; `npm run build`
   passed; `npm audit --omit=dev` reported zero vulnerabilities; `git diff
   --check` passed.
+- Live ccswitch single-query matrix with cached direction search and bounded
+  card timeout:
+  `time series anomaly detection` still returns
+  `BLOCKED_UNDERSTANDING / AUDIT_BLOCKED` on job-family runs, with F-8
+  paper-card raw-copy findings still observed. This is an unresolved M2/M4
+  quality issue, not a timeout or missing-LLM configuration issue.
 
 ## 2026-06-28 ccswitch And UI Reconciliation
 

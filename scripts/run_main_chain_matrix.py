@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing as mp
 import os
+import queue
 import sys
 import time
 from pathlib import Path
@@ -22,7 +24,7 @@ from starlette.testclient import TestClient
 from researchsensei.core.env_loader import load_runtime_env
 from researchsensei.web.app import create_app
 
-# Import smoke functions — import the module, not individual names
+# Import smoke functions - import the module, not individual names
 # so cache helpers and other utilities are available.
 sys.path.insert(0, str(ROOT / "scripts"))
 import run_main_chain_smoke as smoke  # noqa: E402
@@ -57,6 +59,18 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-json", default=str(ROOT / "workspace" / "main_chain_matrix" / "summary.json"), help="Output JSON summary path.")
     parser.add_argument("--queries", nargs="*", default=None, help="Override default queries. If not provided, uses 12 default regression queries.")
     parser.add_argument("--max-failures", type=int, default=0, help="Maximum allowed FAIL rows before matrix exits non-zero. Default 0.")
+    parser.add_argument(
+        "--query-timeout-seconds",
+        type=float,
+        default=240.0,
+        help="Hard timeout per query. Use 0 to disable subprocess isolation.",
+    )
+    parser.add_argument(
+        "--llm-card-timeout-seconds",
+        type=float,
+        default=30.0,
+        help="Override per-card LLM timeout for matrix runs. Use 0 for application default.",
+    )
     return parser.parse_args(argv)
 
 
@@ -81,6 +95,8 @@ def _classify_failure_root_cause(row: dict[str, Any]) -> str:
             return "seed_expansion_no_handoff"
         if stage == "deep_read":
             return f"deep_read_failed:{blocking or status}"
+        if stage == "query_timeout":
+            return "query_timeout"
         if status == "BASELINE_ONLY":
             return "llm_not_configured"
         return f"pipeline_failed:{stage or status}"
@@ -111,33 +127,19 @@ def _source_metrics_summary(metrics_by_source: dict[str, Any]) -> dict[str, int]
 def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
     queries = args.queries if args.queries else DEFAULT_QUERIES
     llm_mode = _resolve_llm_mode(provider=args.provider, skip_llm=args.skip_llm)
-    client = TestClient(
-        create_app(
-            workspace_root=args.workspace,
-            enable_configured_llm=llm_mode["enabled"],
-            llm_provider=args.provider if llm_mode["enabled"] else "",
-        )
-    )
 
     rows: list[dict[str, Any]] = []
     cache_hits = 0
-    total_direction_time_ms = 0
-    direction_count = 0
     start_time = time.perf_counter()
 
     for i, query in enumerate(queries):
         qstart = time.perf_counter()
         print(f"[{i+1}/{len(queries)}] {query} ... ", end="", flush=True)
 
-        result = smoke.run_main_chain_smoke(
-            client,
+        result = _run_query_with_timeout(
+            args,
             query=query,
-            max_candidates=args.max_candidates,
-            llm_enabled=bool(llm_mode["enabled"]),
-            llm_mode_note=str(llm_mode["note"]),
-            cache_dir=args.cache_dir,
-            use_cache=args.use_cache,
-            refresh_cache=args.refresh_cache,
+            llm_mode=llm_mode,
         )
 
         if result.get("cache_hit", False):
@@ -156,6 +158,149 @@ def run_matrix(args: argparse.Namespace) -> dict[str, Any]:
 
     summary = _build_summary(rows, args, cache_hits, total_time_s, llm_mode)
     return summary
+
+
+def _run_query_with_timeout(
+    args: argparse.Namespace,
+    *,
+    query: str,
+    llm_mode: dict[str, object],
+) -> dict[str, Any]:
+    timeout_seconds = float(args.query_timeout_seconds or 0)
+    payload = _query_payload(args, query, llm_mode)
+    if timeout_seconds <= 0:
+        return _run_query_direct(payload)
+
+    ctx = mp.get_context("spawn")
+    result_queue = ctx.Queue(maxsize=1)
+    process = ctx.Process(target=_query_worker, args=(payload, result_queue))
+    process.start()
+    process.join(timeout_seconds)
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        return _timeout_result(query, llm_mode, timeout_seconds)
+
+    try:
+        message = result_queue.get_nowait()
+    except queue.Empty:
+        return _worker_failed_result(query, llm_mode, "Smoke worker exited without returning a result.")
+
+    if not isinstance(message, dict) or not message.get("ok"):
+        error = str((message or {}).get("error") if isinstance(message, dict) else message)
+        return _worker_failed_result(query, llm_mode, error or "Smoke worker failed.")
+    result = message.get("result")
+    if isinstance(result, dict):
+        return result
+    return _worker_failed_result(query, llm_mode, "Smoke worker returned a non-object result.")
+
+
+def _query_payload(args: argparse.Namespace, query: str, llm_mode: dict[str, object]) -> dict[str, Any]:
+    return {
+        "query": query,
+        "provider": args.provider,
+        "workspace": args.workspace,
+        "max_candidates": args.max_candidates,
+        "cache_dir": args.cache_dir,
+        "use_cache": args.use_cache,
+        "refresh_cache": args.refresh_cache,
+        "llm_card_timeout_seconds": float(args.llm_card_timeout_seconds or 0),
+        "llm_enabled": bool(llm_mode["enabled"]),
+        "llm_mode_note": str(llm_mode["note"]),
+    }
+
+
+def _query_worker(payload: dict[str, Any], result_queue: Any) -> None:
+    try:
+        result_queue.put({"ok": True, "result": _run_query_direct(payload)})
+    except Exception as exc:
+        result_queue.put({"ok": False, "error": f"{type(exc).__name__}: {str(exc)[:500]}"})
+
+
+def _run_query_direct(payload: dict[str, Any]) -> dict[str, Any]:
+    card_timeout = float(payload.get("llm_card_timeout_seconds") or 0)
+    if card_timeout > 0:
+        os.environ["RESEARCHSENSEI_LLM_CARD_TIMEOUT_SECONDS"] = str(card_timeout)
+    client = TestClient(
+        create_app(
+            workspace_root=str(payload["workspace"]),
+            enable_configured_llm=bool(payload["llm_enabled"]),
+            llm_provider=str(payload["provider"]) if payload["llm_enabled"] else "",
+        )
+    )
+    return smoke.run_main_chain_smoke(
+        client,
+        query=str(payload["query"]),
+        max_candidates=int(payload["max_candidates"]),
+        llm_enabled=bool(payload["llm_enabled"]),
+        llm_mode_note=str(payload["llm_mode_note"]),
+        cache_dir=str(payload["cache_dir"]),
+        use_cache=bool(payload["use_cache"]),
+        refresh_cache=bool(payload["refresh_cache"]),
+    )
+
+
+def _timeout_result(query: str, llm_mode: dict[str, object], timeout_seconds: float) -> dict[str, Any]:
+    message = f"Main-chain query exceeded {timeout_seconds:.0f}s and was terminated."
+    return _failed_query_result(
+        query,
+        llm_mode,
+        stage="query_timeout",
+        message=message,
+        warnings=[f"QUERY_TIMEOUT:{timeout_seconds:.0f}s"],
+    )
+
+
+def _worker_failed_result(query: str, llm_mode: dict[str, object], error: str) -> dict[str, Any]:
+    message = f"Main-chain smoke worker failed: {error}"
+    return _failed_query_result(
+        query,
+        llm_mode,
+        stage="worker_error",
+        message=message,
+        warnings=["SMOKE_WORKER_FAILED"],
+    )
+
+
+def _failed_query_result(
+    query: str,
+    llm_mode: dict[str, object],
+    *,
+    stage: str,
+    message: str,
+    warnings: list[str],
+) -> dict[str, Any]:
+    return {
+        "query": query,
+        "llm_enabled": bool(llm_mode["enabled"]),
+        "llm_mode_note": str(llm_mode["note"]),
+        "cache_hit": False,
+        "failed_stage": stage,
+        "message": message,
+        "selected_candidate_title": "",
+        "selected_candidate_arxiv_id": "",
+        "selected_candidate_sources": [],
+        "selected_seed_handoff_title": "",
+        "selected_seed_handoff_arxiv_id": "",
+        "selected_seed_handoff_sources": [],
+        "selected_input_type": "unknown",
+        "source_strategy": "unknown",
+        "arxiv_source_downloaded": False,
+        "fallback_used": "",
+        "seed_expansion_status": "",
+        "seed_expansion_group_counts": {"upstream": 0, "downstream": 0, "same_route": 0, "surveys": 0},
+        "direction_source_metrics": {},
+        "seed_source_metrics": {},
+        "handoff_job_id": "",
+        "final_understanding_status": "",
+        "blocking_reason": "",
+        "cards_status_code": 0,
+        "returned_card_components": [],
+        "formula_origin_summary": {},
+        "warnings": warnings,
+        "final_verdict": "FAIL",
+        "verdict_reasons": [message],
+    }
 
 
 def _build_row(result: dict[str, Any], elapsed_ms: int) -> dict[str, Any]:
@@ -212,6 +357,7 @@ def _build_row(result: dict[str, Any], elapsed_ms: int) -> dict[str, Any]:
         "seed_expansion_group_counts": result.get("seed_expansion_group_counts", {}),
         "arxiv_source_downloaded": result.get("arxiv_source_downloaded", False),
         "fallback_used": result.get("fallback_used", ""),
+        "handoff_job_id": result.get("handoff_job_id", ""),
     }
     return row
 
@@ -244,9 +390,11 @@ def _build_summary(
         "provider": args.provider,
         "llm_enabled": bool(llm_mode["enabled"]),
         "llm_mode_note": str(llm_mode["note"]),
-        "cache_enabled": args.use_cache,
+        "cache_enabled": bool(args.use_cache or args.refresh_cache),
         "cache_refreshed": args.refresh_cache,
         "cache_hits": cache_hits,
+        "query_timeout_seconds": float(args.query_timeout_seconds or 0),
+        "llm_card_timeout_seconds": float(args.llm_card_timeout_seconds or 0),
         "total_queries": len(rows),
         "passed": passed,
         "degraded": degraded,
@@ -299,6 +447,15 @@ def print_table(summary: dict[str, Any]) -> None:
     print()
 
 
+def _exit_code_for_summary(summary: dict[str, Any], max_failures: int) -> tuple[int, str]:
+    if int(summary.get("total_queries") or 0) == 0:
+        return 2, "ERROR: No rows produced."
+    failed = int(summary.get("failed") or 0)
+    if failed > max_failures:
+        return 2, f"ERROR: {failed} FAIL rows exceeds max-failures={max_failures}"
+    return 0, ""
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     env_loaded = load_runtime_env(suppress_errors=True)
@@ -316,14 +473,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Wrote matrix summary to {output_path}")
 
     # Exit code
-    max_failures = args.max_failures
-    if summary["failed"] > max_failures:
-        print(f"ERROR: {summary['failed']} FAIL rows exceeds max-failures={max_failures}")
-        return 2
-    if summary["passed"] + summary["failed"] == 0:
-        print("ERROR: No rows produced.")
-        return 2
-    return 0 if summary["failed"] == 0 else 2
+    exit_code, error = _exit_code_for_summary(summary, args.max_failures)
+    if error:
+        print(error)
+    return exit_code
 
 
 if __name__ == "__main__":

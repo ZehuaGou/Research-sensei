@@ -22,6 +22,7 @@ _BACKOFF_503 = [2.0, 4.0, 8.0]
 _CACHE_LOCK = threading.Lock()
 _RESPONSE_CACHE: dict[tuple[str, int, str, bool], tuple[float, dict]] = {}
 _LAST_REQUEST_AT = 0.0
+_RATE_LIMIT_UNTIL = 0.0
 
 
 class SemanticScholarAdapter:
@@ -39,6 +40,7 @@ class SemanticScholarAdapter:
         http_client: object | None = None,
         cache_ttl_seconds: float = 15 * 60,
         min_request_interval_seconds: float = 1.0,
+        rate_limit_cooldown_seconds: float = 60.0,
         clock: Callable[[], float] | None = None,
         sleeper: Callable[[float], None] | None = None,
     ) -> None:
@@ -50,6 +52,7 @@ class SemanticScholarAdapter:
         self.http_client = http_client
         self.cache_ttl_seconds = cache_ttl_seconds
         self.min_request_interval_seconds = min_request_interval_seconds
+        self.rate_limit_cooldown_seconds = rate_limit_cooldown_seconds
         self.clock = clock or time.monotonic
         self.sleeper = sleeper or time.sleep
 
@@ -74,8 +77,10 @@ class SemanticScholarAdapter:
 
     def _fetch_with_retry(self, params: dict, headers: dict) -> dict:
         """Fetch from S2 API with retry/backoff."""
+        last_retry_reason = "retryable errors"
         for attempt in range(_MAX_RETRIES):
             try:
+                self._raise_if_rate_limited()
                 self._throttle_before_request()
                 resp = self._get(params, headers)
 
@@ -87,6 +92,11 @@ class SemanticScholarAdapter:
                         pass
                     backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
                     wait = backoff[min(attempt, len(backoff) - 1)]
+                    last_retry_reason = "rate limiting" if resp.status_code == 429 else "service unavailable"
+                    if resp.status_code == 429:
+                        self._activate_rate_limit_cooldown()
+                        if attempt >= _MAX_RETRIES - 1:
+                            break
                     logger.warning(
                         "Semantic Scholar got %d (%s), retry %d/%d in %.1fs",
                         resp.status_code, body_msg[:100], attempt + 1, _MAX_RETRIES, wait,
@@ -101,6 +111,11 @@ class SemanticScholarAdapter:
                 if exc.response.status_code in _RETRY_CODES:
                     backoff = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
                     wait = backoff[min(attempt, len(backoff) - 1)]
+                    last_retry_reason = "rate limiting" if exc.response.status_code == 429 else "service unavailable"
+                    if exc.response.status_code == 429:
+                        self._activate_rate_limit_cooldown()
+                        if attempt >= _MAX_RETRIES - 1:
+                            break
                     logger.warning(
                         "Semantic Scholar got %d, retry %d/%d in %.1fs",
                         exc.response.status_code, attempt + 1, _MAX_RETRIES, wait,
@@ -111,6 +126,7 @@ class SemanticScholarAdapter:
                 raise
             except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
                 wait = _BACKOFF_503[min(attempt, len(_BACKOFF_503) - 1)]
+                last_retry_reason = "network errors"
                 logger.warning(
                     "Semantic Scholar network error: %s, retry %d/%d in %.1fs",
                     exc, attempt + 1, _MAX_RETRIES, wait,
@@ -118,7 +134,7 @@ class SemanticScholarAdapter:
                 self.sleeper(wait)
                 continue
 
-        raise RuntimeError(f"Semantic Scholar API exhausted {_MAX_RETRIES} retries")
+        raise RuntimeError(f"Semantic Scholar API exhausted {_MAX_RETRIES} retries after {last_retry_reason}")
 
     def _get(self, params: dict, headers: dict):
         if self.http_client is not None:
@@ -137,6 +153,19 @@ class SemanticScholarAdapter:
                 self.sleeper(wait)
                 now = self.clock()
             _LAST_REQUEST_AT = now
+
+    def _raise_if_rate_limited(self) -> None:
+        with _CACHE_LOCK:
+            remaining = _RATE_LIMIT_UNTIL - self.clock()
+        if remaining > 0:
+            raise RuntimeError(f"Semantic Scholar rate limited; cooldown active for {remaining:.1f}s")
+
+    def _activate_rate_limit_cooldown(self) -> None:
+        global _RATE_LIMIT_UNTIL
+        if self.rate_limit_cooldown_seconds <= 0:
+            return
+        with _CACHE_LOCK:
+            _RATE_LIMIT_UNTIL = max(_RATE_LIMIT_UNTIL, self.clock() + self.rate_limit_cooldown_seconds)
 
     def _get_cached(self, key: tuple[str, int, str, bool]) -> dict | None:
         if self.cache_ttl_seconds <= 0:
@@ -159,10 +188,11 @@ class SemanticScholarAdapter:
 
     @classmethod
     def clear_cache(cls) -> None:
-        global _LAST_REQUEST_AT
+        global _LAST_REQUEST_AT, _RATE_LIMIT_UNTIL
         with _CACHE_LOCK:
             _RESPONSE_CACHE.clear()
             _LAST_REQUEST_AT = 0.0
+            _RATE_LIMIT_UNTIL = 0.0
 
     def _to_candidate(self, row: dict) -> CandidatePaper:
         paper_id = str(row.get("paperId") or "")

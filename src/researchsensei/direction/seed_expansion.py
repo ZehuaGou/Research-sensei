@@ -82,9 +82,14 @@ class SeedExpansionService:
         grouped_candidates: dict[str, list[CandidatePaper]] = {}
         warnings: list[str] = []
         source_metrics: list[dict[str, object]] = []
+        skip_sources: set[str] = set()
 
         for relation_type, query in queries.items():
-            candidates, relation_warnings, relation_metrics = self._acquire(relation_type, query)
+            candidates, relation_warnings, relation_metrics = self._acquire(
+                relation_type,
+                query,
+                skip_sources=skip_sources,
+            )
             warnings.extend(relation_warnings)
             source_metrics.extend(relation_metrics)
             grouped_candidates[relation_type] = self._verify_and_dedupe(candidates)[: self.max_group_items]
@@ -150,13 +155,26 @@ class SeedExpansionService:
         self,
         relation_type: str,
         query: str,
+        *,
+        skip_sources: set[str] | None = None,
     ) -> tuple[list[CandidatePaper], list[str], list[dict[str, object]]]:
         candidates: list[CandidatePaper] = []
         warnings: list[str] = []
         source_metrics: list[dict[str, object]] = []
+        skipped = skip_sources if skip_sources is not None else set()
 
         for source in self.sources:
             started = time.perf_counter()
+            if source in skipped:
+                source_metrics.append(_metric(
+                    relation_type,
+                    source,
+                    False,
+                    0,
+                    0,
+                    "skipped after previous transient source failure",
+                ))
+                continue
             adapter = self.adapters.get(source)
             if adapter is None:
                 latency_ms = int((time.perf_counter() - started) * 1000)
@@ -176,6 +194,8 @@ class SeedExpansionService:
                 source_metrics.append(
                     _metric(relation_type, source, False, 0, latency_ms, f"{type(exc).__name__}: {str(exc)[:200]}")
                 )
+                if _is_rate_limited(exc) or _is_transient_source_failure(exc):
+                    skipped.add(source)
 
         return candidates, warnings, source_metrics
 
@@ -478,6 +498,29 @@ def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if paper.doi:
         return "DOI handoff will attempt legal open-access PDF resolution via Unpaywall."
     return "No arXiv ID, arXiv URL, or PDF URL is available for this expansion paper."
+
+
+def _is_rate_limited(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "429" in message or "rate" in message
+
+
+def _is_transient_source_failure(exc: Exception) -> bool:
+    message = str(exc).lower()
+    transient_terms = (
+        "timeout",
+        "timed out",
+        "read operation",
+        "503",
+        "502",
+        "504",
+        "connection",
+        "connect",
+        "max retries",
+        "temporarily",
+        "service unavailable",
+    )
+    return any(term in message for term in transient_terms)
 
 
 def _doi_url(doi: str) -> str:

@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from researchsensei.acquisition.arxiv_adapter import ArxivAdapter
 from researchsensei.acquisition import FullTextResolver
 from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarAdapter
 from researchsensei.schemas import CandidatePaper
@@ -48,6 +51,15 @@ class SemanticScholarClient:
         })
 
 
+class RateLimitedSemanticScholarClient:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def get(self, url: str, **kwargs: object) -> StubResponse:
+        self.calls += 1
+        return StubResponse({"message": "Too Many Requests"}, status_code=429)
+
+
 class UnpaywallClient:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -69,6 +81,16 @@ class StaticAdapter:
 class FailingAdapter:
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
         raise RuntimeError("429 Too Many Requests")
+
+
+class RetryExhaustedArxivAdapter(ArxivAdapter):
+    def __init__(self) -> None:
+        super().__init__(timeout=1.0)
+        self.calls = 0
+
+    def _fetch_atom(self, query: str, *, max_results: int, id_list: list[str] | None = None) -> list[CandidatePaper]:
+        self.calls += 1
+        raise RuntimeError("arXiv API exhausted 3 retries after rate limited (429) for query")
 
 
 def paper(**overrides: object) -> CandidatePaper:
@@ -107,6 +129,15 @@ def test_openalex_oa_pdf_is_recognized_as_fulltext_candidate() -> None:
     assert resolved.needs_user_upload is False
     assert resolved.selected_fulltext_url == "https://publisher.example/paper.pdf"
     assert metrics == []
+
+
+def test_arxiv_search_propagates_retry_exhausted_rate_limit() -> None:
+    adapter = RetryExhaustedArxivAdapter()
+
+    with pytest.raises(RuntimeError, match="rate limited"):
+        adapter.search("graph anomaly detection", max_results=2)
+
+    assert adapter.calls == 1
 
 
 def test_doi_can_find_legal_pdf_through_unpaywall() -> None:
@@ -378,3 +409,44 @@ def test_semantic_scholar_uncached_requests_share_polite_throttle() -> None:
 
     assert len(client.calls) == 2
     assert waits == [1.25]
+
+
+def test_semantic_scholar_rate_limit_enters_shared_cooldown() -> None:
+    class ManualClock:
+        def __init__(self) -> None:
+            self.now = 100.0
+
+        def __call__(self) -> float:
+            return self.now
+
+    clock = ManualClock()
+    waits: list[float] = []
+
+    def sleeper(seconds: float) -> None:
+        waits.append(seconds)
+        clock.now += seconds
+
+    SemanticScholarAdapter.clear_cache()
+    client = RateLimitedSemanticScholarClient()
+    adapter = SemanticScholarAdapter(
+        http_client=client,
+        cache_ttl_seconds=0,
+        min_request_interval_seconds=0,
+        rate_limit_cooldown_seconds=60,
+        clock=clock,
+        sleeper=sleeper,
+    )
+    try:
+        try:
+            adapter.search("rate limited query", max_results=1)
+        except RuntimeError as exc:
+            assert "rate limited" in str(exc).lower()
+        try:
+            adapter.search("second query", max_results=1)
+        except RuntimeError as exc:
+            assert "cooldown active" in str(exc)
+    finally:
+        SemanticScholarAdapter.clear_cache()
+
+    assert client.calls == 1
+    assert waits == [3.0]

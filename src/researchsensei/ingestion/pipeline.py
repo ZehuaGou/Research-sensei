@@ -17,7 +17,11 @@ from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
-from researchsensei.paper_card import build_paper_card
+from researchsensei.paper_card import (
+    build_paper_card,
+    looks_like_paper_card_raw_copy,
+    summarize_paper_card_field,
+)
 from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.parser.adapter import ParserAdapter
 from researchsensei.schemas import (
@@ -27,6 +31,7 @@ from researchsensei.schemas import (
     EvidencePack,
     JobRecord,
     JobStatus,
+    PaperCard,
     QualityReport,
     SourceStatus,
     UnderstandingStatus,
@@ -49,7 +54,7 @@ def _run_async_builder(coro):
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        # No running loop — safe to use asyncio.run
+        # No running loop; safe to use asyncio.run.
         return asyncio.run(coro)
     # Close coroutine to avoid "was never awaited" warning
     if hasattr(coro, "close"):
@@ -230,6 +235,12 @@ class SinglePaperIngestionRunner:
         paper_skeleton,
     ) -> tuple[QualityReport, UnderstandingStatus, dict]:
         """Run QualityAuditor on candidate artifacts. May override status."""
+        card_artifacts = _summarize_raw_copy_paper_card_fields(
+            card_artifacts,
+            claim_evidence,
+            evidence_index,
+            paper_skeleton,
+        )
         bundle = _build_artifact_bundle(
             paper_card=card_artifacts.get("paper_card"),
             formula_cards=card_artifacts.get("formula_cards"),
@@ -691,6 +702,62 @@ def _build_evidence_pack_summary(
         claim_type_counts=claim_type_counts,
         truncated_passage_ids=[],
     )
+
+
+def _summarize_raw_copy_paper_card_fields(
+    card_artifacts: dict,
+    claim_evidence,
+    evidence_index,
+    paper_skeleton,
+) -> dict:
+    paper_card = card_artifacts.get("paper_card")
+    if paper_card is None:
+        return card_artifacts
+    data = paper_card if isinstance(paper_card, dict) else paper_card.model_dump(mode="json")
+    evidence_by_ref = _evidence_text_by_ref(claim_evidence, evidence_index)
+    changed = False
+    warnings = list(data.get("warnings") or [])
+    for field in ("problem", "core_idea", "method_overview", "experiment_summary"):
+        claim = data.get(field)
+        if not isinstance(claim, dict):
+            continue
+        ref = str(claim.get("evidence_ref") or "")
+        text = str(claim.get("text") or "")
+        evidence_text = evidence_by_ref.get(ref, "")
+        if ref and looks_like_paper_card_raw_copy(text, evidence_text):
+            claim["text"] = summarize_paper_card_field(field, evidence_text, paper_skeleton)
+            warnings.append(f"PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: {field}")
+            changed = True
+    if not changed:
+        return card_artifacts
+    data["warnings"] = list(dict.fromkeys(warnings))
+    updated = dict(card_artifacts)
+    updated["paper_card"] = PaperCard.model_validate(data)
+    return updated
+
+
+def _evidence_text_by_ref(claim_evidence, evidence_index) -> dict[str, str]:
+    by_ref: dict[str, list[str]] = {}
+    for bundle in (claim_evidence, evidence_index):
+        for claim in getattr(bundle, "claims", []) or []:
+            ref = str(_field(claim, "evidence_ref") or "")
+            if not ref:
+                continue
+            text = (
+                _field(claim, "quote_or_summary")
+                or _field(claim, "source_sentence")
+                or _field(claim, "claim_text")
+                or ""
+            )
+            if text:
+                by_ref.setdefault(ref, []).append(str(text))
+    return {ref: " ".join(values) for ref, values in by_ref.items()}
+
+
+def _field(obj, name: str):
+    if isinstance(obj, dict):
+        return obj.get(name)
+    return getattr(obj, name, None)
 
 
 def _build_artifact_bundle(

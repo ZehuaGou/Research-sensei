@@ -214,11 +214,18 @@ class DirectionExplorationService:
                     latency_ms = int((time.perf_counter() - started) * 1000)
                     total_latency += latency_ms
                     is_rate_limit = "429" in str(exc) or "rate" in str(exc).lower()
+                    is_transient_source_failure = _is_transient_source_failure(exc)
                     if is_rate_limit:
                         rate_limited = True
                     logger.warning("Direction acquisition failed for %s (%s): %s", source, q[:40], exc)
                     source_error = f"{type(exc).__name__}: {str(exc)[:160]}"
                     search_log.append(f"{source}: failed '{q[:40]}' ({type(exc).__name__})")
+                    if is_rate_limit:
+                        search_log.append(f"{source}: skipped remaining variants after rate limit")
+                        break
+                    if is_transient_source_failure:
+                        search_log.append(f"{source}: skipped remaining variants after transient source failure")
+                        break
 
             if adapter_responded:
                 candidates.extend(source_candidates)
@@ -823,6 +830,24 @@ def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if paper.doi:
         return "DOI handoff will attempt legal open-access PDF resolution via Unpaywall."
     return "No arXiv ID, arXiv URL, or PDF URL is available for this candidate."
+
+
+def _is_transient_source_failure(exc: Exception) -> bool:
+    message = str(exc).lower()
+    transient_terms = (
+        "timeout",
+        "timed out",
+        "read operation",
+        "503",
+        "502",
+        "504",
+        "connection",
+        "connect",
+        "max retries",
+        "temporarily",
+        "service unavailable",
+    )
+    return any(term in message for term in transient_terms)
 
 
 def _unique(values: list[str]) -> list[str]:

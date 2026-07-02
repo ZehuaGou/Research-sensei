@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.runtime_config import card_timeout_seconds
 from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_formula_cards_llm_output
 from researchsensei.schemas import (
@@ -60,7 +61,7 @@ async def build_formula_cards(
             temperature=0.2,
             max_tokens=12000,
             json_mode=True,
-            timeout=300.0,
+            timeout=card_timeout_seconds(300.0),
             max_retries=1,
             retry_delay=1.0,
             disable_thinking=True,

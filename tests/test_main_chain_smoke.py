@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from scripts.run_main_chain_smoke import _handoff_payload, _select_handoff_candidate, evaluate_gating, run_main_chain_smoke
+from scripts.run_main_chain_smoke import (
+    _handoff_payload,
+    _select_handoff_candidate,
+    evaluate_gating,
+    read_cache,
+    run_main_chain_smoke,
+)
 
 
 class FakeResponse:
@@ -208,6 +215,34 @@ def test_main_chain_smoke_prefers_method_like_candidate_over_foundation() -> Non
 
     assert result["selected_seed_handoff_title"] == "Neural Architecture for Time Series Anomaly Detection"
     assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
+
+
+def test_main_chain_smoke_refresh_cache_writes_direction_result(tmp_path: Path) -> None:
+    client = FakeClient(
+        final_status="SUCCESS",
+        cards_status_code=200,
+        cards_payload={"cards": {"paper_card": {}, "formula_cards": {}, "teaching_cards": {}}},
+    )
+    cache_dir = tmp_path / "cache"
+
+    result = run_main_chain_smoke(
+        client,
+        query="time series anomaly detection",
+        max_candidates=5,
+        llm_enabled=True,
+        cache_dir=str(cache_dir),
+        refresh_cache=True,
+    )
+
+    cached = read_cache(str(cache_dir), "time series anomaly detection")
+    direction_search_requests = [
+        request for request in client.requests
+        if request[0] == "POST" and request[1] == "/api/v1/directions/search"
+    ]
+    assert result["cache_hit"] is False
+    assert cached is not None
+    assert cached["papers"][1]["arxiv_id"] == "2401.00001"
+    assert direction_search_requests
 
 
 def test_handoff_candidate_selection_rejects_unrelated_source_backed_paper() -> None:

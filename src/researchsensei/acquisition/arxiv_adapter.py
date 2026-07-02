@@ -53,6 +53,8 @@ class ArxivAdapter:
                     break  # Got results, no need to try other query forms
             except Exception as exc:
                 logger.warning("arXiv query '%s' failed: %s", q[:80], exc)
+                if _should_stop_query_forms(exc):
+                    raise RuntimeError(f"arXiv source unavailable: {exc}") from exc
                 continue
 
         return all_results[:max_results]
@@ -146,6 +148,7 @@ class ArxivAdapter:
         else:
             params["search_query"] = query
 
+        last_retry_reason = "retryable errors"
         for attempt in range(_MAX_RETRIES):
             try:
                 with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
@@ -155,6 +158,7 @@ class ArxivAdapter:
                     body = resp.text
                     if "Rate exceeded" in body or "Please reduce" in body:
                         backoff = _BACKOFF_429[min(attempt, len(_BACKOFF_429) - 1)]
+                        last_retry_reason = "rate limited by response body"
                         logger.warning(
                             "arXiv rate exceeded (body), retry %d/%d in %.1fs",
                             attempt + 1, _MAX_RETRIES, backoff,
@@ -165,6 +169,7 @@ class ArxivAdapter:
                     if resp.status_code in _RETRY_CODES:
                         backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
                         wait = backoff[min(attempt, len(backoff) - 1)]
+                        last_retry_reason = "rate limited (429)" if resp.status_code == 429 else "service unavailable (503)"
                         logger.warning(
                             "arXiv API got %d, retry %d/%d in %.1fs",
                             resp.status_code, attempt + 1, _MAX_RETRIES, wait,
@@ -179,6 +184,7 @@ class ArxivAdapter:
                 if exc.response.status_code in _RETRY_CODES:
                     backoff = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
                     wait = backoff[min(attempt, len(backoff) - 1)]
+                    last_retry_reason = "rate limited (429)" if exc.response.status_code == 429 else "service unavailable (503)"
                     logger.warning(
                         "arXiv API got %d, retry %d/%d in %.1fs",
                         exc.response.status_code, attempt + 1, _MAX_RETRIES, wait,
@@ -188,6 +194,7 @@ class ArxivAdapter:
                 raise
             except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
                 wait = _BACKOFF_503[min(attempt, len(_BACKOFF_503) - 1)]
+                last_retry_reason = "network errors"
                 logger.warning(
                     "arXiv API network error: %s, retry %d/%d in %.1fs",
                     exc, attempt + 1, _MAX_RETRIES, wait,
@@ -195,7 +202,7 @@ class ArxivAdapter:
                 time.sleep(wait)
                 continue
 
-        raise RuntimeError(f"arXiv API exhausted {_MAX_RETRIES} retries for query: {query[:80]}")
+        raise RuntimeError(f"arXiv API exhausted {_MAX_RETRIES} retries after {last_retry_reason} for query: {query[:80]}")
 
     def _parse_atom(self, xml_text: str) -> list[CandidatePaper]:
         """Parse arXiv Atom XML into CandidatePaper list."""
@@ -301,3 +308,17 @@ def _clean(value: object) -> str:
 
 def _stable_id(title: object) -> str:
     return "arxiv_" + _clean(title).lower().replace(" ", "_")[:50] or "arxiv_unknown"
+
+
+def _should_stop_query_forms(exc: Exception) -> bool:
+    message = str(exc).lower()
+    stop_terms = (
+        "rate limited",
+        "rate exceeded",
+        "429",
+        "service unavailable",
+        "503",
+        "network errors",
+        "exhausted",
+    )
+    return any(term in message for term in stop_terms)

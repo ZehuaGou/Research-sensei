@@ -26,6 +26,15 @@ class FailingAdapter:
         raise RuntimeError("source unavailable")
 
 
+class TimeoutRelationAdapter:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        self.calls.append(query)
+        raise TimeoutError("The read operation timed out")
+
+
 class StaticVerifier:
     def verify_batch(self, candidates: list[CandidatePaper]) -> list[CandidatePaper]:
         return [
@@ -115,6 +124,21 @@ def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:
     assert bundle.status == "DEGRADED"
     assert bundle.papers
     assert any("SEED_SOURCE_FAILED" in warning for warning in bundle.warnings)
+
+
+def test_seed_expansion_skips_source_after_transient_failure_for_remaining_relations() -> None:
+    adapter = TimeoutRelationAdapter()
+    service = _service({"crossref": adapter}, sources=["crossref"])
+
+    bundle = service.expand({"title": "Time Series Anomaly Detection with Transformers"})
+
+    assert bundle.status == "BLOCKED"
+    assert len(adapter.calls) == 1
+    skipped_metrics = [
+        metric for metric in bundle.source_metrics
+        if metric["source"] == "crossref" and "skipped after previous transient" in str(metric["error"])
+    ]
+    assert len(skipped_metrics) == 3
 
 
 def test_empty_source_results_return_empty_result() -> None:

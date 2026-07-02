@@ -31,6 +31,7 @@ def sample_success_row() -> dict:
         "pdf_url": "",
         "input_type": "arxiv_source",
         "source_strategy": "source_first",
+        "handoff_job_id": "job-success",
         "final_status": "SUCCESS",
         "blocking_reason": "",
         "cards_code": 200,
@@ -60,6 +61,7 @@ def sample_degraded_row() -> dict:
         "pdf_url": "https://example.com/paper.pdf",
         "input_type": "arxiv_pdf",
         "source_strategy": "pdf_fallback",
+        "handoff_job_id": "job-degraded",
         "final_status": "DEGRADED_STRUCTURAL",
         "blocking_reason": "FORMULA_DERIVATION_BLOCKED",
         "cards_code": 200,
@@ -89,6 +91,7 @@ def sample_paper_card_failed_row() -> dict:
         "pdf_url": "https://example.com/diffusion.pdf",
         "input_type": "arxiv_pdf",
         "source_strategy": "pdf_fallback",
+        "handoff_job_id": "job-blocked",
         "final_status": "BLOCKED_UNDERSTANDING",
         "blocking_reason": "PAPER_CARD_FAILED",
         "cards_code": 403,
@@ -118,6 +121,7 @@ def sample_fail_row() -> dict:
         "pdf_url": "",
         "input_type": "unknown",
         "source_strategy": "unknown",
+        "handoff_job_id": "",
         "final_status": "",
         "blocking_reason": "",
         "cards_code": 0,
@@ -188,6 +192,7 @@ class TestMatrixSummarySchema:
             assert "arxiv_id" in row
             assert "input_type" in row
             assert "source_strategy" in row
+            assert "handoff_job_id" in row
             assert "final_status" in row
             assert "blocking_reason" in row
             assert "cards_code" in row
@@ -286,6 +291,8 @@ def test_parse_args_defaults():
     assert args.use_cache is False
     assert args.refresh_cache is False
     assert args.queries is None
+    assert args.query_timeout_seconds == 240.0
+    assert args.llm_card_timeout_seconds == 30.0
 
 
 def test_parse_args_custom_queries():
@@ -338,6 +345,16 @@ class TestFailureRootCauseClassification:
         result = {"final_verdict": "FAIL", "failed_stage": "direction_search", "final_understanding_status": "BLOCKED", "blocking_reason": "NO_CANDIDATES", "source_strategy": "metadata_only"}
         assert matrix._classify_failure_root_cause(result) == "direction_search_failed"
 
+    def test_classify_query_timeout(self):
+        result = {
+            "final_verdict": "FAIL",
+            "failed_stage": "query_timeout",
+            "final_understanding_status": "",
+            "blocking_reason": "",
+            "source_strategy": "unknown",
+        }
+        assert matrix._classify_failure_root_cause(result) == "query_timeout"
+
     def test_classify_degraded_blocked(self):
         result = {"final_verdict": "BLOCKED", "final_understanding_status": "BLOCKED_UNDERSTANDING", "blocking_reason": "PAPER_CARD_FAILED"}
         assert matrix._classify_failure_root_cause(result) == "blocked:PAPER_CARD_FAILED"
@@ -350,3 +367,88 @@ class TestFailureRootCauseClassification:
             "returned_card_components": ["paper_card", "teaching_cards"],
         }
         assert matrix._classify_failure_root_cause(result) == "degraded_formula_derivation_blocked:FORMULA_DERIVATION_BLOCKED"
+
+
+def test_run_matrix_continues_after_query_timeout(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(
+        matrix,
+        "_resolve_llm_mode",
+        lambda provider, skip_llm: {"enabled": True, "note": f"LLM enabled with provider '{provider}'."},
+    )
+
+    def fake_run_query(args, *, query: str, llm_mode: dict[str, object]) -> dict[str, object]:
+        if query == "q1":
+            return matrix._timeout_result(query, llm_mode, 1.0)
+        return {
+            "query": query,
+            "llm_enabled": True,
+            "llm_mode_note": "test",
+            "cache_hit": False,
+            "selected_candidate_title": "Paper A",
+            "selected_candidate_arxiv_id": "2301.12345",
+            "selected_candidate_sources": ["arxiv"],
+            "selected_seed_handoff_title": "Paper A",
+            "selected_seed_handoff_arxiv_id": "2301.12345",
+            "selected_seed_handoff_sources": ["arxiv"],
+            "selected_input_type": "arxiv_source",
+            "source_strategy": "source_first",
+            "arxiv_source_downloaded": True,
+            "fallback_used": "",
+            "seed_expansion_status": "SUCCESS",
+            "seed_expansion_group_counts": {"upstream": 1, "downstream": 0, "same_route": 0, "surveys": 0},
+            "direction_source_metrics": {"arxiv": {"attempted": True}},
+            "seed_source_metrics": {},
+            "handoff_job_id": "job-1",
+            "final_understanding_status": "SUCCESS",
+            "blocking_reason": "",
+            "cards_status_code": 200,
+            "returned_card_components": ["paper_card", "formula_cards", "teaching_cards"],
+            "formula_origin_summary": {},
+            "warnings": [],
+            "final_verdict": "PASS",
+            "verdict_reasons": [],
+        }
+
+    monkeypatch.setattr(matrix, "_run_query_with_timeout", fake_run_query)
+    args = matrix.parse_args([
+        "--queries",
+        "q1",
+        "q2",
+        "--workspace",
+        str(tmp_path / "workspace"),
+        "--output-json",
+        str(tmp_path / "summary.json"),
+    ])
+
+    summary = matrix.run_matrix(args)
+
+    assert summary["total_queries"] == 2
+    assert summary["failed"] == 1
+    assert summary["passed"] == 1
+    assert summary["failure_root_cause_breakdown"]["query_timeout"] == 1
+    assert summary["rows"][1]["query"] == "q2"
+
+
+def test_exit_code_treats_blocked_rows_as_results() -> None:
+    summary = {
+        "total_queries": 1,
+        "failed": 0,
+        "blocked": 1,
+        "passed": 0,
+    }
+
+    assert matrix._exit_code_for_summary(summary, max_failures=0) == (0, "")
+
+
+def test_exit_code_rejects_empty_matrix() -> None:
+    summary = {
+        "total_queries": 0,
+        "failed": 0,
+        "blocked": 0,
+        "passed": 0,
+    }
+
+    code, message = matrix._exit_code_for_summary(summary, max_failures=0)
+
+    assert code == 2
+    assert "No rows produced" in message

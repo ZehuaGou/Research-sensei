@@ -59,6 +59,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--use-cache", action="store_true", help="Use cached direction search results when available.")
     parser.add_argument("--refresh-cache", action="store_true", help="Force refresh cache even if valid entry exists.")
     parser.add_argument("--cache-dir", default=str(ROOT / ".cache" / "researchsensei"), help="Cache directory for direction search results.")
+    parser.add_argument(
+        "--llm-card-timeout-seconds",
+        type=float,
+        default=0.0,
+        help="Override per-card LLM timeout for smoke runs. Use 0 for application default.",
+    )
     return parser.parse_args(argv)
 
 
@@ -67,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
     env_loaded = load_runtime_env(suppress_errors=True)
     if env_loaded:
         print(f"[env] loaded from .env: {env_loaded}")
+    if args.llm_card_timeout_seconds > 0:
+        os.environ["RESEARCHSENSEI_LLM_CARD_TIMEOUT_SECONDS"] = str(args.llm_card_timeout_seconds)
     llm_mode = resolve_llm_mode(provider=args.provider, skip_llm=args.skip_llm)
     client = TestClient(
         create_app(
@@ -122,6 +130,7 @@ def run_main_chain_smoke(
 ) -> dict[str, Any]:
     warnings: list[str] = []
     cache_hit = False
+    cache_enabled = bool(cache_dir and (use_cache or refresh_cache))
 
     # Try cache first
     if use_cache and cache_dir and not refresh_cache:
@@ -132,6 +141,8 @@ def run_main_chain_smoke(
             warnings.append("CACHE_HIT:direction_search")
         else:
             warnings.append("CACHE_MISS:direction_search")
+    elif refresh_cache and cache_dir:
+        warnings.append("CACHE_REFRESH:direction_search")
 
     if not cache_hit:
         direction_response = _request_json(
@@ -139,13 +150,13 @@ def run_main_chain_smoke(
             "direction search",
         )
         # Write to cache if enabled
-        if use_cache and cache_dir:
+        if cache_enabled:
             write_cache(cache_dir, query, direction_response)
 
     direction_source_metrics = direction_response.get("source_metrics") or []
     direction_papers = _papers(direction_response)
     # Search all direction papers for the best arXiv candidate (don't truncate
-    # before selection — arXiv papers may be ranked after OpenAlex results).
+    # before selection; arXiv papers may be ranked after OpenAlex results.
     direction_candidate = _select_arxiv_candidate(direction_papers, query=query)
     if not direction_candidate:
         return _fail(

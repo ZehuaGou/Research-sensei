@@ -26,6 +26,24 @@ class FailingAdapter:
         raise RuntimeError("source unavailable")
 
 
+class RateLimitedAdapter:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        self.calls.append(query)
+        raise RuntimeError("429 Too Many Requests")
+
+
+class TimeoutAdapter:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        self.calls.append(query)
+        raise TimeoutError("The read operation timed out")
+
+
 class StaticVerifier:
     def verify_batch(self, candidates: list[CandidatePaper]) -> list[CandidatePaper]:
         return [
@@ -152,6 +170,44 @@ def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:
     assert bundle.status == "DEGRADED"
     assert bundle.candidate_cards
     assert any("ACQUISITION_FAILED:openalex" in warning for warning in bundle.warnings)
+
+
+def test_rate_limited_source_skips_remaining_query_variants() -> None:
+    adapter = RateLimitedAdapter()
+    service = _service({"semantic_scholar": adapter}, sources=["semantic_scholar"])
+
+    candidates, warnings, search_log, metrics = service._acquire(
+        "time series anomaly detection",
+        query_variants=[
+            "time series anomaly detection survey",
+            "time series anomaly detection review",
+        ],
+    )
+
+    assert candidates == []
+    assert len(adapter.calls) == 1
+    assert any("ACQUISITION_FAILED:semantic_scholar" in warning for warning in warnings)
+    assert any("skipped remaining variants after rate limit" in line for line in search_log)
+    assert metrics[0]["rate_limited"] is True
+
+
+def test_transient_source_failure_skips_remaining_query_variants() -> None:
+    adapter = TimeoutAdapter()
+    service = _service({"crossref": adapter}, sources=["crossref"])
+
+    candidates, warnings, search_log, metrics = service._acquire(
+        "time series anomaly detection",
+        query_variants=[
+            "time series anomaly detection survey",
+            "time series anomaly detection review",
+        ],
+    )
+
+    assert candidates == []
+    assert len(adapter.calls) == 1
+    assert any("ACQUISITION_FAILED:crossref" in warning for warning in warnings)
+    assert any("skipped remaining variants after transient source failure" in line for line in search_log)
+    assert metrics[0]["success"] is False
 
 
 def test_direction_source_metrics_include_all_attempted_sources() -> None:

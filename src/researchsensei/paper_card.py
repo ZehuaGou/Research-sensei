@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
+
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.runtime_config import card_timeout_seconds
 from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_paper_card_llm_output
 from researchsensei.schemas import (
@@ -69,7 +72,7 @@ async def build_paper_card(
         temperature=0.2,
         max_tokens=12000,
         json_mode=True,
-        timeout=300.0,
+        timeout=card_timeout_seconds(300.0),
         max_retries=1,
         retry_delay=1.0,
         disable_thinking=True,
@@ -91,6 +94,11 @@ def _convert_to_paper_card(
 ) -> PaperCard:
     """Convert LLM output to PaperCard."""
     valid_refs = {item.evidence_ref for item in evidence_pack.items if item.evidence_ref}
+    evidence_by_ref = {
+        item.evidence_ref: item.passage_text or item.quote_or_summary
+        for item in evidence_pack.items
+        if item.evidence_ref
+    }
     avg_confidence = _avg_confidence(evidence_pack)
     warnings: list[str] = []
 
@@ -108,6 +116,9 @@ def _convert_to_paper_card(
             else:
                 candidate_text = "证据不足，暂不展开。"
             warnings.append(f"PAPER_CARD_FIELD_DEGRADED: {field}")
+        if ref and _looks_like_raw_copy(candidate_text, evidence_by_ref.get(ref, "")):
+            candidate_text = _fallback_summary_text(field, evidence_by_ref.get(ref, candidate_text), skeleton)
+            warnings.append(f"PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: {field}")
         return CardClaim(
             text=candidate_text or fallback_text,
             evidence_ref=ref,
@@ -157,13 +168,19 @@ def _fallback_paper_card(
         paper_id=skeleton.paper_id,
         title=skeleton.title or "UNKNOWN",
         one_sentence_summary=skeleton.abstract_summary or "证据不足，暂不展开。",
-        problem=_claim_from_text(skeleton.problem, problem_ref, evidence_pack),
+        problem=_fallback_claim("problem", skeleton.problem, problem_ref, evidence_pack, skeleton),
         background=_claim_from_text(skeleton.abstract_summary, "", evidence_pack),
         old_methods=[],
         bottleneck=CardClaim(text="UNKNOWN"),
-        core_idea=_claim_from_item(_first_item(evidence_pack, {"CONTRIBUTION", "METHOD"}), core_ref, fallback="证据不足，暂不展开。"),
-        method_overview=_claim_from_text(skeleton.method_overview, method_ref, evidence_pack),
-        experiment_summary=_claim_from_text(skeleton.experiment_overview, experiment_ref, evidence_pack),
+        core_idea=_fallback_claim(
+            "core_idea",
+            _item_text(_first_item(evidence_pack, {"CONTRIBUTION", "METHOD"})),
+            core_ref,
+            evidence_pack,
+            skeleton,
+        ),
+        method_overview=_fallback_claim("method_overview", skeleton.method_overview, method_ref, evidence_pack, skeleton),
+        experiment_summary=_fallback_claim("experiment_summary", skeleton.experiment_overview, experiment_ref, evidence_pack, skeleton),
         limitations=CardClaim(text="证据不足，暂不展开。", evidence_type=EvidenceType.INSUFFICIENT_EVIDENCE),
         key_formulas=[],
         evidence_refs=refs,
@@ -171,6 +188,41 @@ def _fallback_paper_card(
         warnings=warnings,
         evidence_status=EvidenceType.SUPPORTED_BY_TEXT if refs else EvidenceType.INSUFFICIENT_EVIDENCE,
     )
+
+
+def _fallback_claim(
+    field: str,
+    text: str,
+    ref: str,
+    evidence_pack: EvidencePack,
+    skeleton: PaperSkeleton,
+) -> CardClaim:
+    summary = _fallback_summary_text(field, text, skeleton) if ref else "证据不足，暂不展开。"
+    return CardClaim(
+        text=summary,
+        evidence_ref=ref,
+        evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
+        confidence=_avg_confidence(evidence_pack) if ref else 0.0,
+    )
+
+
+def _fallback_summary_text(field: str, text: str, skeleton: PaperSkeleton) -> str:
+    if _looks_insufficient(text):
+        return "证据不足，暂不展开。"
+    topic = _paper_topic(skeleton)
+    keywords = _keywords(text, skeleton.title)
+    phrase = "、".join(keywords[:4])
+    if not phrase:
+        phrase = topic
+    if field == "problem":
+        return f"论文聚焦 {topic}，指出现有处理仍受 {phrase} 等因素限制。"
+    if field == "core_idea":
+        return f"核心想法围绕 {topic} 引入 {phrase}，以改进论文关注的任务。"
+    if field == "method_overview":
+        return f"方法围绕 {phrase} 组织，用于解决 {topic} 中的关键建模问题。"
+    if field == "experiment_summary":
+        return f"实验围绕 {topic} 评估方法，并报告 {phrase} 等对比信号。"
+    return f"证据指向 {topic} 中的 {phrase}。"
 
 
 def _claim_from_text(text: str, ref: str, evidence_pack: EvidencePack) -> CardClaim:
@@ -198,6 +250,77 @@ def _claim_from_item(item, ref: str, *, fallback: str) -> CardClaim:
         evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
         confidence=confidence if ref else 0.0,
     )
+
+
+def _item_text(item) -> str:
+    if item is None:
+        return ""
+    return str(item.quote_or_summary or item.passage_text or "")
+
+
+def _paper_topic(skeleton: PaperSkeleton) -> str:
+    title = (skeleton.title or "").strip()
+    if title:
+        return title[:120]
+    abstract = (skeleton.abstract_summary or "").strip()
+    if abstract:
+        return _first_sentence(abstract)[:120]
+    return "这篇论文"
+
+
+def _keywords(text: str, title: str = "") -> list[str]:
+    candidates = []
+    combined = f"{title} {text}"
+    for pattern in (
+        r"\b[A-Z][A-Z0-9-]{2,}\b",
+        r"\b[A-Za-z]+-[A-Za-z0-9-]+\b",
+        r"\b(?:frequency domain|time domain|time series|anomaly detection|frequency matrix)\b",
+        r"\b(?:FFT|SENet|LSTM|Transformer|diffusion|graph neural network|GNN)\b",
+        r"\b(?:accuracy|precision|recall|F1|AUC|dataset|benchmark)\b",
+    ):
+        candidates.extend(match.group(0) for match in re.finditer(pattern, combined, flags=re.IGNORECASE))
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in candidates:
+        value = value.strip()
+        key = value.lower()
+        if len(value) < 3 or key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(value)
+    return cleaned
+
+
+def _first_sentence(text: str) -> str:
+    match = re.split(r"(?<=[.!?。！？])\s+", text.strip(), maxsplit=1)
+    return match[0] if match else text.strip()
+
+
+def _looks_like_raw_copy(text: str, evidence_text: str) -> bool:
+    if not text or not evidence_text:
+        return False
+    left = _content_tokens(text)
+    right = _content_tokens(evidence_text)
+    if len(left) < 12 or not right:
+        return False
+    return len(set(left) & set(right)) / max(1, min(len(set(left)), len(set(right)))) > 0.65
+
+
+def summarize_paper_card_field(field: str, evidence_text: str, skeleton: PaperSkeleton) -> str:
+    return _fallback_summary_text(field, evidence_text, skeleton)
+
+
+def looks_like_paper_card_raw_copy(text: str, evidence_text: str) -> bool:
+    return _looks_like_raw_copy(text, evidence_text)
+
+
+def _content_tokens(text: str) -> list[str]:
+    stopwords = {"the", "and", "for", "with", "that", "this", "from", "are", "was", "were", "into"}
+    return [
+        token
+        for token in re.findall(r"[a-zA-Z][a-zA-Z0-9_\-]{2,}", text.lower())
+        if token not in stopwords
+    ]
 
 
 def _fallback_ref_for_field(field: str, evidence_pack: EvidencePack) -> str:
