@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-06-28.
+Last updated: 2026-07-02.
 
 This is the single authoritative status file for ResearchSensei. README,
 DESIGN, DEVELOPMENT, module contracts, development notes, and historical docs
@@ -28,6 +28,32 @@ after artifact retrieval supplies allowed evidence refs; invalid LLM evidence
 refs are rejected and fall back to deterministic artifact answers. It is not
 yet a PaperQA-backed tutor, vector memory system, direction-level dialogue
 engine, or full drill generator.
+
+## 2026-07-02 Hardening Pass
+
+- Added a tracked-file encoding hygiene test to catch real UTF-8/GBK mojibake
+  saved in source, tests, docs, and frontend text files. M4 user-facing fallback
+  responses are also covered by API-level no-mojibake assertions.
+- Direction query planning now handles common Chinese mixed-intent terms such as
+  forecasting, anomaly detection, multivariate time series, and graph neural
+  networks more consistently. Forecasting/anomaly variants are generated for
+  mixed Chinese queries.
+- Candidate scoring now ranks source-first / LaTeX-source / validated full-text
+  candidates above URL-only candidates while preserving all existing A_READ and
+  M2 gate requirements.
+- Passage indexing now retains short method/result/problem evidence passages
+  when they have evidence refs and method/result keywords. This is intended to
+  help PDF and non-arXiv method evidence survive into downstream evidence packs
+  without relaxing `MISSING_METHOD_EVIDENCE`.
+- Semantic Scholar search now has in-process successful-response caching and a
+  shared polite throttle. Existing retry/backoff and source-level degradation
+  behavior remain fail-closed.
+- DOI/Unpaywall coverage now includes DOI URL normalization and secondary OA
+  PDF locations from `oa_locations`.
+- Validation for this checkpoint: `pytest` = 603 passed / 15 skipped;
+  targeted hardening tests = 69 passed; `npm test` = 52 passed; `npm run build`
+  passed; `npm audit --omit=dev` reported zero vulnerabilities; `git diff
+  --check` passed.
 
 ## 2026-06-28 ccswitch And UI Reconciliation
 
@@ -383,9 +409,11 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
    lookup, but broad DOI acceptance is not verified. Non-arXiv PDFs frequently
    degrade or block because of raw formula provenance, download failures, or
    missing method evidence.
-3. Semantic Scholar can rate-limit; `SEMANTIC_SCHOLAR_API_KEY` and `S2_API_KEY`
-   are supported, source-level degradation is handled, but broad caching/backoff
-   still needs hardening. Matrix runs may time out under API pressure.
+3. Semantic Scholar can still rate-limit under broad live matrix pressure;
+   `SEMANTIC_SCHOLAR_API_KEY` and `S2_API_KEY` are supported, source-level
+   degradation is handled, and the adapter now has in-process success caching
+   plus a shared polite throttle. Broad live matrix behavior still needs
+   re-verification under real API pressure.
 4. Formula cards still degrade on non-source_latex or weak provenance — correct
    fail-closed behavior for both PDF-fallback queries in the current matrix.
 5. Main-chain positive evidence is narrow; source-first success is promising but
@@ -397,14 +425,15 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
 
 ## Next Priority Order
 
-1. Improve candidate selection/query planning for forecasting and mixed-intent
-   queries so source-backed handoff papers better match the requested direction.
-2. Improve PDF/non-arXiv evidence extraction so method passages survive into
-   evidence_pack without relaxing `MISSING_METHOD_EVIDENCE` gates.
-3. Expand DOI-to-legal-fulltext-to-deep_read acceptance across known OA
+1. Run a live/cached 12-query main-chain matrix after the 2026-07-02 query
+   planning, source-aware ranking, and Semantic Scholar cache/throttle changes.
+2. Continue improving candidate selection for forecasting and mixed-intent
+   queries, especially selecting source-backed candidates that truly match the
+   requested direction.
+3. Continue improving PDF/non-arXiv evidence extraction beyond short evidence
+   passage retention, without relaxing `MISSING_METHOD_EVIDENCE` gates.
+4. Expand DOI-to-legal-fulltext-to-deep_read acceptance across known OA
    publishers; keep failures explicit.
-4. Add polite Semantic Scholar cache/backoff to reduce repeated 429s in matrix
-   smokes.
 5. Keep frontend status rendering aligned with `/understanding_status` and
    `/cards` gating.
 6. Harden M4 beyond v1: add stronger retrieval, PaperQA-backed citation
