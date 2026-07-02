@@ -11,121 +11,156 @@ const props = defineProps<{
   allowedDownstream?: Record<string, boolean>
 }>()
 
-const title = computed(() => {
-  switch (props.status) {
-    case 'SUCCESS':
-      return 'Understanding ready'
-    case 'BASELINE_ONLY':
-      return 'Baseline only'
-    case 'BLOCKED_UNDERSTANDING':
-      return 'Understanding blocked'
-    case 'DEGRADED_STRUCTURAL':
-      return 'Degraded understanding'
-    case 'FAILED':
-      return 'Pipeline failed'
-    default:
-      return ''
-  }
-})
+const statusText: Record<string, string> = {
+  SUCCESS: '理解完成',
+  BASELINE_ONLY: '仅基础解析',
+  BLOCKED_UNDERSTANDING: '理解被阻断',
+  DEGRADED_STRUCTURAL: '结构不完整',
+  FAILED: '流水线失败',
+}
 
+const reasonText: Record<string, string> = {
+  NO_LLM_CLIENT: '后端没有启用实时大模型，请开启 RESEARCHSENSEI_ENABLE_API_LLM=1 并重新跑论文。',
+  PAPER_CARD_FAILED: '论文核心卡片没有生成成功。',
+  FORMULA_CARDS_FAILED: '公式卡片没有生成成功。',
+  TEACHING_CARDS_FAILED: '教学卡片没有生成成功。',
+  MISSING_METHOD_EVIDENCE: '证据包里缺少方法部分证据。',
+  EMPTY_EVIDENCE_PACK: '没有可用于生成卡片的证据。',
+  FORMULA_DERIVATION_BLOCKED: '公式来源不够可靠，不能生成可信推导。',
+}
+
+const title = computed(() => statusText[props.status] || '')
+const tone = computed(() => {
+  if (props.status === 'SUCCESS') return 'success'
+  if (props.status === 'BLOCKED_UNDERSTANDING' || props.status === 'FAILED') return 'danger'
+  if (props.status === 'DEGRADED_STRUCTURAL') return 'warning'
+  return 'neutral'
+})
 const message = computed(() => {
-  switch (props.status) {
-    case 'SUCCESS':
-      return 'Evidence-bound paper, formula, and teaching cards are available for this run.'
-    case 'BASELINE_ONLY':
-      return 'No real LLM understanding is available for this run. Diagnostic cards are hidden from the workspace.'
-    case 'BLOCKED_UNDERSTANDING':
-      return props.blockingReason || 'The paper could not enter user-facing understanding.'
-    case 'DEGRADED_STRUCTURAL':
-      return 'Some M2 components are unavailable. Only successful components can be shown.'
-    case 'FAILED':
-      return 'The analysis run failed before a usable understanding status was produced.'
-    default:
-      return ''
-  }
+  if (props.status === 'SUCCESS') return '可以阅读论文卡片、解释公式，并继续向 M4 追问。'
+  if (props.status === 'BASELINE_ONLY') return reasonText.NO_LLM_CLIENT
+  if (props.status === 'BLOCKED_UNDERSTANDING') return reasonText[props.blockingReason || ''] || props.blockingReason || '当前结果不能展示给用户。'
+  if (props.status === 'DEGRADED_STRUCTURAL') return reasonText[props.blockingReason || ''] || '部分组件缺失。'
+  if (props.status === 'FAILED') return '解析或理解流水线执行失败，请查看后端日志。'
+  return ''
 })
 
-const toneStyle = computed(() => {
-  if (props.status === 'SUCCESS') {
-    return 'background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); color: #10b981;'
-  }
-  if (props.status === 'BLOCKED_UNDERSTANDING' || props.status === 'FAILED') {
-    return 'background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #ef4444;'
-  }
-  if (props.status === 'DEGRADED_STRUCTURAL') {
-    return 'background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2); color: #6366f1;'
-  }
-  return 'background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b;'
-})
-
-const detailRows = computed(() => {
+const compactRows = computed(() => {
   const details = props.paperWorkspaceStatus || {}
-  const rows: Array<[string, any]> = [
-    ['blocking_reason', props.blockingReason],
-    ['source_type', details.source_type],
-    ['verification_status', details.verification_status],
-    ['pdf_metadata_check', details.pdf_metadata_check],
-    ['pdf_title_match', details.pdf_title_match],
-    ['can_enter_m2', details.can_enter_m2],
-    ['source_confidence', details.source_confidence],
-    ['canonicalization_status', details.canonicalization_status],
-    ['m2_ready', details.m2_ready],
-    ['degradation_reason', details.degradation_reason],
-    ['formula_origin', details.formula_origin],
-    ['formula_ocr_status', details.formula_ocr_status],
-    ['evidence_status', details.evidence_status],
-    ['quality_status', details.quality_status],
+  const rows = [
+    ['来源', details.source_type],
+    ['验证', details.verification_status],
+    ['证据', details.evidence_status],
+    ['质量', details.quality_status],
+    ['公式来源', details.formula_origin],
+    ['公式 OCR', details.formula_ocr_status],
+    ['阻断原因', props.blockingReason || details.degradation_reason],
   ]
-  Object.entries(props.componentStatus || {}).forEach(([key, value]) => {
-    rows.push([`component_status.${key}`, value])
-  })
-  Object.entries(props.allowedDownstream || {}).forEach(([key, value]) => {
-    rows.push([`allowed_downstream.${key}`, value])
-  })
-  return rows
-    .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([label, value]) => ({ label: String(label), value: formatValue(value) }))
+  return rows.filter(([, value]) => value !== undefined && value !== null && value !== '')
 })
 
-function formatValue(value: any): string {
-  if (typeof value === 'boolean') return value ? 'true' : 'false'
-  if (Array.isArray(value)) return value.join(', ')
-  return String(value)
+function readableKey(value: unknown) {
+  const text = String(value || '')
+  const labels: Record<string, string> = {
+    NO_LLM_CLIENT: '未连接大模型',
+    PAPER_CARD_FAILED: '论文卡片失败',
+    FORMULA_CARDS_FAILED: '公式卡片失败',
+    TEACHING_CARDS_FAILED: '教学卡片失败',
+    MISSING_METHOD_EVIDENCE: '缺少方法证据',
+    EMPTY_EVIDENCE_PACK: '证据为空',
+    FORMULA_DERIVATION_BLOCKED: '公式推导被阻断',
+    paper_card: '论文卡片',
+    formula_cards: '公式卡片',
+    teaching_cards: '教学卡片',
+    llm: '大模型',
+    evidence_pack: '证据包',
+    local_path: '本地文件',
+    upload: '上传文件',
+    arxiv_source: 'arXiv 来源',
+    m1_canonical_bundle: '规范化论文包',
+    verified: '已验证',
+    success: '成功',
+    SUCCESS: '成功',
+    pass: '通过',
+    blocked: '已阻断',
+    failed: '失败',
+    FAILED: '失败',
+    skipped: '已跳过',
+    SKIPPED: '已跳过',
+    BASELINE: '基础解析',
+    not_available: '未提供',
+    not_required: '无需 OCR',
+    source_latex: '论文 LaTeX',
+    mineru_latex: 'MinerU LaTeX',
+    raw_formula_text: '原始公式文本',
+  }
+  return labels[text] || text
+}
+
+function valueText(value: any) {
+  if (typeof value === 'boolean') return value ? '是' : '否'
+  if (Array.isArray(value)) return value.map(readableKey).join('、')
+  return readableKey(value)
 }
 </script>
 
 <template>
-  <div
-    v-if="title"
-    class="rounded-lg p-4 mb-6"
-    :style="toneStyle"
-    data-testid="status-banner"
-  >
-    <div class="text-sm font-semibold mb-1">{{ title }}</div>
-    <p class="text-xs leading-relaxed mb-3" style="color: var(--text-secondary);">
-      {{ message }}
-    </p>
-
-    <div v-if="missingComponents?.length" class="text-xs mb-3" style="color: var(--text-secondary);">
-      missing_components: {{ missingComponents.join(', ') }}
-    </div>
-
-    <dl v-if="detailRows.length" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
-      <div
-        v-for="row in detailRows"
-        :key="row.label"
-        class="rounded-md px-3 py-2"
-        style="background: rgba(255,255,255,0.55);"
-      >
-        <dt class="text-[11px] font-semibold" style="color: var(--text-muted);">{{ row.label }}</dt>
-        <dd class="text-xs break-words" style="color: var(--text-primary);">{{ row.value }}</dd>
+  <section v-if="title" class="status-banner surface" :class="tone" data-testid="status-banner">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div class="min-w-0">
+        <div class="mb-2 flex flex-wrap items-center gap-2">
+          <span class="status-pill" :class="tone">{{ title }}</span>
+          <span v-if="blockingReason" class="text-sm font-medium" style="color: var(--text-muted);">{{ readableKey(blockingReason) }}</span>
+        </div>
+        <p class="max-w-3xl text-[15px] leading-7" style="color: var(--text-secondary);">{{ message }}</p>
       </div>
-    </dl>
 
-    <div v-if="warnings?.length" class="space-y-1">
-      <div v-for="w in warnings" :key="w.code" class="text-xs" style="color: var(--text-muted);">
-        {{ w.code }}: {{ w.message }}
+      <div v-if="missingComponents?.length" class="rounded-[10px] px-3 py-2 text-sm" style="background: var(--bg-secondary); color: var(--text-secondary);">
+        缺少：{{ missingComponents.map(readableKey).join('、') }}
       </div>
     </div>
-  </div>
+
+    <div v-if="compactRows.length" class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div v-for="[label, value] in compactRows" :key="String(label)" class="rounded-[10px] px-3 py-2" style="background: var(--bg-secondary);">
+        <div class="text-xs font-semibold" style="color: var(--text-muted);">{{ label }}</div>
+        <div class="truncate text-sm font-medium" style="color: var(--text-primary);">{{ valueText(value) }}</div>
+      </div>
+    </div>
+
+    <div v-if="warnings?.length" class="mt-3 space-y-1 text-sm" style="color: var(--text-muted);">
+      <div v-for="warning in warnings" :key="warning.code">
+        {{ warning.code }}：{{ warning.message }}
+      </div>
+    </div>
+  </section>
 </template>
+
+<style scoped>
+.status-banner {
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.status-banner.success,
+.status-pill.success {
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--success);
+}
+
+.status-banner.warning,
+.status-pill.warning {
+  background: rgba(196, 122, 6, 0.1);
+  color: var(--warning);
+}
+
+.status-banner.danger,
+.status-pill.danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: var(--danger);
+}
+
+.status-pill.neutral {
+  background: var(--accent-light);
+  color: var(--accent);
+}
+</style>

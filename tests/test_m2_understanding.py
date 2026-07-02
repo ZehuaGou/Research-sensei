@@ -550,7 +550,7 @@ class ScriptedM2LLMClient:
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         text = "\n".join(message.content for message in messages)
-        if "formula_cards" in text and "Formula evidence" in text:
+        if "formula_cards" in text and ("Formula evidence" in text or "公式证据" in text):
             return {
                 "formula_cards": [
                     {
@@ -631,7 +631,31 @@ def test_m2_full_pipeline_llm_path_preserves_formula_origin_and_passes_audit(tmp
     assert not [finding for finding in quality["findings"] if finding["effect"] == "BLOCK"]
 
 
-def test_m2_full_pipeline_invalid_teaching_ref_degrades_before_audit_pollution(tmp_path: Path) -> None:
+def test_m2_paper_card_failure_falls_back_to_evidence_pack(tmp_path: Path) -> None:
+    from researchsensei.m2.full_pipeline import run_m2_full_pipeline
+
+    class EmptyPaperCardLLM:
+        async def chat_json(self, messages, *, config=None):
+            raise RuntimeError("LLM returned empty content")
+
+    input_dir = _write_m1_bundle(tmp_path / "m1")
+    output_dir = tmp_path / "m2_paper_failed"
+
+    result = run_m2_full_pipeline(
+        input_dir=input_dir,
+        output_dir=output_dir,
+        llm_client=EmptyPaperCardLLM(),
+        llm_metadata={"provider": "scripted", "model": "empty"},
+    )
+
+    assert result.status.status == "SUCCESS"
+    assert result.status.component_status["paper_card"] == "SUCCESS"
+    assert result.status.component_status["llm"] == "SUCCESS"
+    assert result.status.component_status["evidence_pack"] == "SUCCESS"
+    assert (output_dir / "paper_card.json").exists()
+
+
+def test_m2_full_pipeline_invalid_teaching_ref_falls_back_without_audit_pollution(tmp_path: Path) -> None:
     from researchsensei.m2.full_pipeline import run_m2_full_pipeline
 
     input_dir = _write_m1_bundle(tmp_path / "m1")
@@ -645,15 +669,14 @@ def test_m2_full_pipeline_invalid_teaching_ref_degrades_before_audit_pollution(t
         llm_metadata={"provider": "scripted", "model": "scripted"},
     )
 
-    assert result.status.status == "DEGRADED_STRUCTURAL"
-    assert result.status.blocking_reason == "PARTIAL_M2_OUTPUT"
+    assert result.status.status == "SUCCESS"
+    assert result.status.allowed_for_user_display is True
     assert result.status.component_status["paper_card"] == "SUCCESS"
     assert result.status.component_status["formula_cards"] == "SUCCESS"
-    assert result.status.component_status["teaching_cards"] == "FAILED"
-    assert any("not in EvidencePack" in warning.message for warning in result.status.warnings)
+    assert result.status.component_status["teaching_cards"] == "SUCCESS"
     assert (output_dir / "paper_card.json").exists()
     assert (output_dir / "formula_cards.json").exists()
-    assert not (output_dir / "teaching_cards.json").exists()
+    assert (output_dir / "teaching_cards.json").exists()
 
     quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
     assert not [
@@ -788,20 +811,40 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
     from researchsensei.schemas import EvidencePack, EvidencePackItem, EvidencePackSummary, PaperSkeleton
     from researchsensei.workspace import WorkspaceStore
 
-    class EmptyFormulaBatchLLM:
+    class FormulaBatchLLM:
         def __init__(self) -> None:
             self.formula_prompt_refs: list[list[str]] = []
 
         async def chat_json(self, messages, *, config=None):
             text = "\n".join(message.content for message in messages)
-            if "Formula evidence" in text and "formula_cards" in text:
+            if "formula_cards" in text and ("Formula evidence" in text or "公式证据" in text):
                 refs = [
                     line.split(":", 1)[1].strip()
                     for line in text.splitlines()
                     if line.strip().startswith("- evidence_ref:")
                 ]
                 self.formula_prompt_refs.append(refs)
-                return {"formula_cards": []}
+                return {
+                    "formula_cards": [
+                        {
+                            "formula_id": f"formula_{ref[-3:]}",
+                            "formula_raw": f"L_{ref[-3:]}=x+y",
+                            "formula_origin": "source_latex",
+                            "formula_ocr_status": "not_required",
+                            "formula_explanation_status": "explained",
+                            "purpose": f"Purpose for {ref}",
+                            "symbols": [],
+                            "terms": [],
+                            "intuition": "Formula intuition.",
+                            "numeric_example": "Let x=1.",
+                            "what_if_removed": "The objective loses this term.",
+                            "weight_sensitivity": "Higher weight increases this term.",
+                            "plain_summary": "A formula explanation.",
+                            "evidence_ref": ref,
+                        }
+                        for ref in refs
+                    ]
+                }
             if "teaching_cards" in text:
                 return {
                     "teaching_cards": [{
@@ -872,7 +915,7 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
         total_tokens=normal_pack.total_tokens,
         claim_type_counts={"METHOD": 1, "FORMULA_CONTEXT": 5},
     )
-    client = EmptyFormulaBatchLLM()
+    client = FormulaBatchLLM()
     runner = SinglePaperIngestionRunner(
         workspace=WorkspaceStore(tmp_path / "workspace"),
         jobs=JobStore(tmp_path / "jobs.sqlite3"),
@@ -894,4 +937,4 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
     assert [len(batch) for batch in client.formula_prompt_refs] == [3, 3, 1]
     assert len(formula_cards) == 7
     assert {card.formula_id for card in formula_cards} == {f"formula_{i:03d}" for i in range(1, 8)}
-    assert all(card.coverage_status == "SUMMARY_ONLY" for card in formula_cards)
+    assert all(card.coverage_status == "LLM_EXPLAINED" for card in formula_cards)

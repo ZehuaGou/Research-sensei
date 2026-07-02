@@ -1,50 +1,79 @@
 <script setup lang="ts">
-const props = defineProps<{ card: any }>()
+defineProps<{ card: any }>()
 </script>
 
 <template>
-  <div class="rounded-2xl overflow-hidden" style="background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-    <div class="px-6 pt-6 pb-4">
-      <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold" style="background: rgba(239,68,68,0.08); color: #ef4444;">训练题</span>
-    </div>
+  <article class="drill-card surface">
+    <header>
+      <span>训练题</span>
+      <h3>{{ card.title || '复习练习' }}</h3>
+    </header>
 
-    <!-- Recall -->
-    <div v-if="card.recall_questions?.length" class="px-6 pb-5">
-      <div class="flex items-center gap-2 mb-2.5">
-        <div class="w-6 h-6 rounded-md flex items-center justify-center text-xs" style="background: rgba(239,68,68,0.08); color: #ef4444;">1</div>
-        <h4 class="text-[13px] font-semibold" style="color: var(--text-primary);">立即复述</h4>
-      </div>
-      <ol class="list-decimal list-inside space-y-1.5 text-[13px] pl-8" style="color: var(--text-secondary);">
+    <section v-if="card.recall_questions?.length">
+      <h4>立即复述</h4>
+      <ol>
         <li v-for="(q, i) in card.recall_questions" :key="i">{{ q }}</li>
       </ol>
-    </div>
+    </section>
 
-    <div v-if="card.recall_questions?.length && card.advisor_questions?.length"
-      class="mx-6 border-t" style="border-color: var(--border-subtle);"></div>
-
-    <!-- Advisor -->
-    <div v-if="card.advisor_questions?.length" class="px-6 py-5">
-      <div class="flex items-center gap-2 mb-2.5">
-        <div class="w-6 h-6 rounded-md flex items-center justify-center text-xs" style="background: rgba(245,158,11,0.08); color: #f59e0b;">2</div>
-        <h4 class="text-[13px] font-semibold" style="color: var(--text-primary);">导师追问</h4>
-      </div>
-      <ol class="list-decimal list-inside space-y-1.5 text-[13px] pl-8" style="color: var(--text-secondary);">
+    <section v-if="card.advisor_questions?.length">
+      <h4>导师追问</h4>
+      <ol>
         <li v-for="(q, i) in card.advisor_questions" :key="i">{{ q }}</li>
       </ol>
-    </div>
+    </section>
 
-    <div v-if="card.advisor_questions?.length && card.error_attribution_prompts?.length"
-      class="mx-6 border-t" style="border-color: var(--border-subtle);"></div>
-
-    <!-- Weakness Check -->
-    <div v-if="card.error_attribution_prompts?.length" class="px-6 py-5">
-      <div class="flex items-center gap-2 mb-2.5">
-        <div class="w-6 h-6 rounded-md flex items-center justify-center text-xs" style="background: rgba(16,185,129,0.08); color: #10b981;">3</div>
-        <h4 class="text-[13px] font-semibold" style="color: var(--text-primary);">薄弱点检查</h4>
-      </div>
-      <ol class="list-decimal list-inside space-y-1.5 text-[13px] pl-8" style="color: var(--text-secondary);">
+    <section v-if="card.error_attribution_prompts?.length">
+      <h4>薄弱点检查</h4>
+      <ol>
         <li v-for="(q, i) in card.error_attribution_prompts" :key="i">{{ q }}</li>
       </ol>
-    </div>
-  </div>
+    </section>
+  </article>
 </template>
+
+<style scoped>
+.drill-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+header span {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+header h3 {
+  margin-top: 10px;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+h4 {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+ol {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 22px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+</style>

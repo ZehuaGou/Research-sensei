@@ -12,3 +12,4 @@ def _disable_api_llm_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """
 
     monkeypatch.setenv("RESEARCHSENSEI_ENABLE_API_LLM", "0")
+    monkeypatch.delenv("RESEARCHSENSEI_LLM_PROVIDER", raising=False)

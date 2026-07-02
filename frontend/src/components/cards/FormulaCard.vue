@@ -1,129 +1,371 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
+import katex from 'katex'
 import { useLearningStore } from '../../stores/learning'
 
 const props = defineProps<{ card: any }>()
 const store = useLearningStore()
-const expanded = ref(false)
 const formulaEl = ref<HTMLElement>()
 const renderError = ref(false)
+const formulaExplainLoading = ref(false)
 
 onMounted(async () => {
   await nextTick()
-  renderFormula()
+  await renderFormula()
 })
 
 async function renderFormula() {
-  if (!formulaEl.value || !props.card.formula_latex) return
+  const latex = props.card.formula_latex || props.card.formula_raw || ''
+  if (!formulaEl.value || !latex) return
+  formulaEl.value.className = ''
+  if (shouldRenderPlainFormula(latex)) {
+    formulaEl.value.textContent = latex
+    formulaEl.value.classList.add('plain-formula')
+    return
+  }
   try {
-    const katex = await import('katex')
-    katex.default.render(props.card.formula_latex, formulaEl.value, { displayMode: true, throwOnError: true })
+    katex.render(latex, formulaEl.value, { displayMode: true, throwOnError: false })
   } catch {
     renderError.value = true
+  }
+}
+
+function shouldRenderPlainFormula(value: unknown) {
+  const text = String(value || '')
+  if (props.card.formula_origin === 'raw_formula_text' || hasInsufficientSource()) return true
+  const letters = (text.match(/[A-Za-z]/g) || []).length
+  const spaces = (text.match(/\s/g) || []).length
+  return text.length > 60 && letters > 30 && spaces > 4 && !/[\\_^{}]/.test(text)
+}
+
+async function explainFormula() {
+  store.isAskPanelOpen = true
+  if (!store.currentJobId || formulaExplainLoading.value) return
+  formulaExplainLoading.value = true
+  store.addMessage({
+    role: 'user',
+    content: `解释公式：${props.card.formula_id || props.card.evidence_ref || props.card.formula_ref || ''}`,
+    timestamp: Date.now(),
+  })
+  try {
+    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/formula/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ formula_id: props.card.formula_id || props.card.formula_ref || '' }),
+    })
+    const data = await res.json()
+    store.addMessage({
+      role: 'assistant',
+      content: formatFormulaExplanation(data),
+      timestamp: Date.now(),
+    })
+  } catch {
+    store.addMessage({ role: 'assistant', content: '公式解释请求失败，请稍后再试。', timestamp: Date.now() })
+  } finally {
+    formulaExplainLoading.value = false
+  }
+}
+
+function askFormula() {
+  const formulaLabel = props.card.purpose || props.card.plain_summary || props.card.formula_id || props.card.evidence_ref || '当前公式'
+  store.setSelectedText(`解释这个公式：${formulaLabel}`)
+  store.isAskPanelOpen = true
+}
+
+function termDetail(term: any) {
+  return [
+    term.encourages ? `鼓励：${term.encourages}` : '',
+    term.penalizes ? `惩罚：${term.penalizes}` : '',
+    term.if_removed ? `去掉：${term.if_removed}` : '',
+  ].filter(Boolean)
+}
+
+function formatFormulaExplanation(data: any) {
+  const parts = [
+    readableText(data.meaning, ''),
+    data.intuition ? `直觉：${readableText(data.intuition, '')}` : '',
+    data.numeric_example ? `例子：${readableText(data.numeric_example, '')}` : '',
+    data.role_in_method ? `在方法里的作用：${readableText(data.role_in_method, '')}` : '',
+  ].filter(Boolean)
+  return parts.join('\n\n') || '这条公式还没有可展示的解释。'
+}
+
+function isInsufficientText(value: unknown) {
+  const text = String(value || '').trim()
+  return /^INSUFFICIENT_EVIDENCE\b/i.test(text)
+    || /^UNKNOWN$/i.test(text)
+    || /M2 preserved this formula slot/i.test(text)
+    || /blocked detailed derivation/i.test(text)
+    || /raw\/unknown formula text/i.test(text)
+}
+
+function readableText(value: unknown, fallback: string) {
+  const text = String(value || '').trim()
+  if (!text) return fallback
+  if (isInsufficientText(text)) return '证据不足，暂不推导。'
+  return text
+}
+
+function hasInsufficientSource() {
+  return isInsufficientText(props.card.purpose)
+    || isInsufficientText(props.card.plain_summary)
+    || isInsufficientText(props.card.intuition)
+}
+
+function isMathLikeLabel(value: unknown) {
+  const text = String(value || '').trim()
+  return /\\|[_^{}]|(\w+\([^)]*[·,][^)]*\))/.test(text)
+}
+
+function mathLabelHtml(value: unknown) {
+  const text = String(value || '').trim()
+  if (!text || !isMathLikeLabel(text)) return ''
+  try {
+    return katex.renderToString(text, {
+      displayMode: false,
+      throwOnError: false,
+      strict: false,
+      output: 'html',
+    })
+  } catch {
+    return ''
   }
 }
 </script>
 
 <template>
-  <div class="rounded-2xl overflow-hidden" style="background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-    <div class="px-6 pt-6 pb-4">
-      <div class="flex items-center gap-2 mb-3">
-        <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold" style="background: var(--accent-light); color: var(--accent);">公式核心</span>
-        <span v-if="card.evidence_status" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(16,185,129,0.08); color: #10b981;">
-          {{ card.evidence_status }}
-        </span>
-        <span v-if="card.formula_origin" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(99,102,241,0.08); color: #6366f1;">
-          origin: {{ card.formula_origin }}
-        </span>
-        <span v-if="card.formula_ocr_status" class="px-2.5 py-1 rounded-full text-[11px] font-medium" style="background: rgba(245,158,11,0.08); color: #b45309;">
-          OCR: {{ card.formula_ocr_status }}
-        </span>
+  <article class="formula-card surface" data-testid="formula-card">
+    <header>
+      <div class="badge-row">
+        <span class="status-pill" style="background: var(--accent-light); color: var(--accent);">公式</span>
+        <span v-if="hasInsufficientSource()" class="status-pill warning">来源不足</span>
+        <span v-else-if="card.evidence_status || card.evidence_ref" class="status-pill success">证据已绑定</span>
       </div>
-      <div class="text-sm font-medium" style="color: var(--text-primary);">{{ card.problem }}</div>
-      <div v-if="card.evidence_ref" class="text-[11px] mt-1" style="color: var(--text-muted);">
-        evidence_ref: {{ card.evidence_ref }}
-      </div>
-      <div class="text-[11px] mt-1" style="color: var(--text-muted);">§ {{ card.formula_ref }}</div>
+      <h2>{{ card.display_title || card.purpose || card.problem || '公式解释' }}</h2>
+    </header>
+
+    <div class="formula-box">
+      <div ref="formulaEl"></div>
+      <code v-if="renderError" class="block whitespace-pre-wrap text-sm">{{ card.formula_latex || card.formula_raw }}</code>
     </div>
 
-    <!-- Formula -->
-    <div class="mx-6 p-5 rounded-xl text-center" style="background: var(--bg-secondary);">
-      <div ref="formulaEl" style="color: var(--text-primary);"></div>
-      <div v-if="renderError" class="text-[12px] py-2" style="color: var(--text-muted);">
-        公式渲染失败: <code class="font-mono text-[11px]">{{ card.formula_latex }}</code>
+    <section v-if="card.symbols?.length || card.terms?.length" class="term-grid">
+      <div v-if="card.symbols?.length" class="term-section-title">符号</div>
+      <div v-for="symbol in card.symbols || []" :key="symbol.symbol" class="term-item">
+        <strong class="term-label">
+          <span v-if="mathLabelHtml(symbol.symbol)" v-html="mathLabelHtml(symbol.symbol)"></span>
+          <span v-else>{{ symbol.symbol }}</span>
+        </strong>
+        <span class="term-copy">{{ symbol.meaning }}</span>
       </div>
-    </div>
-
-    <!-- Term Table (uses FormulaTerm: term/meaning/encourages/penalizes/if_removed) -->
-    <div v-if="card.terms?.length" class="px-6 py-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">项含义</div>
-      <div class="rounded-xl overflow-hidden" style="border: 1px solid var(--border-subtle);">
-        <table class="w-full text-[12px]">
-          <thead>
-            <tr style="background: var(--bg-secondary);">
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">项</th>
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">含义</th>
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">鼓励</th>
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">惩罚</th>
-              <th class="px-3 py-2 text-left font-semibold" style="color: var(--text-muted);">去掉会怎样</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="t in card.terms" :key="t.term" class="border-t" style="border-color: var(--border-subtle);">
-              <td class="px-3 py-2 font-mono font-medium" style="color: var(--accent);">{{ t.term }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.meaning }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.encourages || '-' }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.penalizes || '-' }}</td>
-              <td class="px-3 py-2" style="color: var(--text-secondary);">{{ t.if_removed || '-' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="mx-6 border-t" style="border-color: var(--border-subtle);"></div>
-
-    <!-- Numeric Example -->
-    <div v-if="card.numeric_example" class="px-6 py-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">小数字例子</div>
-      <div class="text-[13px] rounded-xl p-3 font-mono whitespace-pre-wrap" style="background: var(--bg-secondary); color: var(--text-secondary);">
-        {{ card.numeric_example }}
-      </div>
-    </div>
-
-    <!-- Expand -->
-    <div class="px-6 pb-4">
-      <button @click="expanded = !expanded" class="text-[13px] font-medium" style="color: var(--accent);">
-        {{ expanded ? '收起' : '更多分析' }}
-      </button>
-    </div>
-
-    <Transition name="slide-up">
-      <div v-if="expanded" class="px-6 pb-5 space-y-3 text-[13px]" style="color: var(--text-secondary);">
-        <div v-if="card.remove_effect">
-          <span class="font-semibold" style="color: var(--text-primary);">去掉该项：</span>{{ card.remove_effect }}
-        </div>
-        <div v-if="card.weight_change_effect">
-          <span class="font-semibold" style="color: var(--text-primary);">权重变化：</span>{{ card.weight_change_effect }}
-        </div>
-        <div v-if="card.plain_summary" class="font-medium pt-1" style="color: var(--text-primary);">
-          {{ card.plain_summary }}
+      <div v-if="card.terms?.length" class="term-section-title">关键项</div>
+      <div v-for="term in card.terms || []" :key="term.term" class="term-item rich">
+        <strong class="term-label">
+          <span v-if="mathLabelHtml(term.term)" v-html="mathLabelHtml(term.term)"></span>
+          <span v-else>{{ term.term }}</span>
+        </strong>
+        <div class="term-copy">
+          <span>{{ term.meaning }}</span>
+          <small v-for="detail in termDetail(term)" :key="detail">{{ detail }}</small>
         </div>
       </div>
-    </Transition>
+    </section>
 
-    <!-- Footer Actions -->
-    <div class="px-6 py-4 border-t flex gap-2 flex-wrap" style="border-color: var(--border-subtle); background: var(--bg-secondary);">
-      <button @click="store.setSelectedText(card.plain_summary || card.problem)"
-        class="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all hover:scale-105"
-        style="background: var(--accent-light); color: var(--accent);">
-        💬 追问
-      </button>
-      <button @click="store.setSelectedText('请用更简单的方式解释这个公式：' + card.formula_latex)"
-        class="px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all hover:scale-105"
-        style="background: rgba(16,185,129,0.08); color: #10b981;">
-        📐 再推一步
-      </button>
-    </div>
-  </div>
+    <section class="formula-explain">
+      <div>
+        <h3>直觉</h3>
+        <p>{{ readableText(card.intuition || card.plain_summary, '暂无直觉解释。') }}</p>
+      </div>
+      <div>
+        <h3>小例子</h3>
+        <p>{{ readableText(card.numeric_example, '暂无小例子。') }}</p>
+      </div>
+      <div>
+        <h3>拿掉会怎样</h3>
+        <p>{{ readableText(card.what_if_removed || card.remove_effect, '暂无说明。') }}</p>
+      </div>
+      <div>
+        <h3>权重变化</h3>
+        <p>{{ readableText(card.weight_change_effect || card.weight_sensitivity, '暂无说明。') }}</p>
+      </div>
+    </section>
+
+    <footer>
+      <button type="button" class="secondary-btn" @click="explainFormula">{{ formulaExplainLoading ? '解释中...' : '让 M4 解释' }}</button>
+      <button type="button" class="ghost-btn" @click="askFormula">继续追问</button>
+    </footer>
+  </article>
 </template>
+
+<style scoped>
+.formula-card {
+  overflow: hidden;
+  min-width: 0;
+}
+
+header {
+  padding: 20px 20px 0;
+}
+
+.badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-pill.neutral {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+.status-pill.success {
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--success);
+}
+
+.status-pill.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+h2 {
+  margin: 14px 0 0;
+  color: var(--text-primary);
+  font-size: 20px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.formula-box {
+  margin: 18px 20px;
+  overflow-x: auto;
+  max-width: calc(100% - 40px);
+  border-radius: 10px;
+  padding: 15px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.formula-box :deep(.plain-formula) {
+  white-space: pre-wrap;
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.term-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1px;
+  margin: 0 20px 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--border-subtle);
+}
+
+.term-section-title {
+  padding: 7px 12px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.term-item {
+  display: grid;
+  grid-template-columns: minmax(92px, 0.32fr) minmax(0, 1fr);
+  min-width: 0;
+  align-items: start;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+}
+
+.term-item strong {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 6px;
+  padding: 3px 5px;
+  background: var(--bg-secondary);
+  color: var(--accent);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.term-label :deep(.katex) {
+  font-size: 1.05em;
+}
+
+.term-copy,
+.term-copy span,
+.term-copy small {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.term-copy {
+  display: grid;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.term-copy small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.formula-explain {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 0 20px 20px;
+}
+
+.formula-explain > div {
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: var(--bg-secondary);
+}
+
+.formula-explain h3 {
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.formula-explain p {
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+footer {
+  display: flex;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+}
+
+@media (max-width: 900px) {
+  .term-grid,
+  .formula-explain {
+    grid-template-columns: 1fr;
+  }
+
+  .term-item {
+    grid-template-columns: minmax(78px, 0.35fr) minmax(0, 1fr);
+  }
+}
+</style>

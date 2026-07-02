@@ -84,10 +84,10 @@ describe('SeedExpansionPanel', () => {
     expect(wrapper.get('[data-testid="seed-group-same_route_papers"]').text()).toContain('Transformer Routes')
     expect(wrapper.get('[data-testid="seed-group-related_surveys"]').text()).toContain('Survey')
     expect(wrapper.get('[data-testid="seed-relation-reason"]').text()).toContain('weak_relation')
-    expect(wrapper.get('[data-testid="seed-confidence"]').text()).toContain('confidence')
-    expect(wrapper.get('[data-testid="seed-source"]').text()).toContain('source: arxiv')
+    expect(wrapper.get('[data-testid="seed-confidence"]').text()).toContain('置信度：61%')
+    expect(wrapper.get('[data-testid="seed-source"]').text()).toContain('来源：arxiv')
     expect(wrapper.get('[data-testid="seed-verification"]').text()).toContain('verified')
-    expect(wrapper.get('[data-testid="seed-can-enter-m2"]').text()).toContain('true')
+    expect(wrapper.get('[data-testid="seed-can-enter-m2"]').text()).toContain('M2：可进入')
   })
 
   it('shows DEGRADED warnings from partial source failures', async () => {
@@ -167,6 +167,47 @@ describe('SeedExpansionPanel', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/deep_read')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).candidate.arxiv_id).toBe('2401.00001')
     expect(routerPush).toHaveBeenCalledWith('/learn/job-456')
+  })
+
+  it('can hand off a DOI-only expansion paper without sending a non-ArXiv URL as arxiv_url', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => seedResponse({
+          upstream_papers: [paper({
+            paper_id: 'doi-up',
+            source: 'crossref',
+            title: 'DOI Only Expansion Paper',
+            url: 'https://doi.org/10.1145/example',
+            doi: '10.1145/example',
+            arxiv_id: '',
+            arxiv_url: '',
+            pdf_url: '',
+            can_enter_m2: false,
+            can_prepare_deep_read: true,
+          })],
+          downstream_papers: [],
+          same_route_papers: [],
+          related_surveys: [],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ job_id: 'job-doi-seed', handoff_status: 'JOB_CREATED' }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(SeedExpansionPanel)
+    await wrapper.get('[data-testid="seed-title-input"]').setValue('Time Series Anomaly Detection')
+    await wrapper.get('[data-testid="seed-expand-button"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-testid="seed-deep-read-button"]').trigger('click')
+    await flushPromises()
+
+    const candidate = JSON.parse(fetchMock.mock.calls[1][1].body).candidate
+    expect(candidate.doi).toBe('10.1145/example')
+    expect(candidate.arxiv_url).toBe('')
+    expect(routerPush).toHaveBeenCalledWith('/learn/job-doi-seed')
   })
 
   it('shows handoff failure reason', async () => {

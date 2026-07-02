@@ -25,10 +25,10 @@ def _make_success_status() -> dict:
         "allowed_for_user_display": True,
         "allowed_downstream": {
             "reading_display": True,
-            "phase12_patterns": True,
-            "phase12_drill": True,
+            "phase12_patterns": False,
+            "phase12_drill": False,
             "phase12_drill_degraded": False,
-            "advisor_questions": True,
+            "advisor_questions": False,
         },
         "component_status": {
             "paper_card": "SUCCESS",
@@ -206,9 +206,9 @@ def _make_degraded_status() -> dict:
         "allowed_downstream": {
             "reading_display": True,
             "phase12_patterns": True,
-            "phase12_drill": True,
+            "phase12_drill": False,
             "phase12_drill_degraded": True,
-            "advisor_questions": False,
+            "advisor_questions": True,
         },
         "component_status": {
             "paper_card": "SUCCESS",

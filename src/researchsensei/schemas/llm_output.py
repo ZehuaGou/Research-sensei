@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from researchsensei.schemas.base import SenseiModel
 
@@ -17,6 +17,14 @@ class PaperCardLLMOutput(SenseiModel):
     method_overview: ClaimLLMOutput
     experiment_summary: ClaimLLMOutput
     limitations: ClaimLLMOutput | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def coerce_summary_object(cls, data):
+        if isinstance(data, dict) and isinstance(data.get("one_sentence_summary"), dict):
+            summary = data["one_sentence_summary"]
+            data = {**data, "one_sentence_summary": str(summary.get("text") or "")}
+        return data
 
 
 class FormulaCardLLMOutput(SenseiModel):

@@ -32,10 +32,10 @@ async function search() {
     const data = await res.json().catch(() => ({}))
     result.value = data
     if (!res.ok) {
-      error.value = data.detail?.message || 'DirectionWorkspace request failed.'
+      error.value = data.detail?.message || '方向检索失败。'
     }
   } catch {
-    error.value = 'Network error while loading DirectionWorkspace.'
+    error.value = '网络请求失败，请确认后端服务正在运行。'
   } finally {
     isLoading.value = false
   }
@@ -65,7 +65,7 @@ function percent(value: unknown) {
 }
 
 function authorsText(authors: unknown) {
-  return Array.isArray(authors) && authors.length ? authors.join(', ') : 'Unknown authors'
+  return Array.isArray(authors) && authors.length ? authors.join(', ') : '作者未知'
 }
 
 function deepReadJobId(paper: Record<string, any>) {
@@ -90,7 +90,7 @@ function setHandoffState(paper: Record<string, any>, state: { loading?: boolean;
 function discoverySourcesText(paper: Record<string, any>) {
   const sources = paper.discovery_sources || paper.sources
   if (Array.isArray(sources) && sources.length) return sources.join(', ')
-  return paper.source || 'unknown'
+  return paper.source || '未知来源'
 }
 
 function fulltextPdfUrl(paper: Record<string, any>) {
@@ -99,19 +99,25 @@ function fulltextPdfUrl(paper: Record<string, any>) {
   return ''
 }
 
+function arxivHandoffUrl(paper: Record<string, any>) {
+  const value = paper.arxiv_url || ''
+  return typeof value === 'string' && value.includes('arxiv.org/') ? value : ''
+}
+
 function hasDeepReadSource(paper: Record<string, any>) {
   return Boolean(
     paper.can_deep_read ||
     paper.arxiv_id ||
-    paper.arxiv_url ||
-    fulltextPdfUrl(paper)
+    arxivHandoffUrl(paper) ||
+    fulltextPdfUrl(paper) ||
+    paper.doi
   )
 }
 
 function deepReadLabel(paper: Record<string, any>) {
-  if (deepReadJobId(paper)) return '进入精读'
-  if (!hasDeepReadSource(paper)) return '源不可用'
-  return handoffState(paper).loading ? '准备中' : '准备精读'
+  if (deepReadJobId(paper)) return '进入深读'
+  if (!hasDeepReadSource(paper)) return '来源不可用'
+  return handoffState(paper).loading ? '正在准备...' : '深读这篇'
 }
 
 function deepReadDisabled(paper: Record<string, any>) {
@@ -130,7 +136,7 @@ async function openDeepRead(paper: Record<string, any>) {
   }
   if (!hasDeepReadSource(paper)) {
     setHandoffState(paper, {
-      error: paper.deep_read_unavailable_reason || 'No arXiv ID, arXiv URL, or PDF URL is available.',
+      error: paper.deep_read_unavailable_reason || '没有可用的 arXiv、DOI 或 PDF 来源。',
     })
     return
   }
@@ -145,7 +151,7 @@ async function openDeepRead(paper: Record<string, any>) {
           title: paper.title || '',
           doi: paper.doi || '',
           arxiv_id: paper.arxiv_id || '',
-          arxiv_url: paper.arxiv_url || paper.url || paper.landing_url || '',
+          arxiv_url: arxivHandoffUrl(paper),
           pdf_url: fulltextPdfUrl(paper),
         },
       }),
@@ -154,13 +160,13 @@ async function openDeepRead(paper: Record<string, any>) {
     if (!res.ok || !data.job_id) {
       const detail = data.detail || data
       setHandoffState(paper, {
-        error: `${detail.status || detail.handoff_status || 'HANDOFF_FAILED'}: ${detail.message || 'Direction candidate handoff failed.'}`,
+        error: `${detail.status || detail.handoff_status || 'HANDOFF_FAILED'}：${detail.message || '候选论文移交深读失败。'}`,
       })
       return
     }
     await router.push(`/learn/${data.job_id}`)
   } catch {
-    setHandoffState(paper, { error: 'Network error while preparing PaperWorkspace job.' })
+    setHandoffState(paper, { error: '网络请求失败，暂时不能创建深读任务。' })
   } finally {
     const state = handoffState(paper)
     if (state.loading) {
@@ -171,184 +177,396 @@ async function openDeepRead(paper: Record<string, any>) {
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto px-6 py-10">
-    <header class="mb-8">
-      <h1 class="text-2xl font-bold mb-2" style="color: var(--text-primary);">DirectionWorkspace</h1>
-      <p class="text-sm" style="color: var(--text-secondary);">输入研究方向，生成可审计的 M1 方向探索结果。</p>
-    </header>
-
-    <form class="flex gap-2 mb-6" @submit.prevent="search">
-      <input
-        v-model="query"
-        data-testid="direction-query"
-        class="flex-1 px-3 py-2 rounded-md text-sm outline-none"
-        style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary);"
-        placeholder="time-series anomaly detection"
-      />
-      <button
-        type="submit"
-        class="px-4 py-2 rounded-md text-sm font-semibold text-white disabled:opacity-40"
-        style="background: var(--accent);"
-        :disabled="isLoading || !query.trim()"
-      >
-        {{ isLoading ? '检索中' : '探索方向' }}
-      </button>
-    </form>
-
-    <section
-      v-if="result"
-      class="rounded-lg p-4 mb-5"
-      style="background: var(--bg-card); border: 1px solid var(--border);"
-      data-testid="direction-status"
-    >
-      <div class="flex flex-wrap items-center gap-3 mb-2">
-        <div class="text-sm font-semibold" style="color: var(--text-primary);">
-          {{ status }}
-        </div>
-        <div class="text-xs" style="color: var(--text-secondary);">{{ papers.length }} candidates</div>
-      </div>
-      <div class="text-xs mb-3" style="color: var(--text-secondary);">{{ result.message }}</div>
-      <div v-if="warnings.length" class="space-y-1">
-        <div v-for="warning in warnings" :key="warning.code" class="text-xs" style="color: var(--text-muted);" data-testid="direction-warning">
-          {{ warning.code }}: {{ warning.message }}
-        </div>
-      </div>
+  <main class="direction-page">
+    <section class="search-head">
+      <p>方向工作台</p>
+      <h1>先找方向，再挑论文深读</h1>
+      <form class="search-box" @submit.prevent="search">
+        <input
+          v-model="query"
+          data-testid="direction-query"
+          placeholder="例如：time-series anomaly detection"
+        />
+        <button type="submit" class="primary-btn" :disabled="isLoading || !query.trim()">
+          {{ isLoading ? '检索中...' : '检索方向' }}
+        </button>
+      </form>
     </section>
 
-    <div v-if="error" class="mb-5 px-4 py-3 rounded-md text-sm" style="background: rgba(239,68,68,0.08); color: #ef4444;">
+    <div v-if="error" class="error-box">
       {{ error }}
     </div>
 
-    <section v-if="result?.overview" class="mb-6" data-testid="direction-overview">
-      <h2 class="text-sm font-semibold mb-2" style="color: var(--text-primary);">方向概览</h2>
-      <p class="text-sm leading-6" style="color: var(--text-secondary);">{{ result.overview }}</p>
-    </section>
-
-    <section v-if="result?.key_sub_directions?.length" class="mb-6" data-testid="sub-directions">
-      <h2 class="text-sm font-semibold mb-3" style="color: var(--text-primary);">关键子方向</h2>
-      <div class="grid gap-2 md:grid-cols-2">
-        <div
-          v-for="item in result.key_sub_directions"
-          :key="item.name"
-          class="rounded-md px-3 py-2"
-          style="background: var(--bg-card); border: 1px solid var(--border);"
-        >
-          <div class="text-sm font-medium" style="color: var(--text-primary);">{{ item.name }}</div>
-          <div class="text-xs mt-1" style="color: var(--text-muted);">{{ item.description }}</div>
-        </div>
+    <section v-if="result" class="status-card surface" data-testid="direction-status">
+      <div>
+        <strong>{{ status || '已返回结果' }}</strong>
+        <span>{{ papers.length }} 篇候选论文</span>
+      </div>
+      <p v-if="result.message">{{ result.message }}</p>
+      <div v-if="warnings.length" class="warning-list">
+        <span v-for="warning in warnings" :key="warning.code" data-testid="direction-warning">
+          {{ warning.code }}：{{ warning.message }}
+        </span>
       </div>
     </section>
 
-    <section v-if="result?.method_families?.length" class="mb-6" data-testid="method-families">
-      <h2 class="text-sm font-semibold mb-3" style="color: var(--text-primary);">方法家族</h2>
-      <div class="grid gap-2 md:grid-cols-3">
-        <div
-          v-for="family in result.method_families"
-          :key="family.role || family.name"
-          class="rounded-md px-3 py-2"
-          style="background: var(--bg-card); border: 1px solid var(--border);"
-        >
-          <div class="text-sm font-medium" style="color: var(--text-primary);">{{ family.name }}</div>
-          <div class="text-xs mt-1" style="color: var(--text-muted);">{{ family.paper_count }} papers</div>
-        </div>
+    <section v-if="result?.overview" class="overview" data-testid="direction-overview">
+      <h2>方向概览</h2>
+      <p>{{ result.overview }}</p>
+    </section>
+
+    <section v-if="result?.key_sub_directions?.length" class="section-block" data-testid="sub-directions">
+      <h2>关键子方向</h2>
+      <div class="mini-grid">
+        <article v-for="item in result.key_sub_directions" :key="item.name" class="surface mini-card">
+          <strong>{{ item.name }}</strong>
+          <span>{{ item.description }}</span>
+        </article>
       </div>
     </section>
 
-    <section v-if="papers.length" class="mb-6">
-      <h2 class="text-sm font-semibold mb-3" style="color: var(--text-primary);">代表论文候选</h2>
-      <div class="space-y-3">
+    <section v-if="result?.method_families?.length" class="section-block" data-testid="method-families">
+      <h2>方法家族</h2>
+      <div class="mini-grid three">
+        <article v-for="family in result.method_families" :key="family.role || family.name" class="surface mini-card">
+          <strong>{{ family.name }}</strong>
+          <span>{{ family.paper_count || 0 }} 篇论文</span>
+        </article>
+      </div>
+    </section>
+
+    <section v-if="papers.length" class="section-block">
+      <h2>候选论文</h2>
+      <div class="candidate-list">
         <article
           v-for="paper in papers"
           :key="paper.paper_id || paper.title"
-          class="rounded-md p-4"
-          style="background: var(--bg-card); border: 1px solid var(--border);"
+          class="candidate-card surface"
           data-testid="candidate-card"
         >
-          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h3 class="text-sm font-semibold leading-5" style="color: var(--text-primary);">{{ paper.title }}</h3>
-              <p class="text-xs mt-1" style="color: var(--text-secondary);">
-                {{ authorsText(paper.authors) }} · {{ paper.year || 'n.d.' }} · {{ paper.venue || paper.source || 'unknown source' }}
+          <div class="candidate-main">
+            <div class="candidate-title">
+              <h3>{{ paper.title }}</h3>
+              <p>
+                {{ authorsText(paper.authors) }} · {{ paper.year || '年份未知' }} · {{ paper.venue || paper.source || '来源未知' }}
               </p>
             </div>
-            <button
-              type="button"
-              class="px-3 py-2 rounded-md text-xs font-semibold disabled:opacity-50"
-              style="background: var(--accent); color: white;"
-              :disabled="deepReadDisabled(paper)"
-              data-testid="deep-read-button"
-              @click="openDeepRead(paper)"
-            >
-              {{ deepReadLabel(paper) }}
-            </button>
-            <button
-              type="button"
-              class="px-3 py-2 rounded-md text-xs font-semibold"
-              style="background: transparent; color: var(--accent); border: 1px solid var(--border);"
-              data-testid="seed-select-button"
-              @click="selectSeed(paper)"
-            >
-              Expand network
-            </button>
+            <div class="candidate-actions">
+              <button
+                type="button"
+                class="primary-btn"
+                :disabled="deepReadDisabled(paper)"
+                data-testid="deep-read-button"
+                @click="openDeepRead(paper)"
+              >
+                {{ deepReadLabel(paper) }}
+              </button>
+              <button
+                type="button"
+                class="secondary-btn"
+                data-testid="seed-select-button"
+                @click="selectSeed(paper)"
+              >
+                扩展相关论文
+              </button>
+            </div>
           </div>
 
-          <div class="grid gap-2 mt-4 md:grid-cols-4">
-            <div class="text-xs" style="color: var(--text-secondary);">source: {{ paper.source || 'unknown' }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">relevance: {{ percent(paper.relevance_score) }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">verified: {{ paper.verification_status }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">confidence: {{ paper.source_confidence }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">pdf: {{ paper.pdf_available ? 'available' : 'unavailable' }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">canonical: {{ paper.canonicalization_status }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">m2_ready: {{ paper.m2_ready ? 'true' : 'false' }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">priority: {{ paper.priority }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">discovery: {{ discoverySourcesText(paper) }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">fulltext: {{ paper.fulltext_status || 'metadata_only' }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">deep_read: {{ paper.can_deep_read ? 'true' : 'false' }}</div>
-            <div class="text-xs" style="color: var(--text-secondary);">upload: {{ paper.needs_user_upload ? 'needed' : 'not_needed' }}</div>
+          <div class="meta-grid">
+            <span>相关度 {{ percent(paper.relevance_score) }}</span>
+            <span>可信度 {{ paper.source_confidence ?? 'n/a' }}</span>
+            <span>验证 {{ paper.verification_status || '未知' }}</span>
+            <span>全文 {{ paper.pdf_available || paper.selected_fulltext_url ? '可用' : '待确认' }}</span>
+            <span>发现来源 {{ discoverySourcesText(paper) }}</span>
+            <span>M2 {{ paper.m2_ready || paper.can_enter_m2 ? '可进入' : '待验证' }}</span>
           </div>
-          <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="text-xs mt-3" style="color: var(--text-muted);" data-testid="fulltext-note">
-            Full text: {{ paper.selected_fulltext_source || 'metadata_only' }} {{ paper.fulltext_failure_reason ? `- ${paper.fulltext_failure_reason}` : '' }}
+
+          <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="note" data-testid="fulltext-note">
+            全文来源：{{ paper.selected_fulltext_source || 'metadata_only' }}
+            {{ paper.fulltext_failure_reason ? ` · ${paper.fulltext_failure_reason}` : '' }}
           </p>
-          <p v-if="!paper.can_enter_m2" class="text-xs mt-3" style="color: var(--text-muted);" data-testid="m2-readiness-note">
-            M2 gate: {{ paper.m2_unavailable_reason || paper.risk_note || 'Not cleared until source download and canonical validation finish.' }}
+          <p v-if="!paper.can_enter_m2" class="note" data-testid="m2-readiness-note">
+            M2 闸门：{{ paper.m2_unavailable_reason || paper.risk_note || '需要完成来源下载和规范化校验。' }}
           </p>
-          <p v-if="!hasDeepReadSource(paper)" class="text-xs mt-2" style="color: #f59e0b;" data-testid="source-unavailable-note">
-            {{ paper.deep_read_unavailable_reason || 'No supported full-text source is available.' }}
+          <p v-if="!hasDeepReadSource(paper)" class="note warning" data-testid="source-unavailable-note">
+            {{ paper.deep_read_unavailable_reason || '没有可支持的全文来源。' }}
           </p>
-          <p v-if="handoffState(paper).error" class="text-xs mt-2" style="color: #ef4444;" data-testid="handoff-error">
+          <p v-if="handoffState(paper).error" class="note danger" data-testid="handoff-error">
             {{ handoffState(paper).error }}
           </p>
         </article>
       </div>
     </section>
 
-    <section v-if="result?.recommended_reading_order?.length" class="mb-6" data-testid="reading-order">
-      <h2 class="text-sm font-semibold mb-3" style="color: var(--text-primary);">推荐阅读顺序</h2>
-      <ol class="space-y-2">
-        <li
-          v-for="item in result.recommended_reading_order"
-          :key="`${item.rank}-${item.title}`"
-          class="text-sm"
-          style="color: var(--text-secondary);"
-        >
-          {{ item.rank }}. {{ item.title }} · {{ item.priority }} · {{ item.role }}
+    <section v-if="result?.recommended_reading_order?.length" class="section-block" data-testid="reading-order">
+      <h2>建议阅读顺序</h2>
+      <ol class="reading-order">
+        <li v-for="item in result.recommended_reading_order" :key="`${item.rank}-${item.title}`">
+          <span>{{ item.rank }}</span>
+          <p>{{ item.title }} · {{ item.priority }} · {{ item.role }}</p>
         </li>
       </ol>
     </section>
 
-    <section
-      v-if="result && hasEmptyResult"
-      class="mb-6 rounded-md p-4 text-sm"
-      style="background: var(--bg-card); border: 1px solid var(--border); color: var(--text-secondary);"
-      data-testid="empty-result"
-    >
-      没有可展示的候选论文。请换一个更具体的方向或稍后重试外部源。
+    <section v-if="result && hasEmptyResult" class="empty-result surface" data-testid="empty-result">
+      没有可展示的候选论文。可以换一个更具体的方向，或稍后重试外部来源。
     </section>
 
     <SeedExpansionPanel
-      :status="result?.seed_expansion_status || 'NOT_IMPLEMENTED'"
+      :status="result?.seed_expansion_status || 'READY'"
       :warnings="warnings"
       :seed="selectedSeed"
     />
-  </div>
+  </main>
 </template>
+
+<style scoped>
+.direction-page {
+  width: min(1120px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 42px 0 72px;
+}
+
+.search-head {
+  margin-bottom: 22px;
+}
+
+.search-head > p {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.search-head h1 {
+  margin-top: 6px;
+  color: var(--text-primary);
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.search-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.search-box input {
+  width: 100%;
+  outline: none;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.error-box,
+.empty-result {
+  border-radius: 14px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.error-box {
+  margin-bottom: 16px;
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+}
+
+.status-card {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 24px;
+  padding: 16px;
+}
+
+.status-card div:first-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-card strong {
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.status-card span,
+.status-card p,
+.warning-list span {
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.warning-list {
+  display: grid;
+  gap: 4px;
+}
+
+.overview,
+.section-block {
+  margin-bottom: 28px;
+}
+
+.overview h2,
+.section-block h2 {
+  margin-bottom: 12px;
+  color: var(--text-primary);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.overview p {
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.9;
+}
+
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.mini-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.mini-card {
+  padding: 15px;
+}
+
+.mini-card strong,
+.mini-card span {
+  display: block;
+}
+
+.mini-card strong {
+  color: var(--text-primary);
+  font-size: 15px;
+}
+
+.mini-card span {
+  margin-top: 6px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.candidate-list {
+  display: grid;
+  gap: 14px;
+}
+
+.candidate-card {
+  padding: 18px;
+}
+
+.candidate-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+}
+
+.candidate-title h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.45;
+}
+
+.candidate-title p {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.candidate-actions {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.meta-grid span {
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.note {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.note.warning {
+  color: #b45309;
+}
+
+.note.danger {
+  color: #dc2626;
+}
+
+.reading-order {
+  display: grid;
+  gap: 10px;
+}
+
+.reading-order li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  color: var(--text-secondary);
+}
+
+.reading-order span {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-weight: 900;
+}
+
+.reading-order p {
+  padding-top: 4px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+@media (max-width: 820px) {
+  .search-box,
+  .candidate-main {
+    grid-template-columns: 1fr;
+  }
+
+  .candidate-actions {
+    flex-wrap: wrap;
+  }
+
+  .mini-grid,
+  .mini-grid.three,
+  .meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

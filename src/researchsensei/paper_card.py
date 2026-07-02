@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_paper_card_llm_output
 from researchsensei.schemas import (
     CardClaim,
@@ -29,42 +30,56 @@ async def build_paper_card(
 
     messages = prompt_builder.build_simple(
         system=(
-            "You are the ResearchSensei paper-understanding builder.\n"
-            "Use only the supplied evidence pack. Do not use outside knowledge.\n"
-            "Every core claim must cite exactly one allowed evidence_ref.\n"
-            "If evidence is insufficient, write INSUFFICIENT_EVIDENCE and leave evidence_ref empty.\n"
-            "Return only valid JSON."
+            "你是 ResearchSensei 的论文卡片生成器。只根据给定证据包回答，不能使用外部知识。\n"
+            "最终回答只能是一个 JSON 对象；不要输出 Markdown、解释、前后缀或思考过程。\n"
+            "最终回答的第一个字符必须是 {，最后一个字符必须是 }。\n"
+            "one_sentence_summary 必须是字符串，不要写成对象。\n"
+            "problem/core_idea/method_overview/experiment_summary 必须各引用一个允许的 evidence_ref。\n"
+            "证据不足时 text 写 INSUFFICIENT_EVIDENCE，evidence_ref 写空字符串。"
         ),
-        user=f"""Paper title: {skeleton.title}
-Abstract summary: {skeleton.abstract_summary[:500]}
+        user=f"""论文标题：{skeleton.title}
+摘要摘要：{skeleton.abstract_summary[:500]}
 
-Evidence Pack:
+证据包：
 {evidence_text}
 
-Allowed evidence_ref values:
+允许的 evidence_ref：
 {allowed_refs}
 
-Constraints:
-- Choose evidence_ref exactly from Allowed evidence_ref values.
-- Do not concatenate multiple evidence refs.
-- Do not invent datasets, methods, results, or limitations.
-- Use concise Chinese explanations with necessary English terms preserved.
-- If evidence is insufficient, set text to "INSUFFICIENT_EVIDENCE" and evidence_ref to "".
+约束：
+- evidence_ref 必须逐字从“允许的 evidence_ref”中选择。
+- 不要拼接多个 evidence_ref。
+- 不要编造数据集、方法、结果或局限。
+- 用简洁中文解释，必要的英文术语保留。
+- one_sentence_summary 只能是字符串，不能包含 evidence_ref 字段。
+- 如果证据不足，text 写 "INSUFFICIENT_EVIDENCE"，evidence_ref 写 ""。
 
-Return JSON with this schema:
+只返回以下 JSON 结构：
 {{
-  "one_sentence_summary": "one evidence-grounded sentence",
-  "problem": {{"text": "problem addressed by the paper", "evidence_ref": "allowed ref"}},
-  "core_idea": {{"text": "core contribution or idea", "evidence_ref": "allowed ref"}},
-  "method_overview": {{"text": "method overview", "evidence_ref": "allowed ref"}},
-  "experiment_summary": {{"text": "experiment or result summary", "evidence_ref": "allowed ref"}},
-  "limitations": {{"text": "limitations if supported, otherwise INSUFFICIENT_EVIDENCE", "evidence_ref": "allowed ref or empty"}}
+  "one_sentence_summary": "一句有证据支撑的中文总结",
+  "problem": {{"text": "论文解决的问题", "evidence_ref": "allowed ref"}},
+  "core_idea": {{"text": "核心贡献或想法", "evidence_ref": "allowed ref"}},
+  "method_overview": {{"text": "方法概述", "evidence_ref": "allowed ref"}},
+  "experiment_summary": {{"text": "实验或结果总结", "evidence_ref": "allowed ref"}},
+  "limitations": {{"text": "有证据则写局限，否则 INSUFFICIENT_EVIDENCE", "evidence_ref": "allowed ref or empty"}}
 }}""",
     )
 
-    data = await llm_client.chat_json(messages)
-    output = PaperCardLLMOutput.model_validate(data)
-    validate_paper_card_llm_output(output, evidence_pack)
+    paper_config = LLMConfig(
+        temperature=0.2,
+        max_tokens=12000,
+        json_mode=True,
+        timeout=300.0,
+        max_retries=1,
+        retry_delay=1.0,
+        disable_thinking=True,
+    )
+    try:
+        data = await llm_client.chat_json(messages, config=paper_config)
+        output = PaperCardLLMOutput.model_validate(data)
+        validate_paper_card_llm_output(output, evidence_pack)
+    except Exception as exc:
+        return _fallback_paper_card(evidence_pack, skeleton, reason=f"PAPER_CARD_LLM_FALLBACK: {exc}")
 
     return _convert_to_paper_card(output, evidence_pack, skeleton)
 
@@ -77,40 +92,139 @@ def _convert_to_paper_card(
     """Convert LLM output to PaperCard."""
     valid_refs = {item.evidence_ref for item in evidence_pack.items if item.evidence_ref}
     avg_confidence = _avg_confidence(evidence_pack)
+    warnings: list[str] = []
 
-    def _to_card_claim(output_claim, fallback_text: str = "UNKNOWN") -> CardClaim:
+    def _to_card_claim(output_claim, field: str, fallback_text: str = "UNKNOWN") -> CardClaim:
+        candidate_text = (output_claim.text or "").strip()
         ref = output_claim.evidence_ref if output_claim.evidence_ref in valid_refs else ""
+        if not ref:
+            fallback_ref = _fallback_ref_for_field(field, evidence_pack)
+            if _looks_insufficient(candidate_text):
+                candidate_text = "证据不足，暂不展开。"
+            elif field == "experiment_summary" and not _has_claim_type(evidence_pack, {"EXPERIMENT", "RESULT"}):
+                candidate_text = "证据不足，暂不展开。"
+            elif fallback_ref:
+                ref = fallback_ref
+            else:
+                candidate_text = "证据不足，暂不展开。"
+            warnings.append(f"PAPER_CARD_FIELD_DEGRADED: {field}")
         return CardClaim(
-            text=output_claim.text or fallback_text,
+            text=candidate_text or fallback_text,
             evidence_ref=ref,
-            evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.UNVERIFIED,
+            evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
             confidence=avg_confidence if ref else 0.0,
         )
 
     limitations_claim = None
     if output.limitations is not None:
-        limitations_claim = _to_card_claim(output.limitations)
+        limitations_claim = _to_card_claim(output.limitations, "limitations")
     else:
-        limitations_claim = CardClaim(text="UNKNOWN")
+        limitations_claim = CardClaim(text="证据不足，暂不展开。", evidence_type=EvidenceType.INSUFFICIENT_EVIDENCE)
 
     return PaperCard(
         paper_id=skeleton.paper_id,
         title=skeleton.title,
-        one_sentence_summary=output.one_sentence_summary,
-        problem=_to_card_claim(output.problem),
-        background=CardClaim(text=skeleton.abstract_summary),
+        one_sentence_summary=output.one_sentence_summary or skeleton.abstract_summary or "UNKNOWN",
+        problem=_to_card_claim(output.problem, "problem"),
+        background=CardClaim(text=skeleton.abstract_summary or "UNKNOWN"),
         old_methods=[],
         bottleneck=CardClaim(text="UNKNOWN"),
-        core_idea=_to_card_claim(output.core_idea),
-        method_overview=_to_card_claim(output.method_overview),
-        experiment_summary=_to_card_claim(output.experiment_summary),
+        core_idea=_to_card_claim(output.core_idea, "core_idea"),
+        method_overview=_to_card_claim(output.method_overview, "method_overview"),
+        experiment_summary=_to_card_claim(output.experiment_summary, "experiment_summary"),
         limitations=limitations_claim,
         key_formulas=[],
         evidence_refs=sorted(valid_refs),
         confidence=avg_confidence,
-        warnings=[],
-        evidence_status=EvidenceType.SUPPORTED_BY_TEXT,
+        warnings=list(dict.fromkeys(warnings)),
+        evidence_status=EvidenceType.SUPPORTED_BY_TEXT if valid_refs else EvidenceType.INSUFFICIENT_EVIDENCE,
     )
+
+
+def _fallback_paper_card(
+    evidence_pack: EvidencePack,
+    skeleton: PaperSkeleton,
+    *,
+    reason: str,
+) -> PaperCard:
+    warnings = [reason]
+    problem_ref = _fallback_ref_for_field("problem", evidence_pack)
+    core_ref = _fallback_ref_for_field("core_idea", evidence_pack)
+    method_ref = _fallback_ref_for_field("method_overview", evidence_pack)
+    experiment_ref = _fallback_ref_for_field("experiment_summary", evidence_pack)
+    refs = sorted({item.evidence_ref for item in evidence_pack.items if item.evidence_ref})
+    return PaperCard(
+        paper_id=skeleton.paper_id,
+        title=skeleton.title or "UNKNOWN",
+        one_sentence_summary=skeleton.abstract_summary or "证据不足，暂不展开。",
+        problem=_claim_from_text(skeleton.problem, problem_ref, evidence_pack),
+        background=_claim_from_text(skeleton.abstract_summary, "", evidence_pack),
+        old_methods=[],
+        bottleneck=CardClaim(text="UNKNOWN"),
+        core_idea=_claim_from_item(_first_item(evidence_pack, {"CONTRIBUTION", "METHOD"}), core_ref, fallback="证据不足，暂不展开。"),
+        method_overview=_claim_from_text(skeleton.method_overview, method_ref, evidence_pack),
+        experiment_summary=_claim_from_text(skeleton.experiment_overview, experiment_ref, evidence_pack),
+        limitations=CardClaim(text="证据不足，暂不展开。", evidence_type=EvidenceType.INSUFFICIENT_EVIDENCE),
+        key_formulas=[],
+        evidence_refs=refs,
+        confidence=_avg_confidence(evidence_pack),
+        warnings=warnings,
+        evidence_status=EvidenceType.SUPPORTED_BY_TEXT if refs else EvidenceType.INSUFFICIENT_EVIDENCE,
+    )
+
+
+def _claim_from_text(text: str, ref: str, evidence_pack: EvidencePack) -> CardClaim:
+    clean = (text or "").strip()
+    if _looks_insufficient(clean):
+        clean = "证据不足，暂不展开。"
+    return CardClaim(
+        text=clean or "证据不足，暂不展开。",
+        evidence_ref=ref,
+        evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
+        confidence=_avg_confidence(evidence_pack) if ref else 0.0,
+    )
+
+
+def _claim_from_item(item, ref: str, *, fallback: str) -> CardClaim:
+    text = ""
+    confidence = 0.0
+    if item is not None:
+        text = item.quote_or_summary or item.passage_text
+        confidence = item.confidence
+        ref = ref or item.evidence_ref
+    return CardClaim(
+        text=(text or fallback).strip(),
+        evidence_ref=ref,
+        evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
+        confidence=confidence if ref else 0.0,
+    )
+
+
+def _fallback_ref_for_field(field: str, evidence_pack: EvidencePack) -> str:
+    preferences: dict[str, tuple[str, ...]] = {
+        "problem": ("PROBLEM", "MOTIVATION", "DEFINITION", "CONTRIBUTION", "METHOD"),
+        "core_idea": ("CONTRIBUTION", "METHOD", "DEFINITION"),
+        "method_overview": ("METHOD", "CONTRIBUTION", "FORMULA_CONTEXT"),
+        "experiment_summary": ("EXPERIMENT", "RESULT"),
+        "limitations": ("LIMITATION", "DISCUSSION"),
+    }
+    item = _first_item(evidence_pack, set(preferences.get(field, ())))
+    return item.evidence_ref if item is not None else ""
+
+
+def _first_item(evidence_pack: EvidencePack, claim_types: set[str]):
+    for item in evidence_pack.items:
+        if item.claim_type in claim_types and item.evidence_ref:
+            return item
+    return None
+
+
+def _has_claim_type(evidence_pack: EvidencePack, claim_types: set[str]) -> bool:
+    return any(item.claim_type in claim_types for item in evidence_pack.items)
+
+
+def _looks_insufficient(value: str) -> bool:
+    return not value or value.strip().upper() in {"UNKNOWN", "INSUFFICIENT_EVIDENCE", "NEEDS_HUMAN_CHECK"}
 
 
 def _avg_confidence(evidence_pack: EvidencePack) -> float:

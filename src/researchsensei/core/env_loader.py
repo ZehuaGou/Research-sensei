@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 _SENSITIVE_KEYS = frozenset({
     "DEEPSEEK_API_KEY",
     "MIMO_API_KEY",
+    "OPENCODE_GO_API_KEY",
     "OPENAI_COMPATIBLE_API_KEY",
     "SEMANTIC_SCHOLAR_API_KEY",
     "S2_API_KEY",
@@ -30,6 +31,7 @@ _KEY_PRESENT_LOG = frozenset({
     "UNPAYWALL_EMAIL",
     "RESEARCHSENSEI_CONTACT_EMAIL",
     "MIMO_API_KEY",
+    "OPENCODE_GO_API_KEY",
     "DEEPSEEK_API_KEY",
     "SEMANTIC_SCHOLAR_API_KEY",
     "S2_API_KEY",

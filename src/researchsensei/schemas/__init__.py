@@ -7,6 +7,7 @@ from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQual
 from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
+from researchsensei.schemas.m4 import AdvisorEvaluation, AdvisorQuestion, FormulaSymbolExplanation, InteractiveAnswer, M4MemoryBundle, M4MemoryRecord, MemoryRetrievalResult, SelectionExplanation
 from researchsensei.schemas.skeleton import PaperSkeleton
 from researchsensei.schemas.audit import ArtifactBundle, AuditFinding, ComponentAuditResult, QualityReport
 from researchsensei.schemas.source import SourceStatus
@@ -17,6 +18,8 @@ __all__ = [
     "AdapterStatus",
     "ArtifactBundle",
     "AuditFinding",
+    "AdvisorEvaluation",
+    "AdvisorQuestion",
     "BlockType",
     "CanonicalizationStatus",
     "CanonicalQualityStatus",
@@ -54,13 +57,18 @@ __all__ = [
     "PassageIndexStats",
     "FormulaCard",
     "FormulaCardBundle",
+    "FormulaSymbolExplanation",
     "FormulaSymbol",
     "FormulaTerm",
     "ClaimLLMOutput",
     "FormulaCardLLMOutput",
     "FormulaCardsLLMOutput",
     "GeneratedMetadata",
+    "InteractiveAnswer",
     "JobRecord",
+    "M4MemoryBundle",
+    "M4MemoryRecord",
+    "MemoryRetrievalResult",
     "PaperCardLLMOutput",
     "TeachingCardLLMOutput",
     "TeachingCardsLLMOutput",
@@ -80,6 +88,7 @@ __all__ = [
     "SeedExpansionPaper",
     "SeedPaperInput",
     "SearchIntent",
+    "SelectionExplanation",
     "StatusEnvelope",
     "SourcePriority",
     "SourceStatus",

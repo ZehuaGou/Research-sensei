@@ -1,11 +1,12 @@
 # M5 Engineering Reliability
 
 This file is a reliability contract, not a current status table.
-`docs/STATUS.md` is authoritative for M1/M2/M3 state and evidence.
+`docs/STATUS.md` is authoritative for module state and evidence.
 
 M5 itself does not implement business features. It defines testing, smoke,
-security, configuration, and reporting discipline for the implemented M1/M2/M3
-surfaces. M4 reliability work remains future work because M4 is not implemented.
+security, configuration, and reporting discipline for implemented surfaces.
+M4 v1 is covered by local regression tests, including evidence-validated LLM
+answer handling. PaperQA/vector-memory M4 reliability remains future work.
 
 ## Goals
 
@@ -48,12 +49,12 @@ Literature acquisition live smoke:
 .venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
 ```
 
-Main-chain live smoke with Mimo:
+Main-chain live smoke with ccswitch:
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
-$env:RESEARCHSENSEI_LLM_PROVIDER="mimo"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider mimo
+$env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
+.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
 ```
 
 ## Smoke Reporting Contract

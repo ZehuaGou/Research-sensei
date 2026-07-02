@@ -14,7 +14,7 @@ function directionResponse(overrides: Record<string, any> = {}) {
     direction_workspace_status: 'SUCCESS',
     message: 'Direction exploration returned a structured bundle from real paper sources.',
     overview: 'time series anomaly detection is organized as a conservative reading landscape.',
-    seed_expansion_status: 'NOT_IMPLEMENTED',
+    seed_expansion_status: 'READY',
     warnings: [],
     key_sub_directions: [
       { name: 'reconstruction-based detection', description: 'Track reconstruction papers.' },
@@ -99,7 +99,7 @@ describe('DirectionSearchView', () => {
     expect(wrapper.get('[data-testid="sub-directions"]').text()).toContain('reconstruction-based detection')
     expect(wrapper.get('[data-testid="method-families"]').text()).toContain('Transformer/attention methods')
     expect(wrapper.get('[data-testid="reading-order"]').text()).toContain('B_SKIM')
-    expect(wrapper.get('[data-testid="seed-expansion-panel"]').text()).toContain('NOT_IMPLEMENTED')
+    expect(wrapper.get('[data-testid="seed-expansion-panel"]').text()).toContain('READY')
   })
 
   it('shows DEGRADED warnings from source failures', async () => {
@@ -147,16 +147,11 @@ describe('DirectionSearchView', () => {
 
     const card = wrapper.get('[data-testid="candidate-card"]')
     expect(card.text()).toContain('Time Series Anomaly Detection with Transformers')
-    expect(card.text()).toContain('source: arxiv')
-    expect(card.text()).toContain('relevance: 82%')
-    expect(card.text()).toContain('verified: verified')
-    expect(card.text()).toContain('pdf: available')
-    expect(card.text()).toContain('canonical: not_attempted')
-    expect(card.text()).toContain('m2_ready: false')
-    expect(card.text()).toContain('discovery: arxiv, openalex')
-    expect(card.text()).toContain('fulltext: source_ready')
-    expect(card.text()).toContain('deep_read: true')
-    expect(card.text()).toContain('upload: not_needed')
+    expect(card.text()).toContain('相关度 82%')
+    expect(card.text()).toContain('验证 verified')
+    expect(card.text()).toContain('全文 可用')
+    expect(card.text()).toContain('发现来源 arxiv, openalex')
+    expect(card.text()).toContain('M2 待验证')
   })
 
   it('shows prepare deep-read when candidate has a supported source', async () => {
@@ -168,7 +163,7 @@ describe('DirectionSearchView', () => {
     await flushPromises()
 
     const button = wrapper.get('[data-testid="deep-read-button"]')
-    expect(button.text()).toContain('准备精读')
+    expect(button.text()).toContain('深读这篇')
     expect((button.element as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -200,6 +195,52 @@ describe('DirectionSearchView', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/deep_read')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).candidate.arxiv_id).toBe('2401.00001')
     expect(routerPush).toHaveBeenCalledWith('/learn/job-123')
+  })
+
+  it('can hand off a DOI-only candidate without sending a non-arXiv landing URL as arxiv_url', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => directionResponse({
+          papers: [{
+            ...directionResponse().papers[0],
+            paper_id: 'doi-1',
+            source: 'crossref',
+            url: 'https://doi.org/10.1145/example',
+            doi: '10.1145/example',
+            arxiv_id: '',
+            arxiv_url: '',
+            pdf_url: '',
+            candidate_pdf_urls: [],
+            selected_fulltext_url: '',
+            fulltext_status: 'metadata_only',
+            can_deep_read: false,
+            can_prepare_deep_read: true,
+            deep_read_unavailable_reason: '',
+          }],
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          status: 'JOB_CREATED',
+          handoff_status: 'JOB_CREATED',
+          job_id: 'job-doi',
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('doi only paper')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-testid="deep-read-button"]').trigger('click')
+    await flushPromises()
+
+    const candidate = JSON.parse(fetchMock.mock.calls[1][1].body).candidate
+    expect(candidate.doi).toBe('10.1145/example')
+    expect(candidate.arxiv_url).toBe('')
+    expect(routerPush).toHaveBeenCalledWith('/learn/job-doi')
   })
 
   it('shows handoff failure reason on the candidate card', async () => {
@@ -296,7 +337,7 @@ describe('DirectionSearchView', () => {
     await flushPromises()
 
     const button = wrapper.get('[data-testid="deep-read-button"]')
-    expect(button.text()).toContain('源不可用')
+    expect(button.text()).toContain('来源不可用')
     expect((button.element as HTMLButtonElement).disabled).toBe(true)
     expect(wrapper.get('[data-testid="source-unavailable-note"]').text()).toContain('No arXiv ID')
   })

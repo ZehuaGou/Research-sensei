@@ -36,6 +36,13 @@ class JobStore:
             raise JobNotFoundError(f"Job not found: {job_id}")
         return self._from_row(row)
 
+    def delete(self, job_id: str) -> None:
+        with self._connect() as conn:
+            cursor = conn.execute("delete from jobs where job_id = ?", (job_id,))
+            deleted = cursor.rowcount
+        if deleted == 0:
+            raise JobNotFoundError(f"Job not found: {job_id}")
+
     def list_recent(self, limit: int = 20) -> list[JobRecord]:
         with self._connect() as conn:
             rows = conn.execute("select * from jobs order by created_at desc limit ?", (limit,)).fetchall()

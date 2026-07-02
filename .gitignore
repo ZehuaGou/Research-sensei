@@ -16,6 +16,7 @@ config/local.toml
 /workspace/
 /runs/
 /outputs/
+/output/
 /reports/
 /artifacts/
 /cache/

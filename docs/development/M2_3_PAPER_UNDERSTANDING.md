@@ -126,8 +126,8 @@ It reads only M1 artifacts and must not mutate M1 latex, bbox, page, parser sour
 
 LLM prompt 额外约束：
 
-- prompt 中必须列出 Allowed evidence_ref values。
-- LLM 输出的 evidence_ref 必须从 Allowed evidence_ref values 中精确选择一个。
+- prompt 中必须列出“允许的 evidence_ref”清单。
+- LLM 输出的 evidence_ref 必须从“允许的 evidence_ref”清单中精确选择一个。
 - 不允许把多个 evidence_ref 用逗号、空格或列表拼接。
 - 如果证据不足，文本写 `INSUFFICIENT_EVIDENCE` 或不生成对应 card，不能编造 evidence_ref。
 - formula_card 只能基于 EvidencePack 中的 formula block / formula context。
@@ -199,7 +199,7 @@ class UnderstandingStatus(SenseiModel):
 | 状态 | 含义 | allowed_for_user_display | downstream gating |
 |------|------|--------------------------|-------------------|
 | SUCCESS | LLM cards 生成成功，audit 通过 | True | 由 DownstreamGates 决定（全部 True） |
-| DEGRADED_STRUCTURAL | 论文理解成功，但某些组件降级 | True | 由 DownstreamGates 决定 |
+| DEGRADED_STRUCTURAL | 论文理解成功，但存在非 LLM 卡片失败的结构性限制（例如公式 provenance 不可推导） | True | 由 DownstreamGates 决定 |
 | BASELINE_ONLY | 无 LLM 或仅 rule-based baseline | False | 全部 False |
 | BLOCKED_UNDERSTANDING | evidence / LLM / audit 导致理解不可信 | False | 全部 False |
 | FAILED | 系统级异常（pipeline crash / 文件系统错误） | False | 全部 False |
@@ -295,7 +295,7 @@ class SinglePaperIngestionRunner:
 | formula_origin == unknown | 不能做详细公式推导 |
 | 非核心或 LLM 遗漏公式 | 生成 evidence-bound summary-only formula_card，不允许静默跳过 |
 | rule-based baseline | 只能作为 diagnostic，标记 BASELINE_ONLY |
-| paper_card 成功 + teaching_cards 失败 | DEGRADED_STRUCTURAL |
+| paper_card 成功 + teaching_cards 失败 | BLOCKED_UNDERSTANDING |
 | paper_card 成功 + formula_cards 失败（公式核心） | BLOCKED_UNDERSTANDING |
 | paper_card 成功 + formula_cards SKIPPED（无公式） | 不阻断 |
 | paper_card 失败 | BLOCKED |
@@ -306,6 +306,12 @@ class SinglePaperIngestionRunner:
 BLOCKED_UNDERSTANDING 只能展示 status/blocking_reason/warnings/diagnostic metadata，不能包含论文解释、教学内容、核心思想推断或公式讲解。
 
 ## 12. M4 Downstream Gates
+
+Current code note (2026-06-27): M4 v1 is implemented for PaperWorkspace.
+SUCCESS enables `reading_display`, `phase12_patterns`, `phase12_drill`, and
+`advisor_questions`. DEGRADED_STRUCTURAL enables M4 v1 when paper/formula
+artifacts are user-facing; `phase12_drill` requires successful teaching cards
+and otherwise records `phase12_drill_degraded`.
 
 DownstreamGates 控制下游 M4 互动式学习的访问权限，不再用 `status != SUCCESS` 作为唯一判断。
 
@@ -490,8 +496,8 @@ Status: IMPLEMENTED_RULE_BASED / UNIT_TESTED; real survey PDF live acceptance re
 - Real LLM path uses `build_paper_card`, `build_formula_cards`, and `build_teaching_cards`; all outputs must validate against the exact EvidencePack `evidence_ref` set.
 - Formula evidence now carries M1 provenance into the LLM/card layer: `formula_raw`, `original_latex`, `formula_origin`, `formula_ocr_status`, and `formula_explanation_status`.
 - `validate_formula_cards_llm_output` fails if formula evidence exists but the LLM returns no formula cards.
-- Teaching-card prompt is compacted for real Mimo stability: at most 2 cards, short fields, valid JSON only, no markdown.
-- Current real verification: `reports/m2_full_2312_01729v1_mimo` has paper/formula/teaching cards, legal evidence refs, no audit findings, and `understanding_status.status=SUCCESS`.
+- Teaching-card prompt is compact enough for ccswitch live runs: short fields, valid JSON only, no markdown.
+- Current live verification should use `RESEARCHSENSEI_LLM_PROVIDER=cc_switch`; Xiaomi/MiMo is no longer the default local path.
 - Formula evidence selection for the ordinary evidence pack is still heuristic, but `formula_cards.json` now uses a dedicated all-formula evidence pack and must cover every M1 formula evidence ref.
 - Survey/review support now emits evidence-bound `survey_status.json`, `survey_landscape.json`, `method_taxonomy.json`, `extracted_key_papers.json`, and `survey_claims.json` from canonical passages. Non-survey papers get `survey_status=NOT_APPLICABLE`; survey outputs require passage/evidence trace and do not replace `paper_card` or `formula_cards`.
 - Limitation: all-formula coverage is implemented, but advanced symbolic derivation is only as strong as M1 LaTeX and nearby evidence. Raw/unknown formulas remain blocked for derivation.

@@ -52,7 +52,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         description="Run the ResearchSensei M1 -> M2 -> M3 main-chain smoke through local API handlers."
     )
     parser.add_argument("--query", default="time series anomaly detection")
-    parser.add_argument("--provider", default="mimo")
+    parser.add_argument("--provider", default="cc_switch")
     parser.add_argument("--max-candidates", type=int, default=10)
     parser.add_argument("--skip-llm", action="store_true")
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "main_chain_smoke"))

@@ -29,3 +29,4 @@ class LLMConfig(SenseiModel):
     timeout: float = Field(default=120.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
     retry_delay: float = Field(default=1.0, ge=0)
+    disable_thinking: bool = False

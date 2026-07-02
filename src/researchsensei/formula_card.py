@@ -55,27 +55,27 @@ async def build_formula_cards(
             total_tokens=sum(item.token_count for item in batch),
         )
         messages = _build_batch_messages(prompt_builder, skeleton, batch)
-        # Use a longer timeout for formula cards — they require more processing
+        # Formula cards need enough budget for Cici Switch reasoning-model proxies.
         formula_config = LLMConfig(
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=12000,
             json_mode=True,
-            timeout=180.0,
+            timeout=300.0,
             max_retries=1,
+            retry_delay=1.0,
+            disable_thinking=True,
         )
+        refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
         try:
             data = await llm_client.chat_json(messages, config=formula_config)
             output = FormulaCardsLLMOutput.model_validate(data)
-            if output.formula_cards:
-                validate_formula_cards_llm_output(output, batch_pack)
-                llm_cards.extend(output.formula_cards)
-            else:
-                refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
-                warnings.append(f"LLM_EMPTY_FORMULA_BATCH: {refs}")
+            if not output.formula_cards:
+                warnings.append(f"LLM_RETURNED_NO_FORMULA_CARDS_FOR_BATCH: {refs}")
+                continue
+            validate_formula_cards_llm_output(output, batch_pack)
+            llm_cards.extend(output.formula_cards)
         except Exception as exc:
-            refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)
-            warnings.append(f"LLM_FORMULA_BATCH_FAILED: {refs}: {type(exc).__name__}: {str(exc)[:100]}")
-            # Continue to next batch instead of failing entirely
+            warnings.append(f"FORMULA_LLM_BATCH_FALLBACK: {refs}: {exc}")
             continue
 
     return _convert_to_bundle(llm_cards, evidence_pack, skeleton, warnings)
@@ -90,26 +90,30 @@ def _build_batch_messages(
     allowed_refs = "\n".join(f"- {item.evidence_ref}" for item in formula_items if item.evidence_ref) or "- NONE"
     return prompt_builder.build_simple(
         system=(
-            "You are a formula card builder. Use only the supplied evidence.\n"
-            "Each formula_card must cite exactly one allowed evidence_ref.\n"
-            "Preserve formula_id, formula_origin, formula_ocr_status from evidence.\n"
-            "Do not output formula_raw. Return only valid JSON."
+            "你是 ResearchSensei 的公式卡片生成器。只根据给定公式证据回答。\n"
+            "最终回答只能是一个 JSON 对象；不要输出 Markdown、解释、前后缀或思考过程。\n"
+            "最终回答的第一个字符必须是 {，最后一个字符必须是 }。\n"
+            "每个 formula_card 必须引用一个允许的 evidence_ref。\n"
+            "必须保留证据中的 formula_id、formula_origin、formula_ocr_status。\n"
+            "不要输出 formula_raw。"
         ),
-        user=f"""Paper: {skeleton.title}
+        user=f"""论文：{skeleton.title}
 
-Formula evidence:
+公式证据：
 {evidence_text}
 
-Allowed evidence_ref values:
+允许的 evidence_ref：
 {allowed_refs}
 
-Rules:
-- One formula_card per evidence item. evidence_ref from allowed list only.
-- Keep formula_id/formula_origin/formula_ocr_status from evidence.
-- No formula_raw in output. Use concise Chinese with English math terms.
-- source_latex -> source_exact; parser_latex -> parser_derived; raw/unknown -> INSUFFICIENT_EVIDENCE.
+规则：
+- 每条公式证据输出一张 formula_card。evidence_ref 只能来自允许列表。
+- formula_id/formula_origin/formula_ocr_status 必须照抄证据值。
+- 不要输出 formula_raw。用简洁中文解释，必要的英文数学术语保留。
+- symbols[].symbol 和 terms[].term 可以保留必要数学符号；meaning/encourages/penalizes/if_removed 必须是完整中文短句，不能以逗号、顿号、冒号结尾。
+- 不要把 LaTeX 源码当作解释；例如 symbol="\\mathbf{{V}}" 时 meaning 应写“值矩阵。”，而不是复述 "\\mathbf{{V}}"。
+- source_latex 对应 source_exact；parser_latex/mineru_latex/marker_latex 对应 parser_derived；ocr_latex 对应 ocr_derived；raw/unknown 对应 degraded。
 
-JSON schema:
+只返回以下 JSON 结构：
 {{"formula_cards": [{{"formula_id":"","formula_origin":"","formula_ocr_status":"","formula_explanation_status":"","purpose":"","symbols":[{{"symbol":"","meaning":""}}],"terms":[{{"term":"","meaning":"","encourages":"","penalizes":"","if_removed":""}}],"intuition":"","numeric_example":"","what_if_removed":"","weight_sensitivity":"","plain_summary":"","evidence_ref":""}}]}}""",
     )
 
@@ -202,7 +206,7 @@ def _convert_to_bundle(
         evidence_refs=evidence_refs,
         confidence=_bundle_confidence(cards),
         warnings=warnings,
-        evidence_status=EvidenceType.SUPPORTED_BY_FORMULA if cards else EvidenceType.INSUFFICIENT_EVIDENCE,
+        evidence_status=_bundle_evidence_status(cards),
     )
 
 
@@ -371,7 +375,7 @@ def _symbols(values: list[dict], confidence: float) -> list[FormulaSymbol]:
             continue
         symbols.append(FormulaSymbol(
             symbol=symbol,
-            meaning=str(value.get("meaning") or "UNKNOWN"),
+            meaning=_complete_sentence(value.get("meaning"), fallback="UNKNOWN"),
             evidence_status=EvidenceType.SUPPORTED_BY_FORMULA,
             confidence=confidence,
         ))
@@ -388,20 +392,40 @@ def _terms(values: list[dict], confidence: float) -> list[FormulaTerm]:
             continue
         terms.append(FormulaTerm(
             term=term,
-            meaning=str(value.get("meaning") or "UNKNOWN"),
-            encourages=str(value.get("encourages") or "UNKNOWN"),
-            penalizes=str(value.get("penalizes") or "UNKNOWN"),
-            if_removed=str(value.get("if_removed") or "UNKNOWN"),
+            meaning=_complete_sentence(value.get("meaning"), fallback="UNKNOWN"),
+            encourages=_complete_sentence(value.get("encourages"), fallback="UNKNOWN"),
+            penalizes=_complete_sentence(value.get("penalizes"), fallback="UNKNOWN"),
+            if_removed=_complete_sentence(value.get("if_removed"), fallback="UNKNOWN"),
             evidence_status=EvidenceType.SUPPORTED_BY_FORMULA,
             confidence=confidence,
         ))
     return terms
 
 
+def _complete_sentence(value: object, *, fallback: str) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    text = text.rstrip("，,、；;：:")
+    if text in {"UNKNOWN", "INSUFFICIENT_EVIDENCE"}:
+        return text
+    if text.endswith(("。", ".", "！", "!", "？", "?", "）", ")")):
+        return text
+    return f"{text}。"
+
+
 def _bundle_confidence(cards: list[FormulaCard]) -> float:
     if not cards:
         return 0.0
     return round(sum(card.confidence for card in cards) / len(cards), 2)
+
+
+def _bundle_evidence_status(cards: list[FormulaCard]) -> EvidenceType:
+    if not cards:
+        return EvidenceType.INSUFFICIENT_EVIDENCE
+    if any(card.evidence_status == EvidenceType.SUPPORTED_BY_FORMULA for card in cards):
+        return EvidenceType.SUPPORTED_BY_FORMULA
+    return EvidenceType.INSUFFICIENT_EVIDENCE
 
 
 def _avg_confidence(evidence_pack: EvidencePack) -> float:

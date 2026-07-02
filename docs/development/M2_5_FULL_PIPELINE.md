@@ -107,8 +107,8 @@ behavior is correct.
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
-$env:RESEARCHSENSEI_LLM_PROVIDER="mimo"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider mimo
+$env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
+.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
 ```
 
 The smoke exercises M1 direction search, seed expansion, deep_read handoff,

@@ -1,17 +1,17 @@
 # Copy this file to config/local.toml for machine-local provider overrides.
 # Keep secrets in .env, not in TOML and never in git.
 #
-# Typical .env for Mimo/Xiaomi-compatible live smoke:
+# Typical .env for ccswitch live runs:
 # RESEARCHSENSEI_ENABLE_API_LLM=1
-# RESEARCHSENSEI_LLM_PROVIDER=mimo
-# MIMO_API_KEY=...
+# RESEARCHSENSEI_LLM_PROVIDER=cc_switch
+# ccswitch listens on http://127.0.0.1:15721/v1. ResearchSensei sends the model selected in the settings page.
 # UNPAYWALL_EMAIL=you@example.com
 # RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
 # SEMANTIC_SCHOLAR_API_KEY=...
 # S2_API_KEY=...  # optional alias for SEMANTIC_SCHOLAR_API_KEY
 # OPENAI_COMPATIBLE_API_KEY=...
 
-active_provider = "deepseek"
+active_provider = "cc_switch"
 
 [providers.deepseek]
 kind = "openai_compatible"
@@ -27,6 +27,21 @@ api_key_env = "MIMO_API_KEY"
 model = "mimo-v2.5-pro"
 auth_header = "api-key"
 timeout_seconds = 60
+
+[providers.opencode_go]
+kind = "openai_compatible"
+base_url = "https://opencode.ai/zen/go/v1"
+api_key_env = "OPENCODE_GO_API_KEY"
+model = "deepseek-v4-flash"
+timeout_seconds = 120
+
+[providers.cc_switch]
+kind = "anthropic_compatible"
+base_url = "http://127.0.0.1:15721/v1"
+api_key_env = ""
+model = "claude-sonnet-4-6"
+auth_header = "none"
+timeout_seconds = 120
 
 [providers.openai_compatible]
 kind = "openai_compatible"

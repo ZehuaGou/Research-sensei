@@ -786,7 +786,7 @@ def _arxiv_url(paper: CandidatePaper) -> str:
 
 
 def _can_prepare_deep_read(paper: CandidatePaper) -> bool:
-    return bool(paper.can_deep_read or paper.arxiv_id or paper.pdf_url or _arxiv_url(paper))
+    return bool(paper.can_deep_read or paper.arxiv_id or paper.pdf_url or _arxiv_url(paper) or paper.doi)
 
 
 def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
@@ -795,7 +795,7 @@ def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if paper.fulltext_failure_reason:
         return paper.fulltext_failure_reason
     if paper.doi:
-        return "DOI handoff is not implemented yet."
+        return "DOI handoff will attempt legal open-access PDF resolution via Unpaywall."
     return "No arXiv ID, arXiv URL, or PDF URL is available for this candidate."
 
 

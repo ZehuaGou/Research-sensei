@@ -26,6 +26,9 @@ class ModelProviderConfig(ConfigModel):
     def chat_completions_url(self) -> str:
         return f"{self.base_url.rstrip('/')}/chat/completions"
 
+    def messages_url(self) -> str:
+        return f"{self.base_url.rstrip('/')}/messages"
+
     def missing_api_key_message(self) -> str:
         return f"Missing API key. Set environment variable {self.api_key_env}."
 
@@ -53,7 +56,7 @@ class SearchConfig(ConfigModel):
 
 
 class AppConfig(ConfigModel):
-    active_provider: str = "deepseek"
+    active_provider: str = "cc_switch"
     providers: dict[str, ModelProviderConfig] = Field(default_factory=dict)
     app: AppRuntimeConfig = Field(default_factory=AppRuntimeConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -80,8 +83,15 @@ class ConfigService:
         self._load_env()
         data = self._read_toml()
         providers = self._build_providers(data.get("providers") or {})
+        active_provider = _canonical_provider_name(
+            os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or data.get("active_provider", "cc_switch"),
+            providers,
+        )
+        model_override = os.getenv("RESEARCHSENSEI_LLM_MODEL", "").strip()
+        if model_override and active_provider in providers:
+            providers[active_provider] = providers[active_provider].model_copy(update={"model": model_override})
         return AppConfig(
-            active_provider=data.get("active_provider", "deepseek"),
+            active_provider=active_provider,
             providers=providers,
             app=AppRuntimeConfig(**(data.get("app") or {})),
             server=ServerConfig(**(data.get("server") or {})),
@@ -100,17 +110,25 @@ class ConfigService:
     def _build_providers(self, data: dict[str, Any]) -> dict[str, ModelProviderConfig]:
         if not data:
             data = {
-                "deepseek": {
-                    "kind": "openai_compatible",
-                    "base_url": "https://api.deepseek.com",
-                    "api_key_env": "DEEPSEEK_API_KEY",
-                    "model": "deepseek-chat",
+                "cc_switch": {
+                    "kind": "anthropic_compatible",
+                    "base_url": "http://127.0.0.1:15721/v1",
+                    "api_key_env": "",
+                    "model": "claude-sonnet-4-6",
+                    "auth_header": "none",
+                    "timeout_seconds": 120,
                 }
             }
         return {
             name: ModelProviderConfig(name=name, **value)
             for name, value in data.items()
         }
+
+
+def _canonical_provider_name(name: str, providers: dict[str, ModelProviderConfig]) -> str:
+    if name == "ccswitch" and "cc_switch" in providers:
+        return "cc_switch"
+    return name
 
 
 def redact_secret(message: str, secret: str | None) -> str:

@@ -505,13 +505,22 @@ def _build_llm_cards(
     try:
         teaching_cards = _run_async(build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client))
     except Exception as exc:
-        card_artifacts = {"paper_card": paper_card, "formula_cards": formula_cards}
-        return card_artifacts, _degraded_status(
+        status = _blocked_status(
             paper_id,
-            formula_cards,
+            "TEACHING_CARDS_FAILED",
             evidence_pack_summary,
             [WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
         )
+        return {}, status.model_copy(update={
+            "component_status": {
+                "paper_card": "SUCCESS",
+                "formula_cards": "SUCCESS",
+                "teaching_cards": "FAILED",
+                "llm": "FAILED",
+                "evidence_pack": "SUCCESS",
+                "audit": "SKIPPED",
+            }
+        })
 
     card_artifacts = {
         "paper_card": paper_card,
@@ -679,6 +688,7 @@ def _degraded_status(
 ) -> UnderstandingStatus:
     formula_status = formula_cards_status or ("SKIPPED" if not formula_cards.formula_cards else "SUCCESS")
     teaching_status = teaching_cards_status or ("FAILED" if warnings else "SUCCESS")
+    teaching_succeeded = teaching_status == "SUCCESS"
     return UnderstandingStatus(
         schema_version="current",
         paper_id=paper_id,
@@ -689,9 +699,9 @@ def _degraded_status(
         allowed_downstream=DownstreamGates(
             reading_display=True,
             phase12_patterns=True,
-            phase12_drill=True,
-            phase12_drill_degraded=True,
-            advisor_questions=False,
+            phase12_drill=teaching_succeeded,
+            phase12_drill_degraded=not teaching_succeeded,
+            advisor_questions=True,
         ),
         component_status={
             "paper_card": "SUCCESS",
@@ -731,7 +741,7 @@ def _blocked_status(
             "formula_cards": "SKIPPED",
             "teaching_cards": "SKIPPED",
             "llm": llm_component_status,
-            "evidence_pack": "SUCCESS" if evidence_pack_summary else "FAILED",
+            "evidence_pack": "SUCCESS" if evidence_pack_summary is not None else "FAILED",
             "audit": "FAILED" if audit_failed else "SKIPPED",
         },
         checked_artifacts=checked_artifacts or _checked_artifacts(include_cards=False),

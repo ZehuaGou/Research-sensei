@@ -55,13 +55,27 @@ class FailingFormulaLLM:
 
 
 def _first_allowed_ref(prompt: str) -> str:
-    tail = prompt.split("Allowed evidence_ref values:", 1)[-1]
-    for line in tail.splitlines():
+    for line in prompt.splitlines():
         line = line.strip()
-        if line.startswith("- "):
-            value = line[2:].strip()
-            if value and value != "NONE":
+        if line.startswith("- evidence_ref:"):
+            value = line.split(":", 1)[1].strip()
+            if value:
                 return value
+    separators = [
+        "Allowed evidence_ref values:",
+        "允许的 evidence_ref：",
+        "允许的 evidence_ref:",
+    ]
+    for separator in separators:
+        if separator not in prompt:
+            continue
+        tail = prompt.split(separator, 1)[-1]
+        for line in tail.splitlines():
+            line = line.strip()
+            if line.startswith("- "):
+                value = line[2:].strip()
+                if value and value != "NONE":
+                    return value
     raise AssertionError("No allowed evidence_ref in prompt")
 
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 from starlette.testclient import TestClient
 
+from researchsensei.core.config import ConfigService
 from researchsensei.web.app import create_app
 
 
@@ -74,8 +75,36 @@ def test_parse_upload_rejects_unsupported_file_type(tmp_path: Path) -> None:
     assert response.json()["detail"] == "Unsupported file type: .exe"
 
 
-def test_parse_doi_returns_not_implemented_source_status(tmp_path: Path) -> None:
-    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+def test_parse_doi_resolves_legal_oa_pdf_and_creates_job(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
+    http_client = UnpaywallOaHttpClient(_sample_pdf_bytes())
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        http_client=http_client,
+        config_service=_isolated_config(tmp_path),
+    ))
+
+    response = client.post(
+        "/api/v1/documents/parse",
+        data={"title": "Example Paper", "doi": "10.1145/example"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["job_id"]
+    assert data["status"] == "succeeded"
+    job = client.get(f"/api/v1/jobs/{data['job_id']}").json()
+    assert any(artifact["artifact_type"] == "source_status" for artifact in job["artifacts"])
+    assert any("api.unpaywall.org" in url for url in http_client.urls)
+
+
+def test_parse_doi_without_oa_pdf_returns_source_status(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        http_client=UnpaywallNotFoundHttpClient(),
+        config_service=_isolated_config(tmp_path),
+    ))
 
     response = client.post(
         "/api/v1/documents/parse",
@@ -85,9 +114,10 @@ def test_parse_doi_returns_not_implemented_source_status(tmp_path: Path) -> None
     assert response.status_code == 400
     detail = response.json()["detail"]
     assert detail["job_id"]
+    assert detail["status"] == "NO_LEGAL_OA_FULLTEXT_FOUND"
     assert detail["source_status"]["source_type"] == "doi"
     assert detail["source_status"]["status"] == "rejected"
-    assert "DOI_NOT_IMPLEMENTED" in detail["source_status"]["warnings"]
+    assert "UNPAYWALL_NOT_FOUND" in detail["source_status"]["warnings"]
 
 
 def test_direction_endpoint_returns_minimal_bundle_and_seed_expansion_is_wired(tmp_path: Path) -> None:
@@ -143,3 +173,104 @@ def test_health_endpoint_is_preserved(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "researchsensei"}
+
+
+def test_delete_job_removes_it_from_recent_jobs(tmp_path: Path) -> None:
+    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+    created = client.post(
+        "/api/v1/documents/parse",
+        files={"file": ("paper.md", b"# Paper\n## Abstract\nA tiny paper.", "text/markdown")},
+    )
+    assert created.status_code == 200
+    job_id = created.json()["job_id"]
+
+    deleted = client.delete(f"/api/v1/jobs/{job_id}")
+
+    assert deleted.status_code == 200
+    assert deleted.json() == {"status": "DELETED", "job_id": job_id}
+    assert client.get(f"/api/v1/jobs/{job_id}").status_code == 404
+    recent = client.get("/api/v1/jobs").json()["jobs"]
+    assert all(job["job_id"] != job_id for job in recent)
+
+
+class StubHttpResponse:
+    def __init__(
+        self,
+        content: bytes,
+        *,
+        content_type: str = "application/pdf",
+        url: str = "https://repo.example.org/paper.pdf",
+    ) -> None:
+        self.content = content
+        self.headers = {"content-type": content_type, "content-length": str(len(content))}
+        self.url = url
+        self.status_code = 200
+
+    def raise_for_status(self) -> None:
+        return None
+
+
+class UnpaywallOaHttpClient:
+    def __init__(self, pdf_content: bytes) -> None:
+        self.pdf_content = pdf_content
+        self.urls: list[str] = []
+
+    def get(self, url: str, **kwargs):
+        self.urls.append(url)
+        if "api.unpaywall.org" in url:
+            return UnpaywallResponse(pdf_url="https://repo.example.org/paper.pdf")
+        return StubHttpResponse(self.pdf_content, url=url)
+
+
+class UnpaywallNotFoundHttpClient:
+    def get(self, url: str, **kwargs):
+        if "api.unpaywall.org" in url:
+            response = StubHttpResponse(b"not found")
+            response.status_code = 404
+            return response
+        return StubHttpResponse(b"", url=url)
+
+
+class UnpaywallResponse:
+    def __init__(self, pdf_url: str = "") -> None:
+        self.status_code = 200
+        location = {"url_for_pdf": pdf_url} if pdf_url else {}
+        self._data = {
+            "best_oa_location": location if location else None,
+            "oa_locations": [location] if location else [],
+        }
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict:
+        return self._data
+
+
+def _sample_pdf_bytes() -> bytes:
+    import fitz
+
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text(
+        (72, 72),
+        (
+            "Example Paper\n\n"
+            "Abstract\n"
+            "We study anomaly detection.\n\n"
+            "Method\n"
+            "Our method uses attention and reconstruction losses.\n\n"
+            "Experiments\n"
+            "We report benchmark results."
+        ),
+    )
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def _isolated_config(tmp_path: Path) -> ConfigService:
+    return ConfigService(
+        config_path=tmp_path / "missing.toml",
+        env_path=tmp_path / "missing.env",
+    )

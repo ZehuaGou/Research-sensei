@@ -565,6 +565,7 @@ def _redact_secret_like_text(value: str) -> str:
     for secret_name in (
         "DEEPSEEK_API_KEY",
         "MIMO_API_KEY",
+        "OPENCODE_GO_API_KEY",
         "OPENAI_COMPATIBLE_API_KEY",
         "SEMANTIC_SCHOLAR_API_KEY",
         "S2_API_KEY",

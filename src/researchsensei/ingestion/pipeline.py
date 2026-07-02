@@ -150,7 +150,11 @@ class SinglePaperIngestionRunner:
                     understanding_status = _build_blocked_status(
                         actual_job_id,
                         blocking_reason="EMPTY_EVIDENCE_PACK",
-                        component_status=_component_status(blocked=True),
+                        component_status=_component_status(
+                            blocked=True,
+                            llm="SKIPPED",
+                            evidence_pack="FAILED",
+                        ),
                         evidence_pack_summary=evidence_pack_summary,
                     )
                     card_artifacts = {}
@@ -158,7 +162,11 @@ class SinglePaperIngestionRunner:
                     understanding_status = _build_blocked_status(
                         actual_job_id,
                         blocking_reason="MISSING_METHOD_EVIDENCE",
-                        component_status=_component_status(blocked=True),
+                        component_status=_component_status(
+                            blocked=True,
+                            llm="SKIPPED",
+                            evidence_pack="SUCCESS",
+                        ),
                         evidence_pack_summary=evidence_pack_summary,
                     )
                     card_artifacts = {}
@@ -296,7 +304,11 @@ class SinglePaperIngestionRunner:
             return {}, _build_blocked_status(
                 paper_id,
                 blocking_reason="PAPER_CARD_FAILED",
-                component_status=_component_status(blocked=True, paper_card="FAILED"),
+                component_status=_component_status(
+                    blocked=True,
+                    paper_card="FAILED",
+                    evidence_pack="SUCCESS",
+                ),
                 evidence_pack_summary=evidence_pack_summary,
                 warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"paper_card: {exc}")],
             )
@@ -315,6 +327,7 @@ class SinglePaperIngestionRunner:
                     blocked=True,
                     paper_card="SUCCESS",
                     formula_cards="FAILED",
+                    evidence_pack="SUCCESS",
                 ),
                 evidence_pack_summary=evidence_pack_summary,
                 warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"formula_cards: {exc}")],
@@ -352,18 +365,20 @@ class SinglePaperIngestionRunner:
 
         except Exception as exc:
             logger.warning("teaching_cards failed: %s", exc)
-            # Teaching failure → DEGRADED, but still write paper_card + formula_cards
-            card_artifacts = {
-                "paper_card": paper_card,
-                "formula_cards": formula_cards,
-            }
-            understanding_status = _build_degraded_status(
+            # Teaching cards are core M2 output; fail closed instead of exposing partial cards.
+            return {}, _build_blocked_status(
                 paper_id,
-                formula_cards=formula_cards,
+                blocking_reason="TEACHING_CARDS_FAILED",
+                component_status=_component_status(
+                    blocked=True,
+                    paper_card="SUCCESS",
+                    formula_cards="SUCCESS",
+                    teaching_cards="FAILED",
+                    evidence_pack="SUCCESS",
+                ),
                 evidence_pack_summary=evidence_pack_summary,
                 warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
             )
-            return card_artifacts, understanding_status
 
     def _write_artifacts(
         self,
@@ -559,6 +574,7 @@ def _build_degraded_status(
     teaching_cards_status: str = "FAILED",
 ) -> UnderstandingStatus:
     formula_status = formula_cards_status or ("SKIPPED" if not formula_cards.formula_cards else "SUCCESS")
+    teaching_succeeded = teaching_cards_status == "SUCCESS"
     return UnderstandingStatus(
         paper_id=paper_id,
         status="DEGRADED_STRUCTURAL",
@@ -568,9 +584,9 @@ def _build_degraded_status(
         allowed_downstream=DownstreamGates(
             reading_display=True,
             phase12_patterns=True,
-            phase12_drill=True,
-            phase12_drill_degraded=True,
-            advisor_questions=False,
+            phase12_drill=teaching_succeeded,
+            phase12_drill_degraded=not teaching_succeeded,
+            advisor_questions=True,
         ),
         component_status={
             "paper_card": "SUCCESS",
@@ -616,14 +632,18 @@ def _component_status(
     paper_card: str = "SKIPPED",
     formula_cards: str = "SKIPPED",
     teaching_cards: str = "SKIPPED",
+    llm: str = "FAILED",
+    evidence_pack: str = "SUCCESS",
+    audit: str = "SKIPPED",
 ) -> dict[str, str]:
     if blocked:
         return {
             "paper_card": paper_card,
             "formula_cards": formula_cards,
             "teaching_cards": teaching_cards,
-            "llm": "FAILED",
-            "evidence_pack": "FAILED",
+            "llm": llm,
+            "evidence_pack": evidence_pack,
+            "audit": audit,
         }
     return {}
 

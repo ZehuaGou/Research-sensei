@@ -4,10 +4,8 @@ import TopBar from './components/layout/TopBar.vue'
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col" style="background: var(--bg-primary); color: var(--text-primary);">
+  <div class="app-shell">
     <TopBar />
-    <main class="flex-1">
-      <RouterView />
-    </main>
+    <RouterView />
   </div>
 </template>

@@ -223,7 +223,7 @@ class DirectionBundle(SenseiModel):
     recommended_reading_order: list[dict[str, object]] = Field(default_factory=list)
     deep_read_candidates: list[dict[str, object]] = Field(default_factory=list)
     source_metrics: list[dict[str, object]] = Field(default_factory=list)
-    seed_expansion_status: str = "NOT_IMPLEMENTED"
+    seed_expansion_status: str = "READY"
     query_plan: QueryPlan
     candidate_pool: CandidatePool
     source_resolution: SourceResolutionResult = Field(default_factory=lambda: SourceResolutionResult(query=""))

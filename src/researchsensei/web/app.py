@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import sqlite3
 import uuid
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from researchsensei.acquisition.fulltext_resolver import FullTextResolver
@@ -16,12 +19,17 @@ from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.types import LLMConfig
-from researchsensei.schemas import CandidatePaper, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
+from researchsensei.m4.service import M4InteractionService, M4_MEMORY_FILENAME
+from researchsensei.schemas import CandidatePaper, InteractiveAnswer, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.source_resolver import SourceResolver
 from researchsensei.workspace import WorkspaceStore
 
 
 SUPPORTED_PARSE_SUFFIXES = {".md", ".txt", ".pdf", ".tex"}
+
+
+class SettingsUpdate(BaseModel):
+    model: str | None = None
 
 
 def _debug_enabled() -> bool:
@@ -72,6 +80,52 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok", "service": "researchsensei"}
 
+    @app.get("/api/v1/settings")
+    def get_settings() -> dict[str, object]:
+        return _settings_payload(config_service)
+
+    @app.patch("/api/v1/settings")
+    def update_settings(payload: SettingsUpdate) -> dict[str, object]:
+        model = (payload.model or "").strip()
+        if not model:
+            raise HTTPException(status_code=422, detail="model must not be empty")
+        if len(model) > 160:
+            raise HTTPException(status_code=422, detail="model is too long")
+        service = config_service or ConfigService()
+        _set_env_value(service.env_path, "RESEARCHSENSEI_LLM_MODEL", model)
+        os.environ["RESEARCHSENSEI_LLM_MODEL"] = model
+        if resolved_llm_client is not None:
+            resolved_llm_client.provider = resolved_llm_client.provider.model_copy(update={"model": model})
+        return _settings_payload(service)
+
+    @app.post("/api/v1/settings/test")
+    def test_settings() -> dict[str, object]:
+        payload = _settings_payload(config_service)
+        active_provider = str(payload.get("active_provider") or "")
+        if not active_provider:
+            return {
+                **payload,
+                "ok": False,
+                "message": "No model provider is configured.",
+            }
+        if not payload.get("llm_enabled"):
+            return {
+                **payload,
+                "ok": False,
+                "message": "API LLM is disabled. Set RESEARCHSENSEI_ENABLE_API_LLM=1 to enable live calls.",
+            }
+        if not payload.get("api_key_configured"):
+            return {
+                **payload,
+                "ok": False,
+                "message": f"Missing API key. Set environment variable {payload.get('api_key_env')}.",
+            }
+        return {
+            **payload,
+            "ok": True,
+            "message": "Provider configuration is ready. No live LLM call was made.",
+        }
+
     @app.post("/api/v1/documents/parse")
     async def parse_document(
         file: UploadFile | None = File(None),
@@ -115,6 +169,34 @@ def create_app(
             if m2_artifact_job is not None:
                 return _job_parse_response(m2_artifact_job)
 
+        if doi.strip() and not any(value.strip() for value in [local_path, pdf_url, arxiv_id, arxiv_url]):
+            resolved_pdf_url, resolve_error = _resolve_doi_to_legal_pdf(
+                fulltext_resolver,
+                doi.strip(),
+                title,
+            )
+            if resolved_pdf_url:
+                pdf_url = resolved_pdf_url
+                doi = ""
+            else:
+                source_status = SourceStatus(
+                    source_type="doi",
+                    original_input=doi.strip(),
+                    status="rejected",
+                    warnings=[resolve_error],
+                    degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
+                )
+                job = _record_failed_source_job(workspace, jobs, job_id, run_dir, source_status)
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "job_id": job.job_id,
+                        "status": "NO_LEGAL_OA_FULLTEXT_FOUND",
+                        "message": _doi_failure_message(resolve_error),
+                        "source_status": source_status.model_dump(mode="json"),
+                    },
+                )
+
         source_status = _resolve_source(
             resolver=resolver,
             run_dir=run_dir,
@@ -153,6 +235,14 @@ def create_app(
             return _job_response(jobs.get(job_id))
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Job not found.") from error
+
+    @app.delete("/api/v1/jobs/{job_id}")
+    def delete_job(job_id: str) -> dict[str, object]:
+        try:
+            jobs.delete(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="Job not found.") from error
+        return {"status": "DELETED", "job_id": job_id}
 
     @app.get("/api/v1/jobs/{job_id}/artifacts")
     def get_job_artifacts(job_id: str) -> dict[str, object]:
@@ -298,6 +388,67 @@ def create_app(
 
         return result
 
+    @app.post("/api/v1/jobs/{job_id}/selection/explain")
+    def explain_selection(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client)
+        result = service.explain_selection(payload)
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return result.model_dump(mode="json")
+
+    @app.post("/api/v1/jobs/{job_id}/formula/explain")
+    def explain_formula(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client)
+        result = service.explain_formula(payload)
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return result.model_dump(mode="json")
+
+    @app.post("/api/v1/jobs/{job_id}/ask")
+    def ask_job(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        runtime_answer = _runtime_self_answer(
+            payload,
+            llm_client=resolved_llm_client,
+            config_service=config_service,
+        )
+        if runtime_answer is not None:
+            return runtime_answer.model_dump(mode="json")
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client)
+        result = service.answer_question(payload)
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return result.model_dump(mode="json")
+
+    @app.post("/api/v1/jobs/{job_id}/advisor/question")
+    def advisor_question(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client, required_gate="advisor_questions")
+        result = service.advisor_question(payload)
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return result.model_dump(mode="json")
+
+    @app.post("/api/v1/jobs/{job_id}/advisor/evaluate")
+    def advisor_evaluate(job_id: str, payload: dict[str, object]) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client, required_gate="advisor_questions")
+        result = service.advisor_evaluate(payload)
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return result.model_dump(mode="json")
+
+    @app.get("/api/v1/jobs/{job_id}/memory")
+    def get_memory(job_id: str) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client)
+        return service.get_memory().model_dump(mode="json")
+
+    @app.delete("/api/v1/jobs/{job_id}/memory")
+    def clear_memory(job_id: str) -> dict[str, object]:
+        job = _get_job_or_404(jobs, job_id)
+        service = _m4_service_for_job(job, llm_client=resolved_llm_client)
+        bundle = service.clear_memory()
+        _sync_m4_memory_artifact(jobs, job, service.memory_path)
+        return {"status": "CLEARED", **bundle.model_dump(mode="json")}
+
     @app.post("/api/v1/directions/search")
     def search_direction(payload: dict[str, object]) -> dict[str, object]:
         query = str(payload.get("query") or "")
@@ -425,6 +576,7 @@ M2_ARTIFACT_TYPES = {
     "teaching_cards.json": "teaching_cards",
     "quality_report.json": "quality_report",
     "understanding_status.json": "understanding_status",
+    "m4_memory.json": "m4_memory",
     "m2_run_summary.json": "m2_run_summary",
     "m2_full_report.md": "m2_full_report",
 }
@@ -503,6 +655,199 @@ def _read_json_file(path: Path) -> dict[str, object]:
     return data if isinstance(data, dict) else {}
 
 
+def _get_job_or_404(jobs: JobStore, job_id: str) -> JobRecord:
+    try:
+        return jobs.get(job_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail="Job not found.") from error
+
+
+def _m4_service_for_job(
+    job: JobRecord,
+    *,
+    llm_client: LLMClient | None = None,
+    required_gate: str = "reading_display",
+) -> M4InteractionService:
+    status = _job_understanding_status(job)
+    if not status:
+        raise HTTPException(status_code=404, detail="understanding_status not found.")
+    if status.get("allowed_for_user_display") is not True:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": status.get("status", "BLOCKED"),
+                "blocking_reason": status.get("blocking_reason", ""),
+                "message": "M4 requires user-facing M2 understanding artifacts.",
+            },
+        )
+    downstream = status.get("allowed_downstream")
+    downstream = downstream if isinstance(downstream, dict) else {}
+    if required_gate and downstream.get(required_gate) is not True:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "status": status.get("status", "BLOCKED"),
+                "blocking_reason": status.get("blocking_reason", ""),
+                "gate": f"allowed_downstream.{required_gate}",
+                "message": f"M4 route requires allowed_downstream.{required_gate}.",
+            },
+        )
+    return M4InteractionService(
+        job_id=job.job_id,
+        run_dir=Path(job.run_dir),
+        artifacts=_m4_artifacts(job),
+        llm_client=llm_client,
+    )
+
+
+def _m4_artifacts(job: JobRecord) -> dict[str, object]:
+    allowed_types = {
+        "understanding_status",
+        "paper_card",
+        "formula_cards",
+        "teaching_cards",
+        "passage_index",
+        "claim_evidence",
+        "evidence_index",
+        "paper_skeleton",
+    }
+    artifacts: dict[str, object] = {}
+    for artifact in job.artifacts:
+        if artifact.artifact_type not in allowed_types:
+            continue
+        artifacts[artifact.artifact_type] = _read_artifact_content(job, artifact.path)
+    return artifacts
+
+
+def _sync_m4_memory_artifact(jobs: JobStore, job: JobRecord, memory_path: Path) -> JobRecord:
+    if not memory_path.exists():
+        return job
+    if any(artifact.artifact_type == "m4_memory" for artifact in job.artifacts):
+        return job
+    return jobs.update(
+        job.job_id,
+        artifacts=[*job.artifacts, WorkspaceArtifact(artifact_type="m4_memory", path=str(memory_path))],
+    )
+
+
+def _runtime_self_answer(
+    payload: dict[str, object],
+    *,
+    llm_client: LLMClient | None,
+    config_service: ConfigService | None,
+) -> InteractiveAnswer | None:
+    question = _compact_question_text(payload.get("question") or payload.get("user_question"))
+    if not _is_runtime_self_question(question):
+        return None
+
+    settings = _runtime_llm_payload(llm_client=llm_client, config_service=config_service)
+    provider = str(settings.get("active_provider") or settings.get("provider_display_name") or "未配置")
+    model = str(settings.get("model") or "未配置")
+    endpoint = str(settings.get("request_endpoint") or "")
+    route_note = str(settings.get("route_note") or "")
+    llm_enabled = bool(settings.get("llm_enabled"))
+    provider_known = bool(settings.get("provider_known", True))
+    api_key_configured = bool(settings.get("api_key_configured", True))
+
+    lines = [
+        "我是 ResearchSensei 的 M4 论文助教，负责基于当前论文证据解释论文、公式和追问。",
+        f"当前模型配置是 {model}。",
+        f"提供方是 {provider}。",
+    ]
+    if endpoint:
+        lines.append(f"请求通道是 {endpoint}。")
+    if route_note:
+        lines.append(route_note)
+    if not provider_known:
+        lines.append("不过当前 provider 没在配置里找到，所以不能确认真实请求会成功。")
+    elif not llm_enabled:
+        lines.append("不过 API LLM 现在没有启用，论文问答会退回到本地卡片证据。")
+    elif not api_key_configured:
+        lines.append("不过当前 provider 的 API key 没有配置完整，真实调用可能不可用。")
+
+    return InteractiveAnswer(
+        status="SUCCESS",
+        answer="\n".join(lines),
+        evidence_refs=[],
+        memory_refs=[],
+        uncertainty="这是运行时配置问题，不属于论文证据问答，所以没有引用 evidence_ref。",
+        follow_up_suggestions=["要不要我打开设置页看模型列表？", "要不要切换当前模型？"],
+        used_context={"memory": False, "artifacts": False, "llm": False},
+        warnings=[],
+    )
+
+
+def _runtime_llm_payload(
+    *,
+    llm_client: LLMClient | None,
+    config_service: ConfigService | None,
+) -> dict[str, object]:
+    provider = getattr(llm_client, "provider", None)
+    if provider is not None:
+        return {
+            "active_provider": _public_provider_name(str(getattr(provider, "name", "") or "")),
+            "provider_key": str(getattr(provider, "name", "") or ""),
+            "provider_display_name": _public_provider_name(str(getattr(provider, "name", "") or "")),
+            "provider_kind": str(getattr(provider, "kind", "") or ""),
+            "base_url": str(getattr(provider, "base_url", "") or ""),
+            "request_endpoint": _provider_request_endpoint(provider),
+            "api_key_env": str(getattr(provider, "api_key_env", "") or ""),
+            "model": str(getattr(provider, "model", "") or ""),
+            "auth_header": str(getattr(provider, "auth_header", "") or ""),
+            "route_note": _provider_route_note(provider),
+            "llm_enabled": True,
+            "api_key_configured": bool(os.getenv(str(getattr(provider, "api_key_env", "") or ""), ""))
+            if getattr(provider, "api_key_env", "")
+            else True,
+            "provider_known": True,
+        }
+    return _settings_payload(config_service)
+
+
+def _compact_question_text(value: object) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()
+
+
+def _is_runtime_self_question(question: str) -> bool:
+    if not question:
+        return False
+    text = re.sub(r"\s+", "", question.lower())
+    paper_markers = ("这篇论文", "当前论文", "论文里", "论文中", "文中", "文章里", "方法里")
+    self_markers = (
+        "你",
+        "m4",
+        "助教",
+        "系统",
+        "当前配置",
+        "运行配置",
+        "provider",
+        "提供方",
+        "api",
+        "接口",
+        "ccswitch",
+        "cc_switch",
+    )
+    if any(marker in text for marker in paper_markers) and not any(marker in text for marker in self_markers):
+        return False
+
+    if _is_runtime_identity_question(text):
+        return True
+
+    target_markers = ("模型", "model", "provider", "提供方", "接口", "api", "baseurl", "base_url", "ccswitch", "cc_switch")
+    action_markers = ("用", "使用", "调用", "接入", "跑", "配置", "当前", "现在", "哪个", "什么", "是谁")
+    subject_markers = (*self_markers, "当前", "现在")
+    return (
+        any(marker in text for marker in subject_markers)
+        and any(marker in text for marker in target_markers)
+        and any(marker in text for marker in action_markers)
+    )
+
+
+def _is_runtime_identity_question(compact_lower_question: str) -> bool:
+    identity_markers = ("你是谁", "你现在是谁", "你是哪个", "你是什么", "你能做什么", "m4是谁", "助教是谁")
+    return any(marker in compact_lower_question for marker in identity_markers)
+
+
 def _configured_llm_client(
     *,
     enable_configured_llm: bool | None,
@@ -521,7 +866,10 @@ def _configured_llm_client(
     if not enabled:
         return None
 
-    actual_provider = provider_name or os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider
+    actual_provider = _canonical_provider_name(
+        provider_name or os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider,
+        config.providers,
+    )
     if actual_provider not in config.providers:
         raise RuntimeError(f"Unknown LLM provider for API: {actual_provider}")
 
@@ -529,14 +877,268 @@ def _configured_llm_client(
     if provider.api_key_env and not os.getenv(provider.api_key_env, ""):
         raise RuntimeError(provider.missing_api_key_message())
 
+    provider_timeout = float(provider.timeout_seconds or 60)
     runtime_config = llm_config or LLMConfig(
         temperature=0.2,
-        max_tokens=2400,
+        max_tokens=12000 if provider.kind == "anthropic_compatible" else 2400,
         json_mode=True,
-        timeout=float(provider.timeout_seconds or 60),
-        max_retries=0,
+        timeout=max(provider_timeout, 300.0) if provider.kind == "anthropic_compatible" else provider_timeout,
+        max_retries=2,
+        retry_delay=1.0,
+        disable_thinking=provider.kind == "anthropic_compatible",
     )
     return LLMClient(provider, config=runtime_config)
+
+
+def _settings_payload(config_service: ConfigService | None) -> dict[str, object]:
+    service = config_service or ConfigService()
+    config = service.load()
+    requested_provider = _canonical_provider_name(
+        os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider,
+        config.providers,
+    )
+    provider = config.providers.get(requested_provider)
+    if provider is None:
+        return {
+            "active_provider": _public_provider_name(requested_provider),
+            "provider_key": requested_provider,
+            "provider_display_name": _public_provider_name(requested_provider),
+            "provider_kind": "",
+            "base_url": "",
+            "request_endpoint": "",
+            "api_key_env": "",
+            "model": "",
+            "auth_header": "",
+            "route_note": "",
+            "model_options": [],
+            "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
+            "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
+            "api_key_configured": False,
+            "provider_known": False,
+        }
+
+    return {
+        "active_provider": _public_provider_name(provider.name),
+        "provider_key": provider.name,
+        "provider_display_name": _public_provider_name(provider.name),
+        "provider_kind": provider.kind,
+        "base_url": provider.base_url,
+        "request_endpoint": _provider_request_endpoint(provider),
+        "api_key_env": provider.api_key_env,
+        "model": provider.model,
+        "auth_header": provider.auth_header,
+        "route_note": _provider_route_note(provider),
+        "model_options": _model_options_for_provider(provider),
+        "model_env": "RESEARCHSENSEI_LLM_MODEL",
+        "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
+        "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
+        "api_key_configured": bool(os.getenv(provider.api_key_env, "")) if provider.api_key_env else True,
+        "provider_known": True,
+    }
+
+
+def _canonical_provider_name(name: str, providers: dict[str, object]) -> str:
+    if name == "ccswitch" and "cc_switch" in providers:
+        return "cc_switch"
+    return name
+
+
+def _public_provider_name(name: str) -> str:
+    return "ccswitch" if name in {"cc_switch", "ccswitch"} else name
+
+
+def _provider_request_endpoint(provider: object) -> str:
+    kind = str(getattr(provider, "kind", "") or "")
+    base_url = str(getattr(provider, "base_url", "") or "").rstrip("/")
+    if not base_url:
+        return ""
+    return f"{base_url}/messages" if kind == "anthropic_compatible" else f"{base_url}/chat/completions"
+
+
+def _provider_route_note(provider: object) -> str:
+    name = str(getattr(provider, "name", "") or "")
+    kind = str(getattr(provider, "kind", "") or "")
+    if _public_provider_name(name) == "ccswitch" and kind == "anthropic_compatible":
+        return "ccswitch 当前按 Claude/Anthropic 兼容通道请求 /v1/messages；实际上游 API 和路由由 ccswitch 的 Claude provider 配置决定。"
+    if kind == "openai_compatible":
+        return "当前提供方按 OpenAI 兼容通道请求 /chat/completions。"
+    return "当前提供方按配置中的兼容通道发送请求。"
+
+
+def _model_options_for_provider(provider: object) -> list[dict[str, str]]:
+    current_model = str(getattr(provider, "model", "") or "").strip()
+    options: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(model_id: object, *, label: object = "", source: str = "") -> None:
+        model = str(model_id or "").strip()
+        if not model or model in seen:
+            return
+        seen.add(model)
+        options.append({
+            "id": model,
+            "label": str(label or model).strip() or model,
+            "source": source,
+        })
+
+    add(current_model, source="当前配置")
+    if _public_provider_name(str(getattr(provider, "name", "") or "")) == "ccswitch":
+        for model in _ccswitch_current_provider_models():
+            add(model, source="ccswitch 当前 provider")
+        for model in _ccswitch_live_models(str(getattr(provider, "base_url", "") or "")):
+            add(model.get("id"), label=model.get("label"), source="ccswitch 接口")
+        for model in _ccswitch_recent_models():
+            add(model, source="ccswitch 请求历史")
+        for model_id, label in _ccswitch_pricing_models():
+            add(model_id, label=label, source="ccswitch 模型库")
+    return options[:80]
+
+
+def _ccswitch_live_models(base_url: str) -> list[dict[str, str]]:
+    if not base_url:
+        return []
+    try:
+        with httpx.Client(timeout=1.2) as client:
+            response = client.get(f"{base_url.rstrip('/')}/models")
+            response.raise_for_status()
+            payload = response.json()
+    except Exception:
+        return []
+    raw_items = payload.get("models") or payload.get("data") or []
+    if not isinstance(raw_items, list):
+        return []
+    models: list[dict[str, str]] = []
+    for item in raw_items:
+        if isinstance(item, str):
+            models.append({"id": item, "label": item})
+        elif isinstance(item, dict):
+            model_id = item.get("id") or item.get("model") or item.get("name")
+            if model_id:
+                models.append({
+                    "id": str(model_id),
+                    "label": str(item.get("display_name") or item.get("label") or item.get("name") or model_id),
+                })
+    return models
+
+
+def _ccswitch_db_path() -> Path:
+    return Path.home() / ".cc-switch" / "cc-switch.db"
+
+
+def _ccswitch_recent_models() -> list[str]:
+    path = _ccswitch_db_path()
+    if not path.exists():
+        return []
+    try:
+        with sqlite3.connect(path) as connection:
+            rows = connection.execute(
+                """
+                SELECT model_id
+                FROM (
+                    SELECT COALESCE(NULLIF(request_model, ''), NULLIF(model, '')) AS model_id,
+                           MAX(created_at) AS last_seen
+                    FROM proxy_request_logs
+                    WHERE COALESCE(NULLIF(request_model, ''), NULLIF(model, '')) IS NOT NULL
+                    GROUP BY model_id
+                    ORDER BY last_seen DESC
+                    LIMIT 30
+                )
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        return []
+    return [str(row[0]) for row in rows if row and row[0]]
+
+
+def _ccswitch_current_provider_models() -> list[str]:
+    path = _ccswitch_db_path()
+    if not path.exists():
+        return []
+    try:
+        with sqlite3.connect(path) as connection:
+            rows = connection.execute(
+                """
+                SELECT settings_config, meta
+                FROM providers
+                WHERE is_current = 1
+                LIMIT 20
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        return []
+    found: list[str] = []
+    pattern = re.compile(r"\b(?:claude|gpt|deepseek|gemini|minimax|qwen|kimi|glm|mistral|llama|doubao)[A-Za-z0-9_.:/-]*", re.I)
+    for settings_config, meta in rows:
+        text = f"{settings_config or ''} {meta or ''}"
+        found.extend(match.group(0) for match in pattern.finditer(text) if _is_plausible_model_id(match.group(0)))
+    return _unique_strings(found)
+
+
+def _ccswitch_pricing_models() -> list[tuple[str, str]]:
+    path = _ccswitch_db_path()
+    if not path.exists():
+        return []
+    try:
+        with sqlite3.connect(path) as connection:
+            rows = connection.execute(
+                """
+                SELECT model_id, COALESCE(NULLIF(display_name, ''), model_id)
+                FROM model_pricing
+                ORDER BY model_id
+                LIMIT 80
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        return []
+    return [(str(model_id), str(label)) for model_id, label in rows if model_id]
+
+
+def _unique_strings(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in seen:
+            result.append(text)
+            seen.add(text)
+    return result
+
+
+def _is_plausible_model_id(value: str) -> bool:
+    text = value.strip()
+    lower = text.lower()
+    if not text or "_" in text:
+        return False
+    if any(term in lower for term in ["plugin", "desktop", "traffic", "mode", "route"]):
+        return False
+    return bool(re.search(r"[\d.-]", text))
+
+
+def _set_env_value(env_path: str | Path, key: str, value: str) -> None:
+    path = Path(env_path)
+    lines: list[str] = []
+    if path.exists():
+        lines = path.read_text(encoding="utf-8").splitlines()
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    rendered = f'{key}="{escaped}"'
+    updated = False
+    result: list[str] = []
+    for line in lines:
+        stripped = line.lstrip()
+        if not stripped or stripped.startswith("#") or "=" not in line:
+            result.append(line)
+            continue
+        current_key = line.split("=", 1)[0].strip().lstrip("\ufeff")
+        if current_key == key:
+            result.append(rendered)
+            updated = True
+        else:
+            result.append(line)
+    if not updated:
+        if result and result[-1].strip():
+            result.append("")
+        result.append(rendered)
+    path.write_text("\n".join(result).rstrip() + "\n", encoding="utf-8")
 
 
 def _env_truthy(name: str) -> bool:
@@ -556,6 +1158,8 @@ def _direction_handoff_inputs(candidate: dict[str, object]) -> tuple[str, str, s
     pdf_url = str(candidate.get("pdf_url") or "").strip()
     arxiv_id = str(candidate.get("arxiv_id") or "").strip()
     arxiv_url = str(candidate.get("arxiv_url") or "").strip()
+    if arxiv_url and not SourceResolver.arxiv_to_pdf_url(arxiv_url=arxiv_url):
+        arxiv_url = ""
     for key in ("url", "landing_url", "source_url"):
         value = str(candidate.get(key) or "").strip()
         if value and not arxiv_url and SourceResolver.arxiv_to_pdf_url(arxiv_url=value):
@@ -586,8 +1190,8 @@ def _direction_handoff_failure(job: JobRecord, source_status: SourceStatus) -> d
 
 def _direction_failure_status(source_status: SourceStatus) -> str:
     warnings = set(source_status.warnings)
-    if "DOI_NOT_IMPLEMENTED" in warnings:
-        return "DOI_NOT_IMPLEMENTED"
+    if "NO_LEGAL_OA_FULLTEXT_FOUND" in warnings:
+        return "NO_LEGAL_OA_FULLTEXT_FOUND"
     if "DOWNLOAD_FAILED" in warnings or source_status.status == "failed":
         return "PDF_DOWNLOAD_FAILED"
     if "INVALID_ARXIV_ID" in warnings or "UNSUPPORTED_SOURCE" in warnings:
@@ -606,8 +1210,8 @@ def _direction_failure_status(source_status: SourceStatus) -> str:
 
 
 def _direction_failure_message(status: str, source_status: SourceStatus) -> str:
-    if status == "DOI_NOT_IMPLEMENTED":
-        return "DOI handoff is not implemented. Use an arXiv ID, arXiv URL, or PDF URL."
+    if status == "NO_LEGAL_OA_FULLTEXT_FOUND":
+        return "No legal open-access full text found for this DOI. Try providing a PDF URL or arXiv ID."
     if status == "PDF_DOWNLOAD_FAILED":
         return "PDF download failed for the direction candidate."
     if status == "SOURCE_UNAVAILABLE":
@@ -839,7 +1443,7 @@ def _resolve_source(
             source_type="doi",
             original_input=doi.strip(),
             status="rejected",
-            warnings=["DOI_NOT_IMPLEMENTED"],
+            warnings=["NO_LEGAL_OA_FULLTEXT_FOUND"],
             degraded_flags=["FULL_TEXT_MISSING", "ABSTRACT_ONLY", "FORMULA_UNAVAILABLE"],
         )
     if local_path.strip():

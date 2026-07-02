@@ -57,6 +57,14 @@ _FORMULA_ORIGINS = {
     "raw_formula_text",
 }
 
+_INSUFFICIENT_CLAIM_TEXTS = {
+    "",
+    "UNKNOWN",
+    "INSUFFICIENT_EVIDENCE",
+    "NEEDS_HUMAN_CHECK",
+    "证据不足，暂不展开。",
+}
+
 # Expected component_status values for each understanding status
 _STATUS_EXPECTED_COMPONENTS: dict[str, dict[str, str]] = {
     "SUCCESS": {
@@ -74,6 +82,14 @@ _STATUS_EXPECTED_COMPONENTS: dict[str, dict[str, str]] = {
     "BLOCKED_UNDERSTANDING": {},
     "DEGRADED_STRUCTURAL": {},
 }
+
+
+def _is_explicitly_insufficient_claim(claim: dict) -> bool:
+    evidence_type = str(claim.get("evidence_type") or "").strip().upper()
+    text = str(claim.get("text") or "").strip()
+    if evidence_type == "INSUFFICIENT_EVIDENCE":
+        return True
+    return text in _INSUFFICIENT_CLAIM_TEXTS
 
 
 class QualityAuditor:
@@ -845,14 +861,23 @@ class QualityAuditor:
                     artifact="understanding_status",
                     field="allowed_for_user_display",
                 ))
-            if downstream.get("advisor_questions") is not False:
+            if downstream.get("advisor_questions") is True and comp.get("paper_card") != "SUCCESS":
                 findings.append(AuditFinding(
                     code="F-5",
                     severity="P1",
                     effect="BLOCK",
-                    message="DEGRADED_STRUCTURAL but allowed_downstream.advisor_questions is not False",
+                    message="DEGRADED_STRUCTURAL allows advisor_questions without successful paper_card",
                     artifact="understanding_status",
                     field="allowed_downstream.advisor_questions",
+                ))
+            if downstream.get("phase12_drill") is True and comp.get("teaching_cards") != "SUCCESS":
+                findings.append(AuditFinding(
+                    code="F-5",
+                    severity="P1",
+                    effect="BLOCK",
+                    message="DEGRADED_STRUCTURAL allows phase12_drill without successful teaching_cards",
+                    artifact="understanding_status",
+                    field="allowed_downstream.phase12_drill",
                 ))
 
         return findings
@@ -877,6 +902,16 @@ class QualityAuditor:
                         continue
                     ref = field_val.get("evidence_ref", "") if isinstance(field_val, dict) else ""
                     if not ref:
+                        if isinstance(field_val, dict) and _is_explicitly_insufficient_claim(field_val):
+                            findings.append(AuditFinding(
+                                code="F-1-DEGRADED",
+                                severity="P2",
+                                effect="WARNING",
+                                message=f"paper_card.{field_name} is explicitly marked as insufficient evidence",
+                                artifact="paper_card",
+                                field=f"{field_name}.evidence_ref",
+                            ))
+                            continue
                         findings.append(AuditFinding(
                             code="F-1",
                             severity="P0",

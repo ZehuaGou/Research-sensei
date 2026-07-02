@@ -8,8 +8,17 @@ describe('StatusBanner', () => {
       props: { status: 'BASELINE_ONLY' },
     })
 
-    expect(wrapper.text()).toContain('Baseline only')
-    expect(wrapper.text()).toContain('Diagnostic cards are hidden')
+    expect(wrapper.text()).toContain('仅基础解析')
+    expect(wrapper.text()).toContain('后端没有启用实时大模型')
+  })
+
+  it('explains NO_LLM_CLIENT baseline runs are not upgradeable in place', () => {
+    const wrapper = mount(StatusBanner, {
+      props: { status: 'BASELINE_ONLY', blockingReason: 'NO_LLM_CLIENT' },
+    })
+
+    expect(wrapper.text()).toContain('RESEARCHSENSEI_ENABLE_API_LLM=1')
+    expect(wrapper.text()).toContain('重新跑论文')
   })
 
   it('shows blocking_reason and warnings for BLOCKED_UNDERSTANDING', () => {
@@ -21,9 +30,9 @@ describe('StatusBanner', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Understanding blocked')
-    expect(wrapper.text()).toContain('MISSING_METHOD_EVIDENCE')
-    expect(wrapper.text()).toContain('W1: warning text')
+    expect(wrapper.text()).toContain('理解被阻断')
+    expect(wrapper.text()).toContain('缺少方法证据')
+    expect(wrapper.text()).toContain('W1：warning text')
   })
 
   it('shows degraded missing components', () => {
@@ -44,14 +53,13 @@ describe('StatusBanner', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Degraded understanding')
-    expect(wrapper.text()).toContain('missing_components: teaching_cards')
-    expect(wrapper.text()).toContain('CARD_BUILDER_FAILED: teaching cards failed')
-    expect(wrapper.text()).toContain('canonicalization_status')
-    expect(wrapper.text()).toContain('degradation_reason')
-    expect(wrapper.text()).toContain('formula_origin')
-    expect(wrapper.text()).toContain('formula_ocr_status')
-    expect(wrapper.text()).toContain('evidence_status')
+    expect(wrapper.text()).toContain('结构不完整')
+    expect(wrapper.text()).toContain('缺少：教学卡片')
+    expect(wrapper.text()).toContain('CARD_BUILDER_FAILED：teaching cards failed')
+    expect(wrapper.text()).toContain('教学卡片失败')
+    expect(wrapper.text()).toContain('MinerU LaTeX')
+    expect(wrapper.text()).toContain('无需 OCR')
+    expect(wrapper.text()).toContain('成功')
   })
 
   it('shows system error for FAILED', () => {
@@ -59,7 +67,7 @@ describe('StatusBanner', () => {
       props: { status: 'FAILED' },
     })
 
-    expect(wrapper.text()).toContain('Pipeline failed')
+    expect(wrapper.text()).toContain('流水线失败')
   })
 
   it('shows PaperWorkspace status details', () => {
@@ -87,23 +95,19 @@ describe('StatusBanner', () => {
         },
         allowedDownstream: {
           reading_display: true,
-          advisor_questions: true,
+          advisor_questions: false,
         },
       },
     })
 
-    expect(wrapper.text()).toContain('Understanding ready')
-    expect(wrapper.text()).toContain('source_type')
-    expect(wrapper.text()).toContain('upload')
-    expect(wrapper.text()).toContain('canonicalization_status')
-    expect(wrapper.text()).toContain('m2_ready')
-    expect(wrapper.text()).toContain('formula_origin')
-    expect(wrapper.text()).toContain('mineru_latex')
-    expect(wrapper.text()).toContain('formula_ocr_status')
-    expect(wrapper.text()).toContain('evidence_status')
-    expect(wrapper.text()).toContain('component_status.paper_card')
-    expect(wrapper.text()).toContain('allowed_downstream.reading_display')
-    expect(wrapper.text()).toContain('quality_status')
+    expect(wrapper.text()).toContain('理解完成')
+    expect(wrapper.text()).toContain('来源')
+    expect(wrapper.text()).toContain('上传文件')
+    expect(wrapper.text()).toContain('公式来源')
+    expect(wrapper.text()).toContain('MinerU LaTeX')
+    expect(wrapper.text()).toContain('公式 OCR')
+    expect(wrapper.text()).toContain('证据')
+    expect(wrapper.text()).toContain('质量')
   })
 
   it('shows success state', () => {
@@ -111,7 +115,7 @@ describe('StatusBanner', () => {
       props: { status: 'SUCCESS' },
     })
 
-    expect(wrapper.text()).toContain('Understanding ready')
+    expect(wrapper.text()).toContain('理解完成')
   })
 
   it('renders nothing for unknown status', () => {
@@ -150,18 +154,12 @@ describe('StatusBanner', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('Degraded understanding')
-    expect(wrapper.text()).toContain('missing_components: formula_cards')
-    expect(wrapper.text()).toContain('FORMULA_DERIVATION_BLOCKED')
-    expect(wrapper.text()).toContain('degradation_reason')
-    expect(wrapper.text()).toContain('formula_origin')
-    expect(wrapper.text()).toContain('raw_formula_text')
-    expect(wrapper.text()).toContain('formula_ocr_status')
-    expect(wrapper.text()).toContain('not_available')
-    expect(wrapper.text()).toContain('component_status.formula_cards')
-    expect(wrapper.text()).toContain('FAILED')
-    expect(wrapper.text()).toContain('allowed_downstream.advisor_questions')
-    expect(wrapper.text()).toContain('false')
+    expect(wrapper.text()).toContain('结构不完整')
+    expect(wrapper.text()).toContain('缺少：公式卡片')
+    expect(wrapper.text()).toContain('公式推导被阻断')
+    expect(wrapper.text()).toContain('公式来源')
+    expect(wrapper.text()).toContain('原始公式文本')
+    expect(wrapper.text()).toContain('未提供')
     expect(wrapper.text()).toContain('FORMULA_BLOCKED')
   })
 })

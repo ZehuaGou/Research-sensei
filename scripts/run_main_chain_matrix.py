@@ -47,7 +47,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run the ResearchSensei M1->M2->M3 main-chain regression matrix."
     )
-    parser.add_argument("--provider", default="mimo")
+    parser.add_argument("--provider", default="cc_switch")
     parser.add_argument("--skip-llm", action="store_true")
     parser.add_argument("--use-cache", action="store_true", help="Use cached direction search results when available.")
     parser.add_argument("--refresh-cache", action="store_true", help="Force refresh cache even if valid entry exists.")

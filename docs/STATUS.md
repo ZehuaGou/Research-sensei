@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-06-18.
+Last updated: 2026-06-28.
 
 This is the single authoritative status file for ResearchSensei. README,
 DESIGN, DEVELOPMENT, module contracts, development notes, and historical docs
@@ -17,10 +17,73 @@ research direction
   -> source-backed deep_read handoff
   -> M2 evidence-backed paper understanding
   -> M3 controlled PaperWorkspace display
+  -> M4 evidence-bound PaperWorkspace tutoring
 ```
 
-Current work is limited to M1/M2/M3 readiness. M4 chat, tutor follow-up,
-long-term memory, drills, and training features are not started.
+Current M4 status is a narrow v1 implementation: PaperWorkspace can ask
+evidence-bound questions over existing M2 artifacts, explain selected text,
+explain formulas, generate advisor questions, evaluate user answers, and persist
+JSON memory artifacts. `/ask` uses the configured LLM when available, but only
+after artifact retrieval supplies allowed evidence refs; invalid LLM evidence
+refs are rejected and fall back to deterministic artifact answers. It is not
+yet a PaperQA-backed tutor, vector memory system, direction-level dialogue
+engine, or full drill generator.
+
+## 2026-06-28 ccswitch And UI Reconciliation
+
+- Live LLM defaults to ccswitch (`cc_switch` config key). ResearchSensei calls
+  `http://127.0.0.1:15721/v1`; the request model is selected in the settings page.
+- The backend sends `thinking={"type":"disabled"}` for Anthropic-compatible
+  ccswitch requests and uses larger timeouts/token budgets for M2/M4 card
+  builders (`12000` output tokens for M2 cards, `8192` for M4 tutor answers)
+  to avoid empty-content failures from long reasoning output.
+- Live ccswitch verification on 2026-06-28 succeeded for job
+  `992df68ddff9`: `/understanding_status` returned `SUCCESS`,
+  `paper_card`/`formula_cards`/`teaching_cards` all returned `SUCCESS`, and
+  `/cards` returned 200.
+- Core LLM card-builder failures now fail closed. `paper_card`,
+  `formula_cards`, or `teaching_cards` failure returns
+  `BLOCKED_UNDERSTANDING`; user-facing partial cards are not exposed.
+- `DEGRADED_STRUCTURAL` remains only for structural safety cases such as
+  formula derivation blocked by unreliable provenance.
+- The frontend has been rebuilt as a Chinese AI reading workspace: left reading
+  rail, central cards, right M4 tutor, compact status diagnostics, larger fonts,
+  and a viewport-clamped selected-text toolbar.
+- Validation on this checkpoint: `pytest` = 584 passed / 15 skipped;
+  `npm test` = 48 passed; `npm run build` passed.
+
+## 2026-06-27 Implementation Reconciliation
+
+- M3 Home now reads recent runs from `GET /api/v1/jobs`.
+- M3 Settings now reads `GET /api/v1/settings` and tests configuration readiness
+  with `POST /api/v1/settings/test`; this check does not make a live LLM call.
+- Upload DOI and Direction/Seed DOI-only handoff now attempt legal OA PDF
+  resolution through Unpaywall. If no downloadable legal PDF exists, the API
+  returns `NO_LEGAL_OA_FULLTEXT_FOUND`.
+- Direction and Seed handoff payloads no longer send DOI/landing URLs through
+  `arxiv_url`; only actual arXiv URLs are placed there.
+- PaperWorkspace now mounts M4 AskPanel/TextSelectionToolbar and card-level M4
+  actions when `/cards` is allowed.
+- `allowed_downstream` now enables M4 v1 gates for user-facing SUCCESS and
+  supported DEGRADED_STRUCTURAL runs; M4 endpoints still reject jobs where
+  `allowed_for_user_display` is false, and advisor routes require
+  `allowed_downstream.advisor_questions`.
+- M4 v1 adds `/selection/explain`, `/formula/explain`, `/ask`,
+  `/advisor/question`, `/advisor/evaluate`, and `/memory` routes backed by
+  existing M2 artifacts and `m4_memory.json`.
+- BASELINE_ONLY with `blocking_reason=NO_LLM_CLIENT` means the backend process
+  was started without `RESEARCHSENSEI_ENABLE_API_LLM=1`. Existing baseline jobs
+  cannot be upgraded in place; restart the backend with live LLM enabled and
+  rerun the paper.
+- After enabling live LLM in the dev server, rerunning the previous arXiv source
+  job produced `14422d200ed0` with `SUCCESS`, paper/formula/teaching/llm all
+  `SUCCESS`, `/cards=200`, and M4 `/ask` plus `/advisor/question` returning
+  `SUCCESS`. After adding evidence-validated LLM answers to M4, `/ask` on the
+  same job returned `used_context.llm=true` with evidence ref
+  `14422d200ed0:eq009`.
+- Frontend dev proxy now targets the documented backend port `8765`.
+- Unused frontend `mermaid` dependency was removed; `npm audit --omit=dev`
+  reports zero vulnerabilities.
 
 ## Status Vocabulary
 
@@ -44,14 +107,14 @@ long-term memory, drills, and training features are not started.
 | M1 | arXiv source-first | implemented | source/e-print handoff smoke | PARTIAL_REAL_E2E_VERIFIED for narrow arXiv candidates. Source/e-print is preferred over PDF; fallback stays explicit. |
 | M1 | Direction Exploration | implemented minimal loop | backend + frontend tests + source smoke | DEGRADED_SMOKE. Returns overview, sub-directions, method families, candidates, source metrics, and reading order. |
 | M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
-| M1 | DOI deep_read | implemented via Unpaywall | API + Mimo smoke | DOI-only handoff resolves through Unpaywall to legal OA PDF when available; returns `NO_LEGAL_OA_FULLTEXT_FOUND` when no OA PDF exists. Not broad REAL_E2E. |
+| M1 | DOI deep_read | implemented via Unpaywall | API + live smoke history | DOI-only handoff resolves through Unpaywall to legal OA PDF when available; returns `NO_LEGAL_OA_FULLTEXT_FOUND` when no OA PDF exists. Not broad REAL_E2E. |
 | M2 | Selected-paper paper understanding | implemented | `2310_08800v2` live acceptance | PARTIAL_REAL_E2E_VERIFIED only for selected paper. |
-| M2 | Raw/source handoff understanding | implemented fail-closed | Mimo source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. Main-chain source_latex now achieves SUCCESS with all three card types. Not broad REAL_E2E. |
+| M2 | Raw/source handoff understanding | implemented fail-closed | ccswitch + historical source/PDF smokes | Can be SUCCESS, DEGRADED_STRUCTURAL, or BLOCKED_UNDERSTANDING depending on method evidence and formula provenance. LLM card-builder failures fail closed. Not broad REAL_E2E. |
 | M2 | Formula provenance/FSA-5 | implemented strict gate | unit + smoke | Unknown/weak formula origin cannot produce detailed derivation; source_latex improves but does not bypass audit. |
 | M3 | PaperWorkspace | implemented minimal API/UI | selected-paper SUCCESS + raw/handoff DEGRADED/BLOCKED UI/API checks | PARTIAL_REAL_E2E_VERIFIED for narrow paths, not product-ready. |
-| M3 | DirectionSearchView | implemented minimal UI | vitest + handoff smoke | DEGRADED_SMOKE. Shows source readiness and calls deep_read for source-backed candidates. |
-| M3 | SeedExpansionPanel | implemented minimal UI | vitest + seed smoke | DEGRADED_SMOKE. Shows grouped relations and can call deep_read. |
-| M4 | Interactive tutoring/memory/drills | not implemented | none | Do not start in current readiness work. |
+| M3 | DirectionSearchView | implemented minimal UI | vitest + handoff smoke | DEGRADED_SMOKE. Shows source readiness and calls deep_read for source-backed or DOI-resolvable candidates. |
+| M3 | SeedExpansionPanel | implemented minimal UI | vitest + seed smoke | DEGRADED_SMOKE. Shows grouped relations and can call deep_read for source-backed or DOI-resolvable candidates. |
+| M4 | Interactive tutoring/memory/advisor v1 | implemented minimal loop | backend + frontend tests | UNIT_TESTED. Evidence-bound PaperWorkspace interactions with optional validated LLM answers for `/ask`; no PaperQA adapter, vector memory, direction-level chat, or full drill engine yet. |
 
 ## M1 Acquisition And Full-Text Evidence
 
@@ -105,7 +168,7 @@ instead of being discarded.
 | main-chain source-first Mimo | `e6162aaf98e4` | SUCCESS | 200 | paper + formula + teaching | Narrow PASS with source_latex evidence; not broad REAL_E2E. |
 | non-arXiv OA PDF deep_read | `8cba4345fee7` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | Legal OA PDF handoff works; formula provenance remains weaker than source_latex. |
 | DOI-only Unpaywall OA deep_read | `b28134b4496c` | DEGRADED_STRUCTURAL, `FORMULA_DERIVATION_BLOCKED` | 200 | paper + teaching | DOI `10.1038/s41586-021-03819-2` resolved via Unpaywall to legal OA PDF; Mimo M2 ran; formula provenance degraded for non-arXiv PDF. |
-| main-chain source_latex formula success | `cb59b58dbe55` | DEGRADED_STRUCTURAL, `TEACHING_CARDS_FAILED` | 200 | paper + formula | source_latex formula cards now succeed; 18 formula cards with source_latex origin; teaching cards failed separately. |
+| main-chain source_latex formula success | `cb59b58dbe55` | historical old-rule DEGRADED_STRUCTURAL, `TEACHING_CARDS_FAILED` | 200 | paper + formula | Historical record only. Current code treats teaching card failure as `BLOCKED_UNDERSTANDING` and hides cards. |
 | main-chain full SUCCESS | `73ddb4607b6b` | SUCCESS | 200 | paper + formula + teaching | All three card types succeed with source_latex origin; narrow PASS, not broad REAL_E2E. |
 
 Earlier 2026-06-16 incremental Mimo main-chain smokes:
@@ -114,7 +177,7 @@ Earlier 2026-06-16 incremental Mimo main-chain smokes:
 |---|---|---|---|---|---|---:|---|---|---|
 | time series anomaly detection | `522e67e371e2` | `2007.14254`, Improving Robustness on Seasonality-Heavy Multivariate Time Series Anomaly Detection | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED | Mimo was enabled; arXiv source downloaded; formula origin summary showed `source_latex`, but formula cards failed audit/generation so cards stayed blocked. |
 | graph anomaly detection | `a58dbf082252` | `2212.05478`, Mul-GAD: a semi-supervised graph anomaly detection framework via aggregating multi-view information | arxiv_source, source_first | BLOCKED_UNDERSTANDING | FORMULA_CARDS_FAILED | 403 | none | DEGRADED | Smoke selector now avoids unrelated source-backed papers; Mimo was enabled and gate failed closed on formula cards. |
-| time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | PASS | Formula cards now succeed with source_latex origin; 18 formula cards generated; teaching cards failed separately. |
+| time series anomaly detection | `cb59b58dbe55` | source_latex paper | arxiv_source, source_first | historical old-rule DEGRADED_STRUCTURAL | TEACHING_CARDS_FAILED | 200 | paper + formula | historical | Current code treats teaching card failure as `BLOCKED_UNDERSTANDING` and hides cards. |
 | time series anomaly detection | `73ddb4607b6b` | source_latex paper | arxiv_source, source_first | SUCCESS | - | 200 | paper + formula + teaching | PASS | Full SUCCESS with source_latex; all three card types generated. |
 
 ### Main-chain regression matrix (2026-06-17, with polite rate limiting + cache)
@@ -178,6 +241,14 @@ Three non-arXiv legal OA PDF candidates were tested through the existing
 - SUCCESS with missing required card artifact: `/cards=409`.
 - `/artifacts` remains debug/admin oriented.
 
+For user-facing SUCCESS runs, `allowed_downstream.reading_display`,
+`phase12_patterns`, `phase12_drill`, and `advisor_questions` are enabled.
+DEGRADED_STRUCTURAL runs can enable M4 v1 when paper/formula artifacts are
+available; `phase12_drill` requires successful teaching cards, otherwise
+`phase12_drill_degraded` records the degraded drill path. M4 API routes also
+check `allowed_for_user_display` before reading artifacts, and advisor routes
+require `allowed_downstream.advisor_questions`.
+
 BLOCKED_UNDERSTANDING due to `MISSING_METHOD_EVIDENCE` or audit findings is
 evidence gate fail-closed, not a configuration failure. BASELINE_ONLY during an
 LLM-enabled smoke is a failure unless the smoke intentionally used `--skip-llm`.
@@ -188,20 +259,17 @@ Local `.env` example:
 
 ```text
 RESEARCHSENSEI_ENABLE_API_LLM=1
-RESEARCHSENSEI_LLM_PROVIDER=mimo
-MIMO_API_KEY=...
+RESEARCHSENSEI_LLM_PROVIDER=cc_switch
 UNPAYWALL_EMAIL=you@example.com
 RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
 SEMANTIC_SCHOLAR_API_KEY=...
 S2_API_KEY=...
-OPENAI_COMPATIBLE_API_KEY=...
 ```
 
-`config/sensei.example.toml` includes Mimo and generic OpenAI-compatible
-provider placeholders. For Xiaomi or another weaker OpenAI-compatible model,
-set provider base URL, model, and API key env in ignored `config/local.toml` or
-use the generic provider template. Do not lower evidence gates for weaker model
-output.
+`config/sensei.example.toml` defaults to `cc_switch`. Optional provider
+placeholders remain for experiments, but normal local live runs should use Cici
+Switch and switch models inside that app. Do not lower evidence gates for weaker
+model output.
 
 LLM JSON handling is fail-closed: malformed JSON or schema mismatch must become
 explicit component failure/degradation, not accepted evidence.
@@ -216,13 +284,13 @@ without duplicating core pipeline code.
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
-$env:RESEARCHSENSEI_LLM_PROVIDER="mimo"
+$env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
 
 # First pass: live (no cache)
-.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider mimo --refresh-cache --max-candidates 10
+.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider cc_switch --refresh-cache --max-candidates 10
 
 # Second pass: cached (reuses direction search cache, skips external APIs for direction)
-.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider mimo --use-cache --max-candidates 10
+.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider cc_switch --use-cache --max-candidates 10
 ```
 
 ### Matrix Runner Features
@@ -322,7 +390,10 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
    fail-closed behavior for both PDF-fallback queries in the current matrix.
 5. Main-chain positive evidence is narrow; source-first success is promising but
    not broad reliability. Matrix runner provides repeatable acceptance tooling.
-6. M4 remains not implemented by design.
+6. M4 v1 is unit-tested but still narrow: it uses existing M2 artifacts,
+   deterministic retrieval, and optional evidence-validated LLM wording for
+   `/ask`; it is not yet a PaperQA adapter, vector retrieval system,
+   direction-level dialogue, or full drill generator.
 
 ## Next Priority Order
 
@@ -336,21 +407,25 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
    smokes.
 5. Keep frontend status rendering aligned with `/understanding_status` and
    `/cards` gating.
+6. Harden M4 beyond v1: add stronger retrieval, PaperQA-backed citation
+   adapters behind the same evidence gates, and direction/seed interaction
+   paths.
 
 ## Weak-Model Handoff Guide
 
-If a weaker model or Xiaomi/Mimo-compatible model continues this project:
+If another model continues this project through ccswitch:
 
 1. Read this file first.
 2. Run backend tests.
 3. Run one literature acquisition smoke.
-4. If Mimo/API key exists, run one main-chain smoke.
+4. If ccswitch is running, run one main-chain smoke with `--provider cc_switch`.
 5. Treat all failures literally; do not patch around gates.
 6. Make only small, source-local fixes.
 7. Update this file with exact command, job ID, status, cards code, components,
    and strict scope.
 8. Do not create new report files.
-9. Do not start M4.
+9. For M4 changes, preserve evidence refs and artifact fallback behavior; do not
+   add free-form answers that bypass M2 artifacts.
 
 ## Required Regression Commands
 
@@ -360,6 +435,7 @@ If a weaker model or Xiaomi/Mimo-compatible model continues this project:
 cd frontend
 npm test
 npm run build
+npm audit --omit=dev --registry=https://registry.npmjs.org
 ```
 
 Live smokes are optional when keys/network are unavailable, but missing key or
@@ -369,9 +445,9 @@ network must be reported as not live-verified.
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
-$env:RESEARCHSENSEI_LLM_PROVIDER="mimo"
+$env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
 # Live pass:
-.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider mimo --refresh-cache
+.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider cc_switch --refresh-cache
 # Cached pass (after live pass completes):
-.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider mimo --use-cache
+.venv\Scripts\python.exe scripts\run_main_chain_matrix.py --provider cc_switch --use-cache
 ```

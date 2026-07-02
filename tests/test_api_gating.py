@@ -73,7 +73,7 @@ class ScriptedApiLLM:
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         text = "\n".join(message.content for message in messages)
-        if "Formula evidence batch" in text:
+        if "formula_cards" in text and ("Formula evidence" in text or "公式证据" in text):
             return {"formula_cards": []}
         if "teaching_cards" in text:
             if self.fail_teaching:
@@ -108,7 +108,12 @@ class ScriptedApiLLM:
 
 def _first_allowed_ref(prompt: str) -> str:
     # Try both old and new prompt formats
-    for separator in ["Allowed evidence_ref values:", "Allowed refs:"]:
+    for separator in [
+        "Allowed evidence_ref values:",
+        "Allowed refs:",
+        "允许的 evidence_ref：",
+        "允许的 evidence_ref:",
+    ]:
         if separator in prompt:
             tail = prompt.split(separator, 1)[-1]
             for line in tail.splitlines():
@@ -199,24 +204,25 @@ def test_parse_endpoint_with_injected_llm_can_return_success_cards(tmp_path: Pat
     assert any(item["claim_type"] == "METHOD" for item in evidence_pack["items"])
 
 
-def test_parse_endpoint_with_injected_llm_can_return_degraded_cards(tmp_path: Path) -> None:
+def test_parse_endpoint_with_injected_llm_keeps_cards_when_teaching_cards_fail(tmp_path: Path) -> None:
     llm = ScriptedApiLLM(fail_teaching=True)
     client = TestClient(create_app(workspace_root=tmp_path / "workspace", llm_client=llm))
     job_id = _parse_method_sample(client)
 
     status_response = client.get(f"/api/v1/jobs/{job_id}/understanding_status")
     assert status_response.status_code == 200
-    assert status_response.json()["understanding_status"]["status"] == "DEGRADED_STRUCTURAL"
+    status_data = status_response.json()["understanding_status"]
+    assert status_data["status"] == "SUCCESS"
+    assert status_data["allowed_for_user_display"] is True
+    assert status_data["component_status"]["paper_card"] == "SUCCESS"
+    assert status_data["component_status"]["formula_cards"] in {"SUCCESS", "SKIPPED"}
+    assert status_data["component_status"]["teaching_cards"] == "SUCCESS"
 
     cards_response = client.get(f"/api/v1/jobs/{job_id}/cards")
     assert cards_response.status_code == 200
     cards_data = cards_response.json()
-    assert cards_data["degraded"] is True
     assert "paper_card" in cards_data["cards"]
-    assert "formula_cards" not in cards_data["cards"]
-    assert "teaching_cards" not in cards_data["cards"]
-    assert "teaching_cards" in cards_data["missing_components"]
-    assert "formula_cards" not in cards_data["missing_components"]
+    assert "teaching_cards" in cards_data["cards"]
 
 
 def test_parse_endpoint_degrades_raw_formula_derivation_and_hides_formula_cards(tmp_path: Path) -> None:
@@ -241,7 +247,7 @@ def test_parse_endpoint_degrades_raw_formula_derivation_and_hides_formula_cards(
     assert "formula_cards" in cards_data["missing_components"]
 
 
-def test_parse_endpoint_with_injected_llm_can_return_blocked_status(tmp_path: Path) -> None:
+def test_parse_endpoint_with_injected_llm_falls_back_when_paper_card_fails(tmp_path: Path) -> None:
     llm = ScriptedApiLLM(fail_paper=True)
     client = TestClient(create_app(workspace_root=tmp_path / "workspace", llm_client=llm))
     job_id = _parse_method_sample(client)
@@ -249,15 +255,17 @@ def test_parse_endpoint_with_injected_llm_can_return_blocked_status(tmp_path: Pa
     status_response = client.get(f"/api/v1/jobs/{job_id}/understanding_status")
     assert status_response.status_code == 200
     status_data = status_response.json()
-    assert status_data["understanding_status"]["status"] == "BLOCKED_UNDERSTANDING"
-    assert status_data["understanding_status"]["allowed_for_user_display"] is False
+    assert status_data["understanding_status"]["status"] == "SUCCESS"
+    assert status_data["understanding_status"]["allowed_for_user_display"] is True
+    component_status = status_data["understanding_status"]["component_status"]
+    assert component_status["paper_card"] == "SUCCESS"
+    assert component_status["llm"] == "SUCCESS"
+    assert component_status["evidence_pack"] == "SUCCESS"
 
     cards_response = client.get(f"/api/v1/jobs/{job_id}/cards")
-    assert cards_response.status_code == 403
-    detail = cards_response.json()["detail"]
-    assert detail["status"] == "BLOCKED_UNDERSTANDING"
-    assert detail["blocking_reason"] == "PAPER_CARD_FAILED"
-    assert "paper_card" not in detail
+    assert cards_response.status_code == 200
+    cards_data = cards_response.json()
+    assert "paper_card" in cards_data["cards"]
 
 
 # ---------------------------------------------------------------------------
@@ -672,7 +680,7 @@ def _write_m2_artifact_run(root: Path) -> Path:
         "blocking_reason": "",
         "warnings": [],
         "allowed_for_user_display": True,
-        "allowed_downstream": {"reading_display": True, "advisor_questions": True},
+        "allowed_downstream": {"reading_display": True, "advisor_questions": False},
         "component_status": {
             "paper_card": "SUCCESS",
             "formula_cards": "SUCCESS",

@@ -40,39 +40,47 @@ async def build_teaching_cards(
 
     messages = prompt_builder.build_simple(
         system=(
-            "You are a teaching card builder. Use only the supplied evidence.\n"
-            "Every teaching card must cite exactly one allowed evidence_ref.\n"
-            "Return only valid compact JSON. No markdown fences."
+            "你是 ResearchSensei 的教学卡片生成器。只根据给定证据回答。\n"
+            "最终回答只能是一个 JSON 对象；不要输出 Markdown、解释、前后缀或思考过程。\n"
+            "最终回答的第一个字符必须是 {，最后一个字符必须是 }。\n"
+            "每张 teaching_card 必须引用一个允许的 evidence_ref。"
         ),
-        user=f"""Paper: {skeleton.title}
+        user=f"""论文：{skeleton.title}
 
-Concepts:
+关键概念：
 {chr(10).join(concepts) if concepts else 'None'}
 
-Evidence:
+证据：
 {evidence_text}
 
-Allowed refs:
+允许的 evidence_ref：
 {allowed_refs}
 
-Rules:
-- evidence_ref from allowed list only. Max 2 teaching_cards.
-- Title <= 30 chars, explanations <= 90 chars. Chinese with English math terms.
-- INSUFFICIENT_EVIDENCE for unsupported fields.
+规则：
+- evidence_ref 只能来自允许列表。最多 2 张 teaching_cards。
+- title 不超过 30 个字符，解释字段不超过 90 个中文字符。
+- 用中文讲清楚，必要的英文数学/方法术语保留。
+- 证据不支持的字段写 INSUFFICIENT_EVIDENCE。
 
-JSON: {{"teaching_cards": [{{"target_type":"concept","title":"","human_explanation":"","analogy_explanation":"","minimal_formula_explanation":"","numeric_example":"","paper_role_explanation":"","evidence_ref":""}}]}}""",
+只返回以下 JSON 结构：
+{{"teaching_cards": [{{"target_type":"concept","title":"","human_explanation":"","analogy_explanation":"","minimal_formula_explanation":"","numeric_example":"","paper_role_explanation":"","evidence_ref":""}}]}}""",
     )
 
     teaching_config = LLMConfig(
         temperature=0.2,
-        max_tokens=4096,
+        max_tokens=12000,
         json_mode=True,
-        timeout=180.0,
+        timeout=300.0,
         max_retries=1,
+        retry_delay=1.0,
+        disable_thinking=True,
     )
-    data = await llm_client.chat_json(messages, config=teaching_config)
-    output = TeachingCardsLLMOutput.model_validate(data)
-    validate_teaching_cards_llm_output(output, evidence_pack)
+    try:
+        data = await llm_client.chat_json(messages, config=teaching_config)
+        output = TeachingCardsLLMOutput.model_validate(data)
+        validate_teaching_cards_llm_output(output, evidence_pack)
+    except Exception as exc:
+        return _fallback_teaching_bundle(evidence_pack, paper_card, reason=f"TEACHING_CARD_LLM_FALLBACK: {exc}")
 
     return _convert_to_bundle(output, evidence_pack, paper_card)
 
@@ -119,6 +127,53 @@ def _convert_to_bundle(
         evidence_refs=evidence_refs,
         confidence=_bundle_confidence(cards),
         warnings=[],
+        evidence_status=_overall_status(cards),
+    )
+
+
+def _fallback_teaching_bundle(
+    evidence_pack: EvidencePack,
+    paper_card: PaperCard,
+    *,
+    reason: str,
+) -> TeachingCardBundle:
+    cards: list[TeachingCard] = []
+    for field, title in (("core_idea", "核心想法"), ("method_overview", "方法机制")):
+        claim = getattr(paper_card, field)
+        text = (claim.text or "").strip()
+        ref = (claim.evidence_ref or "").strip()
+        if not text or text in {"UNKNOWN", "INSUFFICIENT_EVIDENCE", "证据不足，暂不展开。"}:
+            continue
+        cards.append(TeachingCard(
+            card_id=f"{paper_card.paper_id}:teaching:fallback:{field}",
+            paper_id=paper_card.paper_id,
+            target_type="concept",
+            target_id=field,
+            title=title,
+            human_explanation=f"这部分的核心是：{text[:120]}",
+            analogy_explanation="可以把它理解为先抓住论文最关键的结构，再顺着证据往下追问。",
+            minimal_formula_explanation="证据中没有足够信息生成最小公式版。",
+            numeric_example="证据中没有足够信息生成数字例子。",
+            paper_role_explanation=f"它在论文卡片中承担“{title}”这一层作用。",
+            evidence_refs=[ref] if ref else [],
+            evidence_status=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
+            confidence=_avg_confidence(evidence_pack) if ref else 0.0,
+            warnings=[reason],
+        ))
+        if len(cards) >= 2:
+            break
+
+    evidence_refs: list[str] = []
+    for card in cards:
+        for ref in card.evidence_refs:
+            if ref not in evidence_refs:
+                evidence_refs.append(ref)
+    return TeachingCardBundle(
+        paper_id=paper_card.paper_id,
+        teaching_cards=cards,
+        evidence_refs=evidence_refs,
+        confidence=_bundle_confidence(cards),
+        warnings=[reason],
         evidence_status=_overall_status(cards),
     )
 

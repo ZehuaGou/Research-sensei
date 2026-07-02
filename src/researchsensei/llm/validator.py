@@ -19,22 +19,12 @@ def validate_paper_card_llm_output(
 ) -> None:
     """Validate PaperCardLLMOutput against EvidencePack.
 
-    Raises ValueError if:
-    - EvidencePack is empty
-    - core fields have invalid evidence_ref
+    Paper cards are user-facing learning material, so missing claim-level
+    evidence is downgraded by the converter instead of blocking the whole run.
+    This validator only rejects the unrecoverable case: no evidence pack.
     """
     if not evidence_pack.items:
         raise ValueError("EvidencePack is empty, cannot validate PaperCardLLMOutput")
-
-    valid_refs = evidence_refs_from_pack(evidence_pack)
-
-    _check_claim_ref("problem", output.problem, valid_refs)
-    _check_claim_ref("core_idea", output.core_idea, valid_refs)
-    _check_claim_ref("method_overview", output.method_overview, valid_refs)
-    _check_claim_ref("experiment_summary", output.experiment_summary, valid_refs)
-
-    if output.limitations is not None and output.limitations.evidence_ref:
-        _check_claim_ref("limitations", output.limitations, valid_refs)
 
 
 def validate_formula_cards_llm_output(

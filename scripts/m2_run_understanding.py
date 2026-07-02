@@ -92,7 +92,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="diagnostic keeps the existing rule-based M2 report; full runs the M2.1-M2.5 artifact chain.",
     )
     parser.add_argument("--enable-llm", action="store_true", help="Use the configured real LLM for full mode.")
-    parser.add_argument("--provider", default="", help="Provider name from config/local.toml, e.g. mimo.")
+    parser.add_argument("--provider", default="", help="Provider name from config/local.toml, e.g. cc_switch.")
     parser.add_argument("--llm-max-tokens", type=int, default=2400, help="Max output tokens per LLM call.")
     parser.add_argument("--llm-timeout", type=float, default=0.0, help="Override provider timeout seconds.")
     return parser.parse_args(argv)

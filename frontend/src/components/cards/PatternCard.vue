@@ -1,29 +1,83 @@
 <script setup lang="ts">
-const props = defineProps<{ card: any }>()
+defineProps<{ card: any }>()
 </script>
 
 <template>
-  <div class="rounded-2xl overflow-hidden" style="background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
-    <div class="px-6 pt-6 pb-4">
-      <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold" style="background: rgba(251,191,36,0.08); color: #f59e0b;">科研模式</span>
-      <h3 class="text-[15px] font-semibold mt-3" style="color: var(--text-primary);">{{ card.pattern_id }}</h3>
-      <p class="text-[13px] mt-1.5 leading-relaxed" style="color: var(--text-secondary);">{{ card.definition }}</p>
-    </div>
+  <article class="pattern-card surface">
+    <header>
+      <span>科研模式</span>
+      <h3>{{ card.pattern_id || card.title }}</h3>
+      <p>{{ card.definition }}</p>
+    </header>
 
-    <div v-if="card.signals?.length" class="px-6 pb-4">
-      <div class="text-[11px] font-semibold uppercase tracking-wider mb-2" style="color: var(--text-muted);">信号</div>
-      <div class="flex flex-wrap gap-1.5">
-        <span v-for="s in card.signals" :key="s"
-          class="px-2.5 py-1 rounded-full text-[11px] font-medium"
-          style="background: var(--bg-secondary); color: var(--text-secondary);">
-          {{ s }}
-        </span>
+    <section v-if="card.signals?.length">
+      <h4>识别信号</h4>
+      <div class="chips">
+        <span v-for="signal in card.signals" :key="signal">{{ signal }}</span>
       </div>
-    </div>
+    </section>
 
-    <div v-if="card.transfer_template" class="px-6 py-4 border-t" style="border-color: var(--border-subtle);">
-      <div class="text-[11px] font-semibold uppercase tracking-wider mb-1.5" style="color: var(--text-muted);">迁移指导</div>
-      <p class="text-[13px] leading-relaxed" style="color: var(--text-secondary);">{{ card.transfer_template }}</p>
-    </div>
-  </div>
+    <section v-if="card.transfer_template">
+      <h4>迁移指导</h4>
+      <p>{{ card.transfer_template }}</p>
+    </section>
+  </article>
 </template>
+
+<style scoped>
+.pattern-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+header > span {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+h3 {
+  margin-top: 10px;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+p {
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+section {
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 14px;
+}
+
+h4 {
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.chips span {
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+</style>

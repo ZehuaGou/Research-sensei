@@ -64,6 +64,18 @@ def test_valid_paper_output_passes() -> None:
     validate_paper_card_llm_output(output, pack)  # should not raise
 
 
+def test_paper_output_coerces_summary_object_text() -> None:
+    output = PaperCardLLMOutput.model_validate({
+        "one_sentence_summary": {"text": "Summary text", "evidence_ref": "ref-1"},
+        "problem": {"text": "Problem", "evidence_ref": "ref-1"},
+        "core_idea": {"text": "Core", "evidence_ref": "ref-1"},
+        "method_overview": {"text": "Method", "evidence_ref": "ref-1"},
+        "experiment_summary": {"text": "Exp", "evidence_ref": "ref-1"},
+    })
+
+    assert output.one_sentence_summary == "Summary text"
+
+
 def test_empty_evidence_pack_raises() -> None:
     pack = EvidencePack(paper_id="test", items=[])
     output = PaperCardLLMOutput(
@@ -77,7 +89,7 @@ def test_empty_evidence_pack_raises() -> None:
         validate_paper_card_llm_output(output, pack)
 
 
-def test_invalid_problem_evidence_ref_raises() -> None:
+def test_invalid_problem_evidence_ref_is_downgraded_later() -> None:
     pack = _make_pack("ref-1")
     output = PaperCardLLMOutput(
         one_sentence_summary="Test",
@@ -86,11 +98,10 @@ def test_invalid_problem_evidence_ref_raises() -> None:
         method_overview=ClaimLLMOutput(text="M", evidence_ref="ref-1"),
         experiment_summary=ClaimLLMOutput(text="E", evidence_ref="ref-1"),
     )
-    with pytest.raises(ValueError, match="problem.*INVALID"):
-        validate_paper_card_llm_output(output, pack)
+    validate_paper_card_llm_output(output, pack)  # should not raise
 
 
-def test_missing_required_evidence_ref_raises() -> None:
+def test_missing_required_evidence_ref_is_downgraded_later() -> None:
     pack = _make_pack("ref-1")
     output = PaperCardLLMOutput(
         one_sentence_summary="Test",
@@ -99,8 +110,7 @@ def test_missing_required_evidence_ref_raises() -> None:
         method_overview=ClaimLLMOutput(text="M", evidence_ref="ref-1"),
         experiment_summary=ClaimLLMOutput(text="E", evidence_ref="ref-1"),
     )
-    with pytest.raises(ValueError, match="problem.*required"):
-        validate_paper_card_llm_output(output, pack)
+    validate_paper_card_llm_output(output, pack)  # should not raise
 
 
 def test_limitations_missing_evidence_ref_allowed() -> None:
@@ -175,5 +185,4 @@ def test_error_message_contains_field_name() -> None:
         method_overview=ClaimLLMOutput(text="M", evidence_ref="ref-1"),
         experiment_summary=ClaimLLMOutput(text="E", evidence_ref="ref-1"),
     )
-    with pytest.raises(ValueError, match="problem"):
-        validate_paper_card_llm_output(output, pack)
+    validate_paper_card_llm_output(output, pack)  # paper claim refs are downgraded by conversion

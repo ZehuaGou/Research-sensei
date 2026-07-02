@@ -313,7 +313,7 @@ def _to_expansion_paper(
 ) -> SeedExpansionPaper:
     arxiv_url = _arxiv_url(paper)
     paper_url = paper.url or paper.landing_url or arxiv_url or paper.pdf_url or _doi_url(paper.doi)
-    can_prepare = bool(paper.arxiv_id or arxiv_url or paper.pdf_url)
+    can_prepare = bool(paper.arxiv_id or arxiv_url or paper.pdf_url or paper.doi)
     confidence = _weak_relation_confidence(paper, seed, topic)
     return SeedExpansionPaper(
         paper_id=paper.paper_id or _stable_id(paper.title),
@@ -476,7 +476,7 @@ def _arxiv_url(paper: CandidatePaper) -> str:
 
 def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if paper.doi:
-        return "DOI handoff is not implemented yet."
+        return "DOI handoff will attempt legal open-access PDF resolution via Unpaywall."
     return "No arXiv ID, arXiv URL, or PDF URL is available for this expansion paper."
 
 

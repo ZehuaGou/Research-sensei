@@ -243,7 +243,7 @@ paper_terms = title_words | abstract_words
 | F-2 | card 中的 evidence_ref 不存在于 evidence_index / claim_evidence | P0 | BLOCK |
 | F-3 | BLOCKED_UNDERSTANDING 状态下仍存在 paper_card / formula_cards / teaching_cards artifact | P0 | BLOCK |
 | F-4 | BASELINE_ONLY 状态却 allowed_for_user_display=True | P0 | BLOCK |
-| F-5 | component_status / allowed_downstream 与 status 矛盾（含 DEGRADED_STRUCTURAL 时 allowed_for_user_display 必须为 True、advisor_questions 必须为 False） | P1 | BLOCK |
+| F-5 | component_status / allowed_downstream 与 status 矛盾（含 DEGRADED_STRUCTURAL 时 allowed_for_user_display 必须为 True；advisor_questions 需要 paper_card SUCCESS；phase12_drill 需要 teaching_cards SUCCESS） | P1 | BLOCK |
 | F-6 | ClaimEvidence.passage_id 不存在于 PassageIndex | P0 | BLOCK |
 
 ### 已实现 / 部分实现（F-7 以后）
@@ -272,7 +272,7 @@ paper_terms = title_words | abstract_words
 
 - findings 中存在 effect=BLOCK → BLOCKED_UNDERSTANDING
 - findings 只有 WARNING → 不阻断
-- teaching_cards FAILED → DEGRADED_STRUCTURAL
+- teaching_cards FAILED → BLOCKED_UNDERSTANDING
 - formula_cards FAILED 需要根据 EvidencePack formula core heuristic 判断是否核心
 - parser degraded 不是 hard-fail
 - F-5 检查 component_status / allowed_downstream 与 status 的一致性

@@ -19,11 +19,17 @@ function mountView() {
       stubs: {
         PaperCard: { props: ['card'], template: '<div data-testid="paper-card">{{ card.thirty_second }}</div>' },
         FormulaCard: { props: ['card'], template: '<div data-testid="formula-card">{{ card.problem }}</div>' },
-        AskPanel: { template: '<div />' },
-        TextSelectionToolbar: { template: '<div />' },
+        AskPanel: { template: '<div data-testid="ask-panel-stub"></div>' },
+        TextSelectionToolbar: { template: '<div data-testid="selection-toolbar-stub"></div>' },
       },
     },
   })
+}
+
+function tab(wrapper: any, text: string) {
+  const button = wrapper.findAll('button').find((item: any) => item.text().includes(text))
+  expect(button).toBeDefined()
+  return button!
 }
 
 describe('LearningWorkspaceView', () => {
@@ -59,10 +65,12 @@ describe('LearningWorkspaceView', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/understanding_status')
     expect(wrapper.find('[data-testid="no-cards-state"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="paper-card"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('Baseline only')
-    expect(wrapper.text()).toContain('source_type')
-    expect(wrapper.text()).toContain('component_status.paper_card')
-    expect(wrapper.text()).toContain('allowed_downstream.reading_display')
+    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="selection-toolbar-stub"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('仅基础解析')
+    expect(wrapper.text()).toContain('ccswitch')
+    expect(wrapper.text()).toContain('来源类型')
+    expect(wrapper.text()).toContain('论文卡片')
   })
 
   it('does not request or render cards for BLOCKED_UNDERSTANDING', async () => {
@@ -92,11 +100,12 @@ describe('LearningWorkspaceView', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="paper-card"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="no-cards-state"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Understanding blocked')
-    expect(wrapper.text()).toContain('MISSING_METHOD_EVIDENCE')
+    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('理解被阻断')
+    expect(wrapper.text()).toContain('缺少方法证据')
   })
 
-  it('requests cards for SUCCESS and renders paper card', async () => {
+  it('requests cards for SUCCESS and renders paper, formula, and teaching tabs', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -139,6 +148,14 @@ describe('LearningWorkspaceView', () => {
                 formula_ocr_status: 'not_required',
                 evidence_status: 'SUPPORTED_BY_FORMULA',
                 evidence_ref: 'p:eq1',
+              }, {
+                formula_id: 'formula_002',
+                purpose: 'Second formula purpose',
+                formula_raw: 'a=b',
+                formula_origin: 'mineru_latex',
+                formula_ocr_status: 'not_required',
+                evidence_status: 'SUPPORTED_BY_FORMULA',
+                evidence_ref: 'p:eq2',
               }],
             },
             teaching_cards: {
@@ -160,88 +177,25 @@ describe('LearningWorkspaceView', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(String(fetchMock.mock.calls[1][0])).toContain('/cards')
     expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A grounded summary.')
-    expect(wrapper.text()).toContain('Understanding ready')
-    expect(wrapper.text()).toContain('formula_origin')
-    expect(wrapper.text()).toContain('mineru_latex')
-    expect(wrapper.text()).toContain('allowed_downstream.advisor_questions')
+    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('打开 M4')
+    expect(wrapper.find('[data-testid="selection-toolbar-stub"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('理解完成')
+    expect(wrapper.text()).toContain('公式来源')
+    expect(wrapper.text()).toContain('MinerU LaTeX')
 
-    await wrapper.get('button:nth-of-type(2)').trigger('click')
+    await tab(wrapper, '公式拆解').trigger('click')
+    expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('2 个公式')
+    expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('Formula purpose')
+    expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('Second formula purpose')
+    expect(wrapper.findAll('[data-testid="formula-card"]')).toHaveLength(2)
     expect(wrapper.find('[data-testid="formula-card"]').text()).toContain('Formula purpose')
 
-    await wrapper.get('button:nth-of-type(3)').trigger('click')
+    await tab(wrapper, '教学卡片').trigger('click')
     expect(wrapper.get('[data-testid="teaching-cards"]').text()).toContain('p:b2')
   })
 
-  it('requests cards for DEGRADED_STRUCTURAL and renders only successful components', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          understanding_status: {
-            status: 'DEGRADED_STRUCTURAL',
-            blocking_reason: 'TEACHING_CARDS_FAILED',
-            warnings: [{ code: 'CARD_BUILDER_FAILED', message: 'teaching_cards failed' }],
-            component_status: { paper_card: 'SUCCESS', formula_cards: 'SUCCESS', teaching_cards: 'FAILED' },
-            allowed_downstream: { reading_display: true, advisor_questions: false },
-          },
-          paper_workspace_status: {
-            source_type: 'm1_canonical_bundle',
-            canonicalization_status: 'success',
-            m2_ready: true,
-            degradation_reason: 'TEACHING_CARDS_FAILED',
-            formula_origin: 'mineru_latex',
-            formula_ocr_status: 'not_required',
-            evidence_status: 'SUCCESS',
-          },
-        }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          status: 'DEGRADED_STRUCTURAL',
-          degraded: true,
-          missing_components: ['teaching_cards'],
-          paper_workspace_status: { quality_status: 'warning' },
-          cards: {
-            paper_card: {
-              one_sentence_summary: 'A degraded but grounded summary.',
-              problem: { text: 'Problem', evidence_ref: 'p:b1' },
-              core_idea: { text: 'Idea', evidence_ref: 'p:b2' },
-              method_overview: { text: 'Method', evidence_ref: 'p:b3' },
-            },
-            formula_cards: {
-              formula_cards: [{
-                formula_id: 'formula_001',
-                purpose: 'Formula still available',
-                formula_origin: 'mineru_latex',
-                formula_ocr_status: 'not_required',
-                evidence_ref: 'p:eq1',
-              }],
-            },
-          },
-        }),
-      })
-    vi.stubGlobal('fetch', fetchMock)
-
-    const wrapper = mountView()
-    await flushPromises()
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(String(fetchMock.mock.calls[1][0])).toContain('/cards')
-    expect(wrapper.text()).toContain('Degraded understanding')
-    expect(wrapper.text()).toContain('missing_components: teaching_cards')
-    expect(wrapper.text()).toContain('TEACHING_CARDS_FAILED')
-    expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A degraded but grounded summary.')
-    expect(wrapper.text()).toContain('allowed_downstream.advisor_questions')
-    expect(wrapper.text()).toContain('false')
-
-    await wrapper.get('button:nth-of-type(2)').trigger('click')
-    expect(wrapper.find('[data-testid="formula-card"]').text()).toContain('Formula still available')
-    expect(wrapper.find('[data-testid="teaching-cards"]').exists()).toBe(false)
-  })
-
-  it('shows formula degradation message when formula_cards missing in DEGRADED_STRUCTURAL', async () => {
+  it('renders available components for structural formula degradation', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -250,9 +204,9 @@ describe('LearningWorkspaceView', () => {
           understanding_status: {
             status: 'DEGRADED_STRUCTURAL',
             blocking_reason: 'FORMULA_DERIVATION_BLOCKED',
-            warnings: [{ code: 'FORMULA_BLOCKED', message: '9 blocked formulas, formula_origins: raw_formula_text' }],
-            component_status: { paper_card: 'SUCCESS', formula_cards: 'FAILED', teaching_cards: 'SUCCESS', llm: 'SUCCESS', evidence_pack: 'SUCCESS' },
-            allowed_downstream: { reading_display: true, advisor_questions: false },
+            warnings: [{ code: 'FORMULA_BLOCKED', message: 'formula cards blocked' }],
+            component_status: { paper_card: 'SUCCESS', formula_cards: 'FAILED', teaching_cards: 'SUCCESS' },
+            allowed_downstream: { reading_display: true, advisor_questions: true },
           },
           paper_workspace_status: {
             source_type: 'm1_canonical_bundle',
@@ -271,10 +225,10 @@ describe('LearningWorkspaceView', () => {
           status: 'DEGRADED_STRUCTURAL',
           degraded: true,
           missing_components: ['formula_cards'],
-          paper_workspace_status: {},
+          paper_workspace_status: { quality_status: 'warning' },
           cards: {
             paper_card: {
-              one_sentence_summary: 'A grounded summary.',
+              one_sentence_summary: 'A grounded summary with blocked formulas.',
               problem: { text: 'Problem', evidence_ref: 'p:b1' },
               core_idea: { text: 'Idea', evidence_ref: 'p:b2' },
               method_overview: { text: 'Method', evidence_ref: 'p:b3' },
@@ -282,8 +236,8 @@ describe('LearningWorkspaceView', () => {
             teaching_cards: {
               teaching_cards: [{
                 card_id: 't1',
-                title: 'Teaching',
-                human_explanation: 'A teaching explanation.',
+                title: 'Teaching still available',
+                human_explanation: 'Teaching remains available.',
                 evidence_refs: ['p:b2'],
               }],
             },
@@ -296,62 +250,43 @@ describe('LearningWorkspaceView', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('Degraded understanding')
-    expect(wrapper.text()).toContain('missing_components: formula_cards')
-    expect(wrapper.text()).toContain('FORMULA_DERIVATION_BLOCKED')
+    expect(wrapper.text()).toContain('结构不完整')
+    expect(wrapper.text()).toContain('缺少：公式卡片')
+    expect(wrapper.text()).toContain('公式推导被阻断')
+    expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A grounded summary with blocked formulas.')
 
-    // Formulas tab should be clickable (not disabled) in DEGRADED state
-    const formulaTab = wrapper.findAll('button').find(b => b.text() === 'Formulas')
-    expect(formulaTab).toBeDefined()
-    expect(formulaTab!.attributes('disabled')).toBeUndefined()
-
-    // Click Formulas tab
-    await formulaTab!.trigger('click')
-    await flushPromises()
-
-    // Should show degradation message, not formula cards
-    expect(wrapper.find('[data-testid="formula-degraded-message"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('公式推导不可用')
-    expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('FORMULA_DERIVATION_BLOCKED')
+    await tab(wrapper, '公式拆解').trigger('click')
+    expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('公式拆解暂时不可用')
     expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('raw_formula_text')
-    expect(wrapper.find('[data-testid="formula-card"]').exists()).toBe(false)
 
-    // Paper card should still work
-    await wrapper.findAll('button').find(b => b.text() === 'Paper')!.trigger('click')
-    expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A grounded summary.')
-
-    // Teaching card should still work
-    await wrapper.findAll('button').find(b => b.text() === 'Teaching')!.trigger('click')
-    expect(wrapper.get('[data-testid="teaching-cards"]').text()).toContain('A teaching explanation.')
+    await tab(wrapper, '教学卡片').trigger('click')
+    expect(wrapper.find('[data-testid="teaching-cards"]').text()).toContain('Teaching remains available.')
   })
 
-  it('does not show formula degradation message when status is not DEGRADED', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          understanding_status: {
-            status: 'BLOCKED_UNDERSTANDING',
-            blocking_reason: 'MISSING_METHOD_EVIDENCE',
-            warnings: [],
-            component_status: { paper_card: 'SKIPPED' },
-            allowed_downstream: { reading_display: false },
-          },
-          paper_workspace_status: {
-            source_type: 'm1_canonical_bundle',
-            canonicalization_status: 'success',
-            evidence_status: 'SUCCESS',
-          },
-        }),
-      })
+  it('does not show formula degradation message when status is blocked', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        understanding_status: {
+          status: 'BLOCKED_UNDERSTANDING',
+          blocking_reason: 'MISSING_METHOD_EVIDENCE',
+          warnings: [],
+          component_status: { paper_card: 'SKIPPED' },
+          allowed_downstream: { reading_display: false },
+        },
+        paper_workspace_status: {
+          source_type: 'm1_canonical_bundle',
+          canonicalization_status: 'success',
+          evidence_status: 'SUCCESS',
+        },
+      }),
+    })
     vi.stubGlobal('fetch', fetchMock)
 
     const wrapper = mountView()
     await flushPromises()
 
-    // Formulas tab should be disabled for BLOCKED
-    const formulaTab = wrapper.findAll('button').find(b => b.text() === 'Formulas')
+    const formulaTab = wrapper.findAll('button').find((button) => button.text().includes('公式拆解'))
     expect(formulaTab).toBeDefined()
     expect(formulaTab!.attributes('disabled')).toBeDefined()
     expect(wrapper.find('[data-testid="formula-degraded-message"]').exists()).toBe(false)

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from starlette.testclient import TestClient
 
+from researchsensei.core.config import ConfigService
 from researchsensei.web.app import create_app
 
 
@@ -93,8 +94,13 @@ def test_direction_handoff_source_unavailable_returns_explicit_failure(tmp_path:
     assert detail["source_status"]["status"] == "rejected"
 
 
-def test_direction_handoff_doi_returns_no_legal_oa(tmp_path: Path) -> None:
-    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+def test_direction_handoff_doi_returns_no_legal_oa(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("UNPAYWALL_EMAIL", raising=False)
+    monkeypatch.delenv("RESEARCHSENSEI_CONTACT_EMAIL", raising=False)
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        config_service=_isolated_config(tmp_path),
+    ))
 
     response = client.post(
         "/api/v1/directions/deep_read",
@@ -223,12 +229,14 @@ class _unpaywall_response:
         return self._data
 
 
-def test_direction_doi_only_unpaywall_oa_pdf_creates_job(tmp_path: Path) -> None:
+def test_direction_doi_only_unpaywall_oa_pdf_creates_job(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
     http_client = UnpaywallOaHttpClient(_sample_pdf_bytes())
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
             http_client=http_client,
+            config_service=_isolated_config(tmp_path),
         )
     )
 
@@ -245,12 +253,14 @@ def test_direction_doi_only_unpaywall_oa_pdf_creates_job(tmp_path: Path) -> None
     assert any("unpaywall" in u for u in http_client.urls)
 
 
-def test_direction_doi_only_unpaywall_not_found_returns_error(tmp_path: Path) -> None:
+def test_direction_doi_only_unpaywall_not_found_returns_error(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
     http_client = UnpaywallNotFoundHttpClient()
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
             http_client=http_client,
+            config_service=_isolated_config(tmp_path),
         )
     )
 
@@ -264,12 +274,14 @@ def test_direction_doi_only_unpaywall_not_found_returns_error(tmp_path: Path) ->
     assert detail["status"] == "NO_LEGAL_OA_FULLTEXT_FOUND"
 
 
-def test_direction_doi_only_landing_only_returns_error(tmp_path: Path) -> None:
+def test_direction_doi_only_landing_only_returns_error(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
     http_client = UnpaywallLandingOnlyHttpClient()
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
             http_client=http_client,
+            config_service=_isolated_config(tmp_path),
         )
     )
 
@@ -329,3 +341,10 @@ We evaluate on benchmark datasets and report strong F1.
         info.size = len(data)
         archive.addfile(info, io.BytesIO(data))
     return buffer.getvalue()
+
+
+def _isolated_config(tmp_path: Path) -> ConfigService:
+    return ConfigService(
+        config_path=tmp_path / "missing.toml",
+        env_path=tmp_path / "missing.env",
+    )

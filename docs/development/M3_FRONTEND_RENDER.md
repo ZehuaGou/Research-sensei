@@ -1,109 +1,68 @@
 # M3 API And Frontend Rendering Contract
 
-This document describes M3 rendering rules. Current status and evidence live in
-`docs/STATUS.md`.
+Current status and evidence live in `docs/STATUS.md`.
 
 ## Scope
 
-M3 currently includes:
+M3 includes:
 
+- `HomeView`
 - `UploadView`
 - `DirectionSearchView`
 - `SeedExpansionPanel`
+- `SettingsView`
 - `LearningWorkspaceView`
 - `StatusBanner`
 - FastAPI routes in `src/researchsensei/web/app.py`
 
-M3 does not include M4 chat, advisor questions, drills, or long-term memory.
+M3 also mounts M4 v1 controls inside PaperWorkspace when the job is allowed to
+show cards.
 
-## API Routes
-
-Core routes:
+## Core API Routes
 
 - `POST /api/v1/documents/parse`
-- `GET /api/v1/documents/{job_id}/understanding_status`
-- `GET /api/v1/documents/{job_id}/cards`
-- `GET /api/v1/documents/{job_id}/artifacts` for debug/admin oriented access
+- `GET /api/v1/jobs`
+- `GET /api/v1/jobs/{job_id}`
+- `GET /api/v1/jobs/{job_id}/understanding_status`
+- `GET /api/v1/jobs/{job_id}/cards`
+- `POST /api/v1/jobs/{job_id}/selection/explain`
+- `POST /api/v1/jobs/{job_id}/formula/explain`
+- `POST /api/v1/jobs/{job_id}/ask`
+- `POST /api/v1/jobs/{job_id}/advisor/question`
+- `POST /api/v1/jobs/{job_id}/advisor/evaluate`
+- `GET /api/v1/jobs/{job_id}/memory`
+- `DELETE /api/v1/jobs/{job_id}/memory`
+- `GET /api/v1/settings`
+- `POST /api/v1/settings/test`
 - `POST /api/v1/directions/search`
 - `POST /api/v1/directions/seed_expansion`
 - `POST /api/v1/directions/deep_read`
 
-`deep_read` supports arXiv ID/URL, PDF URL, candidate payload, and explicit DOI
-failure when DOI handoff is not implemented.
+## Rendering Rules
 
-## Rendering Rule
+- Always request `/understanding_status` before `/cards`.
+- Request `/cards` only for `SUCCESS` or `DEGRADED_STRUCTURAL`.
+- Do not show explanatory cards for `BASELINE_ONLY`, `BLOCKED_UNDERSTANDING`,
+  or `FAILED`.
+- Do not mount M4 controls for statuses that cannot show cards.
+- In `DEGRADED_STRUCTURAL`, show only successful components and clearly state
+  which structural component is unavailable.
+- User-facing copy should be Chinese; raw status codes may remain visible in
+  compact technical fields.
 
-LearningWorkspace must request `understanding_status` before cards.
+## PaperWorkspace Layout
 
-Only these statuses may request cards:
+- Left rail: reading tabs and job identity.
+- Center pane: status banner, collapsed technical status, paper/formula/teaching
+  cards.
+- Right pane: M4 tutor chat/advisor/memory.
+- Text selection toolbar: Chinese actions (`追问`, `讲简单点`, `举例`) positioned
+  from the selected range and clamped to the viewport.
 
-- SUCCESS
-- DEGRADED_STRUCTURAL
+## Settings
 
-These statuses must not show explanatory card content:
+Settings is ccswitch focused:
 
-- BLOCKED_UNDERSTANDING
-- BASELINE_ONLY
-- FAILED
-
-## Status Fields To Render
-
-The frontend should expose the operational state, not just card prose:
-
-- source type;
-- canonicalization status;
-- `m2_ready`;
-- degradation reason;
-- warnings;
-- missing components;
-- component status;
-- allowed downstream components;
-- formula origin;
-- formula OCR/source status;
-- evidence status.
-
-DEGRADED_STRUCTURAL must clearly show that the page is degraded and must show
-which components are unavailable.
-
-## DirectionSearchView
-
-DirectionSearchView must:
-
-- accept a direction query;
-- show loading, success, degraded, blocked, and empty states;
-- render overview, sub-directions, method families, candidates, and reading
-  order;
-- display discovery sources, verification/full-text readiness, source metrics,
-  and failure reasons;
-- call `deep_read` for source-backed candidates and navigate to `/learn/{job_id}`
-  only after a real job is created.
-
-## SeedExpansionPanel
-
-SeedExpansionPanel must:
-
-- accept a typed seed or selected candidate payload;
-- render upstream, downstream, same-route, survey, and follow-up groups;
-- show relation reason/confidence and whether citation graph evidence is real or
-  weak;
-- call the same `deep_read` handoff for source-backed expansion papers;
-- show DEGRADED/EMPTY_RESULT states without fake candidates.
-
-## PaperWorkspace
-
-PaperWorkspace may display:
-
-- paper card;
-- formula cards only when formula component succeeded;
-- teaching cards only when teaching component succeeded;
-- status banner and component diagnostics for DEGRADED/BLOCKED paths.
-
-For DEGRADED_STRUCTURAL, `/cards` returns only successful components.
-
-## Boundaries
-
-- Do not make `/artifacts` the normal user path.
-- Do not show BASELINE_ONLY cards.
-- Do not show BLOCKED_UNDERSTANDING cards.
-- Do not hide degradation reasons.
-- Do not claim M3 product readiness from selected-paper or narrow smoke.
+- Show `active_provider`, base URL, model placeholder, and readiness.
+- Explain that model selection is read from ccswitch and saved through the settings page.
+- Do not guide users toward Xiaomi/MiMo token setup as the default path.

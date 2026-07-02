@@ -5,34 +5,28 @@ const theme = useThemeStore()
 </script>
 
 <template>
-  <header class="glass sticky top-0 z-50 border-b" style="border-color: var(--border-subtle);">
-    <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-      <div class="flex items-center gap-8">
-        <router-link to="/" class="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight" style="color: var(--text-primary);">
-          <div class="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold" style="background: linear-gradient(135deg, #6366f1, #8b5cf6);">S</div>
-          ResearchSensei
+  <header class="sticky top-0 z-40 border-b backdrop-blur-xl" style="border-color: var(--border-subtle); background: color-mix(in srgb, var(--bg-card) 88%, transparent);">
+    <div class="mx-auto flex h-16 max-w-[1440px] items-center justify-between px-5 lg:px-8">
+      <div class="flex min-w-0 items-center gap-8">
+        <router-link to="/" class="flex items-center gap-3 font-semibold" style="color: var(--text-primary);">
+          <span class="flex h-9 w-9 items-center justify-center rounded-[10px] text-base font-black text-white" style="background: var(--accent);">研</span>
+          <span class="text-lg tracking-normal">Research Sensei</span>
         </router-link>
-        <nav class="flex items-center gap-1 text-[13px] font-medium" style="color: var(--text-secondary);">
-          <router-link to="/directions/new"
-            class="px-3 py-1.5 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-            方向搜索
-          </router-link>
-          <router-link to="/papers/upload"
-            class="px-3 py-1.5 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-            上传论文
-          </router-link>
-          <router-link to="/settings"
-            class="px-3 py-1.5 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5">
-            设置
-          </router-link>
+
+        <nav class="hidden items-center gap-1 text-[15px] font-medium md:flex" style="color: var(--text-secondary);">
+          <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/directions/new">找方向</router-link>
+          <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/papers/upload">读论文</router-link>
+          <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/settings">模型设置</router-link>
         </nav>
       </div>
+
       <button
+        type="button"
+        class="secondary-btn !h-10 !min-h-10 !px-3"
+        :aria-label="theme.isDark ? '切换到浅色' : '切换到深色'"
         @click="theme.toggle()"
-        class="w-8 h-8 rounded-full flex items-center justify-center transition-all text-sm hover:scale-110"
-        style="background: var(--accent-light); color: var(--accent);"
       >
-        {{ theme.isDark ? '☀' : '☾' }}
+        {{ theme.isDark ? '日间' : '夜间' }}
       </button>
     </div>
   </header>

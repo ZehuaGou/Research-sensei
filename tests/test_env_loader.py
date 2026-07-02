@@ -10,7 +10,7 @@ from researchsensei.core.env_loader import load_runtime_env, mask_value
 
 
 # Persisted env keys that may conflict with tests
-_REAL_ENV_KEYS = ["UNPAYWALL_EMAIL", "MIMO_API_KEY", "DEEPSEEK_API_KEY",
+_REAL_ENV_KEYS = ["UNPAYWALL_EMAIL", "MIMO_API_KEY", "OPENCODE_GO_API_KEY", "DEEPSEEK_API_KEY",
                    "S2_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"]
 
 
@@ -53,6 +53,14 @@ class TestLoadRuntimeEnv:
             loaded = load_runtime_env(env_path=str(env_path), suppress_errors=False)
             assert "MIMO_API_KEY" in loaded
             assert os.environ.get("MIMO_API_KEY") == "tp-secret-key"
+
+    def test_loads_opencode_go_key_into_os_environ(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            env_path = Path(tmp) / ".env"
+            env_path.write_text("OPENCODE_GO_API_KEY=oc-secret-key\n", encoding="utf-8")
+            loaded = load_runtime_env(env_path=str(env_path), suppress_errors=False)
+            assert loaded["OPENCODE_GO_API_KEY"] == "oc-***"
+            assert os.environ.get("OPENCODE_GO_API_KEY") == "oc-secret-key"
 
     def test_returns_masked_values_by_default(self):
         with tempfile.TemporaryDirectory() as tmp:

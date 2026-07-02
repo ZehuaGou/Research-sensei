@@ -7,11 +7,20 @@ export interface ChatMessage {
   timestamp: number
 }
 
+function normalizeSelectedText(text: string) {
+  return text
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.;:，。；：、）\]\}])/g, '$1')
+    .replace(/([（\[\{])\s+/g, '$1')
+    .trim()
+}
+
 export const useLearningStore = defineStore('learning', () => {
   const currentJobId = ref('')
   const chatHistory = ref<ChatMessage[]>([])
   const selectedText = ref('')
-  const isAskPanelOpen = ref(true)
+  const selectedIntent = ref<'explain' | 'simplify' | 'example'>('explain')
+  const isAskPanelOpen = ref(false)
 
   function addMessage(msg: ChatMessage) {
     chatHistory.value.push(msg)
@@ -21,9 +30,19 @@ export const useLearningStore = defineStore('learning', () => {
     chatHistory.value = []
   }
 
-  function setSelectedText(text: string) {
-    selectedText.value = text
+  function setSelectedText(text: string, intent: 'explain' | 'simplify' | 'example' = 'explain') {
+    selectedText.value = normalizeSelectedText(text)
+    selectedIntent.value = intent
   }
 
-  return { currentJobId, chatHistory, selectedText, isAskPanelOpen, addMessage, clearChat, setSelectedText }
+  return {
+    currentJobId,
+    chatHistory,
+    selectedText,
+    selectedIntent,
+    isAskPanelOpen,
+    addMessage,
+    clearChat,
+    setSelectedText,
+  }
 })

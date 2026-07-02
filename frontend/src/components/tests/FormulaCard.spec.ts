@@ -13,7 +13,7 @@ function mountCard(card: any) {
 }
 
 describe('FormulaCard', () => {
-  it('renders formula card with core fields', () => {
+  it('renders formula card without exposing internal metadata', () => {
     const wrapper = mountCard({
       formula_latex: 'E = mc^2',
       formula_ref: 'eq:1',
@@ -22,29 +22,23 @@ describe('FormulaCard', () => {
       terms: [],
     })
     expect(wrapper.text()).toContain('Einstein energy equivalence')
-    expect(wrapper.text()).toContain('eq:1')
-    expect(wrapper.text()).toContain('SUPPORTED_BY_TEXT')
+    expect(wrapper.text()).toContain('证据已绑定')
+    expect(wrapper.text()).not.toContain('eq:1')
+    expect(wrapper.text()).not.toContain('SUPPORTED_BY_TEXT')
   })
 
-  it('renders formula_origin badge', () => {
+  it('hides formula_origin and formula_ocr_status badges from the reader view', () => {
     const wrapper = mountCard({
       formula_latex: 'x + y',
       formula_origin: 'source_latex',
-      terms: [],
-    })
-    expect(wrapper.text()).toContain('source_latex')
-  })
-
-  it('renders formula_ocr_status badge', () => {
-    const wrapper = mountCard({
-      formula_latex: 'x + y',
       formula_ocr_status: 'not_required',
       terms: [],
     })
-    expect(wrapper.text()).toContain('not_required')
+    expect(wrapper.text()).not.toContain('source_latex')
+    expect(wrapper.text()).not.toContain('not_required')
   })
 
-  it('renders term table with encourages/penalizes/if_removed for FormulaTerm data', () => {
+  it('renders terms with encourages, penalizes, and removal effects', () => {
     const terms = [
       {
         term: '\\|x - y\\|^2',
@@ -65,72 +59,70 @@ describe('FormulaCard', () => {
       formula_latex: 'L = ||x - y||^2 + log p(x)',
       terms,
     })
-    expect(wrapper.text()).toContain('项')
-    expect(wrapper.text()).toContain('含义')
-    expect(wrapper.text()).toContain('鼓励')
-    expect(wrapper.text()).toContain('惩罚')
-    expect(wrapper.text()).toContain('去掉会怎样')
 
-    // Verify FormulaTerm fields render correctly
-    expect(wrapper.text()).toContain('\\|x - y\\|^2')
+    expect(wrapper.html()).toContain('katex')
+    expect(wrapper.text()).not.toContain('\\|x - y\\|^2')
     expect(wrapper.text()).toContain('Squared distance between x and y')
-    expect(wrapper.text()).toContain('Similar representations')
-    expect(wrapper.text()).toContain('Dissimilar representations')
-    expect(wrapper.text()).toContain('Model loses contrastive signal')
-
-    expect(wrapper.text()).toContain('\\log p(x)')
+    expect(wrapper.text()).toContain('鼓励：Similar representations')
+    expect(wrapper.text()).toContain('惩罚：Dissimilar representations')
+    expect(wrapper.text()).toContain('去掉：Model loses contrastive signal')
+    expect(wrapper.text()).not.toContain('\\log p(x)')
     expect(wrapper.text()).toContain('Log likelihood')
     expect(wrapper.text()).toContain('High probability data')
     expect(wrapper.text()).toContain('Unlikely data')
     expect(wrapper.text()).toContain('Model becomes unnormalized')
   })
 
-  it('shows fallback dash when FormulaTerm fields are empty', () => {
-    const terms = [
-      {
-        term: 'x',
-        meaning: 'Input variable',
-        encourages: '',
-        penalizes: '',
-        if_removed: '',
-      },
-    ]
+  it('renders LaTeX symbols as readable inline math instead of raw source text', () => {
     const wrapper = mountCard({
-      formula_latex: 'f(x)',
-      terms,
+      formula_latex: '\\mathbf{V}',
+      symbols: [{ symbol: '\\mathbf{V}', meaning: '值矩阵' }],
+      terms: [],
     })
-    // Empty fields should show '-' as fallback, not blank
-    expect(wrapper.text()).toContain('Input variable')
-    expect(wrapper.text()).toContain('x')
+
+    expect(wrapper.html()).toContain('katex')
+    expect(wrapper.text()).toContain('值矩阵')
+    expect(wrapper.text()).not.toContain('\\mathbf{V}')
   })
 
-  it('does not render term table when terms is empty', () => {
+  it('shows term meaning even when optional FormulaTerm fields are empty', () => {
+    const wrapper = mountCard({
+      formula_latex: 'f(x)',
+      terms: [{ term: 'x', meaning: 'Input variable', encourages: '', penalizes: '', if_removed: '' }],
+    })
+    expect(wrapper.text()).toContain('Input variable')
+    expect(wrapper.text()).toContain('x')
+    expect(wrapper.text()).not.toContain('鼓励：')
+  })
+
+  it('does not render term items when terms are empty', () => {
     const wrapper = mountCard({
       formula_latex: 'x + y',
       terms: [],
     })
-    expect(wrapper.text()).not.toContain('项含义')
+    expect(wrapper.text()).not.toContain('Input variable')
+    expect(wrapper.text()).toContain('直觉')
   })
 
   it('handles card without terms field gracefully', () => {
     const wrapper = mountCard({
       formula_latex: 'x = y',
     })
-    // Should not crash, should render other sections
-    expect(wrapper.text()).toContain('更多分析')
+    expect(wrapper.text()).toContain('直觉')
+    expect(wrapper.text()).toContain('小例子')
+    expect(wrapper.text()).toContain('拿掉会怎样')
   })
 
-  it('shows render error for invalid LaTeX', async () => {
+  it('does not throw for invalid LaTeX', async () => {
     const wrapper = mountCard({
       formula_latex: '$$invalid',
       terms: [],
     })
     await new Promise(resolve => setTimeout(resolve, 100))
-    // Component should not throw even if KaTeX rendering fails in jsdom
     expect(wrapper.exists()).toBe(true)
   })
 
-  it('renders expanded section with remove_effect and weight_change_effect', async () => {
+  it('renders remove_effect, weight_change_effect, and plain summary', () => {
     const wrapper = mountCard({
       formula_latex: 'L = L_task + lambda * L_reg',
       remove_effect: 'Without regularization, model overfits',
@@ -138,18 +130,25 @@ describe('FormulaCard', () => {
       plain_summary: 'This is a regularized loss function',
       terms: [],
     })
-    expect(wrapper.text()).toContain('更多分析')
-    // Expanded content should not be visible initially
-    expect(wrapper.text()).not.toContain('去掉该项')
-
-    // Click the expand button (the one with "更多分析"/"收起" text)
-    const expandBtn = wrapper.findAll('button').find(b => b.text().includes('更多分析') || b.text().includes('收起'))
-    expect(expandBtn).toBeTruthy()
-    await expandBtn!.trigger('click')
-    expect(wrapper.text()).toContain('去掉该项')
-    expect(wrapper.text()).toContain('Without regularization')
-    expect(wrapper.text()).toContain('权重变化')
-    expect(wrapper.text()).toContain('Higher lambda')
     expect(wrapper.text()).toContain('This is a regularized loss function')
+    expect(wrapper.text()).toContain('Without regularization')
+    expect(wrapper.text()).toContain('Higher lambda')
+  })
+
+  it('presents insufficient formula evidence as a readable degraded state', () => {
+    const wrapper = mountCard({
+      display_title: '公式 1 来源不足，暂不推导',
+      formula_raw: 'Precision = TP / (TP + FP) where TP represents true positives',
+      formula_origin: 'raw_formula_text',
+      purpose: 'INSUFFICIENT_EVIDENCE: M1 did not provide reliable LaTeX.',
+      intuition: 'INSUFFICIENT_EVIDENCE',
+      numeric_example: 'INSUFFICIENT_EVIDENCE',
+      terms: [],
+    })
+
+    expect(wrapper.text()).toContain('公式 1 来源不足，暂不推导')
+    expect(wrapper.text()).toContain('来源不足')
+    expect(wrapper.text()).toContain('证据不足，暂不推导。')
+    expect(wrapper.text()).not.toContain('INSUFFICIENT_EVIDENCE')
   })
 })
