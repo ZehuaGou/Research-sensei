@@ -165,7 +165,7 @@ class SelectionService:
         recency = self._recency_bonus(paper)
         source_reliability = self._source_reliability(paper)
         open_access_score = 1.0 if paper.open_access else 0.0
-        pdf_available_score = 1.0 if (paper.pdf_downloaded or paper.pdf_available or paper.pdf_url) else 0.0
+        pdf_available_score = self._source_readiness_score(paper)
         metadata_completeness = self._metadata_completeness(paper)
         method_rep = 0.85 if role not in {"SURVEY", "IRRELEVANT"} else 0.35
         penalty = -0.5 if relevance < 0.35 else 0.0
@@ -296,6 +296,26 @@ class SelectionService:
         return 0.1
 
     @staticmethod
+    def _source_readiness_score(paper: CandidatePaper) -> float:
+        """Rank source-first candidates above URL-only candidates without relaxing gates."""
+        if (
+            paper.preferred_m2_input == "latex_source"
+            or paper.source_priority == SourcePriority.LATEX_SOURCE
+            or paper.latex_source_downloaded
+            or paper.latex_source_available
+        ):
+            return 1.0
+        if paper.has_valid_deep_reading_source and (paper.pdf_downloaded or paper.can_enter_m2):
+            return 0.92
+        if paper.pdf_downloaded:
+            return 0.88
+        if paper.can_deep_read or paper.selected_fulltext_url:
+            return 0.82
+        if paper.pdf_available or paper.pdf_url:
+            return 0.72
+        return 0.0
+
+    @staticmethod
     def _eligible_for_a_read(item: ReadingPlanItem) -> bool:
         """A_READ requires ALL of (AND logic, not OR):
 
@@ -372,6 +392,10 @@ class SelectionService:
             f"pdf={'yes' if breakdown.pdf_available_score else 'no'}",
             f"metadata={breakdown.metadata_completeness}",
         ]
+        if paper.preferred_m2_input:
+            parts.append(f"m2_input={paper.preferred_m2_input}")
+        if paper.has_valid_deep_reading_source:
+            parts.append("source_ready=yes")
         if breakdown.venue_prestige >= 0.9:
             parts.append("top-venue-signal")
         if breakdown.citation_score >= 0.1:

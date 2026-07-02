@@ -23,6 +23,31 @@ class StubResponse:
         return self.payload
 
 
+class SemanticScholarClient:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def get(self, url: str, **kwargs: object) -> StubResponse:
+        self.calls.append({"url": url, **kwargs})
+        query = str((kwargs.get("params") or {}).get("query") or "paper")
+        return StubResponse({
+            "data": [
+                {
+                    "paperId": f"s2-{len(self.calls)}",
+                    "title": f"{query} Result",
+                    "authors": [{"name": "A. Researcher"}],
+                    "year": 2024,
+                    "venue": "Conference",
+                    "abstract": "A source-backed method paper.",
+                    "citationCount": 12,
+                    "externalIds": {"DOI": "10.1234/example"},
+                    "openAccessPdf": {"url": "https://example.test/paper.pdf"},
+                    "url": "https://semanticscholar.org/paper/test",
+                }
+            ]
+        })
+
+
 class UnpaywallClient:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
@@ -101,6 +126,29 @@ def test_doi_can_find_legal_pdf_through_unpaywall() -> None:
     assert resolved.selected_fulltext_url == "https://repository.example/oa-paper.pdf"
     assert resolved.can_deep_read is True
     assert metrics[0]["source"] == "unpaywall"
+    assert metrics[0]["success"] is True
+
+
+def test_doi_url_can_find_legal_pdf_from_secondary_unpaywall_location() -> None:
+    client = UnpaywallClient(
+        {
+            "best_oa_location": None,
+            "oa_locations": [
+                {
+                    "url_for_pdf": "https://repo.example.org/accepted-paper.pdf",
+                    "url_for_landing_page": "https://repo.example.org/accepted-paper",
+                }
+            ],
+        }
+    )
+    resolver = FullTextResolver(http_client=client, unpaywall_email="sensei@example.test")
+
+    resolved, metrics = resolver.resolve(paper(doi="https://doi.org/10.1234/example"))
+
+    assert resolved.fulltext_status == "pdf_ready"
+    assert resolved.selected_fulltext_url == "https://repo.example.org/accepted-paper.pdf"
+    assert resolved.can_deep_read is True
+    assert "10.1234%2Fexample" in client.urls[0]
     assert metrics[0]["success"] is True
 
 
@@ -277,3 +325,56 @@ def test_semantic_scholar_api_key_alias_is_supported(monkeypatch) -> None:
     adapter = SemanticScholarAdapter()
 
     assert adapter.api_key == "alias-key"
+
+
+def test_semantic_scholar_search_uses_shared_success_cache() -> None:
+    SemanticScholarAdapter.clear_cache()
+    client = SemanticScholarClient()
+    adapter = SemanticScholarAdapter(
+        http_client=client,
+        cache_ttl_seconds=60,
+        min_request_interval_seconds=0,
+    )
+    try:
+        first = adapter.search("time series anomaly detection", max_results=3)
+        second = adapter.search(" time series anomaly detection ", max_results=3)
+    finally:
+        SemanticScholarAdapter.clear_cache()
+
+    assert len(client.calls) == 1
+    assert first[0].title == "time series anomaly detection Result"
+    assert second[0].title == first[0].title
+
+
+def test_semantic_scholar_uncached_requests_share_polite_throttle() -> None:
+    class ManualClock:
+        def __init__(self) -> None:
+            self.now = 100.0
+
+        def __call__(self) -> float:
+            return self.now
+
+    clock = ManualClock()
+    waits: list[float] = []
+
+    def sleeper(seconds: float) -> None:
+        waits.append(seconds)
+        clock.now += seconds
+
+    SemanticScholarAdapter.clear_cache()
+    client = SemanticScholarClient()
+    adapter = SemanticScholarAdapter(
+        http_client=client,
+        cache_ttl_seconds=0,
+        min_request_interval_seconds=1.25,
+        clock=clock,
+        sleeper=sleeper,
+    )
+    try:
+        adapter.search("query one", max_results=1)
+        adapter.search("query two", max_results=1)
+    finally:
+        SemanticScholarAdapter.clear_cache()
+
+    assert len(client.calls) == 2
+    assert waits == [1.25]

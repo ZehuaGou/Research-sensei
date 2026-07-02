@@ -304,6 +304,27 @@ def test_m4_ask_handles_general_chat_without_paper_fallback(tmp_path: Path) -> N
     assert llm.calls == 0
 
 
+def test_m4_user_facing_fallbacks_do_not_contain_mojibake(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+    responses = [
+        client.post(f"/api/v1/jobs/{job_id}/selection/explain", json={"selected_text": ""}),
+        client.post(f"/api/v1/jobs/{job_id}/formula/explain", json={"formula_id": "missing"}),
+        client.post(f"/api/v1/jobs/{job_id}/ask", json={}),
+        client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "\u4f60\u597d"}),
+    ]
+
+    for response in responses:
+        assert response.status_code == 200
+        _assert_no_mojibake(response.json())
+
+
 def test_m4_ask_rejects_llm_answer_with_unknown_evidence_ref(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     llm = ScriptedM4LLM(evidence_refs=["paper:made_up"])
@@ -588,3 +609,32 @@ def _write_m4_artifact_run(
 
 def _write_json(path: Path, data: dict[str, object]) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _assert_no_mojibake(data: object) -> None:
+    text = json.dumps(data, ensure_ascii=False)
+    markers = _m4_mojibake_markers()
+    assert [marker for marker in markers if marker in text] == []
+
+
+def _m4_mojibake_markers() -> list[str]:
+    normal_snippets = [
+        "\u6ca1\u6709\u6536\u5230",
+        "\u89e3\u91ca\u8bc1\u636e",
+        "\u8bba\u6587\u52a9\u6559",
+        "\u516c\u5f0f\u5361\u7247",
+        "\u7814\u7a76\u95ee\u9898",
+        "\u65b9\u6cd5\u673a\u5236",
+        "\u5bf9\u5e94\u8bc1\u636e",
+    ]
+    markers: set[str] = set()
+    for snippet in normal_snippets:
+        encoded = snippet.encode("utf-8")
+        for codec in ("gbk", "cp936"):
+            try:
+                markers.add(encoded.decode(codec))
+            except UnicodeDecodeError:
+                markers.add(encoded.decode(codec, errors="ignore"))
+                markers.add(encoded.decode(codec, errors="replace"))
+    markers.discard("")
+    return sorted(markers, key=len, reverse=True)

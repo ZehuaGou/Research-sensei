@@ -191,6 +191,20 @@ def test_short_passage_skipped_with_warning() -> None:
     assert index.stats.skipped_short == 1
 
 
+def test_short_method_evidence_passage_is_retained() -> None:
+    doc = _make_document([
+        DocumentBlock(block_id="h001", type=BlockType.HEADING, text="Method", evidence_ref="t:h001", section="method"),
+        DocumentBlock(block_id="b001", type=BlockType.PARAGRAPH, text="We propose ATNet.", evidence_ref="t:b001", section="method"),
+    ])
+
+    index = build_passage_index(doc)
+
+    assert len(index.passages) == 1
+    assert index.passages[0].text == "We propose ATNet."
+    assert index.passages[0].evidence_refs == ["t:b001"]
+    assert not any(w.code == "SHORT_PASSAGE_SKIPPED" for w in index.warnings)
+
+
 def test_long_passage_split_updates_stats() -> None:
     long_text = "This is a sentence. " * 200  # ~4000 chars
     doc = _make_document([

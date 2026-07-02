@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.direction.exploration import DirectionExplorationService
+from researchsensei.direction.exploration import DirectionExplorationService, build_heuristic_query_plan
 from researchsensei.schemas import (
     CandidatePaper,
     CanonicalQualityStatus,
@@ -125,6 +125,17 @@ def test_direction_query_returns_structured_bundle() -> None:
     assert bundle.candidate_cards
     assert bundle.recommended_reading_order
     assert bundle.candidate_cards[0]["title"] == "Time Series Anomaly Detection with Transformers"
+
+
+def test_chinese_mixed_forecasting_query_generates_aligned_variants() -> None:
+    plan = build_heuristic_query_plan("\u591a\u53d8\u91cf\u65f6\u95f4\u5e8f\u5217\u9884\u6d4b\u548c\u5f02\u5e38\u68c0\u6d4b")
+
+    assert "multivariate" in plan.english_query
+    assert "forecasting" in plan.english_query
+    assert "anomaly detection" in plan.english_query
+    assert "forecasting" in plan.core_terms
+    assert "multivariate time series forecasting" in plan.query_variants
+    assert "time series forecasting anomaly detection" in plan.query_variants
 
 
 def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:

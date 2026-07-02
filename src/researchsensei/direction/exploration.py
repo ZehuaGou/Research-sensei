@@ -406,17 +406,34 @@ def _translate_direction(query: str) -> str:
     lower = query.lower()
     replacements = {
         "时间序列": "time series",
+        "时序": "time series",
         "多变量": "multivariate",
+        "多元": "multivariate",
         "异常检测": "anomaly detection",
+        "异常识别": "anomaly detection",
+        "预测": "forecasting",
+        "预报": "forecasting",
+        "分类": "classification",
+        "聚类": "clustering",
         "插补": "imputation",
+        "缺失值填补": "imputation",
         "图神经网络": "graph neural network",
+        "图网络": "graph neural network",
         "图": "graph",
+        "用于": "for",
+        "用来": "for",
+        "面向": "for",
+        "做": "for",
+        "结合": "combined with",
+        "和": "and",
+        "与": "and",
     }
     if all(ord(char) < 128 for char in query):
         return query
     translated = query
     for zh, en in replacements.items():
         translated = translated.replace(zh, f" {en} ")
+    translated = re.sub(r"[的在里中上]", " ", translated)
     translated = re.sub(r"\s+", " ", translated).strip()
     return translated if re.search(r"[a-zA-Z]", translated) else query
 
@@ -431,7 +448,10 @@ def _core_terms(direction: str) -> list[str]:
         "graph neural network",
         "graph",
         "forecasting",
+        "prediction",
         "representation learning",
+        "classification",
+        "clustering",
     ]
     terms = [phrase for phrase in phrases if phrase in lower]
     if terms:
@@ -450,7 +470,7 @@ def _related_terms(direction: str) -> list[str]:
         terms += ["missing data", "masking", "diffusion", "probabilistic"]
     if "graph" in lower:
         terms += ["gnn", "graph representation", "node anomaly", "temporal graph", "spatio-temporal", "graph neural network"]
-    if "forecasting" in lower:
+    if "forecasting" in lower or "prediction" in lower:
         terms += ["prediction", "time series", "forecast"]
     if "transformer" in lower:
         terms += ["attention", "self-attention", "transformer model"]
@@ -593,6 +613,12 @@ def _semantic_variants(query: str) -> list[str]:
             "multivariate time series prediction",
             "time series forecasting multivariate",
             "multivariate forecasting deep learning",
+        ])
+    if "forecasting" in query and has_time and "anomaly" in query:
+        variants.extend([
+            "time series forecasting anomaly detection",
+            "forecasting residual anomaly detection",
+            "multivariate time series forecasting anomaly detection",
         ])
     elif "forecasting" in query and has_time:
         variants.extend([

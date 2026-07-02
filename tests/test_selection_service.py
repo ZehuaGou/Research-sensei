@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from researchsensei.schemas import CandidatePaper, QueryPlan
+from researchsensei.schemas import CandidatePaper, QueryPlan, SourcePriority
 from researchsensei.selection.service import SelectionService
 
 
@@ -63,6 +63,39 @@ def test_selection_service_scoring_breakdown() -> None:
     assert item.scoring_breakdown.relevance_score > 0
     assert item.scoring_breakdown.weighted_total > 0
     assert item.scoring_breakdown.citation_score > 0
+
+
+def test_source_first_candidate_ranks_above_pdf_url_only_peer() -> None:
+    service = SelectionService()
+    query = _make_query(["multivariate time series", "forecasting"])
+    candidates = [
+        _make_paper_full(
+            "Multivariate Time Series Forecasting with PDF URL",
+            abstract="A multivariate time series forecasting method for sensor data.",
+            pdf_url="https://example.test/paper.pdf",
+            pdf_available=True,
+            source_confidence="high",
+            metadata_confidence="high",
+        ),
+        _make_paper_full(
+            "Multivariate Time Series Forecasting with Source",
+            abstract="A multivariate time series forecasting method for sensor data.",
+            pdf_url="https://arxiv.org/pdf/2401.00001.pdf",
+            pdf_available=True,
+            has_valid_deep_reading_source=True,
+            source_priority=SourcePriority.LATEX_SOURCE,
+            preferred_m2_input="latex_source",
+            latex_source_available=True,
+            source_confidence="high",
+            metadata_confidence="high",
+        ),
+    ]
+
+    plan = service.build_reading_plan(query, candidates)
+
+    assert plan.items[0].paper.title == "Multivariate Time Series Forecasting with Source"
+    assert plan.items[0].scoring_breakdown.pdf_available_score > plan.items[1].scoring_breakdown.pdf_available_score
+    assert "m2_input=latex_source" in plan.items[0].selection_reason
 
 
 def test_selection_service_venue_prestige() -> None:

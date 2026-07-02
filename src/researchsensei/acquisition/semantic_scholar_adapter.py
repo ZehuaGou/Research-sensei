@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
+from collections.abc import Callable
 
 import httpx
 
@@ -17,6 +19,9 @@ _RETRY_CODES = {429, 503}
 _MAX_RETRIES = 3
 _BACKOFF_429 = [3.0, 6.0, 12.0]
 _BACKOFF_503 = [2.0, 4.0, 8.0]
+_CACHE_LOCK = threading.Lock()
+_RESPONSE_CACHE: dict[tuple[str, int, str, bool], tuple[float, dict]] = {}
+_LAST_REQUEST_AT = 0.0
 
 
 class SemanticScholarAdapter:
@@ -27,12 +32,26 @@ class SemanticScholarAdapter:
     for higher rate limits.
     """
 
-    def __init__(self, *, timeout: float = 15.0) -> None:
+    def __init__(
+        self,
+        *,
+        timeout: float = 15.0,
+        http_client: object | None = None,
+        cache_ttl_seconds: float = 15 * 60,
+        min_request_interval_seconds: float = 1.0,
+        clock: Callable[[], float] | None = None,
+        sleeper: Callable[[float], None] | None = None,
+    ) -> None:
         self.timeout = timeout
         self.api_key = (
             os.getenv("SEMANTIC_SCHOLAR_API_KEY", "").strip()
             or os.getenv("S2_API_KEY", "").strip()
         )
+        self.http_client = http_client
+        self.cache_ttl_seconds = cache_ttl_seconds
+        self.min_request_interval_seconds = min_request_interval_seconds
+        self.clock = clock or time.monotonic
+        self.sleeper = sleeper or time.sleep
 
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
         """Search Semantic Scholar with retry/backoff on 429/503."""
@@ -45,7 +64,11 @@ class SemanticScholarAdapter:
         if self.api_key:
             headers["x-api-key"] = self.api_key
 
-        data = self._fetch_with_retry(params, headers)
+        cache_key = _cache_key(params, has_api_key=bool(self.api_key))
+        data = self._get_cached(cache_key)
+        if data is None:
+            data = self._fetch_with_retry(params, headers)
+            self._set_cached(cache_key, data)
         results = data.get("data", [])
         return [self._to_candidate(row) for row in results[:max_results] if row.get("title")]
 
@@ -53,26 +76,26 @@ class SemanticScholarAdapter:
         """Fetch from S2 API with retry/backoff."""
         for attempt in range(_MAX_RETRIES):
             try:
-                with httpx.Client(timeout=self.timeout, follow_redirects=True, trust_env=True) as client:
-                    resp = client.get(_S2_API, params=params, headers=headers)
+                self._throttle_before_request()
+                resp = self._get(params, headers)
 
-                    if resp.status_code in _RETRY_CODES:
-                        body_msg = ""
-                        try:
-                            body_msg = resp.json().get("message", "")
-                        except Exception:
-                            pass
-                        backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
-                        wait = backoff[min(attempt, len(backoff) - 1)]
-                        logger.warning(
-                            "Semantic Scholar got %d (%s), retry %d/%d in %.1fs",
-                            resp.status_code, body_msg[:100], attempt + 1, _MAX_RETRIES, wait,
-                        )
-                        time.sleep(wait)
-                        continue
+                if resp.status_code in _RETRY_CODES:
+                    body_msg = ""
+                    try:
+                        body_msg = resp.json().get("message", "")
+                    except Exception:
+                        pass
+                    backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
+                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    logger.warning(
+                        "Semantic Scholar got %d (%s), retry %d/%d in %.1fs",
+                        resp.status_code, body_msg[:100], attempt + 1, _MAX_RETRIES, wait,
+                    )
+                    self.sleeper(wait)
+                    continue
 
-                    resp.raise_for_status()
-                    return resp.json()
+                resp.raise_for_status()
+                return resp.json()
 
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in _RETRY_CODES:
@@ -82,7 +105,7 @@ class SemanticScholarAdapter:
                         "Semantic Scholar got %d, retry %d/%d in %.1fs",
                         exc.response.status_code, attempt + 1, _MAX_RETRIES, wait,
                     )
-                    time.sleep(wait)
+                    self.sleeper(wait)
                     continue
                 logger.warning("Semantic Scholar HTTP error: %s", exc)
                 raise
@@ -92,10 +115,54 @@ class SemanticScholarAdapter:
                     "Semantic Scholar network error: %s, retry %d/%d in %.1fs",
                     exc, attempt + 1, _MAX_RETRIES, wait,
                 )
-                time.sleep(wait)
+                self.sleeper(wait)
                 continue
 
         raise RuntimeError(f"Semantic Scholar API exhausted {_MAX_RETRIES} retries")
+
+    def _get(self, params: dict, headers: dict):
+        if self.http_client is not None:
+            return self.http_client.get(_S2_API, params=params, headers=headers)
+        with httpx.Client(timeout=self.timeout, follow_redirects=True, trust_env=True) as client:
+            return client.get(_S2_API, params=params, headers=headers)
+
+    def _throttle_before_request(self) -> None:
+        global _LAST_REQUEST_AT
+        if self.min_request_interval_seconds <= 0:
+            return
+        with _CACHE_LOCK:
+            now = self.clock()
+            wait = _LAST_REQUEST_AT + self.min_request_interval_seconds - now
+            if wait > 0:
+                self.sleeper(wait)
+                now = self.clock()
+            _LAST_REQUEST_AT = now
+
+    def _get_cached(self, key: tuple[str, int, str, bool]) -> dict | None:
+        if self.cache_ttl_seconds <= 0:
+            return None
+        with _CACHE_LOCK:
+            cached = _RESPONSE_CACHE.get(key)
+            if cached is None:
+                return None
+            expires_at, data = cached
+            if expires_at <= self.clock():
+                _RESPONSE_CACHE.pop(key, None)
+                return None
+            return data
+
+    def _set_cached(self, key: tuple[str, int, str, bool], data: dict) -> None:
+        if self.cache_ttl_seconds <= 0:
+            return
+        with _CACHE_LOCK:
+            _RESPONSE_CACHE[key] = (self.clock() + self.cache_ttl_seconds, data)
+
+    @classmethod
+    def clear_cache(cls) -> None:
+        global _LAST_REQUEST_AT
+        with _CACHE_LOCK:
+            _RESPONSE_CACHE.clear()
+            _LAST_REQUEST_AT = 0.0
 
     def _to_candidate(self, row: dict) -> CandidatePaper:
         paper_id = str(row.get("paperId") or "")
@@ -141,3 +208,12 @@ class SemanticScholarAdapter:
 
 def _stable_id(title: object) -> str:
     return "s2_" + "_".join(str(title or "").lower().split())[:50]
+
+
+def _cache_key(params: dict, *, has_api_key: bool) -> tuple[str, int, str, bool]:
+    return (
+        str(params.get("query") or "").strip().lower(),
+        int(params.get("limit") or 0),
+        str(params.get("fields") or ""),
+        has_api_key,
+    )

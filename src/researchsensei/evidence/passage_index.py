@@ -13,6 +13,26 @@ from researchsensei.schemas.evidence import (
 )
 
 SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+SHORT_EVIDENCE_SECTIONS = {
+    "abstract",
+    "approach",
+    "experiment",
+    "experiments",
+    "introduction",
+    "method",
+    "methodology",
+    "methods",
+    "model",
+    "results",
+}
+SHORT_EVIDENCE_KEYWORDS = re.compile(
+    r"\b("
+    r"achieve|algorithm|architecture|benchmark|challenge|contribution|evaluate|framework|"
+    r"improve|introduce|loss|method|model|module|objective|outperform|problem|propose|"
+    r"result|train|training"
+    r")\b",
+    re.IGNORECASE,
+)
 
 
 def build_passage_index(
@@ -42,6 +62,11 @@ def build_passage_index(
             buffer_blocks.clear()
             return
         if len(text) < cfg.min_passage_chars:
+            if _should_keep_short_passage(buffer_section, buffer_blocks, text):
+                passage_counter += 1
+                passages.append(_make_passage(paper_id, f"p{passage_counter:03d}", buffer_section, buffer_blocks, text))
+                buffer_blocks.clear()
+                return
             skipped_short += 1
             warnings.append(
                 WarningItem(
@@ -173,6 +198,15 @@ def _make_passage(
 
 def _normalize_section(section: str) -> str:
     return section.strip().lower().replace(" ", "_") if section else ""
+
+
+def _should_keep_short_passage(section: str, blocks: list[DocumentBlock], text: str) -> bool:
+    normalized_section = _normalize_section(section)
+    if normalized_section not in SHORT_EVIDENCE_SECTIONS:
+        return False
+    if not any(block.evidence_ref for block in blocks):
+        return False
+    return bool(SHORT_EVIDENCE_KEYWORDS.search(text))
 
 
 def _split_text(text: str, max_chars: int) -> list[str]:
