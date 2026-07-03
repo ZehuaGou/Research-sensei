@@ -6,7 +6,22 @@ const store = useLearningStore()
 const input = ref('')
 const chatContainer = ref<HTMLElement>()
 const isLoading = ref(false)
+const isAdvisorEvaluating = ref(false)
 const memoryCount = ref(0)
+const advisorAnswer = ref('')
+const advisorSession = ref<AdvisorSession | null>(null)
+
+type AdvisorSession = {
+  question: string
+  expectedAnswerPoints: string[]
+  answerFormat: string[]
+  evidenceRefs: string[]
+  feedback: string
+  score: number | null
+  missingPoints: string[]
+  coveredPoints: string[]
+  nextQuestion: string
+}
 
 function compactInlineText(value: string) {
   return value
@@ -45,6 +60,26 @@ function extractApiError(data: unknown) {
     if (typeof message === 'string' && message.trim()) return message
   }
   return 'M4 请求失败，请稍后再试。'
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    : []
+}
+
+function advisorPromptText(session: AdvisorSession) {
+  const points = session.expectedAnswerPoints.length
+    ? `\n\n参考回答要点：${session.expectedAnswerPoints.join('；')}`
+    : ''
+  return normalizeMessageText(`组会追问：${session.question || '暂时没有生成问题。'}${points}`)
+}
+
+function advisorEvaluationText(session: AdvisorSession) {
+  const score = session.score === null ? '' : `评分：${Math.round(session.score * 100)}%。\n`
+  const missing = session.missingPoints.length ? `\n\n还要补：${session.missingPoints.join('；')}` : ''
+  const next = session.nextQuestion ? `\n\n下一问：${session.nextQuestion}` : ''
+  return normalizeMessageText(`${score}${session.feedback || 'M4 已完成评价。'}${missing}${next}`)
 }
 
 async function loadMemory() {
@@ -105,13 +140,25 @@ async function requestAdvisorQuestion() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ advisor_mode: 'group_meeting' }),
     })
-    const data = await res.json()
-    const points = Array.isArray(data.expected_answer_points) && data.expected_answer_points.length
-      ? `\n\n参考回答要点：${data.expected_answer_points.join('；')}`
-      : ''
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(extractApiError(data))
+    }
+    advisorSession.value = {
+      question: typeof data.question === 'string' ? data.question : '',
+      expectedAnswerPoints: stringList(data.expected_answer_points),
+      answerFormat: stringList(data.answer_format),
+      evidenceRefs: stringList(data.evidence_refs),
+      feedback: '',
+      score: null,
+      missingPoints: [],
+      coveredPoints: [],
+      nextQuestion: '',
+    }
+    advisorAnswer.value = ''
     store.addMessage({
       role: 'assistant',
-      content: normalizeMessageText(`组会追问：${data.question || '暂时没有生成问题。'}${points}`),
+      content: advisorPromptText(advisorSession.value),
       timestamp: Date.now(),
     })
     await loadMemory()
@@ -123,11 +170,58 @@ async function requestAdvisorQuestion() {
   }
 }
 
+async function submitAdvisorAnswer() {
+  const session = advisorSession.value
+  const userAnswer = compactInlineText(advisorAnswer.value)
+  if (!store.currentJobId || !session || !userAnswer || isAdvisorEvaluating.value) return
+  isAdvisorEvaluating.value = true
+  store.addMessage({ role: 'user', content: userAnswer, timestamp: Date.now() })
+  try {
+    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/advisor/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: session.question,
+        user_answer: userAnswer,
+        expected_answer_points: session.expectedAnswerPoints,
+        evidence_refs: session.evidenceRefs,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(extractApiError(data))
+    }
+    advisorSession.value = {
+      ...session,
+      feedback: typeof data.feedback === 'string' ? data.feedback : '',
+      score: typeof data.score === 'number' ? data.score : null,
+      missingPoints: stringList(data.missing_points),
+      coveredPoints: stringList(data.covered_points),
+      nextQuestion: typeof data.next_question === 'string' ? data.next_question : '',
+    }
+    advisorAnswer.value = ''
+    store.addMessage({
+      role: 'assistant',
+      content: advisorEvaluationText(advisorSession.value),
+      timestamp: Date.now(),
+    })
+    await loadMemory()
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '组会反馈生成失败。'
+    store.addMessage({ role: 'assistant', content: message, timestamp: Date.now() })
+  } finally {
+    isAdvisorEvaluating.value = false
+    await scrollToBottom()
+  }
+}
+
 async function clearMemory() {
   if (!store.currentJobId) return
   await fetch(`/api/v1/jobs/${store.currentJobId}/memory`, { method: 'DELETE' }).catch(() => null)
   store.clearChat()
   memoryCount.value = 0
+  advisorSession.value = null
+  advisorAnswer.value = ''
 }
 
 function quick(text: string) {
@@ -200,6 +294,39 @@ watch(() => store.currentJobId, () => {
         <div class="bubble loading">正在读证据并组织回答...</div>
       </div>
     </div>
+
+    <section v-if="advisorSession" class="advisor-card" data-testid="advisor-card">
+      <div class="advisor-head">
+        <span>组会追问</span>
+        <strong v-if="advisorSession.score !== null">{{ Math.round(advisorSession.score * 100) }}%</strong>
+      </div>
+      <p class="advisor-question">{{ advisorSession.question }}</p>
+      <ul v-if="advisorSession.answerFormat.length || advisorSession.expectedAnswerPoints.length" class="advisor-points">
+        <li v-for="point in advisorSession.answerFormat.length ? advisorSession.answerFormat : advisorSession.expectedAnswerPoints" :key="point">{{ point }}</li>
+      </ul>
+      <form class="advisor-composer" @submit.prevent="submitAdvisorAnswer">
+        <textarea
+          v-model="advisorAnswer"
+          data-testid="advisor-answer"
+          rows="2"
+          placeholder="写下你的 20-30 秒回答，M4 会按问题、机制、证据给反馈"
+          :disabled="isAdvisorEvaluating"
+        />
+        <button
+          type="submit"
+          data-testid="advisor-submit"
+          class="primary-btn"
+          :disabled="!advisorAnswer.trim() || isAdvisorEvaluating"
+        >
+          {{ isAdvisorEvaluating ? '评价中' : '提交' }}
+        </button>
+      </form>
+      <div v-if="advisorSession.feedback" class="advisor-feedback" data-testid="advisor-feedback">
+        <p>{{ advisorSession.feedback }}</p>
+        <p v-if="advisorSession.missingPoints.length">还要补：{{ advisorSession.missingPoints.join('；') }}</p>
+        <p v-if="advisorSession.nextQuestion">下一问：{{ advisorSession.nextQuestion }}</p>
+      </div>
+    </section>
 
     <div class="quick-row">
       <button type="button" @click="quick('请用中文按“问题-核心机制-为什么有效-对应证据”讲清楚这篇论文的核心方法，结合正文细节，不要只给一句话。')">讲方法</button>
@@ -281,6 +408,72 @@ header p {
   min-height: 0;
   overflow-y: auto;
   padding: 20px 18px;
+}
+
+.advisor-card {
+  margin: 0 18px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--bg-secondary);
+}
+
+.advisor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.advisor-head strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.advisor-question {
+  margin-top: 8px;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.advisor-points {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.advisor-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0;
+}
+
+.advisor-composer textarea {
+  min-height: 54px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  font-size: 14px;
+}
+
+.advisor-feedback {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  border-left: 3px solid var(--accent);
+  padding-left: 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .empty {

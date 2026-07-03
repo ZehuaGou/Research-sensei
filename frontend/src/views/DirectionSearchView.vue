@@ -58,10 +58,117 @@ function normalizeWarnings(raw: any[]): Array<{ code: string; message: string }>
   })
 }
 
+function warningText(warning: { code: string; message: string }) {
+  const code = warning.code || ''
+  const message = warning.message || ''
+  if (code === 'HEURISTIC_QUERY_PLAN_NO_LLM') return '当前使用本地查询规划，未调用 LLM 规划。'
+  if (code === 'ACQUISITION_FAILED') {
+    const source = (message.split(/\s+/).find(Boolean) || '某个外部来源').replace(/:+$/, '')
+    return `${source} 暂时不可用，已用其它来源降级继续。`
+  }
+  if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '当前没有候选同时满足深读全文下载与质量门槛。'
+  if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
+  if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已隐藏。`
+  if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
+  return message ? `${code}：${message}` : code
+}
+
+function statusLabel(value: string) {
+  const labels: Record<string, string> = {
+    SUCCESS: '检索完成',
+    DEGRADED: '部分来源降级',
+    EMPTY_RESULT: '没有可展示候选',
+    BLOCKED: '检索被阻断',
+    FAILED: '检索失败',
+  }
+  return labels[value] || value || '已返回结果'
+}
+
+function directionMessage(value: unknown) {
+  const text = String(value || '')
+  if (text.includes('returned real candidates')) return '已返回真实候选论文，但部分外部来源或全文门槛发生降级。'
+  if (text.includes('structured bundle')) return '已从真实论文来源生成结构化方向包。'
+  if (text.includes('No external paper source')) return '外部论文来源没有返回可用结果。'
+  if (text.includes('no candidate passed')) return '外部来源有响应，但没有候选通过相关性或可读性筛选。'
+  return text
+}
+
+function overviewText(value: unknown) {
+  const text = String(value || '')
+  const match = text.match(/^(.+?) is organized as a conservative reading landscape with (\d+) candidate papers/i)
+  if (match) {
+    return `${match[1]} 已整理为保守的阅读地图，共 ${match[2]} 篇候选论文；只有通过验证全文和规范化门槛的论文才会进入 PaperWorkspace 深读。`
+  }
+  const shortMatch = text.match(/^(.+?) is organized as a conservative reading landscape/i)
+  if (shortMatch) {
+    return `${shortMatch[1]} 已整理为保守的阅读地图；只有通过验证全文和规范化门槛的论文才会进入 PaperWorkspace 深读。`
+  }
+  return text
+}
+
 function percent(value: unknown) {
   const num = Number(value)
   if (!Number.isFinite(num)) return 'n/a'
   return `${Math.round(num * 100)}%`
+}
+
+function confidenceLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    high: '高',
+    medium: '中',
+    low: '低',
+  }
+  return labels[String(value || '').toLowerCase()] || String(value || 'n/a')
+}
+
+function verificationLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    verified: '已验证',
+    verify_pending: '待验证',
+    unverified: '未验证',
+    failed: '失败',
+  }
+  return labels[String(value || '').toLowerCase()] || String(value || '未知')
+}
+
+function fulltextSourceLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    metadata_only: '仅元数据',
+    publisher_oa_pdf: '出版方开放 PDF',
+    arxiv_pdf: 'arXiv PDF',
+    arxiv_source: 'arXiv 源码',
+    doi: 'DOI',
+  }
+  return labels[String(value || '')] || String(value || '待确认')
+}
+
+function m2ReadinessNote(paper: Record<string, any>) {
+  const reason = String(paper.m2_unavailable_reason || paper.risk_note || '')
+  if (!reason) return '需要完成来源下载和规范化校验。'
+  if (reason.includes('Not cleared for M2')) return '尚未通过 M2 深读门槛：需要先下载并验证合法全文。'
+  if (reason.includes('Metadata/source confidence is low')) return '来源或元数据置信度偏低，进入深读前需要人工确认。'
+  return reason
+}
+
+function readingOrderText(item: Record<string, any>) {
+  const priorityLabels: Record<string, string> = {
+    A_READ: '优先深读',
+    A_READ_FOR_M2: '优先进入 M2',
+    B_SKIM: '快速浏览',
+    C_REFERENCE: '留作参考',
+    D_IGNORE: '忽略',
+  }
+  const roleLabels: Record<string, string> = {
+    TRANSFORMER_METHOD: 'Transformer 方法',
+    GRAPH_METHOD: '图方法',
+    RECONSTRUCTION_METHOD: '重构方法',
+    PREDICTION_METHOD: '预测方法',
+    BENCHMARK: '基准/数据集',
+    SURVEY: '综述',
+    METHOD: '方法论文',
+  }
+  return `${item.title} · ${priorityLabels[item.priority] || item.priority} · ${roleLabels[item.role] || item.role}`
 }
 
 function authorsText(authors: unknown) {
@@ -199,20 +306,20 @@ async function openDeepRead(paper: Record<string, any>) {
 
     <section v-if="result" class="status-card surface" data-testid="direction-status">
       <div>
-        <strong>{{ status || '已返回结果' }}</strong>
+        <strong>{{ statusLabel(status) }}</strong>
         <span>{{ papers.length }} 篇候选论文</span>
       </div>
-      <p v-if="result.message">{{ result.message }}</p>
+      <p v-if="result.message">{{ directionMessage(result.message) }}</p>
       <div v-if="warnings.length" class="warning-list">
         <span v-for="warning in warnings" :key="warning.code" data-testid="direction-warning">
-          {{ warning.code }}：{{ warning.message }}
+          {{ warningText(warning) }}
         </span>
       </div>
     </section>
 
     <section v-if="result?.overview" class="overview" data-testid="direction-overview">
       <h2>方向概览</h2>
-      <p>{{ result.overview }}</p>
+      <p>{{ overviewText(result.overview) }}</p>
     </section>
 
     <section v-if="result?.key_sub_directions?.length" class="section-block" data-testid="sub-directions">
@@ -274,19 +381,19 @@ async function openDeepRead(paper: Record<string, any>) {
 
           <div class="meta-grid">
             <span>相关度 {{ percent(paper.relevance_score) }}</span>
-            <span>可信度 {{ paper.source_confidence ?? 'n/a' }}</span>
-            <span>验证 {{ paper.verification_status || '未知' }}</span>
+            <span>可信度 {{ confidenceLabel(paper.source_confidence) }}</span>
+            <span>验证 {{ verificationLabel(paper.verification_status) }}</span>
             <span>全文 {{ paper.pdf_available || paper.selected_fulltext_url ? '可用' : '待确认' }}</span>
             <span>发现来源 {{ discoverySourcesText(paper) }}</span>
             <span>M2 {{ paper.m2_ready || paper.can_enter_m2 ? '可进入' : '待验证' }}</span>
           </div>
 
           <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="note" data-testid="fulltext-note">
-            全文来源：{{ paper.selected_fulltext_source || 'metadata_only' }}
+            全文来源：{{ fulltextSourceLabel(paper.selected_fulltext_source || 'metadata_only') }}
             {{ paper.fulltext_failure_reason ? ` · ${paper.fulltext_failure_reason}` : '' }}
           </p>
           <p v-if="!paper.can_enter_m2" class="note" data-testid="m2-readiness-note">
-            M2 闸门：{{ paper.m2_unavailable_reason || paper.risk_note || '需要完成来源下载和规范化校验。' }}
+            M2 闸门：{{ m2ReadinessNote(paper) }}
           </p>
           <p v-if="!hasDeepReadSource(paper)" class="note warning" data-testid="source-unavailable-note">
             {{ paper.deep_read_unavailable_reason || '没有可支持的全文来源。' }}
@@ -303,7 +410,7 @@ async function openDeepRead(paper: Record<string, any>) {
       <ol class="reading-order">
         <li v-for="item in result.recommended_reading_order" :key="`${item.rank}-${item.title}`">
           <span>{{ item.rank }}</span>
-          <p>{{ item.title }} · {{ item.priority }} · {{ item.role }}</p>
+          <p>{{ readingOrderText(item) }}</p>
         </li>
       </ol>
     </section>

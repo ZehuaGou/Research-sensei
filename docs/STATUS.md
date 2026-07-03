@@ -29,6 +29,41 @@ refs are rejected and fall back to deterministic artifact answers. It is not
 yet a PaperQA-backed tutor, vector memory system, direction-level dialogue
 engine, or full drill generator.
 
+M5 is currently an engineering reliability contract, not a product-facing
+business module or route. It defines regression, live acceptance, configuration,
+security, and reporting discipline for M1-M4 surfaces.
+
+## 2026-07-03 M1 Search And M4 Advisor Feedback Pass
+
+- M1 direction search now tries a high-signal semantic query variant even when
+  the primary query returns candidates. Mixed Chinese queries such as
+  "multivariate time series forecasting and anomaly detection" now prioritize
+  task/method variants before broad `survey`/`review` searches.
+- M1 candidate scoring now adds concept coverage and intent-mismatch penalties,
+  so mixed-intent candidates covering both forecasting and anomaly detection
+  rank above single-intent forecasting candidates even when the latter has
+  stronger citation metadata.
+- Direction-search UI now translates common source failures, source-resolution
+  warnings, verification labels, confidence labels, reading-order priorities,
+  and M2 readiness notes into user-facing Chinese instead of exposing raw
+  internal warning codes.
+- M4 advisor questions now use a problem/mechanism/evidence answer shape and no
+  longer place `evidence_ref` in user-facing expected answer points.
+- M4 advisor evaluation now reports covered points, missing points, concrete
+  improvement steps, and a next question without exposing internal evidence
+  refs. The AskPanel now has a complete advisor loop: generate question, type a
+  20-30 second answer, submit, and view feedback.
+- Playwright screenshots were captured under `output/playwright/` for the M1
+  direction page, live M1 search results, and the M4 advisor-feedback panel.
+- Live M1 UI smoke on `多变量时间序列预测和异常检测` returned 37 candidates in
+  about 73 seconds. The first results included multivariate anomaly-detection
+  and forecasting/anomaly papers, while arXiv/Semantic Scholar degradation was
+  shown as user-facing warnings instead of raw internal codes.
+- Validation for this checkpoint: backend `pytest` = 623 passed / 15 skipped;
+  frontend `npm test` = 52 passed; `npm run build` passed; `git diff --check`
+  passed; tracked mojibake scan passed; `npm audit --omit=dev` passed when run
+  against the official npm registry.
+
 ## 2026-07-03 Formalization And Raw-Copy Cleanup
 
 - Removed tracked legacy generated samples and obsolete docs: top-level

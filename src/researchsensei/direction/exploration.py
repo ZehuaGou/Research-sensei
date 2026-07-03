@@ -162,14 +162,7 @@ class DirectionExplorationService:
         search_log: list[str] = []
         source_metrics: list[dict[str, object]] = []
 
-        # Build the set of queries to search: primary + a few expanded variants.
-        # Limit to 4 total to avoid rate-limiting external APIs.
-        queries_to_search = [query]
-        if query_variants:
-            for variant in query_variants:
-                if variant and variant.lower() != query.lower():
-                    queries_to_search.append(variant)
-            queries_to_search = queries_to_search[:4]
+        queries_to_search = _prioritized_search_queries(query, query_variants or [])
 
         for source_idx, source in enumerate(self.sources):
             # Polite delay between sources to avoid burst rate-limiting
@@ -207,8 +200,7 @@ class DirectionExplorationService:
                     latency_ms = int((time.perf_counter() - started) * 1000)
                     total_latency += latency_ms
                     search_log.append(f"{source}: searched '{q[:60]}' ({len(results)} results)")
-                    # If query returned results, skip remaining variants for this source
-                    if results:
+                    if results and (q_idx > 0 or len(queries_to_search) == 1):
                         break
                 except Exception as exc:
                     latency_ms = int((time.perf_counter() - started) * 1000)
@@ -523,13 +515,7 @@ def _default_sub_directions(direction: str) -> list[str]:
 
 def _query_variants(direction: str) -> list[str]:
     base = direction.lower()
-    variants = [
-        base,
-        f"{base} survey",
-        f"{base} review",
-        f"{base} benchmark",
-        f"{base} state of the art",
-    ]
+    variants = [base]
     # Add abbreviation variants for compound queries
     _ABBREVS = {
         "graph neural network": "gnn",
@@ -554,7 +540,7 @@ def _query_variants(direction: str) -> list[str]:
             expanded_variant = expanded.replace(full, abbrev)
             if expanded_variant != expanded:
                 variants.append(expanded_variant)
-    # Add semantic reformulations for compound queries
+    # Search the closest task/method reformulations before broad survey terms.
     variants.extend(_semantic_variants(base))
     # Add decomposed term pairs for very compound queries
     tokens = [t for t in re.split(r"[^a-z0-9]+", base) if len(t) >= 3]
@@ -564,7 +550,23 @@ def _query_variants(direction: str) -> list[str]:
             variants.append(" ".join(key_terms[:2]))
             if len(key_terms) >= 3:
                 variants.append(" ".join(key_terms[:3]))
+    variants.extend([
+        f"{base} recent method",
+        f"{base} benchmark",
+        f"{base} survey",
+        f"{base} review",
+        f"{base} state of the art",
+    ])
     return _unique(variants)
+
+
+def _prioritized_search_queries(query: str, query_variants: list[str]) -> list[str]:
+    """Primary query plus high-signal variants, capped to protect external APIs."""
+    queries = [query]
+    for variant in query_variants:
+        if variant and variant.lower() != query.lower():
+            queries.append(variant)
+    return _unique(queries)[:4]
 
 
 def _semantic_variants(query: str) -> list[str]:
@@ -621,11 +623,18 @@ def _semantic_variants(query: str) -> list[str]:
             "time series forecasting multivariate",
             "multivariate forecasting deep learning",
         ])
+    if "anomaly" in query and has_time:
+        variants.extend([
+            "time series anomaly detection",
+            "multivariate time series anomaly detection",
+            "deep anomaly detection time series",
+        ])
     if "forecasting" in query and has_time and "anomaly" in query:
         variants.extend([
             "time series forecasting anomaly detection",
             "forecasting residual anomaly detection",
             "multivariate time series forecasting anomaly detection",
+            "forecasting-based time series anomaly detection",
         ])
     elif "forecasting" in query and has_time:
         variants.extend([

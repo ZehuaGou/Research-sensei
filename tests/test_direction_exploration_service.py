@@ -21,6 +21,16 @@ class StaticAdapter:
         return self.papers[:max_results]
 
 
+class RecordingAdapter:
+    def __init__(self, papers_by_query: dict[str, list[CandidatePaper]]) -> None:
+        self.papers_by_query = papers_by_query
+        self.calls: list[str] = []
+
+    def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        self.calls.append(query)
+        return self.papers_by_query.get(query, [])[:max_results]
+
+
 class FailingAdapter:
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
         raise RuntimeError("source unavailable")
@@ -154,6 +164,42 @@ def test_chinese_mixed_forecasting_query_generates_aligned_variants() -> None:
     assert "forecasting" in plan.core_terms
     assert "multivariate time series forecasting" in plan.query_variants
     assert "time series forecasting anomaly detection" in plan.query_variants
+    assert "survey" not in " ".join(plan.query_variants[:3])
+
+
+def test_acquisition_tries_high_signal_variant_after_primary_results() -> None:
+    base_candidate = _candidate(
+        paper_id="base",
+        title="Broad Time Series Forecasting",
+        abstract="A broad forecasting paper.",
+    )
+    variant_candidate = _candidate(
+        paper_id="variant",
+        title="Time Series Forecasting Anomaly Detection",
+        abstract="Forecasting residuals are used for anomaly detection.",
+    )
+    adapter = RecordingAdapter({
+        "multivariate time series forecasting and anomaly detection": [base_candidate],
+        "multivariate time series forecasting": [variant_candidate],
+    })
+    service = _service({"arxiv": adapter}, sources=["arxiv"])
+
+    candidates, warnings, search_log, metrics = service._acquire(
+        "multivariate time series forecasting and anomaly detection",
+        query_variants=[
+            "multivariate time series forecasting",
+            "time series anomaly detection",
+        ],
+    )
+
+    assert [candidate.paper_id for candidate in candidates] == ["base", "variant"]
+    assert adapter.calls[:2] == [
+        "multivariate time series forecasting and anomaly detection",
+        "multivariate time series forecasting",
+    ]
+    assert warnings == []
+    assert metrics[0]["count"] == 2
+    assert any("multivariate time series forecasting" in line for line in search_log)
 
 
 def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:
@@ -226,7 +272,7 @@ def test_direction_source_metrics_include_all_attempted_sources() -> None:
 
     assert set(metrics_by_source) == {"arxiv", "openalex", "semantic_scholar", "crossref"}
     assert metrics_by_source["arxiv"]["attempted"] is True
-    assert metrics_by_source["openalex"]["count"] == 1
+    assert metrics_by_source["openalex"]["count"] >= 1
     assert metrics_by_source["semantic_scholar"]["success"] is False
     assert metrics_by_source["crossref"]["success"] is True
 

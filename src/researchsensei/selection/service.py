@@ -168,7 +168,8 @@ class SelectionService:
         pdf_available_score = self._source_readiness_score(paper)
         metadata_completeness = self._metadata_completeness(paper)
         method_rep = 0.85 if role not in {"SURVEY", "IRRELEVANT"} else 0.35
-        penalty = -0.5 if relevance < 0.35 else 0.0
+        intent_penalty = _intent_mismatch_penalty(query_plan, paper)
+        penalty = (-0.5 if relevance < 0.35 else 0.0) - intent_penalty
 
         total = max(
             0.0,
@@ -227,8 +228,10 @@ class SelectionService:
 
         core_score = _term_score(text, query_terms)
         related_score = _term_score(text, related_terms)
+        concept_score = _concept_coverage_score(text, query_terms)
+        intent_penalty = _intent_mismatch_penalty(query_plan, paper)
         title_bonus = 0.12 if _term_score(paper.title.lower(), query_terms) > 0 else 0.0
-        return min(1.0, 0.75 * core_score + 0.25 * related_score + title_bonus)
+        return min(1.0, max(0.0, 0.58 * core_score + 0.18 * related_score + 0.24 * concept_score + title_bonus - intent_penalty))
 
     def _relevance_score_for_text(self, query: str, paper: CandidatePaper) -> float:
         tokens = [token for token in re.split(r"[^a-z0-9]+", query.lower()) if len(token) > 2]
@@ -532,6 +535,42 @@ def _normalize_arxiv_id(arxiv_id: str) -> str:
     if normalized.lower().startswith("arxiv:"):
         normalized = normalized[6:]
     return re.sub(r"v\d+$", "", normalized)
+
+
+def _concept_coverage_score(text: str, query_terms: Iterable[str]) -> float:
+    groups = _required_concept_groups(query_terms)
+    if not groups:
+        return 0.0
+    hits = sum(1 for _name, terms, _weight in groups if any(term in text for term in terms))
+    return hits / len(groups)
+
+
+def _intent_mismatch_penalty(query_plan: QueryPlan, paper: CandidatePaper) -> float:
+    query_terms = query_plan.core_terms or [query_plan.english_query, query_plan.direction_en]
+    groups = _required_concept_groups(query_terms)
+    if not groups:
+        return 0.0
+    text = f"{paper.title} {paper.abstract} {paper.tldr}".lower()
+    missing_weight = sum(weight for _name, terms, weight in groups if not any(term in text for term in terms))
+    return min(0.36, missing_weight)
+
+
+def _required_concept_groups(query_terms: Iterable[str]) -> list[tuple[str, tuple[str, ...], float]]:
+    query_text = " ".join(term.lower() for term in query_terms if term)
+    groups: list[tuple[str, tuple[str, ...], float]] = []
+    if "time series" in query_text or "temporal" in query_text:
+        groups.append(("time_series", ("time series", "temporal", "sequence"), 0.06))
+    if "multivariate" in query_text:
+        groups.append(("multivariate", ("multivariate", "multi-variate", "multiple variables", "sensor"), 0.05))
+    if "anomaly" in query_text or "outlier" in query_text:
+        groups.append(("anomaly", ("anomaly", "anomalies", "outlier", "novelty", "abnormal"), 0.14))
+    if "forecast" in query_text or "prediction" in query_text:
+        groups.append(("forecasting", ("forecast", "forecasting", "prediction", "predictive", "residual"), 0.14))
+    if "imputation" in query_text:
+        groups.append(("imputation", ("imputation", "missing data", "missing values", "masking"), 0.14))
+    if "graph" in query_text or "gnn" in query_text:
+        groups.append(("graph", ("graph", "gnn", "graph neural", "spatio-temporal"), 0.12))
+    return groups
 
 
 def _term_score(text: str, terms: Iterable[str]) -> float:

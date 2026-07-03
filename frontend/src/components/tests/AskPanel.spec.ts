@@ -30,8 +30,19 @@ function mockM4Fetch() {
     }
     if (url.endsWith('/advisor/question')) {
       return jsonResponse({
-        question: '为什么这个方法能回应论文问题？',
-        expected_answer_points: ['论文要解决的问题', '方法机制', '对应证据'],
+        question: '为什么这个方法能回应论文问题？请按问题、机制、证据回答。',
+        expected_answer_points: ['问题：论文要解决的问题', '机制：方法机制', '证据：对应证据'],
+        answer_format: ['问题：先说痛点', '机制：再说方法', '证据：最后补依据'],
+        evidence_refs: ['paper:b002'],
+      })
+    }
+    if (url.endsWith('/advisor/evaluate')) {
+      return jsonResponse({
+        score: 0.67,
+        covered_points: ['机制：方法机制'],
+        missing_points: ['证据：对应证据'],
+        feedback: '方向是对的，但还需要把证据补实。',
+        next_question: '请补一句：论文中哪类证据支持这个机制？',
         evidence_refs: ['paper:b002'],
       })
     }
@@ -104,7 +115,22 @@ describe('AskPanel', () => {
       advisor_mode: 'group_meeting',
     })
     expect(wrapper.text()).toContain('组会追问：为什么这个方法能回应论文问题？')
-    expect(wrapper.text()).toContain('参考回答要点：论文要解决的问题；方法机制；对应证据')
+    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('问题：先说痛点')
+    expect(wrapper.text()).not.toContain('paper:b002')
+
+    await wrapper.get('[data-testid="advisor-answer"]').setValue('这个方法用 attention 连接证据。')
+    await wrapper.get('form.advisor-composer').trigger('submit')
+    await flushPromises()
+
+    const evaluateCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/advisor/evaluate'))
+    expect(evaluateCall).toBeTruthy()
+    expect(JSON.parse(String((evaluateCall![1] as RequestInit).body))).toMatchObject({
+      question: '为什么这个方法能回应论文问题？请按问题、机制、证据回答。',
+      user_answer: '这个方法用 attention 连接证据。',
+      evidence_refs: ['paper:b002'],
+    })
+    expect(wrapper.get('[data-testid="advisor-feedback"]').text()).toContain('方向是对的')
+    expect(wrapper.text()).toContain('请补一句：论文中哪类证据支持这个机制？')
     expect(wrapper.text()).not.toContain('paper:b002')
   })
 })

@@ -98,6 +98,39 @@ def test_source_first_candidate_ranks_above_pdf_url_only_peer() -> None:
     assert "m2_input=latex_source" in plan.items[0].selection_reason
 
 
+def test_mixed_intent_candidate_ranks_above_single_intent_peer() -> None:
+    service = SelectionService()
+    query = QueryPlan(
+        user_query="多变量时间序列预测和异常检测",
+        english_query="multivariate time series forecasting and anomaly detection",
+        core_terms=["multivariate", "time series", "forecasting", "anomaly detection"],
+        related_terms=["forecasting residual", "outlier detection"],
+        query_variants=["time series forecasting anomaly detection"],
+    )
+    combined = _make_paper_full(
+        "Forecasting Residuals for Multivariate Time Series Anomaly Detection",
+        abstract="We use forecasting residuals to detect anomalies in multivariate time series sensor data.",
+        citation_count=30,
+        source_confidence="high",
+        metadata_confidence="high",
+        pdf_url="https://example.test/combined.pdf",
+    )
+    forecasting_only = _make_paper_full(
+        "Highly Cited Multivariate Time Series Forecasting",
+        abstract="A strong forecasting model for multivariate time series prediction.",
+        citation_count=900,
+        source_confidence="high",
+        metadata_confidence="high",
+        pdf_url="https://example.test/forecast.pdf",
+    )
+
+    plan = service.build_reading_plan(query, [forecasting_only, combined])
+
+    assert plan.items[0].paper.title == "Forecasting Residuals for Multivariate Time Series Anomaly Detection"
+    assert plan.items[0].scoring_breakdown.relevance_score > plan.items[1].scoring_breakdown.relevance_score
+    assert plan.items[1].scoring_breakdown.penalty_noise < plan.items[0].scoring_breakdown.penalty_noise
+
+
 def test_selection_service_venue_prestige() -> None:
     service = SelectionService()
     query = _make_query(["test"])

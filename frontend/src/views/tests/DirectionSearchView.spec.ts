@@ -94,11 +94,11 @@ describe('DirectionSearchView', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('SUCCESS')
-    expect(wrapper.get('[data-testid="direction-overview"]').text()).toContain('conservative reading landscape')
+    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('检索完成')
+    expect(wrapper.get('[data-testid="direction-overview"]').text()).toContain('保守的阅读地图')
     expect(wrapper.get('[data-testid="sub-directions"]').text()).toContain('reconstruction-based detection')
     expect(wrapper.get('[data-testid="method-families"]').text()).toContain('Transformer/attention methods')
-    expect(wrapper.get('[data-testid="reading-order"]').text()).toContain('B_SKIM')
+    expect(wrapper.get('[data-testid="reading-order"]').text()).toContain('快速浏览')
     expect(wrapper.get('[data-testid="seed-expansion-panel"]').text()).toContain('READY')
   })
 
@@ -114,8 +114,8 @@ describe('DirectionSearchView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('DEGRADED')
-    expect(wrapper.get('[data-testid="direction-warning"]').text()).toContain('ACQUISITION_FAILED')
+    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('部分来源降级')
+    expect(wrapper.get('[data-testid="direction-warning"]').text()).toContain('openalex 暂时不可用')
   })
 
   it('shows an explicit empty-result state', async () => {
@@ -133,7 +133,7 @@ describe('DirectionSearchView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('EMPTY_RESULT')
+    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('没有可展示候选')
     expect(wrapper.get('[data-testid="empty-result"]').text()).toContain('没有可展示的候选论文')
   })
 
@@ -148,7 +148,7 @@ describe('DirectionSearchView', () => {
     const card = wrapper.get('[data-testid="candidate-card"]')
     expect(card.text()).toContain('Time Series Anomaly Detection with Transformers')
     expect(card.text()).toContain('相关度 82%')
-    expect(card.text()).toContain('验证 verified')
+    expect(card.text()).toContain('验证 已验证')
     expect(card.text()).toContain('全文 可用')
     expect(card.text()).toContain('发现来源 arxiv, openalex')
     expect(card.text()).toContain('M2 待验证')
@@ -279,7 +279,7 @@ describe('DirectionSearchView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('Not cleared for M2')
+    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('尚未通过 M2 深读门槛')
   })
 
   it('passes a selected candidate into SeedExpansionPanel', async () => {

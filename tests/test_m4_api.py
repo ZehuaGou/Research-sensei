@@ -93,6 +93,9 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     assert "attention architecture" in advisor["question"]
     assert advisor["evidence_refs"] == ["paper:b001"]
     assert advisor["expected_answer_points"]
+    assert advisor["answer_format"]
+    assert advisor["why_it_matters"]
+    assert "evidence_ref" not in " ".join(advisor["expected_answer_points"])
 
     evaluation_response = client.post(
         f"/api/v1/jobs/{job_id}/advisor/evaluate",
@@ -107,6 +110,9 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     evaluation = evaluation_response.json()
     assert evaluation["score"] > 0
     assert evaluation["feedback"]
+    assert evaluation["covered_points"]
+    assert evaluation["improvement_steps"] or evaluation["score"] >= 0.75
+    assert "evidence_ref" not in evaluation["next_question"]
     assert evaluation["evidence_refs"] == ["paper:b001"]
 
     memory_response = client.get(f"/api/v1/jobs/{job_id}/memory")
@@ -183,6 +189,40 @@ def test_m4_advisor_respects_downstream_gate(tmp_path: Path) -> None:
     detail = advisor_response.json()["detail"]
     assert detail["gate"] == "allowed_downstream.advisor_questions"
     assert detail["message"] == "M4 route requires allowed_downstream.advisor_questions."
+
+
+def test_m4_advisor_evaluation_gives_specific_missing_points(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "advisor_feedback")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    advisor = client.post(
+        f"/api/v1/jobs/{job_id}/advisor/question",
+        json={"advisor_mode": "group_meeting"},
+    ).json()
+    evaluation_response = client.post(
+        f"/api/v1/jobs/{job_id}/advisor/evaluate",
+        json={
+            "question": advisor["question"],
+            "user_answer": "It uses attention.",
+            "expected_answer_points": advisor["expected_answer_points"],
+            "evidence_refs": advisor["evidence_refs"],
+        },
+    )
+
+    assert evaluation_response.status_code == 200
+    evaluation = evaluation_response.json()
+    assert 0 < evaluation["score"] < 0.8
+    assert evaluation["missing_points"]
+    assert evaluation["improvement_steps"]
+    assert "问题" in evaluation["feedback"] or "机制" in evaluation["feedback"] or "证据" in evaluation["feedback"]
+    assert "evidence_ref" not in evaluation["feedback"]
+    assert "evidence_ref" not in evaluation["next_question"]
 
 
 def test_m4_ask_uses_llm_when_client_is_configured(tmp_path: Path) -> None:

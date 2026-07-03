@@ -59,6 +59,8 @@ class AdvisorQuestion(SenseiModel):
     target_concept: str = ""
     difficulty: str = "medium"
     expected_answer_points: list[str] = Field(default_factory=list)
+    why_it_matters: str = ""
+    answer_format: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
     question_type: str = "method"
     follow_up_policy: str = "deeper"
@@ -68,8 +70,10 @@ class AdvisorQuestion(SenseiModel):
 class AdvisorEvaluation(SenseiModel):
     status: str = "SUCCESS"
     score: float = 0.0
+    covered_points: list[str] = Field(default_factory=list)
     missing_points: list[str] = Field(default_factory=list)
     misconceptions: list[str] = Field(default_factory=list)
+    improvement_steps: list[str] = Field(default_factory=list)
     next_question: str = ""
     evidence_refs: list[str] = Field(default_factory=list)
     feedback: str = ""

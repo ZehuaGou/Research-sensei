@@ -63,6 +63,22 @@ function normalizeWarnings(raw: any[]): Array<{ code: string; message: string }>
   })
 }
 
+function warningText(warning: { code: string; message: string }) {
+  const code = warning.code || ''
+  const message = warning.message || ''
+  if (code === 'HEURISTIC_QUERY_PLAN_NO_LLM') return '当前使用本地查询规划，未调用 LLM 规划。'
+  if (code === 'ACQUISITION_FAILED') {
+    const source = (message.split(/\s+/).find(Boolean) || '某个外部来源').replace(/:+$/, '')
+    return `${source} 暂时不可用，已用其它来源降级继续。`
+  }
+  if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '当前没有候选同时满足深读全文下载与质量门槛。'
+  if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
+  if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已隐藏。`
+  if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
+  return message ? `${code}：${message}` : code
+}
+
 function groupItems(key: string) {
   const items = result.value?.[key]
   return Array.isArray(items) ? items : []
@@ -213,7 +229,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
     <div v-if="warnings.length" class="warning-list">
       <span v-for="warning in warnings" :key="`${warning.code}-${warning.message}`" data-testid="seed-warning">
-        {{ warning.code }}：{{ warning.message }}
+        {{ warningText(warning) }}
       </span>
     </div>
 

@@ -257,6 +257,7 @@ class M4InteractionService:
         paper_card = _as_dict(self.artifacts.get("paper_card"))
         method = _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
         problem = _claim_text(paper_card.get("problem"))
+        core_idea = _claim_text(paper_card.get("core_idea"))
         evidence_ref = _claim_ref(paper_card.get("method_overview")) or _claim_ref(paper_card.get("core_idea")) or self._first_evidence_ref()
         if not method:
             return AdvisorQuestion(
@@ -267,14 +268,23 @@ class M4InteractionService:
 
         difficulty = "hard" if mode in {"defense", "qualifying_exam"} else "medium"
         question = (
-            f"请解释：为什么论文的方法“{method}”能够合理回应它要解决的问题"
-            f"{'：“' + problem + '”' if problem else ''}？"
+            f"如果组会上有人追问：这篇论文为什么认为“{method}”能回应"
+            f"{'“' + problem + '”这个问题' if problem else '它提出的研究问题'}？"
+            "请用 30 秒回答，把问题、机制和论文证据各讲清楚一句。"
         )
+        expected_points = _advisor_expected_points_from_claims(
+            problem=problem,
+            method=method,
+            core_idea=core_idea,
+        )
+        answer_format = ["问题：先说论文要解决的具体痛点", "机制：再说方法怎样作用到这个痛点", "证据：最后补一句论文中哪类依据支持这个判断"]
         result = AdvisorQuestion(
             question=question,
             target_concept=method,
             difficulty=difficulty,
-            expected_answer_points=[point for point in [problem, method, "说明有 evidence_ref 支撑的方法机制"] if point],
+            expected_answer_points=expected_points,
+            why_it_matters="这个问题检查你有没有把论文的研究问题、方法机制和证据链连成一条线，而不是只背方法名。",
+            answer_format=answer_format,
             evidence_refs=_list_of_one(evidence_ref),
             question_type="method",
             follow_up_policy="deeper" if mode != "qualifying_exam" else "redirect_then_deeper",
@@ -300,24 +310,19 @@ class M4InteractionService:
         if not expected:
             expected = self._advisor_expected_points()
 
-        answer_tokens = set(_tokens(answer))
-        expected_tokens = set(_tokens(" ".join(expected)))
-        overlap = len(answer_tokens & expected_tokens)
-        score = min(1.0, max(0.0, (overlap / max(len(expected_tokens), 1)) * 1.4))
-        if len(answer) > 80 and score < 0.55:
-            score = 0.55
-        missing = [point for point in expected if not (set(_tokens(point)) & answer_tokens)]
-        misconceptions = [] if answer else ["还没有作答。"]
-        feedback = (
-            "不错，你已经碰到了有证据支撑的方法点。再补上问题背景、机制和证据引用，会更像组会里的完整回答。"
-            if score >= 0.6
-            else "这个回答还偏薄。建议把“论文要解决的问题、提出的机制、哪条证据支撑它”连成一条线。"
-        )
+        covered, missing = _advisor_point_coverage(answer=answer, expected_points=expected)
+        score = _advisor_score(answer=answer, covered_count=len(covered), total_count=len(expected))
+        misconceptions = _advisor_misconceptions(answer)
+        improvement_steps = _advisor_improvement_steps(missing)
+        feedback = _advisor_feedback(answer=answer, score=score, covered=covered, missing=missing)
+        next_question = _advisor_next_question(missing)
         result = AdvisorEvaluation(
             score=round(score, 2),
+            covered_points=covered,
             missing_points=missing[:4],
             misconceptions=misconceptions,
-            next_question="你刚才描述的方法机制，对应哪一个 evidence_ref？",
+            improvement_steps=improvement_steps,
+            next_question=next_question,
             evidence_refs=evidence_refs,
             feedback=feedback,
             warnings=[] if evidence_refs else [_warning("EVALUATION_EVIDENCE_MISSING", "这次评价没有 evidence_refs。")],
@@ -653,15 +658,11 @@ class M4InteractionService:
 
     def _advisor_expected_points(self) -> list[str]:
         paper_card = _as_dict(self.artifacts.get("paper_card"))
-        return [
-            point
-            for point in [
-                _claim_text(paper_card.get("problem")),
-                _claim_text(paper_card.get("method_overview")),
-                _claim_text(paper_card.get("core_idea")),
-            ]
-            if point
-        ]
+        return _advisor_expected_points_from_claims(
+            problem=_claim_text(paper_card.get("problem")),
+            method=_claim_text(paper_card.get("method_overview")),
+            core_idea=_claim_text(paper_card.get("core_idea")),
+        )
 
     def _claims(self) -> list[dict[str, object]]:
         claims = _as_dict(self.artifacts.get("claim_evidence")).get("claims", [])
@@ -920,6 +921,143 @@ def _formula_term_summary(formula: dict[str, object]) -> str:
         if len(rendered) >= 8:
             break
     return "；".join(rendered)
+
+
+def _advisor_expected_points_from_claims(*, problem: str, method: str, core_idea: str) -> list[str]:
+    points = []
+    if problem:
+        points.append(f"问题：点明论文要解决的痛点是“{problem}”。")
+    if method:
+        points.append(f"机制：解释方法怎样发挥作用，而不是只复述名称；当前方法是“{method}”。")
+    elif core_idea:
+        points.append(f"机制：解释核心想法怎样发挥作用，而不是只复述名称；当前想法是“{core_idea}”。")
+    if core_idea and core_idea != method:
+        points.append(f"连接：说明核心想法如何落到方法上；核心想法是“{core_idea}”。")
+    points.append("证据：补一句论文中哪类依据支持这个判断，例如正文方法描述、实验结果或局限分析。")
+    return points
+
+
+def _advisor_point_coverage(*, answer: str, expected_points: list[str]) -> tuple[list[str], list[str]]:
+    if not answer:
+        return [], expected_points
+    answer_terms = _advisor_terms(answer)
+    covered: list[str] = []
+    missing: list[str] = []
+    for point in expected_points:
+        category = _advisor_point_category(point)
+        point_terms = _advisor_terms(point)
+        overlap = len(answer_terms & point_terms)
+        has_category_signal = bool(answer_terms & _advisor_category_terms(category))
+        min_overlap = 2 if category in {"problem", "mechanism"} else 1
+        if has_category_signal or overlap >= min_overlap:
+            covered.append(point)
+        else:
+            missing.append(point)
+    return covered, missing
+
+
+def _advisor_score(*, answer: str, covered_count: int, total_count: int) -> float:
+    if not answer:
+        return 0.0
+    coverage = covered_count / max(total_count, 1)
+    detail_bonus = 0.08 if len(answer) >= 80 else (0.03 if len(answer) >= 40 else 0.0)
+    structure_bonus = 0.07 if any(marker in answer for marker in ["问题", "机制", "证据", "实验", "because", "therefore"]) else 0.0
+    return min(1.0, max(0.0, coverage * 0.85 + detail_bonus + structure_bonus))
+
+
+def _advisor_misconceptions(answer: str) -> list[str]:
+    if not answer:
+        return ["还没有作答。"]
+    text = answer.lower()
+    misconceptions: list[str] = []
+    if len(answer) < 24:
+        misconceptions.append("回答太短，像关键词列表，还没有形成可复述的组会回答。")
+    if any(marker in text for marker in ["随便", "万能", "肯定有效", "because it is ai", "because it uses ai"]):
+        misconceptions.append("回答里有泛化判断，建议换成论文证据能支撑的具体机制。")
+    return misconceptions
+
+
+def _advisor_improvement_steps(missing_points: list[str]) -> list[str]:
+    if not missing_points:
+        return ["把现在这版压缩成 2-3 句：先问题，再机制，最后证据。"]
+    steps: list[str] = []
+    for point in missing_points[:3]:
+        category = _advisor_point_category(point)
+        if category == "problem":
+            steps.append("先补论文痛点：旧方法或当前任务到底卡在哪里。")
+        elif category == "mechanism":
+            steps.append("再补方法机制：这个结构或步骤具体怎样缓解痛点。")
+        elif category == "evidence":
+            steps.append("最后补证据类型：正文方法描述、实验结果或局限分析支持了哪一句判断。")
+        else:
+            steps.append("把缺失要点和前一句回答接起来，形成连续解释。")
+    return _unique(steps)
+
+
+def _advisor_feedback(*, answer: str, score: float, covered: list[str], missing: list[str]) -> str:
+    if not answer:
+        return "还没有看到你的回答。先用三句话试一版：论文问题是什么，方法怎么解决，哪类证据支持这个判断。"
+    covered_labels = "、".join(_advisor_point_label(point) for point in covered) or "暂时还不明显"
+    missing_labels = "、".join(_advisor_point_label(point) for point in missing) or "没有明显缺口"
+    if score >= 0.75:
+        lead = "这版已经像组会回答了：有主线，也能看出你在把方法和证据连起来。"
+    elif score >= 0.45:
+        lead = "方向是对的，但还需要把缺口补实，避免听起来像只背了方法名。"
+    else:
+        lead = "这版还偏散，建议先按“问题-机制-证据”重组。"
+    return f"{lead}\n\n已经覆盖：{covered_labels}。\n还要补：{missing_labels}。"
+
+
+def _advisor_next_question(missing_points: list[str]) -> str:
+    if not missing_points:
+        return "如果把你的回答再压缩到 20 秒，你会保留哪一句作为核心机制？"
+    category = _advisor_point_category(missing_points[0])
+    if category == "problem":
+        return "请先补一句：论文要解决的具体痛点是什么，为什么旧做法不够？"
+    if category == "mechanism":
+        return "请补一句：这个方法的关键机制怎样作用到刚才那个痛点上？"
+    if category == "evidence":
+        return "请补一句：论文中哪类证据支持这个机制，正文描述还是实验结果？"
+    return "请把缺失要点补成一句能直接放进组会回答里的话。"
+
+
+def _advisor_point_category(point: str) -> str:
+    text = point.lower()
+    if text.startswith("问题") or "problem" in text or "痛点" in text:
+        return "problem"
+    if text.startswith("机制") or text.startswith("连接") or "method" in text or "mechanism" in text or "方法" in text:
+        return "mechanism"
+    if text.startswith("证据") or "evidence" in text or "实验" in text:
+        return "evidence"
+    return "other"
+
+
+def _advisor_point_label(point: str) -> str:
+    category = _advisor_point_category(point)
+    return {
+        "problem": "问题背景",
+        "mechanism": "方法机制",
+        "evidence": "证据支撑",
+    }.get(category, _compact_user_text(point, max_chars=24))
+
+
+def _advisor_category_terms(category: str) -> set[str]:
+    groups = {
+        "problem": {"问题", "痛点", "难点", "挑战", "瓶颈", "解决", "problem", "challenge", "brittle", "sparse", "retrieval"},
+        "mechanism": {"方法", "机制", "结构", "步骤", "连接", "建模", "attention", "architecture", "method", "mechanism", "connect", "link", "model"},
+        "evidence": {"证据", "依据", "论文", "正文", "实验", "结果", "显示", "benchmark", "evidence", "experiment", "result", "paper"},
+    }
+    return groups.get(category, set())
+
+
+def _advisor_terms(value: str) -> set[str]:
+    text = value.lower()
+    terms = {token for token in re.findall(r"[a-z0-9][a-z0-9_-]+", text) if len(token) > 2}
+    cjk = re.findall(r"[\u4e00-\u9fff]", value)
+    terms.update(cjk)
+    terms.update("".join(cjk[index : index + 2]) for index in range(max(0, len(cjk) - 1)))
+    terms.update(marker for marker in ["问题", "痛点", "机制", "方法", "证据", "实验", "结果", "论文"] if marker in value)
+    return terms
 
 
 def _warning(code: str, message: str) -> WarningItem:
