@@ -68,12 +68,18 @@ class M4InteractionService:
 
         claim_text = str(evidence.get("claim_text") or evidence.get("text") or selected_text)
         section = str(evidence.get("section") or "当前论文")
+        section_label = _user_facing_section_label(section)
         answer = (
-            f"这段内容最接近论文中“{section}”部分的证据。"
+            f"这段内容最接近论文中“{section_label}”部分的证据。"
             f"它支撑的局部论断是：{claim_text}"
         )
         if question:
-            answer += f"\n\n结合你的追问，可以这样理解：{question}"
+            answer += "\n\n" + _selection_followup_answer(
+                question=question,
+                selected_text=selected_text,
+                claim_text=claim_text,
+                section=section,
+            )
 
         result = SelectionExplanation(
             status=status,
@@ -511,6 +517,14 @@ class M4InteractionService:
             for candidate, score in self._ranked_evidence_candidates(question)
             if score >= 0.08 and not _is_front_matter_candidate(candidate)
         ][:3]
+        if _is_limitation_question(question) and not _claim_text(paper_card.get("limitations")):
+            refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
+            return (
+                _missing_limitation_answer(paper_card, question=question, evidence_rows=ranked_evidence),
+                refs[:3],
+                0.45 if refs else 0.2,
+                [_warning("LIMITATION_EVIDENCE_MISSING", "当前论文卡片没有可追踪的局限证据。")],
+            )
         if any(term in lower for term in ["formula", "equation", "symbol", "公式", "方程", "符号"]):
             formula = self._find_formula("")
             if formula is not None:
@@ -907,6 +921,57 @@ def _paper_card_evidence_answer(paper_card: dict[str, object]) -> str:
     return "当前论文卡片中的主要依据可以这样看：" + "；".join(rendered) + "。"
 
 
+def _selection_followup_answer(*, question: str, selected_text: str, claim_text: str, section: str) -> str:
+    label = _user_facing_section_label(section)
+    question_hint = _compact_user_text(question, max_chars=90)
+    if _is_why_question(question):
+        return (
+            f"它重要在于：这段证据不是孤立描述，而是在“{label}”里说明“{_compact_user_text(claim_text, max_chars=180)}”。"
+            "用它回答你的问题时，重点应放在它把论文的机制和要解决的问题连起来，而不是只复述这句话本身。"
+        )
+    if _is_evidence_question(question):
+        return (
+            f"这段可以作为回答“{question_hint}”的正文依据：它来自“{label}”，"
+            f"支撑的论断是“{_compact_user_text(claim_text, max_chars=180)}”。"
+        )
+    return (
+        f"结合你的追问“{question_hint}”，可以把这段当作“{label}”证据来读："
+        f"它支撑的是“{_compact_user_text(claim_text, max_chars=180)}”，回答时应围绕这个论断展开。"
+    )
+
+
+def _missing_limitation_answer(
+    paper_card: dict[str, object],
+    *,
+    question: str,
+    evidence_rows: list[dict[str, object]] | None = None,
+) -> str:
+    rows = _paper_card_claim_rows(paper_card)
+    parts = [
+        f"重点：针对“{_compact_user_text(question, max_chars=90)}”，当前论文卡片没有给出可追踪的局限证据，所以不能硬编局限。",
+    ]
+    method = _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
+    experiment = _claim_text(paper_card.get("experiment_summary"))
+    if method:
+        parts.append(f"已有证据能确认的是方法机制：{method}")
+    if experiment:
+        parts.append(f"已有实验相关证据：{experiment}")
+    focused = []
+    seen: set[str] = set()
+    for candidate in evidence_rows or []:
+        rendered = _candidate_user_facing_evidence(candidate)
+        key = _normalize(rendered)
+        if rendered and key not in seen:
+            focused.append(rendered)
+            seen.add(key)
+    if focused:
+        parts.append("可用证据边界：" + "；".join(focused[:3]))
+    elif rows:
+        parts.append("可用证据边界：" + "；".join(f"{label}：{text}" for label, text, _ref in rows[:3]))
+    parts.append("更稳妥的回答是：这篇论文当前材料支持它的方法和实验设置，但没有足够依据判断具体局限。")
+    return "\n\n".join(parts)
+
+
 def _structured_paper_answer(
     paper_card: dict[str, object],
     *,
@@ -933,6 +998,8 @@ def _structured_paper_answer(
         focus_text = problem
     elif focus == "核心想法" and idea:
         focus_text = idea
+    elif focus == "局限" and limitations:
+        focus_text = limitations
 
     if question:
         parts = [f"重点：针对“{_compact_user_text(question, max_chars=90)}”，这篇论文给出的抓手是：{focus_text}"]
@@ -953,11 +1020,17 @@ def _structured_paper_answer(
     if why_items:
         parts.append(f"为什么有效：{'；'.join(why_items)}")
     evidence_lines = [f"{label}来自论文卡片中的正文依据：{text}" for label, text, _ref in rows[:4]]
-    focused_evidence = [
-        _candidate_user_facing_evidence(candidate)
-        for candidate in (evidence_rows or [])
-        if _candidate_user_facing_evidence(candidate)
-    ]
+    focused_evidence: list[str] = []
+    seen_focused_evidence: set[str] = set()
+    seen_focused_bodies: set[str] = set()
+    for candidate in evidence_rows or []:
+        rendered = _candidate_user_facing_evidence(candidate)
+        key = _normalize(rendered)
+        body_key = _evidence_line_body_key(rendered)
+        if rendered and key not in seen_focused_evidence and not _has_redundant_body(body_key, seen_focused_bodies):
+            focused_evidence.append(rendered)
+            seen_focused_evidence.add(key)
+            seen_focused_bodies.add(body_key)
     if focused_evidence:
         parts.append("贴着你的问题看：" + "；".join(focused_evidence[:3]))
     if evidence_lines:
@@ -1317,6 +1390,16 @@ def _is_evidence_question(question: str) -> bool:
     return any(term in text for term in ["证据", "evidence", "对应哪", "引用"])
 
 
+def _is_why_question(question: str) -> bool:
+    text = question.lower()
+    return any(term in text for term in ["为什么", "为何", "怎么", "如何", "why", "how", "important", "重要"])
+
+
+def _is_limitation_question(question: str) -> bool:
+    text = question.lower()
+    return any(term in text for term in ["局限", "不足", "缺点", "弱点", "限制", "limitation", "weakness", "drawback"])
+
+
 def _is_paper_level_question(question: str) -> bool:
     text = question.lower()
     return any(
@@ -1426,7 +1509,7 @@ def _candidate_text(candidate: dict[str, object]) -> str:
 def _candidate_user_facing_evidence(candidate: dict[str, object]) -> str:
     if _is_front_matter_candidate(candidate):
         return ""
-    section = _clean(candidate.get("section")) or "正文"
+    section = _user_facing_section_label(_clean(candidate.get("section")) or "正文")
     text = (
         _clean(candidate.get("claim_text"))
         or _clean(candidate.get("quote_or_summary"))
@@ -1436,6 +1519,42 @@ def _candidate_user_facing_evidence(candidate: dict[str, object]) -> str:
     if not text:
         return ""
     return f"{section}：{_compact_user_text(text, max_chars=220)}"
+
+
+def _evidence_line_body_key(line: str) -> str:
+    body = re.sub(r"^[^：:]{1,16}[：:]", "", line)
+    return _normalize(body)
+
+
+def _has_redundant_body(body_key: str, seen_bodies: set[str]) -> bool:
+    if not body_key:
+        return False
+    for seen in seen_bodies:
+        if not seen:
+            continue
+        shorter, longer = sorted([body_key, seen], key=len)
+        if len(shorter) >= 18 and shorter in longer:
+            return True
+    return False
+
+
+def _user_facing_section_label(section: str) -> str:
+    normalized = _clean(section).lower()
+    mapping = {
+        "method": "方法",
+        "method_overview": "方法机制",
+        "problem": "研究问题",
+        "core_idea": "核心想法",
+        "experiment_summary": "实验结论",
+        "limitations": "局限",
+        "background": "背景",
+        "bottleneck": "瓶颈",
+        "result": "实验结果",
+        "results": "实验结果",
+        "discussion": "讨论",
+        "正文": "正文",
+    }
+    return mapping.get(normalized, section or "正文")
 
 
 def _is_front_matter_candidate(candidate: dict[str, object]) -> bool:

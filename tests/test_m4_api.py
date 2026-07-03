@@ -356,6 +356,57 @@ def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: 
     assert "paper:b001" not in data["answer"]
 
 
+def test_m4_ask_limitation_question_does_not_invent_missing_limitations(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这个方法还有什么局限？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["warnings"][0]["code"] == "LIMITATION_EVIDENCE_MISSING"
+    assert "没有给出可追踪的局限证据" in data["answer"]
+    assert "不能硬编局限" in data["answer"]
+    assert "没有足够依据判断具体局限" in data["answer"]
+
+
+def test_m4_selected_text_followup_explains_why_it_matters(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "这句话为什么重要？",
+            "selected_text": "The attention architecture links sparse evidence passages to solve the retrieval problem.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "这段内容最接近论文中“方法”部分的证据" in data["answer"]
+    assert "它重要在于" in data["answer"]
+    assert "把论文的机制和要解决的问题连起来" in data["answer"]
+    assert "可以这样理解：这句话为什么重要" not in data["answer"]
+
+
 def test_m4_ask_answers_runtime_model_question_without_paper_fallback(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     provider = ModelProviderConfig(
