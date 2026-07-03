@@ -254,6 +254,11 @@ class M4InteractionService:
 
     def advisor_question(self, payload: dict[str, object]) -> AdvisorQuestion:
         mode = _clean(payload.get("advisor_mode")) or "group_meeting"
+        user_question = _compact_user_text(
+            payload.get("user_question") or payload.get("focus_question") or payload.get("question"),
+            max_chars=600,
+        )
+        selected_text = _compact_user_text(payload.get("selected_text"), max_chars=900)
         paper_card = _as_dict(self.artifacts.get("paper_card"))
         method = _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
         problem = _claim_text(paper_card.get("problem"))
@@ -267,29 +272,52 @@ class M4InteractionService:
             )
 
         difficulty = "hard" if mode in {"defense", "qualifying_exam"} else "medium"
-        question = (
-            f"如果组会上有人追问：这篇论文为什么认为“{method}”能回应"
-            f"{'“' + problem + '”这个问题' if problem else '它提出的研究问题'}？"
-            "请用 30 秒回答，把问题、机制和论文证据各讲清楚一句。"
-        )
+        if user_question:
+            question = (
+                f"围绕你自己的问题“{user_question}”，请先用这篇论文给出回答；"
+                f"再说明论文中的“{method}”怎样支撑这个回答。"
+                "如果组会上继续追问，请把你的问题、论文机制和证据依据各讲清楚一句。"
+            )
+            if selected_text:
+                question += f" 可以优先结合你选中的这段内容：“{_compact_user_text(selected_text, max_chars=180)}”。"
+        else:
+            question = (
+                f"如果组会上有人追问：这篇论文为什么认为“{method}”能回应"
+                f"{'“' + problem + '”这个问题' if problem else '它提出的研究问题'}？"
+                "请用 30 秒回答，把问题、机制和论文证据各讲清楚一句。"
+            )
         expected_points = _advisor_expected_points_from_claims(
             problem=problem,
             method=method,
             core_idea=core_idea,
         )
-        answer_format = ["问题：先说论文要解决的具体痛点", "机制：再说方法怎样作用到这个痛点", "证据：最后补一句论文中哪类依据支持这个判断"]
+        if user_question:
+            expected_points = [
+                f"你的问题：先明确回答“{user_question}”，不要换成泛泛的论文概述。",
+                *expected_points,
+            ]
+            answer_format = [
+                "你的问题：先点明你正在问什么",
+                "论文回答：再用当前论文的机制或发现直接回答",
+                "证据依据：最后说明正文、方法、实验或局限中的哪类证据支撑",
+            ]
+        else:
+            answer_format = ["问题：先说论文要解决的具体痛点", "机制：再说方法怎样作用到这个痛点", "证据：最后补一句论文中哪类依据支持这个判断"]
         result = AdvisorQuestion(
             question=question,
-            target_concept=method,
+            user_question=user_question,
+            target_concept=user_question or method,
             difficulty=difficulty,
             expected_answer_points=expected_points,
             why_it_matters="这个问题检查你有没有把论文的研究问题、方法机制和证据链连成一条线，而不是只背方法名。",
             answer_format=answer_format,
             evidence_refs=_list_of_one(evidence_ref),
-            question_type="method",
+            question_type="custom_focus" if user_question else "method",
             follow_up_policy="deeper" if mode != "qualifying_exam" else "redirect_then_deeper",
             warnings=[] if evidence_ref else [_warning("ADVISOR_EVIDENCE_MISSING", "这个追问没有附带 evidence_ref。")],
         )
+        if user_question:
+            result.why_it_matters = "这个问题检查你能不能把自己的疑问和论文证据接起来，而不是脱离论文泛泛回答。"
         self._append_memory(
             memory_type="advisor_question",
             text=result.target_concept,
@@ -298,7 +326,12 @@ class M4InteractionService:
             evidence_refs=result.evidence_refs,
             confidence=0.8 if result.evidence_refs else 0.35,
             source_artifact="paper_card",
-            metadata={"advisor_mode": mode, "question_type": result.question_type},
+            metadata={
+                "advisor_mode": mode,
+                "question_type": result.question_type,
+                "user_question": user_question,
+                "selected_text": selected_text,
+            },
         )
         return result
 

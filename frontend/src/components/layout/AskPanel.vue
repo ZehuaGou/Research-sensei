@@ -13,6 +13,7 @@ const advisorSession = ref<AdvisorSession | null>(null)
 
 type AdvisorSession = {
   question: string
+  userQuestion: string
   expectedAnswerPoints: string[]
   answerFormat: string[]
   evidenceRefs: string[]
@@ -69,10 +70,11 @@ function stringList(value: unknown) {
 }
 
 function advisorPromptText(session: AdvisorSession) {
+  const focus = session.userQuestion ? `围绕你的问题：${session.userQuestion}\n\n` : ''
   const points = session.expectedAnswerPoints.length
     ? `\n\n参考回答要点：${session.expectedAnswerPoints.join('；')}`
     : ''
-  return normalizeMessageText(`组会追问：${session.question || '暂时没有生成问题。'}${points}`)
+  return normalizeMessageText(`${focus}组会追问：${session.question || '暂时没有生成问题。'}${points}`)
 }
 
 function advisorEvaluationText(session: AdvisorSession) {
@@ -133,12 +135,47 @@ async function send() {
 
 async function requestAdvisorQuestion() {
   if (!store.currentJobId || isLoading.value) return
+  const focusQuestion = compactInlineText(input.value)
+  const selectedText = selectedPayloadText()
+  if (focusQuestion) {
+    store.addMessage({ role: 'user', content: focusQuestion, timestamp: Date.now() })
+    input.value = ''
+    await scrollToBottom()
+  }
   isLoading.value = true
   try {
+    if (focusQuestion) {
+      const answerRes = await fetch(`/api/v1/jobs/${store.currentJobId}/ask`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: focusQuestion,
+          selected_text: selectedText,
+          context_scope: selectedText ? 'selection' : 'paper',
+        }),
+      })
+      const answerData = await answerRes.json().catch(() => ({}))
+      if (!answerRes.ok) {
+        throw new Error(extractApiError(answerData))
+      }
+      const answerEvidenceRefs = stringList(answerData.evidence_refs)
+      store.addMessage({
+        role: 'assistant',
+        content: normalizeMessageText(answerData.answer || 'M4 暂时无法回答这个问题。'),
+        timestamp: Date.now(),
+      })
+      if (answerData.status === 'DEGRADED' && answerEvidenceRefs.length === 0) {
+        await loadMemory()
+        return
+      }
+    }
+    const advisorPayload: Record<string, string> = { advisor_mode: 'group_meeting' }
+    if (focusQuestion) advisorPayload.user_question = focusQuestion
+    if (selectedText) advisorPayload.selected_text = selectedText
     const res = await fetch(`/api/v1/jobs/${store.currentJobId}/advisor/question`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ advisor_mode: 'group_meeting' }),
+      body: JSON.stringify(advisorPayload),
     })
     const data = await res.json().catch(() => ({}))
     if (!res.ok) {
@@ -146,6 +183,7 @@ async function requestAdvisorQuestion() {
     }
     advisorSession.value = {
       question: typeof data.question === 'string' ? data.question : '',
+      userQuestion: typeof data.user_question === 'string' && data.user_question ? data.user_question : focusQuestion,
       expectedAnswerPoints: stringList(data.expected_answer_points),
       answerFormat: stringList(data.answer_format),
       evidenceRefs: stringList(data.evidence_refs),
@@ -182,6 +220,7 @@ async function submitAdvisorAnswer() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         question: session.question,
+        user_question: session.userQuestion,
         user_answer: userAnswer,
         expected_answer_points: session.expectedAnswerPoints,
         evidence_refs: session.evidenceRefs,
@@ -331,7 +370,7 @@ watch(() => store.currentJobId, () => {
     <div class="quick-row">
       <button type="button" @click="quick('请用中文按“问题-核心机制-为什么有效-对应证据”讲清楚这篇论文的核心方法，结合正文细节，不要只给一句话。')">讲方法</button>
       <button type="button" @click="quick('这条结论对应哪条证据？')">找证据</button>
-      <button type="button" data-testid="advisor-button" @click="requestAdvisorQuestion">组会追问</button>
+      <button type="button" data-testid="advisor-button" @click="requestAdvisorQuestion">按问题追问</button>
       <button type="button" @click="clearMemory">清空</button>
     </div>
 

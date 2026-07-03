@@ -191,6 +191,48 @@ def test_m4_advisor_respects_downstream_gate(tmp_path: Path) -> None:
     assert detail["message"] == "M4 route requires allowed_downstream.advisor_questions."
 
 
+def test_m4_advisor_question_can_follow_user_focus(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "advisor_focus")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/advisor/question",
+        json={
+            "advisor_mode": "group_meeting",
+            "user_question": "为什么这个方法能处理稀疏证据？",
+            "selected_text": "Attention helps connect scattered evidence.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["question_type"] == "custom_focus"
+    assert data["user_question"] == "为什么这个方法能处理稀疏证据？"
+    assert "为什么这个方法能处理稀疏证据？" in data["question"]
+    assert "你选中的这段内容" in data["question"]
+    assert data["target_concept"] == "为什么这个方法能处理稀疏证据？"
+    assert data["expected_answer_points"][0].startswith("你的问题：")
+    assert data["answer_format"][0].startswith("你的问题：")
+    visible_text = json.dumps(
+        {
+            "question": data["question"],
+            "expected_answer_points": data["expected_answer_points"],
+            "answer_format": data["answer_format"],
+            "why_it_matters": data["why_it_matters"],
+        },
+        ensure_ascii=False,
+    )
+    assert "evidence_ref" not in visible_text
+    assert "paper:b001" not in visible_text
+    _assert_no_mojibake(data)
+
+
 def test_m4_advisor_evaluation_gives_specific_missing_points(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "advisor_feedback")
     client = TestClient(

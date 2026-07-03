@@ -23,16 +23,24 @@ function mockM4Fetch() {
     }
     if (url.endsWith('/ask')) {
       return jsonResponse({
+        status: 'SUCCESS',
         answer: 'M4 的正文回答。',
         evidence_refs: ['paper:b001'],
         memory_refs: ['m4_memory_2'],
       })
     }
     if (url.endsWith('/advisor/question')) {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      const focus = typeof body.user_question === 'string' ? body.user_question : ''
       return jsonResponse({
-        question: '为什么这个方法能回应论文问题？请按问题、机制、证据回答。',
+        question: focus
+          ? `围绕你的问题“${focus}”，请按你的问题、论文回答、证据依据回答。`
+          : '为什么这个方法能回应论文问题？请按问题、机制、证据回答。',
+        user_question: focus,
         expected_answer_points: ['问题：论文要解决的问题', '机制：方法机制', '证据：对应证据'],
-        answer_format: ['问题：先说痛点', '机制：再说方法', '证据：最后补依据'],
+        answer_format: focus
+          ? ['你的问题：先点明你正在问什么', '论文回答：再直接回答', '证据依据：最后补依据']
+          : ['问题：先说痛点', '机制：再说方法', '证据：最后补依据'],
         evidence_refs: ['paper:b002'],
       })
     }
@@ -97,6 +105,40 @@ describe('AskPanel', () => {
     expect(wrapper.text()).toContain('M4 的正文回答。')
     expect(wrapper.text()).not.toContain('paper:b001')
     expect(wrapper.text()).not.toContain('m4_memory_2')
+  })
+
+  it('answers a custom user question before creating a focused advisor question', async () => {
+    const fetchMock = mockM4Fetch()
+    vi.stubGlobal('fetch', fetchMock)
+    const { store, wrapper } = mountPanel()
+    store.selectedText = 'Attention helps connect scattered evidence.'
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('为什么这个方法能处理稀疏证据？')
+    await wrapper.get('[data-testid="advisor-button"]').trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    const askCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/ask'))
+    expect(askCall).toBeTruthy()
+    expect(JSON.parse(String((askCall![1] as RequestInit).body))).toMatchObject({
+      question: '为什么这个方法能处理稀疏证据？',
+      selected_text: 'Attention helps connect scattered evidence.',
+      context_scope: 'selection',
+    })
+
+    const advisorCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/advisor/question'))
+    expect(advisorCall).toBeTruthy()
+    expect(JSON.parse(String((advisorCall![1] as RequestInit).body))).toEqual({
+      advisor_mode: 'group_meeting',
+      user_question: '为什么这个方法能处理稀疏证据？',
+      selected_text: 'Attention helps connect scattered evidence.',
+    })
+    expect(wrapper.text()).toContain('M4 的正文回答。')
+    expect(wrapper.text()).toContain('围绕你的问题：为什么这个方法能处理稀疏证据？')
+    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('你的问题：先点明你正在问什么')
+    expect(wrapper.text()).not.toContain('paper:b001')
+    expect(wrapper.text()).not.toContain('paper:b002')
   })
 
   it('requests advisor questions without exposing internal evidence refs', async () => {

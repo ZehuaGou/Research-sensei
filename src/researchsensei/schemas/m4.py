@@ -56,6 +56,7 @@ class InteractiveAnswer(SenseiModel):
 class AdvisorQuestion(SenseiModel):
     status: str = "SUCCESS"
     question: str = ""
+    user_question: str = ""
     target_concept: str = ""
     difficulty: str = "medium"
     expected_answer_points: list[str] = Field(default_factory=list)
