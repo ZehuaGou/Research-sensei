@@ -21,7 +21,7 @@ from researchsensei.llm.client import LLMClient
 from researchsensei.llm.types import LLMConfig
 from researchsensei.m4.service import M4InteractionService, M4_MEMORY_FILENAME
 from researchsensei.schemas import CandidatePaper, InteractiveAnswer, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
-from researchsensei.source_resolver import SourceResolver
+from researchsensei.source_resolver import PaperSourceResolver, SourceResolver
 from researchsensei.workspace import WorkspaceStore
 
 
@@ -73,7 +73,17 @@ def create_app(
         http_client=http_client,
         max_download_bytes=max_download_bytes,
     )
-    resolved_direction_service = direction_service or DirectionExplorationService()
+    m1_source_dir = workspace.root / "m1_sources"
+    resolved_direction_service = direction_service or DirectionExplorationService(
+        source_resolver=PaperSourceResolver(
+            network_enabled=True,
+            download_dir=m1_source_dir,
+            http_client=http_client,
+            max_download_bytes=max_download_bytes,
+        ),
+        fulltext_resolver=fulltext_resolver,
+        source_download_dir=m1_source_dir,
+    )
     resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService()
 
     @app.get("/health")

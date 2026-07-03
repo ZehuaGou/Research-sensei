@@ -12,9 +12,9 @@ Boundary: do not invent papers or source identifiers.
 
 ## acquisition
 
-Input: query variants and enabled source names.
-Output: `CandidatePaper` objects from arXiv, OpenAlex, Semantic Scholar,
-Crossref, DBLP, and legal full-text lookup metadata.
+Input: query variants and the Google Scholar MCP discovery source.
+Output: `CandidatePaper` objects normalized from Google Scholar MCP rows, plus
+legal full-text lookup metadata from official/OA resolver inputs.
 Boundary: adapters may fail independently; failures must become source metrics
 and warnings, not fake success.
 

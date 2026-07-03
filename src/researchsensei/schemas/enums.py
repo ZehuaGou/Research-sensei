@@ -132,3 +132,38 @@ class AdapterStatus(str, Enum):
     DEPENDENCY_AVAILABLE_NOT_WIRED = "DEPENDENCY_AVAILABLE_NOT_WIRED"
     BLOCKED = "BLOCKED"
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
+
+
+# --- M1 venue-quality + fulltext source labels ---
+
+class VenueRank(str, Enum):
+    """A-conference / A-journal quality rank.
+
+    `A_STAR` is reserved for CCF A + CORE A* top venues (NeurIPS, ICML, CVPR, ...).
+    `A` is for CCF A / CORE A tier.
+    `B` is for CCF B / CORE B.
+    `C` is for CCF C / CORE C.
+    `UNRANKED` for venues outside the rankings.
+    """
+    A_STAR = "A*"
+    A = "A"
+    B = "B"
+    C = "C"
+    UNRANKED = "unranked"
+
+
+class FulltextSource(str, Enum):
+    """Label of which path produced a paper's resolved full text.
+
+    Used for audit and visualization; downstream code can branch on this to
+    decide which download path produced a PDF.
+    """
+    ARXIV_SOURCE = "arxiv_source"
+    ARXIV_PDF = "arxiv_pdf"
+    UNPAYWALL_OA = "unpaywall_oa"
+    OPENALEX_OA = "openalex_oa"
+    S2_OA = "semantic_scholar_oa"
+    LANDING_EXTRACTED = "landing_extracted"       # extracted PDF URL from OA venue landing HTML
+    ARXIV_CROSSLINK = "arxiv_crosslink"           # arxiv_id reverse-found in OpenAlex/S2 metadata
+    PDF_CACHE = "pdf_cache"                       # PDF cache hit; no new HTTP fetch
+    METADATA_ONLY = "metadata_only"

@@ -22,7 +22,7 @@ from researchsensei.core.env_loader import load_runtime_env  # noqa: E402
 
 load_runtime_env(suppress_errors=True)
 
-from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, DBLPAdapter, FullTextResolver, OpenAlexAdapter, SemanticScholarAdapter  # noqa: E402
+from researchsensei.acquisition import ArxivAdapter, DBLPAdapter, FullTextResolver, GoogleScholarAdapter, OpenAlexAdapter, SemanticScholarAdapter  # noqa: E402
 from researchsensei.schemas import CandidatePaper  # noqa: E402
 from researchsensei.selection import SelectionService  # noqa: E402
 
@@ -36,8 +36,11 @@ SOURCE_ALIASES = {
     "semanticscholar": "semantic_scholar",
     "semantic-scholar": "semantic_scholar",
     "s2": "semantic_scholar",
+    "googlescholar": "google_scholar",
+    "google-scholar": "google_scholar",
+    "scholar": "google_scholar",
 }
-SEARCH_SOURCE_ORDER = ["arxiv", "openalex", "semantic_scholar", "crossref", "dblp"]
+SEARCH_SOURCE_ORDER = ["google_scholar", "arxiv", "openalex", "semantic_scholar", "dblp", "crossref"]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -48,8 +51,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--download-top-n", type=int, default=5)
     parser.add_argument(
         "--sources",
-        default="arxiv,openalex,semanticscholar,crossref,dblp,unpaywall",
-        help="Comma-separated sources: arxiv,openalex,semanticscholar,crossref,dblp,unpaywall",
+        default="google-scholar,unpaywall",
+        help="Comma-separated sources. Default M1 chain is google-scholar,unpaywall; legacy diagnostics may pass arxiv/openalex/semanticscholar/dblp explicitly.",
     )
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "literature_acquisition_acceptance"))
     return parser.parse_args(argv)
@@ -326,8 +329,8 @@ def _default_adapters() -> dict[str, SearchAdapter]:
     return {
         "arxiv": ArxivAdapter(timeout=12.0),
         "openalex": OpenAlexAdapter(),
+        "google_scholar": GoogleScholarAdapter(),
         "semantic_scholar": SemanticScholarAdapter(timeout=12.0),
-        "crossref": CrossrefAdapter(),
         "dblp": DBLPAdapter(timeout=12.0),
     }
 

@@ -3,7 +3,7 @@ from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEn
 from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SeedExpansionBundle, SeedExpansionOrderItem, SeedExpansionPaper, SeedPaperInput, SourceResolutionResult
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceRecord, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
+from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, FulltextSource, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VenueRank, VerificationStatus
 from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
@@ -47,6 +47,7 @@ __all__ = [
     "EvidenceRetrievalResult",
     "EvidenceType",
     "FormulaBlock",
+    "FulltextSource",
     "FormulaOcrResult",
     "FormulaOcrStatus",
     "FormulaOrigin",
@@ -94,6 +95,10 @@ __all__ = [
     "SourceStatus",
     "SourceResolutionResult",
     "TeachingCard",
+    "TeachingCardBundle",
+    "UnderstandingStatus",
+    "VenueRank",
+    "VerificationStatus",
     "TeachingCardBundle",
     "UnderstandingStatus",
     "VerificationStatus",

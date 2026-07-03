@@ -161,7 +161,7 @@ class M4InteractionService:
                 uncertainty="M4 需要一个问题，或者需要你先选中一段论文内容。",
                 warnings=[_warning("QUESTION_MISSING", "缺少 question。")],
             )
-        if not selected_text and _is_general_chat_question(question):
+        if not selected_text and _is_non_paper_question(question):
             return InteractiveAnswer(
                 status="DEGRADED",
                 answer=(
@@ -1459,6 +1459,139 @@ def _is_general_chat_question(question: str) -> bool:
     return (
         len(text) <= 14
         and any(marker in text for marker in ["你是谁", "你好吗", "讲笑话", "闲聊", "聊天"])
+    )
+
+
+def _is_non_paper_question(question: str) -> bool:
+    text = question.lower()
+    compact = re.sub(r"[\s，。！？,.!?；;：:\"'“”‘’、]+", "", text)
+    if not compact:
+        return False
+    if _is_general_chat_question(question):
+        return True
+
+    hard_off_topic_markers = [
+        "天气",
+        "几点",
+        "日期",
+        "今天几号",
+        "星期几",
+        "讲笑话",
+        "讲个笑话",
+        "说笑话",
+        "笑话",
+        "写诗",
+        "写首诗",
+        "讲故事",
+        "写故事",
+        "歌词",
+        "菜谱",
+        "做饭",
+        "订机票",
+        "订票",
+        "订酒店",
+        "简历",
+        "求职信",
+        "weather",
+        "time is it",
+        "what time",
+        "date today",
+        "joke",
+        "poem",
+        "story",
+        "lyrics",
+        "recipe",
+        "cook",
+        "flight",
+        "hotel",
+        "ticket",
+        "resume",
+        "cover letter",
+    ]
+    if any(marker in text for marker in hard_off_topic_markers):
+        return True
+
+    has_paper_intent = _has_paper_intent(question)
+    code_request_markers = ["写代码", "编代码", "write code"]
+    if any(marker in text for marker in code_request_markers):
+        return True
+    programming_terms = ["python", "javascript", "typescript", "sql"]
+    programming_actions = [
+        "帮我写",
+        "写一段",
+        "写一个",
+        "生成",
+        "实现",
+        "write",
+        "create",
+        "generate",
+        "implement",
+        "code",
+    ]
+    if any(term in text for term in programming_terms) and any(action in text for action in programming_actions):
+        return True
+
+    if has_paper_intent:
+        return False
+
+    if any(term in text for term in programming_terms):
+        return True
+
+    off_topic_task_markers = [
+        "帮我写",
+        "帮我生成",
+        "帮我创作",
+        "生成一段",
+        "写一段",
+        "写一个",
+        "创作",
+        "draft",
+        "write a",
+        "write an",
+        "create a",
+        "generate a",
+    ]
+    return any(marker in text for marker in off_topic_task_markers)
+
+
+def _has_paper_intent(question: str) -> bool:
+    text = question.lower()
+    return any(
+        marker in text
+        for marker in [
+            "论文",
+            "这篇",
+            "文中",
+            "文章",
+            "paper",
+            "method",
+            "formula",
+            "equation",
+            "symbol",
+            "evidence",
+            "experiment",
+            "result",
+            "limitation",
+            "contribution",
+            "abstract",
+            "section",
+            "claim",
+            "方法",
+            "公式",
+            "变量",
+            "符号",
+            "证据",
+            "实验",
+            "结果",
+            "局限",
+            "贡献",
+            "摘要",
+            "章节",
+            "模型",
+            "算法",
+            "定理",
+            "证明",
+        ]
     )
 
 

@@ -26,6 +26,7 @@ ResearchSensei must not reimplement mature infrastructure when a reliable open-s
 | GPT-Researcher | NOT_USE | 不适合教学场景 |
 | PaperQA2 | OPTIONAL_ADAPTER | 参考 passage retrieval |
 | paper-search-mcp | OPTIONAL_ADAPTER | 可选搜索 adapter |
+| Google-Scholar-MCP-Server | DIRECT_ADAPTER | Default Google Scholar discovery source for M1; loaded from its search module because direct upstream pip packaging currently fails |
 
 ## Decision Categories
 

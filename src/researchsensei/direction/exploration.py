@@ -6,7 +6,10 @@ import time
 from pathlib import Path
 from typing import Protocol
 
-from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, DBLPAdapter, FullTextResolver, OpenAlexAdapter, SemanticScholarAdapter
+from researchsensei.acquisition import (
+    FullTextResolver,
+    GoogleScholarAdapter,
+)
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
@@ -46,13 +49,13 @@ class DirectionExplorationService:
         max_verify_candidates: int = 12,
         source_download_dir: str | Path | None = None,
     ) -> None:
-        self.adapters = adapters or {
-            "arxiv": ArxivAdapter(timeout=12.0),
-            "openalex": OpenAlexAdapter(),
-            "semantic_scholar": SemanticScholarAdapter(timeout=12.0),
-            "crossref": CrossrefAdapter(),
-            "dblp": DBLPAdapter(timeout=12.0),
-        }
+        if adapters is None:
+            default_adapters: dict[str, SearchAdapter] = {
+                "google_scholar": GoogleScholarAdapter(),
+            }
+        else:
+            default_adapters = adapters
+        self.adapters = default_adapters
         self.sources = sources or list(self.adapters.keys())
         self.selection_service = selection_service or SelectionService()
         self.verifier = verifier or CandidateVerifier(timeout_seconds=8.0)

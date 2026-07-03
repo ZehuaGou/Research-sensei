@@ -141,6 +141,16 @@ def _service(
     )
 
 
+def test_default_direction_source_is_google_scholar_mcp_only() -> None:
+    service = DirectionExplorationService(
+        verifier=StaticVerifier(),  # type: ignore[arg-type]
+        max_results_per_source=1,
+    )
+
+    assert set(service.adapters) == {"google_scholar"}
+    assert service.sources == ["google_scholar"]
+
+
 def test_direction_query_returns_structured_bundle() -> None:
     service = _service({"arxiv": StaticAdapter([_candidate()])})
 

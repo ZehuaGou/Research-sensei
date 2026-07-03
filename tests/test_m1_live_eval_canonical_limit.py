@@ -29,6 +29,12 @@ class CountingNormalizer:
         )
 
 
+def test_direction_runner_default_source_is_google_scholar_mcp_only(tmp_path) -> None:
+    runner = DirectionRunner(workspace=WorkspaceStore(tmp_path / "workspace"))
+
+    assert runner.sources == ["google_scholar"]
+
+
 def test_direction_runner_limits_live_canonicalization_to_source_candidates(tmp_path) -> None:
     normalizer = CountingNormalizer()
     runner = DirectionRunner(

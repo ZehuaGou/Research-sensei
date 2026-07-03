@@ -27,12 +27,16 @@ evidence-bound tutor over M2 artifacts.
   cards, passage index, claim evidence, evidence index, and previous M4 memory.
 - M4 controls mount only when `/cards` is allowed.
 - Answers must cite allowed evidence refs when evidence is available.
+- Non-paper/off-task prompts such as weather, jokes, code writing, travel
+  booking, or creative writing are rejected as `DEGRADED` without calling the
+  LLM or writing M4 memory.
 - If the configured LLM answer is missing, invalid, empty, or cites unknown
   evidence refs, M4 falls back to deterministic artifact answers and emits a
   warning.
-- The configured live LLM path uses ccswitch by default, requests
-  `disable_thinking=True`, and gives M4 tutor answers an `8192` output-token
-  budget to avoid token exhaustion on models that emit long reasoning blocks.
+- The configured live LLM path uses ccswitch by default. M4 tutor calls pass a
+  route-specific override of `disable_thinking=True`, `max_tokens=2400`, and
+  `timeout=90` so interactive answers fail over quickly to deterministic
+  evidence-card responses when the live model is unavailable or invalid.
 - User-facing M4 text is Chinese by default.
 
 ## Frontend Interaction

@@ -5,7 +5,12 @@ import re
 import time
 from pathlib import Path
 
-from researchsensei.acquisition import ArxivAdapter, CrossrefAdapter, OpenAlexAdapter, SemanticScholarAdapter
+from researchsensei.acquisition import (
+    ArxivAdapter,
+    GoogleScholarAdapter,
+    OpenAlexAdapter,
+    SemanticScholarAdapter,
+)
 from researchsensei.canonical import MaterialNormalizer
 from researchsensei.query import QueryPlanner
 from researchsensei.relevance_judge import RelevanceJudge
@@ -42,7 +47,7 @@ class DirectionRunner:
         arxiv_adapter: ArxivAdapter | None = None,
         openalex_adapter: OpenAlexAdapter | None = None,
         semantic_scholar_adapter: SemanticScholarAdapter | None = None,
-        crossref_adapter: CrossrefAdapter | None = None,
+        google_scholar_adapter: GoogleScholarAdapter | None = None,
         selection_service: SelectionService | None = None,
         source_resolver: PaperSourceResolver | None = None,
         verifier: CandidateVerifier | None = None,
@@ -57,13 +62,13 @@ class DirectionRunner:
         self.arxiv_adapter = arxiv_adapter or ArxivAdapter()
         self.openalex_adapter = openalex_adapter or OpenAlexAdapter()
         self.semantic_scholar_adapter = semantic_scholar_adapter or SemanticScholarAdapter()
-        self.crossref_adapter = crossref_adapter or CrossrefAdapter()
+        self.google_scholar_adapter = google_scholar_adapter or GoogleScholarAdapter()
         self.selection_service = selection_service or SelectionService()
         self.source_resolver = source_resolver or PaperSourceResolver(network_enabled=True)
         self.verifier = verifier or CandidateVerifier()
         self.relevance_judge = relevance_judge or RelevanceJudge()
         self.material_normalizer = material_normalizer or MaterialNormalizer()
-        self.sources = sources or ["arxiv", "openalex", "semantic_scholar", "crossref"]
+        self.sources = sources or ["google_scholar"]
         self.max_results_per_source = max_results_per_source
         self.max_canonicalize_candidates = max_canonicalize_candidates
 
@@ -303,8 +308,8 @@ class DirectionRunner:
             return self.openalex_adapter
         if source == "semantic_scholar":
             return self.semantic_scholar_adapter
-        if source == "crossref":
-            return self.crossref_adapter
+        if source == "google_scholar":
+            return self.google_scholar_adapter
         raise ValueError(f"Unknown source: {source}")
 
     @staticmethod

@@ -26,6 +26,14 @@ class QueryPlan(SenseiModel):
     is_cross_domain: bool = False
     domain_components: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    # Venue-targeted search: canonical venue names the user explicitly requested.
+    venue_targets: list[str] = Field(default_factory=list)
+    # OpenAlex source IDs derived from venue_targets via VENUE_REGISTRY.
+    venue_openalex_source_ids: list[str] = Field(default_factory=list)
+    # Optional year range filter (inclusive). Year extraction is heuristic
+    # from user query ("2024", "recent", etc.). None means "any year".
+    year_from: int | None = None
+    year_to: int | None = None
 
 
 class CandidatePaper(SenseiModel):

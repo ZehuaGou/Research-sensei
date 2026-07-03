@@ -89,6 +89,16 @@ def _service(adapters: dict[str, object], *, sources: list[str] | None = None) -
     )
 
 
+def test_default_seed_expansion_source_is_google_scholar_mcp_only() -> None:
+    service = SeedExpansionService(
+        verifier=StaticVerifier(),  # type: ignore[arg-type]
+        max_results_per_source=1,
+    )
+
+    assert set(service.adapters) == {"google_scholar"}
+    assert service.sources == ["google_scholar"]
+
+
 def test_seed_expansion_returns_structured_bundle() -> None:
     service = _service({"arxiv": RelationAdapter()})
 

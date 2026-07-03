@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 import time
@@ -8,8 +9,14 @@ from urllib.parse import quote
 
 import httpx
 
+from researchsensei.acquisition.arxiv_crosslink import ArxivCrosslink
+from researchsensei.acquisition.landing_extractor import LandingPdfExtractor
+from researchsensei.acquisition.pdf_cache import PdfCache
+from researchsensei.acquisition.venue_registry import is_known_oa_landing
 from researchsensei.schemas import CandidatePaper
 from researchsensei.source_resolver import SourceResolver
+
+logger = logging.getLogger(__name__)
 
 READY_STATUSES = {"source_ready", "pdf_ready", "html_ready"}
 
@@ -18,9 +25,17 @@ class FullTextResolver:
     """Discover legal full-text options without pretending metadata is readable.
 
     Resolver priority:
-    arXiv source -> arXiv PDF -> Unpaywall/OpenAlex OA PDF ->
-    Semantic Scholar OA PDF -> publisher/repository PDF -> ar5iv/html ->
-    user upload / metadata-only.
+    1. arXiv source/e-print (LaTeX)
+    2. arXiv PDF
+    3. OpenAlex/Semantic Scholar OA PDF (best_oa_location.pdf_url, openAccessPdf)
+    4. Unpaywall OA PDF
+    5. arXiv crosslink: arxiv_id reverse-found in OpenAlex/S2 raw metadata
+    6. OA venue landing page -> fetch HTML -> extract PDF URL (landing_extractor)
+    7. metadata-only
+
+    PDF cache layer is checked before any HTTP download and populated after
+    any successful download, so the same DOI/arxiv_id across directions does
+    not re-fetch.
     """
 
     def __init__(
@@ -30,10 +45,28 @@ class FullTextResolver:
         timeout_seconds: float = 30.0,
         max_download_bytes: int = 80 * 1024 * 1024,
         unpaywall_email: str | None = None,
+        landing_extractor: LandingPdfExtractor | None = None,
+        arxiv_crosslink: ArxivCrosslink | None = None,
+        pdf_cache: PdfCache | None = None,
+        cache_root: str | Path | None = None,
     ) -> None:
         self.http_client = http_client or httpx.Client(follow_redirects=True, trust_env=True)
         self.timeout_seconds = timeout_seconds
         self.max_download_bytes = max_download_bytes
+        self.landing_extractor = landing_extractor or LandingPdfExtractor(
+            http_client=self.http_client,
+            timeout_seconds=timeout_seconds,
+        )
+        self.arxiv_crosslink = arxiv_crosslink or ArxivCrosslink()
+        # PDF cache: explicit instance wins; otherwise construct from env/cache_root.
+        if pdf_cache is not None:
+            self.pdf_cache = pdf_cache
+        else:
+            try:
+                self.pdf_cache = PdfCache(cache_root=Path(cache_root) if cache_root else None)
+            except Exception as exc:  # pragma: no cover - filesystem-unavailable safety
+                logger.warning("PDF cache disabled: %s", exc)
+                self.pdf_cache = None
         self.unpaywall_email = (
             unpaywall_email
             if unpaywall_email is not None
@@ -65,13 +98,30 @@ class FullTextResolver:
         run_dir: str | Path | None = None,
     ) -> tuple[CandidatePaper, list[dict[str, object]]]:
         metrics: list[dict[str, object]] = []
-        arxiv_id = _candidate_arxiv_id(candidate)
+        arxiv_id = self.arxiv_crosslink.resolve(candidate) or _candidate_arxiv_id(candidate)
         pdf_urls = _unique([*candidate.candidate_pdf_urls, *self._metadata_pdf_urls(candidate, arxiv_id)])
         source_urls = _unique([*candidate.candidate_source_urls, *self._metadata_source_urls(candidate, arxiv_id)])
         html_urls = _unique([*candidate.candidate_html_urls, *self._metadata_html_urls(candidate, arxiv_id)])
+        landing_urls = _unique(self._metadata_landing_urls(candidate))
 
         lookup_errors: list[str] = []
-        if candidate.doi:
+        attempted_landing_urls: set[str] = set()
+
+        def extract_landing_candidates() -> None:
+            pending_landing_urls = [url for url in _unique(landing_urls) if url not in attempted_landing_urls]
+            attempted_landing_urls.update(pending_landing_urls)
+            if not pending_landing_urls:
+                return
+            extracted_pdfs, landing_metrics, landing_errors = self._extract_oa_landing_pdfs(pending_landing_urls)
+            pdf_urls.extend(extracted_pdfs)
+            metrics.extend(landing_metrics)
+            lookup_errors.extend(landing_errors)
+
+        if not source_urls and not pdf_urls:
+            extract_landing_candidates()
+            pdf_urls = _unique(pdf_urls)
+
+        if not source_urls and not pdf_urls and candidate.doi:
             started = time.perf_counter()
             unpaywall_pdf, unpaywall_landing, error = self._lookup_unpaywall(candidate.doi)
             metrics.append(_metric("unpaywall", bool(unpaywall_pdf or unpaywall_landing), 1 if (unpaywall_pdf or unpaywall_landing) else 0, started, error))
@@ -79,9 +129,14 @@ class FullTextResolver:
                 lookup_errors.append(error)
             if unpaywall_pdf:
                 pdf_urls.append(unpaywall_pdf)
+            if unpaywall_landing:
+                landing_urls.append(unpaywall_landing)
             if _is_fulltext_html_url(unpaywall_landing):
                 html_urls.append(unpaywall_landing)
-        elif "unpaywall" in (candidate.sources or []):
+            pdf_urls = _unique(pdf_urls)
+            if not source_urls and not pdf_urls:
+                extract_landing_candidates()
+        elif not source_urls and not pdf_urls and "unpaywall" in (candidate.sources or []):
             metrics.append(_metric("unpaywall", False, 0, time.perf_counter(), "doi_missing"))
 
         pdf_urls = _unique(pdf_urls)
@@ -91,6 +146,71 @@ class FullTextResolver:
         selected_source, selected_url, status, reason = self._select(candidate, source_urls, pdf_urls, html_urls, arxiv_id=arxiv_id)
         if status == "metadata_only" and lookup_errors:
             reason = ";".join(_unique(lookup_errors))
+
+        # ---- PDF cache short-circuit: avoid HTTP if DOI/arxiv_id already cached ----
+        if (
+            download
+            and status in READY_STATUSES
+            and run_dir is not None
+            and self.pdf_cache is not None
+        ):
+            cached_path = self.pdf_cache.get(
+                doi=candidate.doi,
+                arxiv_id=candidate.arxiv_id or arxiv_id,
+                pdf_url=selected_url or (pdf_urls[0] if pdf_urls else ""),
+            )
+            if cached_path is not None:
+                cached_meta = self.pdf_cache.meta(
+                    doi=candidate.doi,
+                    arxiv_id=candidate.arxiv_id or arxiv_id,
+                    pdf_url=selected_url or (pdf_urls[0] if pdf_urls else ""),
+                )
+                started = time.perf_counter()
+                metrics.append(_metric(
+                    "pdf_cache",
+                    True,
+                    1,
+                    started,
+                    "",
+                ))
+                # Resolve the cached PDF into the run_dir so downstream M2 sees a
+                # local file under the expected path layout.
+                paper_dir = Path(run_dir) / _safe_name(candidate.paper_id or candidate.title or candidate.doi or "paper")
+                paper_dir.mkdir(parents=True, exist_ok=True)
+                target = paper_dir / (cached_path.name if cached_path.name.startswith("source.") else "source.pdf")
+                try:
+                    target.write_bytes(cached_path.read_bytes())
+                    run_dir_resolved_fulltext_source = "pdf_cache"
+                    run_dir_resolved_url = selected_url or (pdf_urls[0] if pdf_urls else str(cached_path))
+                    run_dir_resolved_status = "pdf_ready"
+                    run_dir_resolved_reason = "cache_hit"
+                    candidate_updates_for_cache_hit = {
+                        "pdf_url": candidate.pdf_url or (pdf_urls[0] if pdf_urls else str(cached_path)),
+                    }
+                    can_deep_read = True
+                    needs_user_upload = False
+                    updates = {
+                        "candidate_pdf_urls": pdf_urls,
+                        "candidate_source_urls": source_urls,
+                        "candidate_html_urls": html_urls,
+                        "arxiv_id": candidate.arxiv_id or arxiv_id,
+                        **candidate_updates_for_cache_hit,
+                        "selected_fulltext_source": run_dir_resolved_fulltext_source,
+                        "selected_fulltext_url": run_dir_resolved_url,
+                        "fulltext_status": run_dir_resolved_status,
+                        "fulltext_failure_reason": run_dir_resolved_reason,
+                        "can_deep_read": can_deep_read,
+                        "needs_user_upload": needs_user_upload,
+                        "has_valid_deep_reading_source": True,
+                        "pdf_available": True,
+                        "pdf_downloaded": True,
+                        "source_url": candidate.source_url or (source_urls[0] if source_urls else ""),
+                        "metadata_only": False,
+                    }
+                    return candidate.model_copy(update=updates), metrics
+                except OSError as exc:
+                    logger.warning("PDF cache hit but copy failed: %s; falling back to download", exc)
+
         if download and status in READY_STATUSES and run_dir is not None:
             selected_source, selected_url, status, reason = self._verify_download(
                 candidate,
@@ -98,6 +218,39 @@ class FullTextResolver:
                 selected_url=selected_url,
                 run_dir=Path(run_dir),
             )
+            # On successful download, populate the PDF cache so subsequent
+            # resolves of the same DOI/arxiv_id short-circuit.
+            if (
+                self.pdf_cache is not None
+                and status == "pdf_ready"
+                and selected_url
+                and Path(run_dir).exists()
+            ):
+                try:
+                    # Find the downloaded file under run_dir; default to source.pdf
+                    paper_dir = Path(run_dir) / _safe_name(candidate.paper_id or candidate.title or candidate.doi or "paper")
+                    candidates_pdf_paths = [
+                        paper_dir / "source.pdf",
+                        paper_dir / "source.tar.gz",
+                        paper_dir / "source.tex",
+                    ]
+                    for cand_path in candidates_pdf_paths:
+                        if cand_path.exists():
+                            content = cand_path.read_bytes()
+                            ext = cand_path.suffix.lstrip(".") or "pdf"
+                            self.pdf_cache.put(
+                                content,
+                                doi=candidate.doi,
+                                arxiv_id=candidate.arxiv_id or arxiv_id,
+                                pdf_url=selected_url,
+                                source_url=source_urls[0] if source_urls else "",
+                                venue=candidate.venue,
+                                fulltext_source=selected_source or "legal",
+                                extension=ext,
+                            )
+                            break
+                except OSError as exc:
+                    logger.warning("PDF cache write failed: %s", exc)
 
         can_deep_read = status in READY_STATUSES
         needs_user_upload = not can_deep_read or status == "metadata_only"
@@ -214,6 +367,25 @@ class FullTextResolver:
             return "arxiv_pdf", selected_url, "pdf_ready", status.fallback_used
         return selected_source or status.source_type, selected_url, "pdf_ready", ""
 
+    def _extract_oa_landing_pdfs(self, landing_urls: list[str]) -> tuple[list[str], list[dict[str, object]], list[str]]:
+        pdf_urls: list[str] = []
+        metrics: list[dict[str, object]] = []
+        errors: list[str] = []
+        for landing_url in landing_urls:
+            is_oa, archive_kind, _ = is_known_oa_landing(landing_url)
+            if not is_oa:
+                continue
+            started = time.perf_counter()
+            result = self.landing_extractor.extract(landing_url)
+            error = ";".join(result.warnings)
+            source = f"landing_extractor:{result.archive_kind or archive_kind or 'oa'}"
+            metrics.append(_metric(source, bool(result.pdf_url), 1 if result.pdf_url else 0, started, error))
+            if result.pdf_url and _is_legal_pdf_url(result.pdf_url):
+                pdf_urls.append(result.pdf_url)
+            elif error:
+                errors.append(f"{archive_kind or 'oa_landing'}:{error}")
+        return _unique(pdf_urls), metrics, errors
+
     def _metadata_pdf_urls(self, candidate: CandidatePaper, arxiv_id: str = "") -> list[str]:
         urls = []
         if candidate.pdf_url:
@@ -221,11 +393,11 @@ class FullTextResolver:
         if arxiv_id:
             urls.append(SourceResolver.arxiv_to_pdf_url(arxiv_id=arxiv_id))
         raw = candidate.raw_source_metadata or {}
-        for key in ("best_oa_location", "primary_location"):
-            location = raw.get(key) if isinstance(raw.get(key), dict) else {}
-            pdf = str((location or {}).get("pdf_url") or "")
-            if pdf:
-                urls.append(pdf)
+        for location in _metadata_locations(raw):
+            for key in ("pdf_url", "url_for_pdf"):
+                pdf = str((location or {}).get(key) or "")
+                if pdf:
+                    urls.append(pdf)
         open_access = raw.get("open_access") if isinstance(raw.get("open_access"), dict) else {}
         oa_url = str((open_access or {}).get("oa_url") or "")
         if _is_legal_pdf_url(oa_url):
@@ -249,6 +421,22 @@ class FullTextResolver:
         if arxiv_id:
             urls.append(f"https://ar5iv.labs.arxiv.org/html/{arxiv_id}")
         return _unique([url for url in urls if _is_fulltext_html_url(url)])
+
+    def _metadata_landing_urls(self, candidate: CandidatePaper) -> list[str]:
+        urls = [
+            candidate.landing_url,
+            candidate.url,
+            *candidate.candidate_html_urls,
+        ]
+        raw = candidate.raw_source_metadata or {}
+        for location in _metadata_locations(raw):
+            for key in ("landing_page_url", "url_for_landing_page", "url"):
+                urls.append(str((location or {}).get(key) or ""))
+        open_access = raw.get("open_access") if isinstance(raw.get("open_access"), dict) else {}
+        oa_url = str((open_access or {}).get("oa_url") or "")
+        if oa_url and not _is_legal_pdf_url(oa_url):
+            urls.append(oa_url)
+        return _unique([url for url in urls if url])
 
 
 def _metric(source: str, success: bool, count: int, started: float, error: str) -> dict[str, object]:
@@ -281,17 +469,31 @@ def _candidate_arxiv_id(candidate: CandidatePaper) -> str:
         *candidate.candidate_html_urls,
     ]
     raw = candidate.raw_source_metadata or {}
-    for key in ("best_oa_location", "primary_location"):
-        location = raw.get(key) if isinstance(raw.get(key), dict) else {}
+    for location in _metadata_locations(raw):
         values.extend([
             str((location or {}).get("pdf_url") or ""),
             str((location or {}).get("landing_page_url") or ""),
+            str((location or {}).get("url") or ""),
         ])
     for value in values:
         arxiv_id = SourceResolver.arxiv_id_from_url(str(value or ""))
         if arxiv_id:
             return arxiv_id
     return ""
+
+
+def _metadata_locations(raw: dict[str, object]) -> list[dict[str, object]]:
+    locations: list[dict[str, object]] = []
+    for key in ("best_oa_location", "primary_location"):
+        location = raw.get(key) if isinstance(raw.get(key), dict) else None
+        if isinstance(location, dict):
+            locations.append(location)
+    for key in ("locations", "oa_locations"):
+        values = raw.get(key)
+        if not isinstance(values, list):
+            continue
+        locations.extend(location for location in values if isinstance(location, dict))
+    return locations
 
 
 def _normalize_doi(doi: str) -> str:
@@ -306,7 +508,14 @@ def _is_legal_pdf_url(url: str) -> bool:
     value = str(url or "").strip()
     if not value.lower().startswith(("http://", "https://")):
         return False
-    return value.lower().endswith(".pdf") or "/pdf" in value.lower() or "pdf" in value.lower()
+    lower = value.lower()
+    if lower.endswith(".pdf") or "/pdf" in lower or "pdf" in lower:
+        return True
+    # OJS-hosted venues such as AAAI often expose PDF files through numeric
+    # article/download or article/view galley URLs without a .pdf suffix.
+    if "ojs.aaai.org" in lower and re.search(r"/article/(?:download|view)/\d+/\d+", lower):
+        return True
+    return False
 
 
 def _pdf_source_label(url: str) -> str:

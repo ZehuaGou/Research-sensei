@@ -145,6 +145,20 @@ def test_selection_service_venue_prestige() -> None:
     assert items_by_title["Test Paper A"].scoring_breakdown.venue_prestige > items_by_title["Test Paper B"].scoring_breakdown.venue_prestige
 
 
+def test_selection_service_venue_registry_covers_ccf_a_systems_and_security() -> None:
+    service = SelectionService()
+
+    osdi_score = service._venue_prestige(
+        _make_paper("OSDI Paper", venue="USENIX Symposium on Operating Systems Design and Implementation")
+    )
+    sp_score = service._venue_prestige(
+        _make_paper("Security Paper", venue="IEEE Symposium on Security and Privacy")
+    )
+
+    assert osdi_score >= 0.95
+    assert sp_score >= 0.95
+
+
 def test_selection_service_recency_bonus() -> None:
     service = SelectionService()
     query = _make_query(["test"])

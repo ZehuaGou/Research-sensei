@@ -537,6 +537,43 @@ def test_m4_ask_handles_general_chat_without_paper_fallback(tmp_path: Path) -> N
     assert llm.calls == 0
 
 
+def test_m4_ask_rejects_off_topic_tasks_without_memory_pollution(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    llm = ScriptedM4LLM(answer="不应该被非论文任务调用")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    for question in ["今天天气怎么样？", "帮我写一段 Python 代码", "给我讲个笑话", "Can you write a poem?"]:
+        response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": question})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "DEGRADED"
+        assert "M4 论文助教" in data["answer"]
+        assert "attention architecture" not in data["answer"]
+        assert data["evidence_refs"] == []
+        assert data["used_context"] == {"memory": False, "artifacts": False, "llm": False}
+        assert data["warnings"][0]["code"] == "M4_GENERAL_CHAT"
+
+    assert llm.calls == 0
+    memory_response = client.get(f"/api/v1/jobs/{job_id}/memory")
+    assert memory_response.status_code == 200
+    assert memory_response.json()["records"] == []
+
+    paper_response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "What is the method?"})
+    assert paper_response.status_code == 200
+    paper_answer = paper_response.json()
+    assert paper_answer["status"] == "SUCCESS"
+    assert paper_answer["used_context"] == {"memory": False, "artifacts": True, "llm": True}
+    assert paper_answer["memory_refs"] == []
+    assert llm.calls == 1
+
+
 def test_m4_user_facing_fallbacks_do_not_contain_mojibake(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     client = TestClient(

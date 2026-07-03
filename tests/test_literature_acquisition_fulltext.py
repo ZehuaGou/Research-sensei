@@ -6,6 +6,8 @@ import pytest
 
 from researchsensei.acquisition.arxiv_adapter import ArxivAdapter
 from researchsensei.acquisition import FullTextResolver
+from researchsensei.acquisition.google_scholar_adapter import GoogleScholarAdapter
+from researchsensei.acquisition.openalex_adapter import OpenAlexAdapter
 from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarAdapter
 from researchsensei.schemas import CandidatePaper
 from researchsensei.selection import SelectionService
@@ -24,6 +26,70 @@ class StubResponse:
 
     def json(self) -> dict[str, object]:
         return self.payload
+
+
+class HtmlResponse:
+    def __init__(self, text: str, *, url: str, status_code: int = 200) -> None:
+        self.text = text
+        self.url = url
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+class LandingClient:
+    def __init__(self, html: str) -> None:
+        self.html = html
+        self.calls: list[dict[str, object]] = []
+
+    def get(self, url: str, **kwargs: object) -> HtmlResponse:
+        self.calls.append({"url": url, **kwargs})
+        return HtmlResponse(self.html, url=url)
+
+
+class NoNetworkClient:
+    def get(self, url: str, **kwargs: object) -> HtmlResponse:
+        raise AssertionError(f"unexpected network call: {url}")
+
+
+class OpenAlexWorksStub:
+    def __init__(self, rows: list[dict[str, object]], *, fail: bool = False) -> None:
+        self.rows = rows
+        self.fail = fail
+        self.search_queries: list[str] = []
+        self.per_pages: list[int] = []
+
+    def search(self, query: str) -> OpenAlexWorksStub:
+        self.search_queries.append(query)
+        if self.fail:
+            raise RuntimeError("openalex generic search failed")
+        return self
+
+    def get(self, *, per_page: int) -> list[dict[str, object]]:
+        self.per_pages.append(per_page)
+        return self.rows[:per_page]
+
+
+class OpenAlexHttpClient:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+        self.calls: list[dict[str, object]] = []
+
+    def get(self, url: str, **kwargs: object) -> StubResponse:
+        self.calls.append({"url": url, **kwargs})
+        return StubResponse({"results": self.rows})
+
+
+class FakeGoogleScholarMcpSearch:
+    def __init__(self, rows: list[dict[str, object]]) -> None:
+        self.rows = rows
+        self.calls: list[tuple[str, int]] = []
+
+    def __call__(self, query: str, num_results: int = 5) -> list[dict[str, object]]:
+        self.calls.append((query, num_results))
+        return self.rows[:num_results]
 
 
 class SemanticScholarClient:
@@ -111,6 +177,153 @@ def paper(**overrides: object) -> CandidatePaper:
     return CandidatePaper(**base)
 
 
+def openalex_row(
+    *,
+    work_id: str,
+    title: str,
+    venue: str,
+    source_id: str,
+    doi: str = "",
+    pdf_url: str = "",
+) -> dict[str, object]:
+    location = {
+        "pdf_url": pdf_url,
+        "landing_page_url": f"https://example.test/{work_id}",
+        "source": {
+            "id": f"https://openalex.org/{source_id}",
+            "display_name": venue,
+        },
+    }
+    return {
+        "id": f"https://openalex.org/{work_id}",
+        "title": title,
+        "doi": doi,
+        "publication_year": 2024,
+        "primary_location": location,
+        "best_oa_location": location,
+        "locations": [location],
+        "open_access": {"is_oa": bool(pdf_url), "oa_status": "gold" if pdf_url else None, "oa_url": pdf_url},
+        "cited_by_count": 12,
+    }
+
+
+def test_openalex_search_adds_ccf_venue_boost() -> None:
+    generic = openalex_row(
+        work_id="W-GENERIC",
+        title="Generic Time Series Search Result",
+        venue="arXiv.org",
+        source_id="S4210160352",
+    )
+    venue = openalex_row(
+        work_id="W-AAAI",
+        title="AAAI Time Series Anomaly Detection",
+        venue="Proceedings of the AAAI Conference on Artificial Intelligence",
+        source_id="S4210191458",
+    )
+    works = OpenAlexWorksStub([generic])
+    http_client = OpenAlexHttpClient([venue])
+    adapter = OpenAlexAdapter(
+        works=works,
+        http_client=http_client,
+        ccf_venue_source_ids=["S4210191458"],
+        ccf_venue_boost_extra_results=4,
+    )
+
+    results = adapter.search("time series anomaly detection", max_results=1)
+
+    assert [paper.title for paper in results] == [
+        "AAAI Time Series Anomaly Detection",
+        "Generic Time Series Search Result",
+    ]
+    assert http_client.calls
+    params = http_client.calls[0]["params"]
+    assert params["filter"] == "primary_location.source.id:S4210191458"
+    assert params["search"] == "time series anomaly detection"
+
+
+def test_openalex_ccf_venue_boost_can_cover_generic_search_failure() -> None:
+    venue = openalex_row(
+        work_id="W-AAAI",
+        title="AAAI Time Series Anomaly Detection",
+        venue="Proceedings of the AAAI Conference on Artificial Intelligence",
+        source_id="S4210191458",
+    )
+    adapter = OpenAlexAdapter(
+        works=OpenAlexWorksStub([], fail=True),
+        http_client=OpenAlexHttpClient([venue]),
+        ccf_venue_source_ids=["S4210191458"],
+    )
+
+    results = adapter.search("time series anomaly detection", max_results=3)
+
+    assert len(results) == 1
+    assert results[0].title == "AAAI Time Series Anomaly Detection"
+    assert results[0].venue == "Proceedings of the AAAI Conference on Artificial Intelligence"
+
+
+def test_google_scholar_adapter_maps_mcp_results_to_candidates() -> None:
+    GoogleScholarAdapter.clear_cache()
+    search = FakeGoogleScholarMcpSearch([
+        {
+            "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+            "Authors": "A Deng, B Hooi - Proceedings of the AAAI Conference on Artificial Intelligence, 2021 - ojs.aaai.org",
+            "Abstract": "We study graph neural network anomaly detection.",
+            "URL": "https://arxiv.org/pdf/2106.06947.pdf",
+        }
+    ])
+    adapter = GoogleScholarAdapter(
+        search_function=search,
+        min_request_interval_seconds=0,
+        cache_ttl_seconds=0,
+    )
+
+    results = adapter.search("graph neural network anomaly detection", max_results=5)
+
+    assert search.calls == [("graph neural network anomaly detection", 5)]
+    assert len(results) == 1
+    paper = results[0]
+    assert paper.source == "google_scholar"
+    assert paper.source_ids["google_scholar"] == "graph_neural_network_based_anomaly_detection_in_multivariate_time_series"
+    assert paper.title == "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series"
+    assert paper.authors == ["A Deng", "B Hooi"]
+    assert paper.year == 2021
+    assert paper.venue == "Proceedings of the AAAI Conference on Artificial Intelligence"
+    assert paper.abstract == "We study graph neural network anomaly detection."
+    assert paper.arxiv_id == "2106.06947"
+    assert paper.pdf_url == "https://arxiv.org/pdf/2106.06947.pdf"
+    assert paper.can_deep_read is False
+    assert "https://arxiv.org/pdf/2106.06947.pdf" in paper.candidate_pdf_urls
+    assert paper.raw_source_metadata["mcp_project"] == "JackKuo666/Google-Scholar-MCP-Server"
+
+
+def test_google_scholar_mcp_aaai_url_feeds_fulltext_resolver() -> None:
+    GoogleScholarAdapter.clear_cache()
+    aaai_url = "https://ojs.aaai.org/index.php/AAAI/article/download/16523/16330"
+    adapter = GoogleScholarAdapter(
+        search_function=FakeGoogleScholarMcpSearch([
+            {
+                "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+                "Authors": "A Deng, B Hooi - Proceedings of the AAAI Conference on Artificial Intelligence, 2021 - ojs.aaai.org",
+                "Abstract": "We study graph neural network anomaly detection.",
+                "URL": aaai_url,
+            }
+        ]),
+        min_request_interval_seconds=0,
+        cache_ttl_seconds=0,
+    )
+
+    paper = adapter.search("graph neural network anomaly detection", max_results=5)[0]
+    resolved, metrics = FullTextResolver(unpaywall_email="").resolve(paper)
+
+    assert paper.pdf_url == aaai_url
+    assert aaai_url in paper.candidate_pdf_urls
+    assert resolved.fulltext_status == "pdf_ready"
+    assert resolved.selected_fulltext_source == "publisher_oa_pdf"
+    assert resolved.selected_fulltext_url == aaai_url
+    assert resolved.can_deep_read is True
+    assert metrics == []
+
+
 def test_openalex_oa_pdf_is_recognized_as_fulltext_candidate() -> None:
     resolver = FullTextResolver(unpaywall_email="")
     candidate = paper(
@@ -129,6 +342,122 @@ def test_openalex_oa_pdf_is_recognized_as_fulltext_candidate() -> None:
     assert resolved.needs_user_upload is False
     assert resolved.selected_fulltext_url == "https://publisher.example/paper.pdf"
     assert metrics == []
+
+
+def test_openalex_oa_pdf_with_doi_does_not_require_unpaywall_email() -> None:
+    resolver = FullTextResolver(unpaywall_email="")
+    candidate = paper(
+        doi="10.1234/example",
+        raw_source_metadata={
+            "best_oa_location": {
+                "pdf_url": "https://publisher.example/paper.pdf",
+                "landing_page_url": "https://publisher.example/paper",
+            }
+        },
+    )
+
+    resolved, metrics = resolver.resolve(candidate)
+
+    assert resolved.fulltext_status == "pdf_ready"
+    assert resolved.selected_fulltext_url == "https://publisher.example/paper.pdf"
+    assert metrics == []
+
+
+def test_known_oa_venue_landing_is_extracted_to_pdf() -> None:
+    html = Path("tests/fixtures/oa_landing_pages/aaai_sample.html").read_text(encoding="utf-8")
+    client = LandingClient(html)
+    resolver = FullTextResolver(http_client=client, unpaywall_email="")
+    candidate = paper(
+        landing_url="https://ojs.aaai.org/index.php/AAAI/article/view/12345",
+        raw_source_metadata={
+            "best_oa_location": {
+                "pdf_url": "",
+                "landing_page_url": "https://ojs.aaai.org/index.php/AAAI/article/view/12345",
+                "source": {
+                    "id": "https://openalex.org/S4210191458",
+                    "display_name": "AAAI Conference on Artificial Intelligence",
+                },
+            }
+        },
+    )
+
+    resolved, metrics = resolver.resolve(candidate)
+
+    assert resolved.fulltext_status == "pdf_ready"
+    assert resolved.can_deep_read is True
+    assert resolved.selected_fulltext_url == "https://ojs.aaai.org/index.php/AAAI/article/view/12345/15000"
+    assert resolved.candidate_pdf_urls == ["https://ojs.aaai.org/index.php/AAAI/article/view/12345/15000"]
+    assert metrics[0]["source"] == "landing_extractor:aaai"
+    assert metrics[0]["success"] is True
+    assert client.calls[0]["url"] == "https://ojs.aaai.org/index.php/AAAI/article/view/12345"
+
+
+def test_paywalled_landing_is_not_treated_as_fulltext() -> None:
+    resolver = FullTextResolver(http_client=NoNetworkClient(), unpaywall_email="")
+
+    resolved, metrics = resolver.resolve(
+        paper(
+            landing_url="https://dl.acm.org/doi/10.1145/1234567",
+            raw_source_metadata={
+                "best_oa_location": {
+                    "pdf_url": "",
+                    "landing_page_url": "https://dl.acm.org/doi/10.1145/1234567",
+                    "source": {
+                        "id": "https://openalex.org/S4306419648",
+                        "display_name": "SIGMOD",
+                    },
+                }
+            },
+        )
+    )
+
+    assert resolved.fulltext_status == "metadata_only"
+    assert resolved.can_deep_read is False
+    assert resolved.needs_user_upload is True
+    assert metrics == []
+
+
+def test_openalex_preserves_locations_for_arxiv_crosslink() -> None:
+    candidate = OpenAlexAdapter()._to_candidate(
+        {
+            "id": "https://openalex.org/W123",
+            "title": "Venue Paper With Hidden Arxiv Copy",
+            "publication_year": 2024,
+            "primary_location": {
+                "landing_page_url": "https://ojs.aaai.org/index.php/AAAI/article/view/12345",
+                "source": {
+                    "id": "https://openalex.org/S4210191458",
+                    "display_name": "AAAI Conference on Artificial Intelligence",
+                },
+            },
+            "best_oa_location": {
+                "landing_page_url": "https://ojs.aaai.org/index.php/AAAI/article/view/12345",
+                "source": {
+                    "id": "https://openalex.org/S4210191458",
+                    "display_name": "AAAI Conference on Artificial Intelligence",
+                },
+            },
+            "locations": [
+                {
+                    "pdf_url": "https://arxiv.org/pdf/2401.12345",
+                    "landing_page_url": "https://arxiv.org/abs/2401.12345",
+                    "source": {
+                        "id": "https://openalex.org/S4210160352",
+                        "display_name": "arXiv.org",
+                    },
+                }
+            ],
+            "open_access": {"is_oa": True, "oa_status": "green", "oa_url": "https://arxiv.org/abs/2401.12345"},
+        }
+    )
+
+    assert candidate.raw_source_metadata["locations"][0]["source"]["id"] == "https://openalex.org/S4210160352"
+
+    resolved, _ = FullTextResolver(unpaywall_email="").resolve(candidate)
+
+    assert resolved.arxiv_id == "2401.12345"
+    assert resolved.selected_fulltext_source == "arxiv_source"
+    assert resolved.fulltext_status == "source_ready"
 
 
 def test_arxiv_search_propagates_retry_exhausted_rate_limit() -> None:

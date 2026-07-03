@@ -12,9 +12,9 @@ ResearchSensei is a PhD-style research-reading simulator for the path:
 
 ```text
 research direction
-  -> legal multi-source paper discovery
+  -> Google Scholar MCP paper discovery
   -> seed expansion
-  -> source-backed deep_read handoff
+  -> official/OA source-backed deep_read handoff
   -> M2 evidence-backed paper understanding
   -> M3 controlled PaperWorkspace display
   -> M4 evidence-bound PaperWorkspace tutoring
@@ -145,9 +145,10 @@ security, and reporting discipline for M1-M4 surfaces.
 - Live LLM defaults to ccswitch (`cc_switch` config key). ResearchSensei calls
   `http://127.0.0.1:15721/v1`; the request model is selected in the settings page.
 - The backend sends `thinking={"type":"disabled"}` for Anthropic-compatible
-  ccswitch requests and uses larger timeouts/token budgets for M2/M4 card
-  builders (`12000` output tokens for M2 cards, `8192` for M4 tutor answers)
-  to avoid empty-content failures from long reasoning output.
+  ccswitch requests. Provider-level configured calls keep the larger
+  `12000`-token / 300-second budget, while M4 tutor calls now override that
+  with `max_tokens=2400` and `timeout=90` so interactive answers can fall back
+  quickly to deterministic evidence-card responses.
 - Live ccswitch verification on 2026-06-28 succeeded for job
   `992df68ddff9`: `/understanding_status` returned `SUCCESS`,
   `paper_card`/`formula_cards`/`teaching_cards` all returned `SUCCESS`, and
@@ -214,7 +215,7 @@ security, and reporting discipline for M1-M4 surfaces.
 | Module | Surface | Current state | Evidence | Strict judgement |
 |---|---|---|---|---|
 | M1 | Focused acquisition / selected-paper canonical handoff | implemented | selected real-paper acceptance | Narrow verified only. Direction and Seed were separate gaps and are now minimal loops, not full M1 completion. |
-| M1 | Multi-source literature acquisition | implemented | source metrics + legal full-text smoke | DEGRADED_SMOKE. arXiv, OpenAlex, Semantic Scholar, Crossref, DBLP, and Unpaywall participate; not broad M1 REAL_E2E. |
+| M1 | Google Scholar MCP literature acquisition | implemented | source metrics + legal full-text smoke | DEGRADED_SMOKE. Default discovery is Google Scholar MCP only; arXiv, OA venue pages, OpenAlex/Semantic Scholar OA metadata, and Unpaywall participate as full-text resolution inputs or explicit diagnostics. |
 | M1 | arXiv source-first | implemented | source/e-print handoff smoke | PARTIAL_REAL_E2E_VERIFIED for narrow arXiv candidates. Source/e-print is preferred over PDF; fallback stays explicit. |
 | M1 | Direction Exploration | implemented minimal loop | backend + frontend tests + source smoke | DEGRADED_SMOKE. Returns overview, sub-directions, method families, candidates, source metrics, and reading order. |
 | M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
@@ -233,11 +234,12 @@ Current acquisition stack:
 
 | Source/tool | Runtime status | Current role | Full-text capability | Strict note |
 |---|---|---|---|---|
-| arXiv | invoked | search, metadata, source/e-print, PDF | source_ready/pdf_ready | Source-first is implemented and preferred over PDF. |
-| OpenAlex | invoked | search, DOI, OA location metadata | OA PDF/landing metadata | Contributes DOI/OA data; not every DOI has legal full text. |
-| Semantic Scholar | invoked | search, citation/reference metadata, openAccessPdf | OA PDF metadata | `SEMANTIC_SCHOLAR_API_KEY` or `S2_API_KEY` enables x-api-key; 429/rate limits degrade source only. |
-| Crossref | invoked | DOI/venue/publisher/year metadata | metadata-only | Never treated as fulltext-ready by itself. |
-| DBLP | invoked | CS venue metadata discovery | metadata-only | Helps discovery/venue, not download. |
+| Google Scholar MCP | invoked by default | broad discovery rows and candidate URLs | metadata + candidate URL/PDF URL | Wrapped through `JackKuo666/Google-Scholar-MCP-Server`; ResearchSensei loads its `google_scholar_web_search.py` module from an installed module, configured checkout, or `.cache` clone because upstream direct pip packaging currently fails. |
+| arXiv | resolver input | arXiv ID/URL -> source/e-print/PDF | source_ready/pdf_ready | Source-first is implemented and preferred over PDF. Not a default search source. |
+| OpenAlex | resolver metadata / explicit diagnostics | DOI, OA location metadata | OA PDF/landing metadata | Not a default search source. Existing OA metadata still feeds full-text resolution. |
+| Semantic Scholar | resolver metadata / explicit diagnostics | openAccessPdf metadata | OA PDF metadata | Not a default search source. 429/rate limits degrade explicit diagnostic source only. |
+| Crossref | explicit diagnostics | DOI/venue/publisher/year metadata | metadata-only | Never treated as fulltext-ready by itself. |
+| DBLP | explicit diagnostics | CS venue metadata discovery | metadata-only | Helps diagnostics/venue only, not download. |
 | Unpaywall | invoked when email configured | DOI -> legal OA location | publisher/repository OA PDF or landing | Requires `UNPAYWALL_EMAIL` or `RESEARCHSENSEI_CONTACT_EMAIL`. |
 | local upload | implemented | fallback for valuable metadata-only papers | user-provided PDF/canonical | Required when legal full text cannot be fetched automatically. |
 
@@ -417,7 +419,7 @@ $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
 ### Cache Behavior
 
 - Cache stores direction search metadata only (paper titles, arxiv_ids, DOIs, source URLs). PDFs, source archives, and LLM outputs are never cached.
-- Cache hit means the direction search step is skipped entirely — no arXiv, OpenAlex, Semantic Scholar, Crossref, or DBLP API calls for that query.
+- Cache hit means the direction search step is skipped entirely; no Google Scholar MCP call is made for that query.
 - Seed expansion, deep_read, M2 parsing, and LLM card building are NEVER cached. Only the initial direction discovery is cached.
 - Cache validation: `--use-cache` without `--refresh-cache` reads cached entries. A secondary `--use-cache` run should produce the same direction candidates as the original `--refresh-cache` run, with zero external API calls during direction search.
 - Cache TTL is 6 hours (`_CACHE_TTL_SECONDS = 3600 * 6`).

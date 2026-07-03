@@ -4,6 +4,7 @@ import re
 from datetime import date
 from typing import Iterable
 
+from researchsensei.acquisition.venue_registry import venue_rank
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
@@ -13,6 +14,7 @@ from researchsensei.schemas import (
     ReadingPlanItem,
     ScoringBreakdown,
     SourcePriority,
+    VenueRank,
     VerificationStatus,
 )
 
@@ -43,6 +45,7 @@ TOP_VENUE_TERMS = (
 SOURCE_RELIABILITY = {
     "semantic_scholar": 0.92,
     "openalex": 0.9,
+    "google_scholar": 0.86,
     "arxiv": 0.78,
     "crossref": 0.74,
     "dblp": 0.72,
@@ -259,6 +262,15 @@ class SelectionService:
 
     def _venue_prestige(self, paper: CandidatePaper) -> float:
         venue = paper.venue.lower()
+        rank = venue_rank(venue)
+        if rank == VenueRank.A_STAR:
+            return 0.97
+        if rank == VenueRank.A:
+            return 0.9
+        if rank == VenueRank.B:
+            return 0.68
+        if rank == VenueRank.C:
+            return 0.55
         if any(term in venue for term in TOP_VENUE_TERMS):
             return 0.95
         if venue and venue not in {"unknown", "arxiv"}:

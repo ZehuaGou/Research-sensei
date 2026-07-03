@@ -19,6 +19,9 @@ dependencies = [
   "pyalex>=0.15",
   "semanticscholar>=0.8",
   "habanero>=1.2",
+  "beautifulsoup4>=4.12",
+  "requests>=2.31",
+  "scholarly>=1.7",
 ]
 
 [project.optional-dependencies]

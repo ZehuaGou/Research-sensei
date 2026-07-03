@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import logging
+import re
+from typing import Iterable
 
+from researchsensei.acquisition.venue_registry import VENUE_REGISTRY, lookup_venue
 from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
 from researchsensei.schemas import QueryPlan
@@ -94,7 +97,86 @@ Return JSON with this schema:
             sub_directions=_list_of_str(data.get("sub_directions")),
             is_cross_domain=bool(data.get("is_cross_domain", False)),
             domain_components=_list_of_str(data.get("domain_components")),
+            venue_targets=_detect_venue_targets(user_query, _list_of_str(data.get("sub_directions"))),
+            venue_openalex_source_ids=[],  # filled in by _detect_venue_targets inside the helper
+            year_from=_detect_year(user_query, "from"),
+            year_to=_detect_year(user_query, "to"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Venue + year detection helpers
+# ---------------------------------------------------------------------------
+_YEAR_RANGE_RE = re.compile(r"\b(20\d{2})\s*(?:[-–—]\s*(20\d{2}))?")
+_YEAR_RECENT_RE = re.compile(r"\b(recent|latest|new|近(?:期|年|最新)|最新|近期)\b", re.I)
+
+
+def _detect_venue_targets(raw_query: str, secondary_strings: list[str]) -> list[str]:
+    """Scan the user query and LLM-emitted strings for known venue aliases.
+
+    Returns a unique list of canonical_name values (preserving first-match order).
+    Populates a module-level side-effect is intentionally avoided: callers can
+    re-deriving openalex_source_ids from the returned targets via VENUE_REGISTRY.
+    """
+    if not raw_query:
+        return []
+    pools: list[str] = [raw_query.lower()]
+    pools.extend((s.lower() for s in secondary_strings if s))
+
+    seen: set[str] = set()
+    targets: list[str] = []
+    for cfg in VENUE_REGISTRY.values():
+        for alias in cfg.aliases:
+            if not alias:
+                continue
+            if any(alias in pool for pool in pools):
+                if cfg.canonical_name not in seen:
+                    seen.add(cfg.canonical_name)
+                    targets.append(cfg.canonical_name)
+                break
+    return targets
+
+
+def detect_venue_openalex_source_ids(canonical_targets: Iterable[str]) -> list[str]:
+    """Map a list of canonical_name strings to OpenAlex source IDs.
+
+    Used by DirectionRunner after the planner has produced venue_targets.
+    """
+    out: list[str] = []
+    seen: set[str] = set()
+    for target in canonical_targets:
+        cfg = lookup_venue(target) or None
+        if cfg is None:
+            continue
+        for sid in cfg.openalex_source_ids:
+            if not sid or sid in seen:
+                continue
+            seen.add(sid)
+            out.append(sid)
+    return out
+
+
+def _detect_year(raw_query: str, boundary: str) -> int | None:
+    """Return a year integer for the requested boundary, or None if no year hint.
+
+    boundary: "from" returns the earliest year; "to" returns the latest.
+    Multiplicity: "2023-2024" -> from=2023, to=2024. "2023" -> from=2023, to=2023.
+    """
+    if not raw_query:
+        return None
+    match = _YEAR_RANGE_RE.search(raw_query)
+    if match:
+        first = int(match.group(1))
+        second = match.group(2)
+        if second:
+            return first if boundary == "from" else int(second)
+        return first
+    # "recent" / "latest" / 最新 -> widen year window to last 3 years.
+    if _YEAR_RECENT_RE.search(raw_query):
+        import datetime
+        current_year = datetime.date.today().year
+        return current_year - 2 if boundary == "from" else current_year
+    return None
 
 
 def _parse_intents(raw: list[str]) -> list[SearchIntent]:
