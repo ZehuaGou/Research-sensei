@@ -24,6 +24,49 @@ type AdvisorSession = {
   nextQuestion: string
 }
 
+type AnswerTone = 'lead' | 'concept' | 'evidence' | 'caution' | 'followup' | 'plain'
+type AnswerBlock = {
+  text: string
+  tone: AnswerTone
+  label: string
+}
+type AnswerSegment = {
+  text: string
+  highlighted: boolean
+}
+
+const answerToneLabels: Record<AnswerTone, string> = {
+  lead: '重点',
+  concept: '解释',
+  evidence: '证据',
+  caution: '提醒',
+  followup: '追问',
+  plain: '说明',
+}
+
+const answerHighlightTerms = [
+  '核心问题',
+  '核心方法',
+  '关键机制',
+  '关键',
+  '直觉',
+  '机制',
+  '证据',
+  '依据',
+  '结论',
+  '限制',
+  '公式',
+  '变量',
+  '实验',
+  '消融',
+  '结果',
+  '注意力',
+  'attention',
+  'embedding',
+  'loss',
+  'reward',
+]
+
 function compactInlineText(value: string) {
   return value
     .replace(/\s+/g, ' ')
@@ -50,6 +93,69 @@ function normalizeMessageText(value: string) {
     .replace(/\n{3,}/g, '\n\n')
     .replace(/([A-Za-z])\n(?=[A-Za-z])/g, '$1 ')
     .trim()
+}
+
+function splitAnswerText(content: string) {
+  return content
+    .replace(/\r\n/g, '\n')
+    .split(/\n\s*\n|\n(?=\s*(?:\d+[.、]|[-*]\s|[（(]?\d+[）)]))/)
+    .map(part => part.replace(/\s*\n\s*/g, ' ').trim())
+    .filter(Boolean)
+}
+
+function answerTone(text: string, index: number): AnswerTone {
+  const compact = text.replace(/\s+/g, '')
+  if (/证据不足|没有足够|没有给出|无法|不能硬编|不确定|暂时|缺少|不足以|失败/.test(compact)) return 'caution'
+  if (/组会追问|下一问|追问|你可以|继续问|可以继续|直接问|直接回我|试着回答|补一句/.test(compact)) return 'followup'
+  if (index === 0) return 'lead'
+  if (/能追到|证据是|依据是|正文|实验|结果|消融|评估|对比|支撑|显示|表明|观察到/.test(compact)) return 'evidence'
+  if (/直觉|可以理解为|换句话说|意思是|机制|方法|公式|变量|模型|训练|推理|注意力|attention|embedding|向量|loss|reward|算法|理论|定理|证明/.test(compact)) {
+    return 'concept'
+  }
+  if (/证据|依据/.test(compact)) return 'evidence'
+  return 'plain'
+}
+
+function answerBlocks(content: string): AnswerBlock[] {
+  return splitAnswerText(content).map((text, index) => {
+    const tone = answerTone(text, index)
+    return {
+      text,
+      tone,
+      label: answerToneLabels[tone],
+    }
+  })
+}
+
+function highlightSegments(text: string): AnswerSegment[] {
+  const segments: AnswerSegment[] = []
+  let cursor = 0
+  const lowerText = text.toLowerCase()
+  const terms = [...answerHighlightTerms].sort((a, b) => b.length - a.length)
+
+  while (cursor < text.length) {
+    let bestIndex = -1
+    let bestTerm = ''
+    for (const term of terms) {
+      const index = lowerText.indexOf(term.toLowerCase(), cursor)
+      if (index === -1) continue
+      if (bestIndex === -1 || index < bestIndex || (index === bestIndex && term.length > bestTerm.length)) {
+        bestIndex = index
+        bestTerm = term
+      }
+    }
+    if (bestIndex === -1) {
+      segments.push({ text: text.slice(cursor), highlighted: false })
+      break
+    }
+    if (bestIndex > cursor) {
+      segments.push({ text: text.slice(cursor, bestIndex), highlighted: false })
+    }
+    segments.push({ text: text.slice(bestIndex, bestIndex + bestTerm.length), highlighted: true })
+    cursor = bestIndex + bestTerm.length
+  }
+
+  return segments.length ? segments : [{ text, highlighted: false }]
 }
 
 function extractApiError(data: unknown) {
@@ -325,7 +431,26 @@ watch(() => store.currentJobId, () => {
         data-testid="chat-message"
       >
         <div class="avatar">{{ msg.role === 'user' ? '你' : 'M4' }}</div>
-        <div class="bubble" :class="{ compact: msg.role === 'user' }">{{ msg.content }}</div>
+        <div v-if="msg.role === 'assistant'" class="bubble answer-bubble">
+          <p
+            v-for="(block, blockIndex) in answerBlocks(msg.content)"
+            :key="`${index}-${blockIndex}-${block.text.slice(0, 18)}`"
+            class="answer-block"
+            :class="`tone-${block.tone}`"
+          >
+            <span class="answer-label">{{ block.label }}</span>
+            <span class="answer-text">
+              <template
+                v-for="(segment, segmentIndex) in highlightSegments(block.text)"
+                :key="`${segmentIndex}-${segment.text}`"
+              >
+                <mark v-if="segment.highlighted" class="answer-keyword">{{ segment.text }}</mark>
+                <span v-else>{{ segment.text }}</span>
+              </template>
+            </span>
+          </p>
+        </div>
+        <div v-else class="bubble compact">{{ msg.content }}</div>
       </article>
 
       <div v-if="isLoading" class="message assistant">
@@ -579,9 +704,108 @@ header p {
   color: var(--text-primary);
   font-size: 15px;
   line-height: 1.75;
+  letter-spacing: 0;
   overflow-wrap: break-word;
   white-space: pre-wrap;
   word-break: normal;
+}
+
+.answer-bubble {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-card));
+  white-space: normal;
+}
+
+.answer-block {
+  --answer-accent: var(--accent);
+  --answer-bg: rgba(var(--accent-rgb), 0.08);
+  margin: 0;
+  border-left: 3px solid var(--answer-accent);
+  border-radius: 8px;
+  padding: 8px 10px 8px 11px;
+  background: var(--answer-bg);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.78;
+}
+
+.answer-block.tone-lead {
+  --answer-accent: #2563eb;
+  --answer-bg: rgba(37, 99, 235, 0.08);
+  font-weight: 650;
+}
+
+.answer-block.tone-concept {
+  --answer-accent: #0f766e;
+  --answer-bg: rgba(15, 118, 110, 0.08);
+}
+
+.answer-block.tone-evidence {
+  --answer-accent: #b45309;
+  --answer-bg: rgba(180, 83, 9, 0.1);
+}
+
+.answer-block.tone-caution {
+  --answer-accent: #be123c;
+  --answer-bg: rgba(190, 18, 60, 0.08);
+}
+
+.answer-block.tone-followup {
+  --answer-accent: #7c3aed;
+  --answer-bg: rgba(124, 58, 237, 0.08);
+}
+
+.answer-block.tone-plain {
+  --answer-accent: var(--text-muted);
+  --answer-bg: color-mix(in srgb, var(--bg-card) 54%, transparent);
+}
+
+.answer-label {
+  display: inline-flex;
+  margin-right: 8px;
+  color: var(--answer-accent);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: inherit;
+}
+
+.answer-text {
+  font-weight: 450;
+}
+
+.answer-keyword {
+  border-radius: 5px;
+  padding: 0 0.18em;
+  background: color-mix(in srgb, var(--answer-accent) 16%, transparent);
+  color: color-mix(in srgb, var(--answer-accent) 88%, var(--text-primary));
+  font-weight: 850;
+}
+
+:global(.dark) .answer-block.tone-lead {
+  --answer-accent: #93c5fd;
+  --answer-bg: rgba(147, 197, 253, 0.11);
+}
+
+:global(.dark) .answer-block.tone-concept {
+  --answer-accent: #5eead4;
+  --answer-bg: rgba(94, 234, 212, 0.1);
+}
+
+:global(.dark) .answer-block.tone-evidence {
+  --answer-accent: #fbbf24;
+  --answer-bg: rgba(251, 191, 36, 0.11);
+}
+
+:global(.dark) .answer-block.tone-caution {
+  --answer-accent: #fb7185;
+  --answer-bg: rgba(251, 113, 133, 0.1);
+}
+
+:global(.dark) .answer-block.tone-followup {
+  --answer-accent: #c4b5fd;
+  --answer-bg: rgba(196, 181, 253, 0.11);
 }
 
 .message.user .bubble.compact {

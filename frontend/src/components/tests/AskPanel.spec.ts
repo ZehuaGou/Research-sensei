@@ -24,7 +24,11 @@ function mockM4Fetch() {
     if (url.endsWith('/ask')) {
       return jsonResponse({
         status: 'SUCCESS',
-        answer: 'M4 的正文回答。',
+        answer: [
+          '可以先把它理解成：模型不是平均看所有证据，而是先找和问题最相关的片段。',
+          '关键机制是 attention 会给不同片段分配权重，权重高的部分更影响最终表示，所以稀疏证据也能被拉出来。',
+          '能追到的证据是论文正文里的方法描述和实验对比，它们说明这种权重分配支撑了结论。',
+        ].join('\n\n'),
         evidence_refs: ['paper:b001'],
         memory_refs: ['m4_memory_2'],
       })
@@ -102,7 +106,12 @@ describe('AskPanel', () => {
       selected_text: 'attention architecture',
       context_scope: 'selection',
     })
-    expect(wrapper.text()).toContain('M4 的正文回答。')
+    expect(wrapper.text()).toContain('模型不是平均看所有证据')
+    expect(wrapper.find('.answer-bubble').exists()).toBe(true)
+    expect(wrapper.find('.answer-block.tone-lead').text()).toContain('重点')
+    expect(wrapper.find('.answer-block.tone-concept').text()).toContain('关键机制')
+    expect(wrapper.find('.answer-block.tone-evidence').text()).toContain('证据')
+    expect(wrapper.findAll('.answer-keyword').map(node => node.text())).toContain('证据')
     expect(wrapper.text()).not.toContain('paper:b001')
     expect(wrapper.text()).not.toContain('m4_memory_2')
   })
@@ -134,7 +143,8 @@ describe('AskPanel', () => {
       user_question: '为什么这个方法能处理稀疏证据？',
       selected_text: 'Attention helps connect scattered evidence.',
     })
-    expect(wrapper.text()).toContain('M4 的正文回答。')
+    expect(wrapper.text()).toContain('模型不是平均看所有证据')
+    expect(wrapper.findAll('.answer-block').length).toBeGreaterThanOrEqual(3)
     expect(wrapper.text()).toContain('围绕你的问题：为什么这个方法能处理稀疏证据？')
     expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('先用一句自然话回答你真正想问的点')
     expect(wrapper.text()).not.toContain('paper:b001')
