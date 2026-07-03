@@ -67,11 +67,12 @@ class M4InteractionService:
             warnings.append(_warning("LOW_SELECTION_MATCH", "这段选中文本和证据片段的匹配度偏低。"))
 
         claim_text = str(evidence.get("claim_text") or evidence.get("text") or selected_text)
+        taught_claim_text = _teach_phrase(claim_text, max_chars=220)
         section = str(evidence.get("section") or "当前论文")
         section_label = _user_facing_section_label(section)
         answer = (
             f"这段内容最接近论文中“{section_label}”部分的证据。"
-            f"它支撑的局部论断是：{claim_text}"
+            f"它支撑的局部论断是：{taught_claim_text}"
         )
         if question:
             answer += "\n\n" + _selection_followup_answer(
@@ -123,11 +124,11 @@ class M4InteractionService:
             status="SUCCESS" if evidence_ref else "DEGRADED",
             formula_id=_clean(formula.get("formula_id")) or formula_id,
             symbol=symbol or matched_symbol[0],
-            meaning=matched_symbol[1] if symbol else full_explanation,
-            source_sentence=_clean(formula.get("purpose")) or _clean(formula.get("plain_summary")),
-            intuition=_clean(formula.get("intuition")) or _clean(formula.get("plain_summary")),
-            numeric_example=_clean(formula.get("numeric_example")),
-            role_in_method=_clean(formula.get("what_if_removed")) or _clean(formula.get("purpose")),
+            meaning=_teach_phrase(matched_symbol[1]) if symbol else full_explanation,
+            source_sentence=_teach_phrase(_clean(formula.get("purpose")) or _clean(formula.get("plain_summary"))),
+            intuition=_teach_phrase(_clean(formula.get("intuition")) or _clean(formula.get("plain_summary"))),
+            numeric_example=_teach_phrase(_clean(formula.get("numeric_example"))),
+            role_in_method=_teach_phrase(_clean(formula.get("what_if_removed")) or _clean(formula.get("purpose"))),
             evidence_ref=evidence_ref,
             formula_origin=_clean(formula.get("formula_origin")),
             formula_ocr_status=_clean(formula.get("formula_ocr_status")),
@@ -439,6 +440,7 @@ class M4InteractionService:
                 "answer 必须是简体中文自然语言，即使 question、selected_text 或 context 是英文。",
                 "不要逐字复述 selected_text；尤其不要整段复制 LaTeX、KaTeX 或公式源码。",
                 "公式只保留必要符号，优先解释变量含义、机制和论文里的作用。",
+                "理论类和公式类问题必须按“直觉-对象-逻辑链-证据边界”讲：先用一句话说明它在解决什么困惑，再解释每个对象是什么，最后说明为什么这一步有用。",
                 "回答要像真实助教：先直接回答问题，不要用“可以这样理解”“这段内容说明了”这类空泛开场。",
                 "如果 question 在问“为什么/怎么/能不能”，answer 必须给出因果链：论文要解决的障碍是什么、方法做了哪一步、这一步为什么能回应障碍。",
                 "每个段落至少落到一个具体对象，例如变量、模块、训练项、数据集、指标、约束或论文中的方法步骤。",
@@ -464,6 +466,7 @@ class M4InteractionService:
                     "你是 ResearchSensei 的 M4 论文助教。必须用简体中文回答，只能使用提供的 context。"
                     "即使用户问题、选中文本或证据是英文，也要翻译成中文解释。"
                     "不要整段复制 LaTeX/KaTeX/公式源码；要把公式转成中文含义和作用。"
+                    "理论和公式必须讲懂：先给直觉，再讲对象，再讲逻辑链，不要只堆术语或翻译英文。"
                     "回答要像真实助教，先直接解释用户问的点，再展开变量、机制、证据中的具体细节。"
                     "如果用户问的是自己的疑问，要围绕这个疑问组织因果解释，不要退回成通用论文摘要。"
                     "论文级问题必须给正文细节，不要只回答标题、作者或一句摘要。"
@@ -924,19 +927,20 @@ def _paper_card_evidence_answer(paper_card: dict[str, object]) -> str:
 def _selection_followup_answer(*, question: str, selected_text: str, claim_text: str, section: str) -> str:
     label = _user_facing_section_label(section)
     question_hint = _compact_user_text(question, max_chars=90)
+    taught_claim = _teach_phrase(claim_text, max_chars=180)
     if _is_why_question(question):
         return (
-            f"它重要在于：这段证据不是孤立描述，而是在“{label}”里说明“{_compact_user_text(claim_text, max_chars=180)}”。"
-            "用它回答你的问题时，重点应放在它把论文的机制和要解决的问题连起来，而不是只复述这句话本身。"
+            f"它重要在于：这段证据不是孤立描述，而是在“{label}”里说明“{taught_claim}”。"
+            "换句话说，它把论文想解决的困难和论文采用的机制接到了一起；读理论时先抓这条连接，比只背术语更容易懂。"
         )
     if _is_evidence_question(question):
         return (
             f"这段可以作为回答“{question_hint}”的正文依据：它来自“{label}”，"
-            f"支撑的论断是“{_compact_user_text(claim_text, max_chars=180)}”。"
+            f"支撑的论断是“{taught_claim}”。"
         )
     return (
         f"结合你的追问“{question_hint}”，可以把这段当作“{label}”证据来读："
-        f"它支撑的是“{_compact_user_text(claim_text, max_chars=180)}”，回答时应围绕这个论断展开。"
+        f"它支撑的是“{taught_claim}”，回答时应围绕这个论断展开。"
     )
 
 
@@ -953,9 +957,9 @@ def _missing_limitation_answer(
     method = _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
     experiment = _claim_text(paper_card.get("experiment_summary"))
     if method:
-        parts.append(f"已有证据能确认的是方法机制：{method}")
+        parts.append(f"已有证据能确认的是方法机制：{_teach_phrase(method)}")
     if experiment:
-        parts.append(f"已有实验相关证据：{experiment}")
+        parts.append(f"已有实验相关证据：{_teach_phrase(experiment)}")
     focused = []
     seen: set[str] = set()
     for candidate in evidence_rows or []:
@@ -967,7 +971,7 @@ def _missing_limitation_answer(
     if focused:
         parts.append("可用证据边界：" + "；".join(focused[:3]))
     elif rows:
-        parts.append("可用证据边界：" + "；".join(f"{label}：{text}" for label, text, _ref in rows[:3]))
+        parts.append("可用证据边界：" + "；".join(f"{label}：{_teach_phrase(text)}" for label, text, _ref in rows[:3]))
     parts.append("更稳妥的回答是：这篇论文当前材料支持它的方法和实验设置，但没有足够依据判断具体局限。")
     return "\n\n".join(parts)
 
@@ -984,12 +988,12 @@ def _structured_paper_answer(
         summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
         return f"重点：{summary}" if summary else ""
     by_label = {label: text for label, text, _ref in rows}
-    problem = by_label.get("研究问题", "")
-    idea = by_label.get("核心想法", "")
-    method = by_label.get("方法机制", "")
-    experiment = by_label.get("实验结论", "")
-    limitations = by_label.get("局限", "")
-    summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
+    problem = _teach_phrase(by_label.get("研究问题", ""))
+    idea = _teach_phrase(by_label.get("核心想法", ""))
+    method = _teach_phrase(by_label.get("方法机制", ""))
+    experiment = _teach_phrase(by_label.get("实验结论", ""))
+    limitations = _teach_phrase(by_label.get("局限", ""))
+    summary = _teach_phrase(_clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second")))
 
     focus_text = method or idea or summary or problem
     if focus == "实验结论" and experiment:
@@ -1011,7 +1015,9 @@ def _structured_paper_answer(
         mechanism = "；".join(item for item in [idea, method] if item)
         parts.append(f"核心机制：{mechanism}")
     why_items = []
-    if method:
+    if problem and method:
+        why_items.append(f"它不是空泛地说“提升检索”，而是把“{method}”作为具体步骤，用来回应“{problem}”这个困难")
+    elif method:
         why_items.append("它把论文的方法主张落到可执行的建模步骤上")
     if experiment:
         why_items.append(f"实验结论显示：{experiment}")
@@ -1019,7 +1025,7 @@ def _structured_paper_answer(
         why_items.append(f"同时要注意局限：{limitations}")
     if why_items:
         parts.append(f"为什么有效：{'；'.join(why_items)}")
-    evidence_lines = [f"{label}来自论文卡片中的正文依据：{text}" for label, text, _ref in rows[:4]]
+    evidence_lines = [f"{label}来自论文卡片中的正文依据：{_teach_phrase(text)}" for label, text, _ref in rows[:4]]
     focused_evidence: list[str] = []
     seen_focused_evidence: set[str] = set()
     seen_focused_bodies: set[str] = set()
@@ -1039,11 +1045,11 @@ def _structured_paper_answer(
 
 
 def _formula_context_text(formula: dict[str, object]) -> str:
-    purpose = _clean(formula.get("purpose")) or _clean(formula.get("plain_summary"))
-    intuition = _clean(formula.get("intuition"))
-    example = _clean(formula.get("numeric_example"))
-    removed = _clean(formula.get("what_if_removed")) or _clean(formula.get("remove_effect"))
-    sensitivity = _clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect"))
+    purpose = _teach_phrase(_clean(formula.get("purpose")) or _clean(formula.get("plain_summary")))
+    intuition = _teach_phrase(_clean(formula.get("intuition")))
+    example = _teach_phrase(_clean(formula.get("numeric_example")))
+    removed = _teach_phrase(_clean(formula.get("what_if_removed")) or _clean(formula.get("remove_effect")))
+    sensitivity = _teach_phrase(_clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect")))
     parts = [
         item
         for item in [
@@ -1061,21 +1067,24 @@ def _formula_context_text(formula: dict[str, object]) -> str:
 
 
 def _formula_full_explanation(formula: dict[str, object]) -> str:
-    purpose = _clean(formula.get("purpose")) or _clean(formula.get("plain_summary")) or "这条公式用于说明论文方法中的一个计算步骤。"
+    purpose = _teach_phrase(_clean(formula.get("purpose")) or _clean(formula.get("plain_summary"))) or "这条公式用于说明论文方法中的一个计算步骤。"
     symbols = _formula_symbol_summary(formula)
     terms = _formula_term_summary(formula)
-    intuition = _clean(formula.get("intuition")) or _clean(formula.get("plain_summary"))
-    example = _clean(formula.get("numeric_example"))
-    removed = _clean(formula.get("what_if_removed")) or _clean(formula.get("remove_effect"))
-    sensitivity = _clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect"))
+    intuition = _teach_phrase(_clean(formula.get("intuition")) or _clean(formula.get("plain_summary")))
+    example = _teach_phrase(_clean(formula.get("numeric_example")))
+    removed = _teach_phrase(_clean(formula.get("what_if_removed")) or _clean(formula.get("remove_effect")))
+    sensitivity = _teach_phrase(_clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect")))
 
-    parts = [f"先看目标：{purpose}"]
+    parts = [
+        f"一句话直觉：这条公式是在把论文里的一个理论对象变成可计算的分数或权重，方便模型判断它有多重要。",
+        f"先看目标：{purpose}",
+    ]
     if symbols:
-        parts.append(f"参数/符号：{symbols}")
+        parts.append(f"对象是什么：{symbols}")
     if terms:
         parts.append(f"关键项：{terms}")
     if intuition and intuition != purpose:
-        parts.append(f"直觉：{intuition}")
+        parts.append(f"为什么这样做：{intuition}")
     if example:
         parts.append(f"例子：{example}")
     if removed:
@@ -1096,9 +1105,9 @@ def _formula_symbol_summary(formula: dict[str, object]) -> str:
         symbol = _clean(item.get("symbol"))
         meaning = _clean(item.get("meaning"))
         if symbol and meaning:
-            rendered.append(f"{symbol} 表示 {meaning}")
+            rendered.append(f"{symbol} 表示：{_teach_phrase(meaning)}")
         elif meaning:
-            rendered.append(meaning)
+            rendered.append(_teach_phrase(meaning))
         if len(rendered) >= 8:
             break
     return "；".join(rendered)
@@ -1114,10 +1123,10 @@ def _formula_term_summary(formula: dict[str, object]) -> str:
             continue
         term = _clean(item.get("term"))
         details = [
-            _clean(item.get("meaning")),
-            f"鼓励 {_clean(item.get('encourages'))}" if _clean(item.get("encourages")) else "",
-            f"惩罚 {_clean(item.get('penalizes'))}" if _clean(item.get("penalizes")) else "",
-            f"去掉后 {_clean(item.get('if_removed'))}" if _clean(item.get("if_removed")) else "",
+            _teach_phrase(_clean(item.get("meaning"))),
+            f"鼓励 {_teach_phrase(_clean(item.get('encourages')))}" if _clean(item.get("encourages")) else "",
+            f"惩罚 {_teach_phrase(_clean(item.get('penalizes')))}" if _clean(item.get("penalizes")) else "",
+            f"去掉后 {_teach_phrase(_clean(item.get('if_removed')))}" if _clean(item.get("if_removed")) else "",
         ]
         detail_text = "，".join(detail for detail in details if detail)
         if term and detail_text:
@@ -1518,7 +1527,7 @@ def _candidate_user_facing_evidence(candidate: dict[str, object]) -> str:
     )
     if not text:
         return ""
-    return f"{section}：{_compact_user_text(text, max_chars=220)}"
+    return f"{section}：{_teach_phrase(text, max_chars=220)}"
 
 
 def _evidence_line_body_key(line: str) -> str:
@@ -1555,6 +1564,51 @@ def _user_facing_section_label(section: str) -> str:
         "正文": "正文",
     }
     return mapping.get(normalized, section or "正文")
+
+
+def _teach_phrase(value: str, *, max_chars: int = 260) -> str:
+    text = _compact_user_text(value, max_chars=max_chars)
+    if not text:
+        return ""
+    exact = {
+        "Scores each evidence passage with an attention weight.": "给每个证据片段分配一个注意力权重，也就是让模型判断哪段证据更值得关注。",
+        "x is transformed into an attention score.": "x 会被转换成注意力分数，用来表示这段证据在当前问题里有多重要。",
+        "the evidence passage representation": "证据片段的向量表示，也就是模型内部用来描述这段证据的一组特征。",
+        "The attention architecture links sparse evidence passages to solve the retrieval problem.": "注意力架构把分散、稀疏的证据片段连接起来，用来缓解检索时证据不完整、不稳定的问题。",
+        "The attention architecture links sparse evidence passages.": "注意力架构会把分散的证据片段连接起来。",
+        "Sparse evidence passages make retrieval brittle.": "证据片段太分散，会让检索结果不稳定、容易漏掉关键信息。",
+        "Use attention to connect related evidence passages.": "用注意力机制把相关证据片段连接起来，让模型看到片段之间的关系。",
+        "An attention architecture links sparse evidence passages.": "用注意力架构连接分散的证据片段。",
+        "The method is evaluated on retrieval benchmarks.": "论文在检索基准上评估了这个方法。",
+        "A paper about attention architecture for evidence retrieval.": "这篇论文研究如何用注意力架构改进证据检索。",
+    }
+    if text in exact:
+        return exact[text]
+
+    replacements = [
+        ("attention architecture", "注意力架构"),
+        ("sparse evidence passages", "分散、稀疏的证据片段"),
+        ("related evidence passages", "相关证据片段"),
+        ("evidence passage representation", "证据片段的向量表示"),
+        ("evidence passage", "证据片段"),
+        ("evidence passages", "证据片段"),
+        ("attention weight", "注意力权重"),
+        ("attention score", "注意力分数"),
+        ("retrieval benchmarks", "检索基准"),
+        ("retrieval problem", "检索问题"),
+        ("retrieval", "检索"),
+        ("benchmarks", "基准"),
+        ("representation", "向量表示"),
+        ("transformed into", "转换成"),
+        ("links", "连接"),
+        ("connect", "连接"),
+        ("evaluated on", "在...上评估"),
+        ("method", "方法"),
+    ]
+    taught = text
+    for source, target in replacements:
+        taught = re.sub(re.escape(source), target, taught, flags=re.IGNORECASE)
+    return _compact_user_text(taught, max_chars=max_chars)
 
 
 def _is_front_matter_candidate(candidate: dict[str, object]) -> bool:

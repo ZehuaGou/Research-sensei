@@ -65,8 +65,11 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     )
     assert full_formula_response.status_code == 200
     full_formula = full_formula_response.json()
+    assert "一句话直觉" in full_formula["meaning"]
     assert "先看目标" in full_formula["meaning"]
-    assert "参数/符号" in full_formula["meaning"]
+    assert "对象是什么" in full_formula["meaning"]
+    assert "证据片段的向量表示" in full_formula["meaning"]
+    assert "注意力分数" in full_formula["meaning"]
     assert full_formula["symbol"] == ""
 
     ask_payload = {
@@ -352,7 +355,10 @@ def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: 
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["answer"].startswith("重点：针对“为什么这个方法能处理稀疏证据？”")
     assert "贴着你的问题看：" in data["answer"]
-    assert "attention architecture links sparse evidence passages" in data["answer"]
+    assert "用注意力架构连接分散的证据片段" in data["answer"]
+    assert "证据片段太分散" in data["answer"]
+    assert "它不是空泛地说" in data["answer"]
+    assert "attention architecture links sparse evidence passages" not in data["answer"]
     assert "paper:b001" not in data["answer"]
 
 
@@ -403,7 +409,9 @@ def test_m4_selected_text_followup_explains_why_it_matters(tmp_path: Path) -> No
     assert data["evidence_refs"] == ["paper:b001"]
     assert "这段内容最接近论文中“方法”部分的证据" in data["answer"]
     assert "它重要在于" in data["answer"]
-    assert "把论文的机制和要解决的问题连起来" in data["answer"]
+    assert "把论文想解决的困难和论文采用的机制接到了一起" in data["answer"]
+    assert "读理论时先抓这条连接" in data["answer"]
+    assert "The attention architecture links sparse evidence passages" not in data["answer"]
     assert "可以这样理解：这句话为什么重要" not in data["answer"]
 
 
