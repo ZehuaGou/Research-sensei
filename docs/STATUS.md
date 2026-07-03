@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-07-02.
+Last updated: 2026-07-03.
 
 This is the single authoritative status file for ResearchSensei. README,
 DESIGN, DEVELOPMENT, module contracts, development notes, and historical docs
@@ -28,6 +28,36 @@ after artifact retrieval supplies allowed evidence refs; invalid LLM evidence
 refs are rejected and fall back to deterministic artifact answers. It is not
 yet a PaperQA-backed tutor, vector memory system, direction-level dialogue
 engine, or full drill generator.
+
+## 2026-07-03 Formalization And Raw-Copy Cleanup
+
+- Removed tracked legacy generated samples and obsolete docs: top-level
+  `cards/`, top-level `schemas/`, the broken `examples/render_manual_sample.py`,
+  old `docs/archive/RS设计文档.md`, `docs/MAIN_CHAIN_V1_REVIEW.md`, and
+  `docs/TECHNICAL_DISCUSSION.md`. Runtime schemas and current M1-M5 contracts
+  remain under `src/researchsensei/schemas/` and `docs/development/`.
+- Renamed temporary-feeling scripts to formal names:
+  `run_main_chain_acceptance.py`,
+  `run_literature_acquisition_acceptance.py`,
+  `run_m1_mineru_gpu_check.py`,
+  `repair_m1_acceptance_package.py`,
+  `repair_m1_equation_groups.py`, and
+  `validate_m1_acceptance_outputs.py`. Tests and docs now reference the new
+  names.
+- Paper-card fallback/raw-copy handling now produces compact Chinese summaries
+  with only a small set of paper-specific terms. Regression tests run the
+  resulting cards back through `QualityAuditor` and assert no F-8 BLOCK remains.
+- The tracked-file encoding hygiene test now skips paths that are deleted in the
+  active working tree, so it remains usable during cleanup commits.
+- Validation for this checkpoint: `pytest` = 620 passed / 15 skipped;
+  frontend `npm test` = 52 passed; `npm run build` passed;
+  `npm audit --omit=dev` reported zero vulnerabilities.
+- Live ccswitch single-query main-chain acceptance passed on
+  `time series anomaly detection`: job `33784545690d`, selected source-first
+  arXiv handoff `2007.14254`, final status `SUCCESS`, `/cards=200`, returned
+  `paper_card`, `formula_cards`, and `teaching_cards`, formula origin
+  `source_latex`. Semantic Scholar/DBLP/arXiv still produced scoped 429/timeout
+  warnings, but the chain degraded those sources instead of failing the job.
 
 ## 2026-07-02 Hardening Pass
 
@@ -68,12 +98,12 @@ engine, or full drill generator.
   targeted hardening tests = 132 passed; `npm test` = 52 passed; `npm run build`
   passed; `npm audit --omit=dev` reported zero vulnerabilities; `git diff
   --check` passed.
-- Live ccswitch single-query matrix with cached direction search and bounded
-  card timeout:
+- Historical live ccswitch single-query matrix with cached direction search and
+  bounded card timeout before the 2026-07-03 cleanup:
   `time series anomaly detection` still returns
   `BLOCKED_UNDERSTANDING / AUDIT_BLOCKED` on job-family runs, with F-8
-  paper-card raw-copy findings still observed. This is an unresolved M2/M4
-  quality issue, not a timeout or missing-LLM configuration issue.
+  paper-card raw-copy findings observed. This was superseded by the
+  2026-07-03 compact-summary fix and live acceptance result above.
 
 ## 2026-06-28 ccswitch And UI Reconciliation
 
@@ -188,7 +218,7 @@ These are narrow evidence records, not product readiness.
 Command shape:
 
 ```powershell
-.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "<query>" --max-results 80 --download-top-n 10
+.venv\Scripts\python.exe scripts\run_literature_acquisition_acceptance.py --query "<query>" --max-results 80 --download-top-n 10
 ```
 
 Latest 2026-06-16 smoke after configuring Unpaywall/contact email:
@@ -217,7 +247,7 @@ instead of being discarded.
 | main-chain source_latex formula success | `cb59b58dbe55` | historical old-rule DEGRADED_STRUCTURAL, `TEACHING_CARDS_FAILED` | 200 | paper + formula | Historical record only. Current code treats teaching card failure as `BLOCKED_UNDERSTANDING` and hides cards. |
 | main-chain full SUCCESS | `73ddb4607b6b` | SUCCESS | 200 | paper + formula + teaching | All three card types succeed with source_latex origin; narrow PASS, not broad REAL_E2E. |
 
-Earlier 2026-06-16 incremental Mimo main-chain smokes:
+Earlier 2026-06-16 incremental Mimo main-chain acceptance checks:
 
 | Query | Job | Selected paper | Input | Final status | Blocking reason | Cards | Components | Verdict | Strict note |
 |---|---|---|---|---|---|---:|---|---|---|
@@ -256,10 +286,10 @@ via `--use-cache`). "graph neural network anomaly detection" fully resolved.
 
 Tracked fixture: `tests/fixtures/m1_acquisition_queries.json`.
 
-`scripts/run_literature_acquisition_smoke.py` supports:
+`scripts/run_literature_acquisition_acceptance.py` supports:
 
 ```powershell
-.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --fixture tests/fixtures/m1_acquisition_queries.json --max-results 80 --download-top-n 10
+.venv\Scripts\python.exe scripts\run_literature_acquisition_acceptance.py --fixture tests/fixtures/m1_acquisition_queries.json --max-results 80 --download-top-n 10
 ```
 
 The fixture stores query names and minimum expectations only: total candidates,
@@ -323,7 +353,7 @@ explicit component failure/degradation, not accepted evidence.
 ## Repeatable Main-Chain Regression Matrix
 
 `scripts/run_main_chain_matrix.py` is the repeatable acceptance tool for the
-12-query main-chain regression matrix. It reuses `run_main_chain_smoke.py` logic
+12-query main-chain regression matrix. It reuses `run_main_chain_acceptance.py` logic
 without duplicating core pipeline code.
 
 ### Command
@@ -445,8 +475,9 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
 
 ## Next Priority Order
 
-1. Run a live/cached 12-query main-chain matrix after the 2026-07-02 query
-   planning, source-aware ranking, and Semantic Scholar cache/throttle changes.
+1. Run a live/cached 12-query main-chain matrix after the 2026-07-03 cleanup and
+   paper-card raw-copy fix. The single-query acceptance is green, but the broad
+   matrix still needs current evidence.
 2. Continue improving candidate selection for forecasting and mixed-intent
    queries, especially selecting source-backed candidates that truly match the
    requested direction.
@@ -466,8 +497,8 @@ If another model continues this project through ccswitch:
 
 1. Read this file first.
 2. Run backend tests.
-3. Run one literature acquisition smoke.
-4. If ccswitch is running, run one main-chain smoke with `--provider cc_switch`.
+3. Run one literature acquisition acceptance.
+4. If ccswitch is running, run one main-chain acceptance with `--provider cc_switch`.
 5. Treat all failures literally; do not patch around gates.
 6. Make only small, source-local fixes.
 7. Update this file with exact command, job ID, status, cards code, components,

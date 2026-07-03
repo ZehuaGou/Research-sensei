@@ -10,7 +10,7 @@ from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarA
 from researchsensei.schemas import CandidatePaper
 from researchsensei.selection import SelectionService
 
-from scripts.run_literature_acquisition_smoke import run_literature_acquisition_fixture, run_literature_acquisition_smoke
+from scripts.run_literature_acquisition_acceptance import run_literature_acquisition_fixture, run_literature_acquisition_acceptance
 
 
 class StubResponse:
@@ -273,8 +273,8 @@ def test_multiple_sources_merge_preserves_discovery_and_fulltext_urls() -> None:
     assert merged.candidate_html_urls == []
 
 
-def test_smoke_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
-    result = run_literature_acquisition_smoke(
+def test_acceptance_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
+    result = run_literature_acquisition_acceptance(
         query="time series anomaly detection",
         max_results=5,
         download_top_n=0,
@@ -294,8 +294,8 @@ def test_smoke_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
     assert result["verdict"] == "DEGRADED"
 
 
-def test_semantic_scholar_429_does_not_fail_entire_smoke(tmp_path: Path) -> None:
-    result = run_literature_acquisition_smoke(
+def test_semantic_scholar_429_does_not_fail_entire_acceptance(tmp_path: Path) -> None:
+    result = run_literature_acquisition_acceptance(
         query="time series anomaly detection",
         max_results=5,
         download_top_n=0,

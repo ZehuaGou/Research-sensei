@@ -32,6 +32,8 @@ def test_tracked_text_files_do_not_contain_utf8_gbk_mojibake() -> None:
         path = Path(raw_path)
         if path.suffix.lower() not in TEXT_EXTENSIONS:
             continue
+        if not path.exists():
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:

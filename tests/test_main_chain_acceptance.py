@@ -3,12 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from scripts.run_main_chain_smoke import (
+from scripts.run_main_chain_acceptance import (
     _handoff_payload,
     _select_handoff_candidate,
     evaluate_gating,
     read_cache,
-    run_main_chain_smoke,
+    run_main_chain_acceptance,
 )
 
 
@@ -142,14 +142,14 @@ def _seed_paper(arxiv_id: str, title: str, relation_type: str) -> dict[str, Any]
     }
 
 
-def test_main_chain_smoke_success_cards_gate() -> None:
+def test_main_chain_acceptance_success_cards_gate() -> None:
     client = FakeClient(
         final_status="SUCCESS",
         cards_status_code=200,
         cards_payload={"cards": {"paper_card": {}, "formula_cards": {}, "teaching_cards": {}}},
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
@@ -176,7 +176,7 @@ def test_main_chain_smoke_success_cards_gate() -> None:
     assert result["returned_card_components"] == ["formula_cards", "paper_card", "teaching_cards"]
 
 
-def test_main_chain_smoke_degraded_cards_gate_only_success_components() -> None:
+def test_main_chain_acceptance_degraded_cards_gate_only_success_components() -> None:
     client = FakeClient(
         final_status="DEGRADED_STRUCTURAL",
         cards_status_code=200,
@@ -185,7 +185,7 @@ def test_main_chain_smoke_degraded_cards_gate_only_success_components() -> None:
         seed_warnings=["SEED_SOURCE_FAILED:survey:semantic_scholar: RuntimeError: rate limited"],
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
@@ -199,14 +199,14 @@ def test_main_chain_smoke_degraded_cards_gate_only_success_components() -> None:
     assert any("SEED_SOURCE_FAILED" in warning for warning in result["warnings"])
 
 
-def test_main_chain_smoke_prefers_method_like_candidate_over_foundation() -> None:
+def test_main_chain_acceptance_prefers_method_like_candidate_over_foundation() -> None:
     client = FakeClient(
         final_status="DEGRADED_STRUCTURAL",
         cards_status_code=200,
         cards_payload={"cards": {"paper_card": {}, "teaching_cards": {}}},
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
@@ -217,7 +217,7 @@ def test_main_chain_smoke_prefers_method_like_candidate_over_foundation() -> Non
     assert result["selected_seed_handoff_arxiv_id"] == "2401.00004"
 
 
-def test_main_chain_smoke_refresh_cache_writes_direction_result(tmp_path: Path) -> None:
+def test_main_chain_acceptance_refresh_cache_writes_direction_result(tmp_path: Path) -> None:
     client = FakeClient(
         final_status="SUCCESS",
         cards_status_code=200,
@@ -225,7 +225,7 @@ def test_main_chain_smoke_refresh_cache_writes_direction_result(tmp_path: Path) 
     )
     cache_dir = tmp_path / "cache"
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
@@ -256,14 +256,14 @@ def test_handoff_candidate_selection_rejects_unrelated_source_backed_paper() -> 
     assert candidate is None
 
 
-def test_main_chain_smoke_blocked_cards_gate() -> None:
+def test_main_chain_acceptance_blocked_cards_gate() -> None:
     client = FakeClient(
         final_status="BLOCKED_UNDERSTANDING",
         cards_status_code=403,
         cards_payload={"detail": {"status": "BLOCKED_UNDERSTANDING"}},
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
@@ -274,7 +274,7 @@ def test_main_chain_smoke_blocked_cards_gate() -> None:
     assert result["cards_status_code"] == 403
 
 
-def test_main_chain_smoke_handoff_failure_returns_fail_summary() -> None:
+def test_main_chain_acceptance_handoff_failure_returns_fail_summary() -> None:
     client = FakeClient(
         final_status="",
         cards_status_code=0,
@@ -287,7 +287,7 @@ def test_main_chain_smoke_handoff_failure_returns_fail_summary() -> None:
         },
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="multivariate time series imputation",
         max_candidates=5,
@@ -300,19 +300,19 @@ def test_main_chain_smoke_handoff_failure_returns_fail_summary() -> None:
     assert result["message"] == "PDF download failed for the direction candidate."
 
 
-def test_main_chain_smoke_no_llm_baseline_is_degraded() -> None:
+def test_main_chain_acceptance_no_llm_baseline_is_degraded() -> None:
     client = FakeClient(
         final_status="BASELINE_ONLY",
         cards_status_code=403,
         cards_payload={"detail": {"status": "BASELINE_ONLY"}},
     )
 
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query="time series anomaly detection",
         max_candidates=5,
         llm_enabled=False,
-        llm_mode_note="MIMO_API_KEY is missing; running no-LLM smoke and expecting BASELINE_ONLY.",
+        llm_mode_note="MIMO_API_KEY is missing; running no-LLM acceptance and expecting BASELINE_ONLY.",
     )
 
     assert result["final_verdict"] == "DEGRADED"

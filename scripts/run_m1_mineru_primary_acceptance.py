@@ -64,7 +64,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run real MinerU2.5-Pro primary M1 acceptance.")
     parser.add_argument("--limit", type=int, default=2, help="Number of selected unseen papers to run.")
     parser.add_argument("--keys", default=",".join(DEFAULT_KEYS), help="Comma-separated arXiv short IDs from the candidate pool.")
-    parser.add_argument("--max-pages", type=int, default=0, help="Developer smoke limit. Acceptance must use 0.")
+    parser.add_argument("--max-pages", type=int, default=0, help="Developer page limit. Formal acceptance must use 0.")
     parser.add_argument("--render-scale", type=float, default=1.0)
     parser.add_argument("--force", action="store_true", help="Ignore cached MinerU page JSON.")
     parser.add_argument("--enable-ollama-latex", action="store_true", help="Run Ollama formula LaTeX polishing after MinerU extraction.")
@@ -348,7 +348,7 @@ def canonical_match_count(formulas: Iterable[Any], canonical_text: str) -> int:
 def acceptance_reasons(metrics: dict[str, Any]) -> list[str]:
     reasons: list[str] = []
     if metrics["max_pages"]:
-        reasons.append("SMOKE_MAX_PAGES_NOT_FORMAL_ACCEPTANCE")
+        reasons.append("LIMITED_MAX_PAGES_NOT_FORMAL_ACCEPTANCE")
     if metrics["primary_parser"] != "mineru25pro":
         reasons.append("PRIMARY_PARSER_NOT_MINERU25PRO")
     if metrics["fallback_used"]:
@@ -525,7 +525,7 @@ def write_top_level(candidates: list[Candidate], rows: list[dict[str, Any]], *, 
         "",
         "Primary route: MinerU2.5-Pro via mineru-vl-utils + RuleBasedStructureRefiner.",
         "Fallback parsers are not used for PASS claims in this report.",
-        f"Acceptance mode: {'SMOKE (max_pages set)' if max_pages else 'FULL PAPER'}",
+        f"Acceptance mode: {'LIMITED (max_pages set)' if max_pages else 'FULL PAPER'}",
         "",
         "## Candidate Search",
         "",

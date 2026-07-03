@@ -1,6 +1,6 @@
-"""Fix M1 acceptance package: search consistency, crop padding, groups, nearby text.
+"""Repair M1 acceptance package: search consistency, crop padding, groups, nearby text.
 
-Does NOT re-run MinerU parse. Reads existing artifacts and fixes:
+Does NOT re-run MinerU parse. Reads existing artifacts and repairs:
 1. candidate_papers.json consistency with metadata_candidates.json
 2. Crop padding (increase from ~4px to 12px)
 3. Equation group identification for multi-line formulas
@@ -19,11 +19,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def fix_acceptance_package(accept_dir: Path) -> None:
-    """Fix all issues in the acceptance package."""
+def repair_acceptance_package(accept_dir: Path) -> None:
+    """Repair known issues in the acceptance package."""
     accept_dir = Path(accept_dir)
     print("=" * 60)
-    print("M1 Acceptance Package Fix")
+    print("M1 Acceptance Package Repair")
     print("=" * 60)
 
     # Load existing artifacts
@@ -34,27 +34,27 @@ def fix_acceptance_package(accept_dir: Path) -> None:
 
     print(f"Loaded: {len(slots)} slots, {len(blocks)} blocks")
 
-    # ── Fix 1: candidate_papers.json consistency ──
-    print("\n[1/7] Fixing candidate_papers.json...")
-    _fix_candidate_papers(accept_dir, meta)
+    # ── Repair 1: candidate_papers.json consistency ──
+    print("\n[1/7] Repairing candidate_papers.json...")
+    _repair_candidate_papers(accept_dir, meta)
 
-    # ── Fix 2: Add nearby_text from document_blocks ──
+    # ── Repair 2: Add nearby_text from document_blocks ──
     print("\n[2/7] Adding nearby_text from document_blocks...")
     _add_nearby_text(slots, blocks)
 
-    # ── Fix 3: Add equation group info ──
+    # ── Repair 3: Add equation group info ──
     print("\n[3/7] Adding equation group info...")
     _add_equation_groups(slots, blocks)
 
-    # ── Fix 4: Re-generate crops with more padding ──
+    # ── Repair 4: Re-generate crops with more padding ──
     print("\n[4/7] Re-generating crops with increased padding...")
     _regenerate_crops(accept_dir, slots)
 
-    # ── Fix 5: Re-generate overlays ──
+    # ── Repair 5: Re-generate overlays ──
     print("\n[5/7] Re-generating overlays...")
     _regenerate_overlays(accept_dir, slots)
 
-    # ── Fix 6: Save updated formula_slots.json ──
+    # ── Repair 6: Save updated formula_slots.json ──
     print("\n[6/7] Saving updated formula_slots.json...")
     (accept_dir / "formula_slots.json").write_text(
         json.dumps(slots, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -62,7 +62,7 @@ def fix_acceptance_package(accept_dir: Path) -> None:
     # Also update formula_slots.md
     _write_formula_slots_md(accept_dir, slots)
 
-    # ── Fix 7: Re-generate all reports and zip ──
+    # ── Repair 7: Re-generate all reports and zip ──
     print("\n[7/7] Re-generating reports and zip...")
     _regenerate_all_reports(accept_dir, slots, blocks, meta, perf)
 
@@ -71,7 +71,7 @@ def fix_acceptance_package(accept_dir: Path) -> None:
     print("=" * 60)
 
 
-def _fix_candidate_papers(accept_dir: Path, meta: dict) -> None:
+def _repair_candidate_papers(accept_dir: Path, meta: dict) -> None:
     """Replace candidate_papers.json with metadata_candidates.json data."""
     mc_path = accept_dir / "metadata_candidates.json"
     if not mc_path.exists():
@@ -847,10 +847,10 @@ def _create_zip(source_dir: Path, zip_path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Fix an explicit M1 acceptance package directory.")
+    parser = argparse.ArgumentParser(description="Repair an explicit M1 acceptance package directory.")
     parser.add_argument("accept_dir", type=Path, help="M1 acceptance artifact directory to repair.")
     args = parser.parse_args(argv)
-    fix_acceptance_package(args.accept_dir)
+    repair_acceptance_package(args.accept_dir)
     return 0
 
 

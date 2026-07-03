@@ -24,10 +24,9 @@ from starlette.testclient import TestClient
 from researchsensei.core.env_loader import load_runtime_env
 from researchsensei.web.app import create_app
 
-# Import smoke functions - import the module, not individual names
-# so cache helpers and other utilities are available.
+# Import acceptance helpers as a module so cache helpers and utilities are available.
 sys.path.insert(0, str(ROOT / "scripts"))
-import run_main_chain_smoke as smoke  # noqa: E402
+import run_main_chain_acceptance as acceptance  # noqa: E402
 
 DEFAULT_QUERIES = [
     "time series anomaly detection",
@@ -75,7 +74,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _resolve_llm_mode(provider: str, skip_llm: bool) -> dict[str, object]:
-    return smoke.resolve_llm_mode(provider=provider, skip_llm=skip_llm)
+    return acceptance.resolve_llm_mode(provider=provider, skip_llm=skip_llm)
 
 
 def _classify_failure_root_cause(row: dict[str, Any]) -> str:
@@ -184,15 +183,15 @@ def _run_query_with_timeout(
     try:
         message = result_queue.get_nowait()
     except queue.Empty:
-        return _worker_failed_result(query, llm_mode, "Smoke worker exited without returning a result.")
+        return _worker_failed_result(query, llm_mode, "Acceptance worker exited without returning a result.")
 
     if not isinstance(message, dict) or not message.get("ok"):
         error = str((message or {}).get("error") if isinstance(message, dict) else message)
-        return _worker_failed_result(query, llm_mode, error or "Smoke worker failed.")
+        return _worker_failed_result(query, llm_mode, error or "Acceptance worker failed.")
     result = message.get("result")
     if isinstance(result, dict):
         return result
-    return _worker_failed_result(query, llm_mode, "Smoke worker returned a non-object result.")
+    return _worker_failed_result(query, llm_mode, "Acceptance worker returned a non-object result.")
 
 
 def _query_payload(args: argparse.Namespace, query: str, llm_mode: dict[str, object]) -> dict[str, Any]:
@@ -228,7 +227,7 @@ def _run_query_direct(payload: dict[str, Any]) -> dict[str, Any]:
             llm_provider=str(payload["provider"]) if payload["llm_enabled"] else "",
         )
     )
-    return smoke.run_main_chain_smoke(
+    return acceptance.run_main_chain_acceptance(
         client,
         query=str(payload["query"]),
         max_candidates=int(payload["max_candidates"]),
@@ -252,13 +251,13 @@ def _timeout_result(query: str, llm_mode: dict[str, object], timeout_seconds: fl
 
 
 def _worker_failed_result(query: str, llm_mode: dict[str, object], error: str) -> dict[str, Any]:
-    message = f"Main-chain smoke worker failed: {error}"
+    message = f"Main-chain acceptance worker failed: {error}"
     return _failed_query_result(
         query,
         llm_mode,
         stage="worker_error",
         message=message,
-        warnings=["SMOKE_WORKER_FAILED"],
+        warnings=["ACCEPTANCE_WORKER_FAILED"],
     )
 
 

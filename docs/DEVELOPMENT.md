@@ -8,7 +8,7 @@ evidence, blockers, and next steps. This file records development discipline.
 - Do not commit `.env`, API keys, downloaded PDFs/source archives, caches, model
   weights, or generated report files.
 - Do not relax QualityAuditor, FSA-5, evidence validation, or `/cards` gating to
-  make a smoke pass.
+  make an acceptance pass.
 - Do not expose partial user-facing cards when a core LLM card builder fails.
   `paper_card`, `formula_cards`, and `teaching_cards` failures must fail closed.
 - Do not let M4 answers bypass M2 artifacts, evidence refs, or explicit
@@ -28,7 +28,7 @@ evidence, blockers, and next steps. This file records development discipline.
 | M2 parser/evidence/cards/audit | `src/researchsensei/parser/`, `src/researchsensei/evidence/`, `src/researchsensei/ingestion/`, `src/researchsensei/audit/` | `docs/development/M2_5_FULL_PIPELINE.md` |
 | M3 API/UI | `src/researchsensei/web/app.py`, `frontend/src/views/`, `frontend/src/components/` | `docs/development/M3_FRONTEND_RENDER.md` |
 | M4 interactive learning v1 | `src/researchsensei/m4/`, `src/researchsensei/schemas/m4.py`, PaperWorkspace M4 components | `docs/development/M4_INTERACTIVE_LEARNING.md` |
-| Reliability and smokes | `scripts/`, `tests/`, `frontend/src/**/tests/` | `docs/STATUS.md` |
+| Reliability and acceptance checks | `scripts/`, `tests/`, `frontend/src/**/tests/` | `docs/STATUS.md` |
 
 ## Configuration
 
@@ -77,12 +77,12 @@ cd frontend
 npm run dev
 ```
 
-Main-chain smoke with ccswitch:
+Main-chain acceptance with ccswitch:
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
 $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
+.venv\Scripts\python.exe scripts\run_main_chain_acceptance.py --query "time series anomaly detection" --provider cc_switch
 ```
 
 ## Continuation Discipline

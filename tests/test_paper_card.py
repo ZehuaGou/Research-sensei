@@ -3,9 +3,10 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
+from researchsensei.audit.quality_auditor import QualityAuditor
 from researchsensei.ingestion.pipeline import _summarize_raw_copy_paper_card_fields
-from researchsensei.paper_card import build_paper_card
-from researchsensei.schemas import PaperSkeleton
+from researchsensei.paper_card import build_paper_card, summarize_paper_card_field
+from researchsensei.schemas import ArtifactBundle, PaperSkeleton
 from researchsensei.schemas.evidence import EvidencePack, EvidencePackItem
 
 
@@ -34,6 +35,8 @@ def test_paper_card_summarizes_llm_raw_copy_fields() -> None:
     assert card.method_overview.text != passage
     assert "PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: method_overview" in card.warnings
     assert "F-SE-LSTM" in card.method_overview.text
+    report = QualityAuditor().audit(_audit_bundle(card, skeleton, passage))
+    assert not [finding for finding in report.findings if finding.code == "F-8" and finding.effect == "BLOCK"]
 
 
 def test_paper_card_summarizes_raw_copy_after_fallback_ref() -> None:
@@ -45,6 +48,14 @@ def test_paper_card_summarizes_raw_copy_after_fallback_ref() -> None:
     assert card.method_overview.text != passage
     assert "PAPER_CARD_FIELD_DEGRADED: method_overview" in card.warnings
     assert "PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: method_overview" in card.warnings
+
+
+def test_paper_card_summarizes_supported_limitations_without_error() -> None:
+    _pack, skeleton, passage = _raw_copy_fixture()
+    summary = summarize_paper_card_field("limitations", passage, skeleton)
+
+    assert "F-SE-LSTM" in summary
+    assert summary.startswith("证据指向")
 
 
 def test_pipeline_summarizes_raw_copy_before_quality_audit() -> None:
@@ -73,6 +84,8 @@ def test_pipeline_summarizes_raw_copy_before_quality_audit() -> None:
 
     assert updated["paper_card"].method_overview.text != passage
     assert "PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: method_overview" in updated["paper_card"].warnings
+    report = QualityAuditor().audit(_audit_bundle(updated["paper_card"], skeleton, passage))
+    assert not [finding for finding in report.findings if finding.code == "F-8" and finding.effect == "BLOCK"]
 
 
 def _raw_copy_fixture() -> tuple[EvidencePack, PaperSkeleton, str]:
@@ -106,3 +119,24 @@ def _raw_copy_fixture() -> tuple[EvidencePack, PaperSkeleton, str]:
         experiment_overview=passage,
     )
     return pack, skeleton, passage
+
+
+def _audit_bundle(card, skeleton: PaperSkeleton, passage: str) -> ArtifactBundle:
+    return ArtifactBundle(
+        paper_card=card.model_dump(mode="json"),
+        claim_evidence={
+            "claims": [
+                {
+                    "claim_id": "paper:claim:c001",
+                    "claim_type": "METHOD",
+                    "evidence_ref": "paper:b001",
+                    "passage_id": "paper:b001",
+                    "quote_or_summary": passage,
+                    "source_sentence": passage,
+                    "claim_text": passage,
+                }
+            ]
+        },
+        evidence_index={"paper_id": "paper", "claims": []},
+        paper_skeleton=skeleton.model_dump(mode="json"),
+    )

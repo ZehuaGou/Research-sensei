@@ -85,13 +85,13 @@ The report shows **3-layer GPU status**:
 | 2. PyTorch CUDA | `torch.cuda.is_available()` | PyTorch can use the GPU |
 | 3. Not CPU-only | `torch.version.cuda` is not None | Correct PyTorch build installed |
 
-## Running MinerU GPU Smoke Test
+## Running MinerU GPU Check
 
 ```bash
-.\.venv\Scripts\python.exe scripts\m1_mineru_gpu_smoke_test.py
+.\.venv\Scripts\python.exe scripts\run_m1_mineru_gpu_check.py
 ```
 
-Outputs: `reports/m1_gpu_smoke_test/gpu_smoke_report.md`
+Outputs: `reports/m1_gpu_check/gpu_check_report.md`
 
 **Pass criteria**:
 - `device_mode_actual == "cuda"` (not "cpu")

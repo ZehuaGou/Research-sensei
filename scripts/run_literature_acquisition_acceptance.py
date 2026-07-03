@@ -41,7 +41,7 @@ SEARCH_SOURCE_ORDER = ["arxiv", "openalex", "semantic_scholar", "crossref", "dbl
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Smoke-test ResearchSensei M1 literature acquisition and legal full-text discovery.")
+    parser = argparse.ArgumentParser(description="Acceptance-check ResearchSensei M1 literature acquisition and legal full-text discovery.")
     parser.add_argument("--query", default="")
     parser.add_argument("--fixture", default="", help="JSON fixture list of acquisition queries and minimum expectations.")
     parser.add_argument("--max-results", type=int, default=20)
@@ -51,7 +51,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default="arxiv,openalex,semanticscholar,crossref,dblp,unpaywall",
         help="Comma-separated sources: arxiv,openalex,semanticscholar,crossref,dblp,unpaywall",
     )
-    parser.add_argument("--workspace", default=str(ROOT / "workspace" / "literature_acquisition_smoke"))
+    parser.add_argument("--workspace", default=str(ROOT / "workspace" / "literature_acquisition_acceptance"))
     return parser.parse_args(argv)
 
 
@@ -71,14 +71,14 @@ def main(argv: list[str] | None = None) -> int:
     else:
         if not args.query:
             raise SystemExit("ERROR: --query is required unless --fixture is provided.")
-        result = run_literature_acquisition_smoke(
+        result = run_literature_acquisition_acceptance(
             query=args.query,
             max_results=args.max_results,
             download_top_n=args.download_top_n,
             sources=_parse_sources(args.sources),
             workspace=Path(args.workspace),
         )
-    print("ResearchSensei literature acquisition smoke summary")
+    print("ResearchSensei literature acquisition acceptance summary")
     print(json.dumps(result, ensure_ascii=False, indent=2))
     return 0 if result["verdict"] == "PASS" else 2
 
@@ -105,7 +105,7 @@ def run_literature_acquisition_fixture(
         query = str(row.get("query") or "").strip()
         if not query:
             raise ValueError(f"Fixture {fixture_path} row is missing query")
-        result = run_literature_acquisition_smoke(
+        result = run_literature_acquisition_acceptance(
             query=query,
             max_results=int(row.get("max_results") or max_results),
             download_top_n=int(row.get("download_top_n") or download_top_n),
@@ -137,7 +137,7 @@ def run_literature_acquisition_fixture(
     }
 
 
-def run_literature_acquisition_smoke(
+def run_literature_acquisition_acceptance(
     *,
     query: str,
     max_results: int,

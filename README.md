@@ -94,12 +94,12 @@ npm run dev
 The frontend dev server runs on port `13000` and proxies API traffic to backend
 port `8765`.
 
-Main-chain smoke with ccswitch:
+Main-chain acceptance with ccswitch:
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
 $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
+.venv\Scripts\python.exe scripts\run_main_chain_acceptance.py --query "time series anomaly detection" --provider cc_switch
 ```
 
 Live tests are opt-in. They require explicit environment gates:

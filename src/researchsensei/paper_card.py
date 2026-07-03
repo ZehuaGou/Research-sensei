@@ -209,20 +209,16 @@ def _fallback_claim(
 def _fallback_summary_text(field: str, text: str, skeleton: PaperSkeleton) -> str:
     if _looks_insufficient(text):
         return "证据不足，暂不展开。"
-    topic = _paper_topic(skeleton)
-    keywords = _keywords(text, skeleton.title)
-    phrase = "、".join(keywords[:4])
-    if not phrase:
-        phrase = topic
+    phrase = _summary_phrase(text, skeleton.title, limit=4) or "论文主题"
     if field == "problem":
-        return f"论文聚焦 {topic}，指出现有处理仍受 {phrase} 等因素限制。"
+        return f"论文把 {phrase} 概括为主要研究问题。"
     if field == "core_idea":
-        return f"核心想法围绕 {topic} 引入 {phrase}，以改进论文关注的任务。"
+        return f"核心想法围绕 {phrase} 形成方法改进。"
     if field == "method_overview":
-        return f"方法围绕 {phrase} 组织，用于解决 {topic} 中的关键建模问题。"
+        return f"方法围绕 {phrase} 展开建模流程。"
     if field == "experiment_summary":
-        return f"实验围绕 {topic} 评估方法，并报告 {phrase} 等对比信号。"
-    return f"证据指向 {topic} 中的 {phrase}。"
+        return f"实验摘要保留 {phrase} 相关证据信号。"
+    return f"证据指向 {phrase}。"
 
 
 def _claim_from_text(text: str, ref: str, evidence_pack: EvidencePack) -> CardClaim:
@@ -268,16 +264,36 @@ def _paper_topic(skeleton: PaperSkeleton) -> str:
     return "这篇论文"
 
 
+def _summary_phrase(text: str, title: str = "", *, limit: int) -> str:
+    terms = _keywords(title) + _keywords(text)
+    selected: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        key = term.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        selected.append(term)
+        if len(selected) >= limit:
+            break
+    return "、".join(selected)
+
+
 def _keywords(text: str, title: str = "") -> list[str]:
     candidates = []
     combined = f"{title} {text}"
-    for pattern in (
+    case_sensitive_patterns = (
         r"\b[A-Z][A-Z0-9-]{2,}\b",
         r"\b[A-Za-z]+-[A-Za-z0-9-]+\b",
+    )
+    phrase_patterns = (
         r"\b(?:frequency domain|time domain|time series|anomaly detection|frequency matrix)\b",
         r"\b(?:FFT|SENet|LSTM|Transformer|diffusion|graph neural network|GNN)\b",
         r"\b(?:accuracy|precision|recall|F1|AUC|dataset|benchmark)\b",
-    ):
+    )
+    for pattern in case_sensitive_patterns:
+        candidates.extend(match.group(0) for match in re.finditer(pattern, combined))
+    for pattern in phrase_patterns:
         candidates.extend(match.group(0) for match in re.finditer(pattern, combined, flags=re.IGNORECASE))
     cleaned: list[str] = []
     seen: set[str] = set()

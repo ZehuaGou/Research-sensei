@@ -102,13 +102,13 @@ Seed Expansion output must include:
 When real citation data is unavailable, relation reasons must say weak
 query/title-similarity or metadata relation. Do not fake a citation graph.
 
-## Smoke Command
+## Acceptance Command
 
 ```powershell
-.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
+.venv\Scripts\python.exe scripts\run_literature_acquisition_acceptance.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
 ```
 
-The smoke prints source metrics, dedup totals, non-arXiv counts, legal full-text
+The acceptance command prints source metrics, dedup totals, non-arXiv counts, legal full-text
 counts, source/PDF/metadata-only counts, and top failure reasons. It writes no
 report files.
 

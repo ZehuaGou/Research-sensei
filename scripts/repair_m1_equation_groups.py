@@ -1,6 +1,6 @@
-"""Fix M1 equation groups and generate group-level crops.
+"""Repair M1 equation groups and generate group-level crops.
 
-Fixes:
+Repairs:
 1. Equation group identification by equation number (not proximity)
 2. Group-level crops and overlays
 3. Group-level visual audit pages
@@ -31,11 +31,11 @@ def extract_equation_number(latex: str) -> int | None:
     return None
 
 
-def fix_equation_groups(accept_dir: Path) -> None:
-    """Fix equation group identification and generate group crops."""
+def repair_equation_groups(accept_dir: Path) -> None:
+    """Repair equation group identification and generate group crops."""
     accept_dir = Path(accept_dir)
     print("=" * 60)
-    print("M1 Equation Group Fix")
+    print("M1 Equation Group Repair")
     print("=" * 60)
 
     slots = json.loads((accept_dir / "formula_slots.json").read_text(encoding="utf-8"))
@@ -819,10 +819,10 @@ def _create_zip(source_dir: Path, zip_path: Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Fix equation groups for an explicit M1 acceptance directory.")
+    parser = argparse.ArgumentParser(description="Repair equation groups for an explicit M1 acceptance directory.")
     parser.add_argument("accept_dir", type=Path, help="M1 acceptance artifact directory to repair.")
     args = parser.parse_args(argv)
-    fix_equation_groups(args.accept_dir)
+    repair_equation_groups(args.accept_dir)
     return 0
 
 

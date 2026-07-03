@@ -1,11 +1,11 @@
-"""M1 MinerU GPU Smoke Test — verify MinerU2.5-Pro runs on GPU.
+"""M1 MinerU GPU Check — verify MinerU2.5-Pro runs on GPU.
 
 Creates a minimal single-page PDF, runs MinerU parse on it,
 and verifies device_mode_actual=cuda.
 
 Outputs:
-  reports/m1_gpu_smoke_test/gpu_smoke_report.md
-  reports/m1_gpu_smoke_test/gpu_smoke_report.json
+  reports/m1_gpu_check/gpu_check_report.md
+  reports/m1_gpu_check/gpu_check_report.json
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "reports" / "m1_gpu_smoke_test"
+OUT = ROOT / "reports" / "m1_gpu_check"
 
 
 def _create_test_pdf(path: Path) -> Path:
@@ -26,7 +26,7 @@ def _create_test_pdf(path: Path) -> Path:
     doc = fitz.open()
     page = doc.new_page(width=595, height=842)  # A4
     # Title
-    page.insert_text((72, 72), "GPU Smoke Test Document", fontsize=18, fontname="helv")
+    page.insert_text((72, 72), "GPU Check Document", fontsize=18, fontname="helv")
     # Body text
     page.insert_text(
         (72, 120),
@@ -67,10 +67,10 @@ def _get_gpu_memory() -> dict:
     return result
 
 
-def run_smoke_test(device_mode: str = "auto") -> dict:
-    """Run MinerU GPU smoke test on a minimal PDF."""
+def run_mineru_gpu_check(device_mode: str = "auto") -> dict:
+    """Run MinerU GPU check on a minimal PDF."""
     print("=" * 60)
-    print("M1 MinerU GPU Smoke Test")
+    print("M1 MinerU GPU Check")
     print("=" * 60)
 
     # Pre-checks
@@ -105,7 +105,7 @@ def run_smoke_test(device_mode: str = "auto") -> dict:
 
     # Create test PDF
     OUT.mkdir(parents=True, exist_ok=True)
-    test_pdf = OUT / "_smoke_test_input.pdf"
+    test_pdf = OUT / "_check_input.pdf"
     _create_test_pdf(test_pdf)
     print(f"  Test PDF: {test_pdf}")
 
@@ -153,7 +153,7 @@ def run_smoke_test(device_mode: str = "auto") -> dict:
     print("  Parsing test PDF (1 page)...")
     parse_start = time.time()
     try:
-        blocks, meta = adapter.parse_pdf(test_pdf, output_dir=OUT / "_smoke_output")
+        blocks, meta = adapter.parse_pdf(test_pdf, output_dir=OUT / "_check_output")
     except Exception as e:
         report = {
             "timestamp": datetime.datetime.now().isoformat(),
@@ -216,9 +216,9 @@ def run_smoke_test(device_mode: str = "auto") -> dict:
     # Cleanup
     test_pdf.unlink(missing_ok=True)
     import shutil
-    smoke_out = OUT / "_smoke_output"
-    if smoke_out.exists():
-        shutil.rmtree(smoke_out, ignore_errors=True)
+    check_output = OUT / "_check_output"
+    if check_output.exists():
+        shutil.rmtree(check_output, ignore_errors=True)
 
     _write_report(report)
     return report
@@ -226,13 +226,13 @@ def run_smoke_test(device_mode: str = "auto") -> dict:
 
 def _write_report(report: dict) -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "gpu_smoke_report.json").write_text(
+    (OUT / "gpu_check_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
     success_str = "PASS" if report.get("success") else "FAIL"
     lines = [
-        "# M1 MinerU GPU Smoke Test Report",
+        "# M1 MinerU GPU Check Report",
         "",
         f"Generated: {report.get('timestamp', 'unknown')}",
         "",
@@ -279,7 +279,7 @@ def _write_report(report: dict) -> None:
     if not report.get("warnings"):
         lines.append("- None")
 
-    (OUT / "gpu_smoke_report.md").write_text("\n".join(lines), encoding="utf-8")
+    (OUT / "gpu_check_report.md").write_text("\n".join(lines), encoding="utf-8")
 
 
 def main() -> int:
@@ -287,7 +287,7 @@ def main() -> int:
     if len(sys.argv) > 1:
         device_mode = sys.argv[1]
 
-    report = run_smoke_test(device_mode)
+    report = run_mineru_gpu_check(device_mode)
     return 0 if report.get("success") else 1
 
 

@@ -103,13 +103,13 @@ REAL_E2E. Raw/source handoff jobs can be SUCCESS, DEGRADED_STRUCTURAL, or
 BLOCKED_UNDERSTANDING depending on evidence and provenance. That fail-closed
 behavior is correct.
 
-## Smoke Command
+## Acceptance Command
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
 $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
+.venv\Scripts\python.exe scripts\run_main_chain_acceptance.py --query "time series anomaly detection" --provider cc_switch
 ```
 
-The smoke exercises M1 direction search, seed expansion, deep_read handoff,
+The acceptance command exercises M1 direction search, seed expansion, deep_read handoff,
 M2 understanding status, and M3 `/cards` gating. It writes no report files.

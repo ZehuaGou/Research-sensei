@@ -49,13 +49,13 @@ class ClientLike(Protocol):
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the ResearchSensei M1 -> M2 -> M3 main-chain smoke through local API handlers."
+        description="Run the ResearchSensei M1 -> M2 -> M3 main-chain acceptance through local API handlers."
     )
     parser.add_argument("--query", default="time series anomaly detection")
     parser.add_argument("--provider", default="cc_switch")
     parser.add_argument("--max-candidates", type=int, default=10)
     parser.add_argument("--skip-llm", action="store_true")
-    parser.add_argument("--workspace", default=str(ROOT / "workspace" / "main_chain_smoke"))
+    parser.add_argument("--workspace", default=str(ROOT / "workspace" / "main_chain_acceptance"))
     parser.add_argument("--use-cache", action="store_true", help="Use cached direction search results when available.")
     parser.add_argument("--refresh-cache", action="store_true", help="Force refresh cache even if valid entry exists.")
     parser.add_argument("--cache-dir", default=str(ROOT / ".cache" / "researchsensei"), help="Cache directory for direction search results.")
@@ -63,7 +63,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--llm-card-timeout-seconds",
         type=float,
         default=0.0,
-        help="Override per-card LLM timeout for smoke runs. Use 0 for application default.",
+        help="Override per-card LLM timeout for acceptance runs. Use 0 for application default.",
     )
     return parser.parse_args(argv)
 
@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
             llm_provider=args.provider if llm_mode["enabled"] else "",
         )
     )
-    result = run_main_chain_smoke(
+    result = run_main_chain_acceptance(
         client,
         query=args.query,
         max_candidates=args.max_candidates,
@@ -104,7 +104,7 @@ def resolve_llm_mode(*, provider: str, skip_llm: bool) -> dict[str, object]:
     if not _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"):
         return {
             "enabled": False,
-            "note": "RESEARCHSENSEI_ENABLE_API_LLM is not enabled; running no-LLM smoke and expecting BASELINE_ONLY.",
+            "note": "RESEARCHSENSEI_ENABLE_API_LLM is not enabled; running no-LLM acceptance and expecting BASELINE_ONLY.",
         }
     if provider not in config.providers:
         raise SystemExit(f"ERROR: unknown LLM provider '{provider}'. Configure it in config/local.toml or config/sensei.example.toml.")
@@ -112,12 +112,12 @@ def resolve_llm_mode(*, provider: str, skip_llm: bool) -> dict[str, object]:
     if provider_config.api_key_env and not os.getenv(provider_config.api_key_env, ""):
         return {
             "enabled": False,
-            "note": f"{provider_config.api_key_env} is missing; running no-LLM smoke and expecting BASELINE_ONLY.",
+            "note": f"{provider_config.api_key_env} is missing; running no-LLM acceptance and expecting BASELINE_ONLY.",
         }
     return {"enabled": True, "note": f"LLM enabled with provider '{provider}'."}
 
 
-def run_main_chain_smoke(
+def run_main_chain_acceptance(
     client: ClientLike,
     *,
     query: str,
@@ -308,7 +308,7 @@ def evaluate_gating(
 
     if not llm_enabled:
         if final_status != "BASELINE_ONLY":
-            reasons.append(f"no-LLM smoke expected BASELINE_ONLY, got {final_status}")
+            reasons.append(f"no-LLM acceptance expected BASELINE_ONLY, got {final_status}")
         if cards_status_code != 403:
             reasons.append(f"BASELINE_ONLY cards endpoint must be 403, got {cards_status_code}")
         return ("DEGRADED" if not reasons else "FAIL", reasons)
@@ -395,7 +395,7 @@ def _seed_metrics_by_source(metrics: Any) -> dict[str, dict[str, Any]]:
 
 
 def print_summary(result: dict[str, Any]) -> None:
-    print("ResearchSensei main-chain smoke summary")
+    print("ResearchSensei main-chain acceptance summary")
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

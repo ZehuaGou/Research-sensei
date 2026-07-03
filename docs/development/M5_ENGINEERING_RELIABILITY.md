@@ -3,7 +3,7 @@
 This file is a reliability contract, not a current status table.
 `docs/STATUS.md` is authoritative for module state and evidence.
 
-M5 itself does not implement business features. It defines testing, smoke,
+M5 itself does not implement business features. It defines testing, acceptance,
 security, configuration, and reporting discipline for implemented surfaces.
 M4 v1 is covered by local regression tests, including evidence-validated LLM
 answer handling. PaperQA/vector-memory M4 reliability remains future work.
@@ -11,7 +11,7 @@ answer handling. PaperQA/vector-memory M4 reliability remains future work.
 ## Goals
 
 - Keep local regression commands repeatable.
-- Keep live smokes explicit and scoped.
+- Keep live acceptance checks explicit and scoped.
 - Prevent `.env`, keys, downloaded papers, source archives, cache, and generated
   report files from entering git.
 - Keep source/adapters replaceable.
@@ -43,26 +43,26 @@ npm test
 npm run build
 ```
 
-Literature acquisition live smoke:
+Literature acquisition live acceptance:
 
 ```powershell
-.venv\Scripts\python.exe scripts\run_literature_acquisition_smoke.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
+.venv\Scripts\python.exe scripts\run_literature_acquisition_acceptance.py --query "time series anomaly detection" --max-results 80 --download-top-n 10
 ```
 
-Main-chain live smoke with ccswitch:
+Main-chain live acceptance with ccswitch:
 
 ```powershell
 $env:RESEARCHSENSEI_ENABLE_API_LLM="1"
 $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
-.venv\Scripts\python.exe scripts\run_main_chain_smoke.py --query "time series anomaly detection" --provider cc_switch
+.venv\Scripts\python.exe scripts\run_main_chain_acceptance.py --query "time series anomaly detection" --provider cc_switch
 ```
 
-## Smoke Reporting Contract
+## Acceptance Reporting Contract
 
-Do not write new report files for routine readiness smokes. Console output and a
+Do not write new report files for routine readiness checks. Console output and a
 brief scoped update in `docs/STATUS.md` are enough.
 
-Literature smoke must show:
+Literature acceptance must show:
 
 - attempted sources;
 - returned count by source;
@@ -74,7 +74,7 @@ Literature smoke must show:
 - Unpaywall success/failure counts when email is configured;
 - top failure reasons.
 
-Main-chain smoke must show:
+Main-chain acceptance must show:
 
 - selected candidate title and source IDs;
 - selected input type and source strategy;
