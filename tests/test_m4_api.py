@@ -15,9 +15,11 @@ class ScriptedM4LLM:
         self.calls = 0
         self.evidence_refs = evidence_refs or ["paper:b001"]
         self.answer = answer
+        self.messages = []
 
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
+        self.messages.append(messages)
         return {
             "answer": self.answer,
             "evidence_refs": self.evidence_refs,
@@ -291,6 +293,67 @@ def test_m4_ask_uses_llm_when_client_is_configured(tmp_path: Path) -> None:
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": True}
     assert data["warnings"] == []
     assert llm.calls == 1
+
+
+def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    llm = ScriptedM4LLM(
+        answer=(
+            "重点：稀疏证据会让检索变脆弱，论文用注意力结构把分散证据片段连接起来。"
+            "\n\n问题：障碍是证据分散。核心机制：attention architecture 建立片段之间的联系。"
+            "\n\n为什么有效：它把检索问题转成可聚合的证据连接。对应证据：正文方法段说明该结构连接 sparse evidence passages。"
+        )
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "为什么这个方法能处理稀疏证据？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": True}
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "稀疏证据" in data["answer"]
+    prompt = json.loads(llm.messages[0][1].content)
+    context_text = json.dumps(prompt["context"], ensure_ascii=False)
+    assert prompt["allowed_evidence_refs"] == ["paper:b001"]
+    assert "sparse evidence passages" in context_text
+    assert "attention architecture" in context_text
+    assert "front_matter" not in context_text
+
+
+def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "为什么这个方法能处理稀疏证据？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["answer"].startswith("重点：针对“为什么这个方法能处理稀疏证据？”")
+    assert "贴着你的问题看：" in data["answer"]
+    assert "attention architecture links sparse evidence passages" in data["answer"]
+    assert "paper:b001" not in data["answer"]
 
 
 def test_m4_ask_answers_runtime_model_question_without_paper_fallback(tmp_path: Path) -> None:

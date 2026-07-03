@@ -208,12 +208,17 @@ class M4InteractionService:
         else:
             answer, evidence_refs, confidence, warnings = self._answer_from_artifacts(question)
 
+        llm_evidence_refs = self._expanded_question_evidence_refs(
+            question=question,
+            selected_text=selected_text,
+            seed_refs=evidence_refs,
+        )
         used_context = {"memory": False, "artifacts": True, "llm": False}
         llm_result = self._answer_with_llm(
             question=question,
             selected_text=selected_text,
             fallback_answer=answer,
-            allowed_evidence_refs=evidence_refs,
+            allowed_evidence_refs=llm_evidence_refs or evidence_refs,
         )
         if llm_result is not None:
             answer = llm_result["answer"]
@@ -380,6 +385,29 @@ class M4InteractionService:
         self._write_memory(bundle)
         return bundle
 
+    def _expanded_question_evidence_refs(
+        self,
+        *,
+        question: str,
+        selected_text: str,
+        seed_refs: list[str],
+        limit: int = 6,
+    ) -> list[str]:
+        refs = list(seed_refs)
+        query = f"{question} {selected_text}".strip()
+        for candidate, score in self._ranked_evidence_candidates(query):
+            ref = _clean(candidate.get("evidence_ref"))
+            if not ref or ref in refs:
+                continue
+            if score < 0.08 and refs:
+                continue
+            refs.append(ref)
+            if len(refs) >= limit:
+                break
+        if not refs:
+            refs.extend(self._paper_card_refs())
+        return _unique(refs)[:limit]
+
     def _answer_with_llm(
         self,
         *,
@@ -406,6 +434,7 @@ class M4InteractionService:
                 "不要逐字复述 selected_text；尤其不要整段复制 LaTeX、KaTeX 或公式源码。",
                 "公式只保留必要符号，优先解释变量含义、机制和论文里的作用。",
                 "回答要像真实助教：先直接回答问题，不要用“可以这样理解”“这段内容说明了”这类空泛开场。",
+                "如果 question 在问“为什么/怎么/能不能”，answer 必须给出因果链：论文要解决的障碍是什么、方法做了哪一步、这一步为什么能回应障碍。",
                 "每个段落至少落到一个具体对象，例如变量、模块、训练项、数据集、指标、约束或论文中的方法步骤。",
                 "解释公式时，如果 context 里有参数/符号或关键项，必须单独讲清楚它们各自的作用。",
                 "论文级方法、贡献、证据问题开头必须用“重点：...”一句话凸显最核心抓手。",
@@ -430,6 +459,7 @@ class M4InteractionService:
                     "即使用户问题、选中文本或证据是英文，也要翻译成中文解释。"
                     "不要整段复制 LaTeX/KaTeX/公式源码；要把公式转成中文含义和作用。"
                     "回答要像真实助教，先直接解释用户问的点，再展开变量、机制、证据中的具体细节。"
+                    "如果用户问的是自己的疑问，要围绕这个疑问组织因果解释，不要退回成通用论文摘要。"
                     "论文级问题必须给正文细节，不要只回答标题、作者或一句摘要。"
                     "answer 字段面向用户，不能出现 evidence_ref、memory_ref、job id、b038、eq009、m4_xxx 等内部编号。"
                     "只返回 JSON，不要输出 Markdown。evidence_refs 必须从 allowed_evidence_refs 中原样复制。"
@@ -476,6 +506,11 @@ class M4InteractionService:
     def _answer_from_artifacts(self, question: str) -> tuple[str, list[str], float, list[WarningItem]]:
         lower = question.lower()
         paper_card = _as_dict(self.artifacts.get("paper_card"))
+        ranked_evidence = [
+            candidate
+            for candidate, score in self._ranked_evidence_candidates(question)
+            if score >= 0.08 and not _is_front_matter_candidate(candidate)
+        ][:3]
         if any(term in lower for term in ["formula", "equation", "symbol", "公式", "方程", "符号"]):
             formula = self._find_formula("")
             if formula is not None:
@@ -487,7 +522,12 @@ class M4InteractionService:
                     [] if ref else [_warning("FORMULA_EVIDENCE_MISSING", "这张公式卡片没有 evidence_ref。")],
                 )
         if _is_evidence_question(question):
-            answer = _structured_paper_answer(paper_card, focus="对应证据")
+            answer = _structured_paper_answer(
+                paper_card,
+                focus="对应证据",
+                question=question,
+                evidence_rows=ranked_evidence,
+            )
             refs = _primary_paper_card_refs(paper_card)
             if answer and refs:
                 return answer, refs, 0.82, []
@@ -503,13 +543,29 @@ class M4InteractionService:
                 text = _claim_text(paper_card.get(field))
                 ref = _claim_ref(paper_card.get(field))
                 if text:
-                    answer = _structured_paper_answer(paper_card, focus=label)
+                    answer = _structured_paper_answer(
+                        paper_card,
+                        focus=label,
+                        question=question,
+                        evidence_rows=ranked_evidence,
+                    )
                     refs = _primary_paper_card_refs(paper_card) or _list_of_one(ref)
                     return answer or f"关于“{label}”：{text}", refs, 0.82 if refs else 0.4, []
         summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
         refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
         if summary:
-            return _structured_paper_answer(paper_card, focus="论文核心") or f"论文层面的回答：{summary}", refs[:2], 0.75 if refs else 0.35, []
+            return (
+                _structured_paper_answer(
+                    paper_card,
+                    focus="论文核心",
+                    question=question,
+                    evidence_rows=ranked_evidence,
+                )
+                or f"论文层面的回答：{summary}",
+                refs[:2],
+                0.75 if refs else 0.35,
+                [],
+            )
         return (
             "M4 没有找到足够的卡片或证据上下文来回答这个问题。",
             [],
@@ -604,6 +660,33 @@ class M4InteractionService:
                 best_score = score
         return {**best, "score": max(0.0, min(0.95, best_score))}
 
+    def _ranked_evidence_candidates(self, query: str) -> list[tuple[dict[str, object], float]]:
+        candidates = self._evidence_candidates()
+        if not candidates:
+            return []
+        query_terms = _expanded_query_terms(query)
+        normalized_query = _normalize(query)
+        ranked: list[tuple[dict[str, object], float]] = []
+        for candidate in candidates:
+            haystack = _candidate_text(candidate)
+            haystack_terms = _expanded_query_terms(haystack)
+            overlap = len(query_terms & haystack_terms)
+            score = overlap / max(len(query_terms), 1)
+            haystack_lower = haystack.lower()
+            for term in query_terms:
+                if len(term) >= 4 and term in haystack_lower:
+                    score += 0.04
+            if normalized_query and normalized_query in _normalize(haystack):
+                score += 0.35
+            section = _clean(candidate.get("section")).lower()
+            if any(marker in section for marker in ["front", "title", "author"]):
+                score -= 0.35
+            if _clean(candidate.get("claim_type")).upper() in {"METHOD", "RESULT", "FINDING"}:
+                score += 0.08
+            ranked.append((candidate, max(0.0, min(0.99, score))))
+        ranked.sort(key=lambda item: item[1], reverse=True)
+        return ranked
+
     def _evidence_candidates(self) -> list[dict[str, object]]:
         candidates: list[dict[str, object]] = []
         passage_by_id: dict[str, dict[str, object]] = {}
@@ -624,6 +707,7 @@ class M4InteractionService:
             candidates.append({
                 "evidence_ref": _clean(claim.get("evidence_ref")),
                 "passage_id": passage_id,
+                "claim_type": _clean(claim.get("claim_type")),
                 "claim_text": _clean(claim.get("claim_text")),
                 "quote_or_summary": _clean(claim.get("quote_or_summary")),
                 "source_sentence": _clean(claim.get("source_sentence")),
@@ -823,7 +907,13 @@ def _paper_card_evidence_answer(paper_card: dict[str, object]) -> str:
     return "当前论文卡片中的主要依据可以这样看：" + "；".join(rendered) + "。"
 
 
-def _structured_paper_answer(paper_card: dict[str, object], *, focus: str = "") -> str:
+def _structured_paper_answer(
+    paper_card: dict[str, object],
+    *,
+    focus: str = "",
+    question: str = "",
+    evidence_rows: list[dict[str, object]] | None = None,
+) -> str:
     rows = _paper_card_claim_rows(paper_card)
     if not rows:
         summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
@@ -844,7 +934,10 @@ def _structured_paper_answer(paper_card: dict[str, object], *, focus: str = "") 
     elif focus == "核心想法" and idea:
         focus_text = idea
 
-    parts = [f"重点：{focus_text}"]
+    if question:
+        parts = [f"重点：针对“{_compact_user_text(question, max_chars=90)}”，这篇论文给出的抓手是：{focus_text}"]
+    else:
+        parts = [f"重点：{focus_text}"]
     if problem:
         parts.append(f"问题：{problem}")
     if idea or method:
@@ -860,6 +953,13 @@ def _structured_paper_answer(paper_card: dict[str, object], *, focus: str = "") 
     if why_items:
         parts.append(f"为什么有效：{'；'.join(why_items)}")
     evidence_lines = [f"{label}来自论文卡片中的正文依据：{text}" for label, text, _ref in rows[:4]]
+    focused_evidence = [
+        _candidate_user_facing_evidence(candidate)
+        for candidate in (evidence_rows or [])
+        if _candidate_user_facing_evidence(candidate)
+    ]
+    if focused_evidence:
+        parts.append("贴着你的问题看：" + "；".join(focused_evidence[:3]))
     if evidence_lines:
         parts.append("对应证据：" + "；".join(evidence_lines))
     return "\n\n".join(parts)
@@ -1313,6 +1413,79 @@ def _unique(values: list[str]) -> list[str]:
             result.append(value)
             seen.add(value)
     return result
+
+
+def _candidate_text(candidate: dict[str, object]) -> str:
+    return " ".join(
+        _clean(candidate.get(key))
+        for key in ("claim_text", "quote_or_summary", "source_sentence", "text", "section", "claim_type")
+        if _clean(candidate.get(key))
+    )
+
+
+def _candidate_user_facing_evidence(candidate: dict[str, object]) -> str:
+    if _is_front_matter_candidate(candidate):
+        return ""
+    section = _clean(candidate.get("section")) or "正文"
+    text = (
+        _clean(candidate.get("claim_text"))
+        or _clean(candidate.get("quote_or_summary"))
+        or _clean(candidate.get("source_sentence"))
+        or _clean(candidate.get("text"))
+    )
+    if not text:
+        return ""
+    return f"{section}：{_compact_user_text(text, max_chars=220)}"
+
+
+def _is_front_matter_candidate(candidate: dict[str, object]) -> bool:
+    section = _clean(candidate.get("section")).lower()
+    claim_type = _clean(candidate.get("claim_type")).upper()
+    return claim_type == "BACKGROUND" and "front" in section or any(
+        marker in section for marker in ["front", "title", "author"]
+    )
+
+
+def _expanded_query_terms(value: str) -> set[str]:
+    text = _clean(value).lower()
+    terms = set(_tokens(text))
+    expansions = {
+        "稀疏": {"sparse"},
+        "证据": {"evidence", "passage", "claim"},
+        "片段": {"passage", "evidence"},
+        "检索": {"retrieval", "retrieve", "search"},
+        "注意力": {"attention"},
+        "方法": {"method", "architecture", "model"},
+        "机制": {"mechanism", "method", "architecture"},
+        "实验": {"experiment", "benchmark", "evaluation"},
+        "结果": {"result", "benchmark", "metric"},
+        "局限": {"limitation", "weakness", "future"},
+        "贡献": {"contribution", "idea"},
+        "为什么": {"why", "because", "solve"},
+        "处理": {"handle", "solve", "address"},
+        "解决": {"solve", "address"},
+        "有效": {"effective", "work", "useful"},
+        "公式": {"formula", "equation", "symbol"},
+    }
+    for marker, mapped_terms in expansions.items():
+        if marker in text:
+            terms.update(mapped_terms)
+    reverse = {
+        "sparse": {"稀疏"},
+        "evidence": {"证据", "片段"},
+        "passage": {"证据", "片段"},
+        "retrieval": {"检索"},
+        "attention": {"注意力"},
+        "method": {"方法", "机制"},
+        "architecture": {"方法", "机制"},
+        "experiment": {"实验"},
+        "benchmark": {"实验", "结果"},
+        "limitation": {"局限"},
+        "formula": {"公式"},
+    }
+    for token in list(terms):
+        terms.update(reverse.get(token, set()))
+    return terms
 
 
 def _normalize(value: str) -> str:
