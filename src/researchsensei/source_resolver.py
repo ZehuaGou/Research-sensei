@@ -219,7 +219,7 @@ class PaperSourceResolver:
                     continue
                 response.raise_for_status()
                 break
-            except (httpx.TimeoutException, httpx.ConnectError, OSError) as exc:
+            except (httpx.TimeoutException, httpx.TransportError, OSError) as exc:
                 if attempt < max_retries - 1:
                     wait = backoff[min(attempt, len(backoff) - 1)]
                     logger.warning(

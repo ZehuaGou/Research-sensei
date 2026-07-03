@@ -19,6 +19,9 @@ from researchsensei.source_resolver import SourceResolver
 logger = logging.getLogger(__name__)
 
 READY_STATUSES = {"source_ready", "pdf_ready", "html_ready"}
+PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other"}
+UNVERIFIED_OFFICIAL_PDF_SOURCE = "official_pdf_url_unverified"
+UNVERIFIED_OFFICIAL_PDF_REASON = "PDF_URL_REQUIRES_DOWNLOAD_VERIFICATION"
 
 
 class FullTextResolver:
@@ -50,7 +53,16 @@ class FullTextResolver:
         pdf_cache: PdfCache | None = None,
         cache_root: str | Path | None = None,
     ) -> None:
-        self.http_client = http_client or httpx.Client(follow_redirects=True, trust_env=True)
+        default_headers = {
+            "User-Agent": "ResearchSensei/0.5 (+https://github.com/ZehuaGou/Research-sensei)",
+            "Accept": "application/pdf,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Connection": "close",
+        }
+        self.http_client = http_client or httpx.Client(
+            follow_redirects=True,
+            trust_env=True,
+            headers=default_headers,
+        )
         self.timeout_seconds = timeout_seconds
         self.max_download_bytes = max_download_bytes
         self.landing_extractor = landing_extractor or LandingPdfExtractor(
@@ -211,6 +223,7 @@ class FullTextResolver:
                 except OSError as exc:
                     logger.warning("PDF cache hit but copy failed: %s; falling back to download", exc)
 
+        download_verified = False
         if download and status in READY_STATUSES and run_dir is not None:
             selected_source, selected_url, status, reason = self._verify_download(
                 candidate,
@@ -218,6 +231,7 @@ class FullTextResolver:
                 selected_url=selected_url,
                 run_dir=Path(run_dir),
             )
+            download_verified = status == "pdf_ready"
             # On successful download, populate the PDF cache so subsequent
             # resolves of the same DOI/arxiv_id short-circuit.
             if (
@@ -251,6 +265,15 @@ class FullTextResolver:
                             break
                 except OSError as exc:
                     logger.warning("PDF cache write failed: %s", exc)
+
+        if (
+            status == "pdf_ready"
+            and not download_verified
+            and _requires_download_verification(selected_url)
+        ):
+            selected_source = UNVERIFIED_OFFICIAL_PDF_SOURCE
+            status = "metadata_only"
+            reason = UNVERIFIED_OFFICIAL_PDF_REASON
 
         can_deep_read = status in READY_STATUSES
         needs_user_upload = not can_deep_read or status == "metadata_only"
@@ -372,13 +395,14 @@ class FullTextResolver:
         metrics: list[dict[str, object]] = []
         errors: list[str] = []
         for landing_url in landing_urls:
-            is_oa, archive_kind, _ = is_known_oa_landing(landing_url)
-            if not is_oa:
+            is_oa, archive_kind, cfg = is_known_oa_landing(landing_url)
+            can_probe = archive_kind in PROBE_ONLY_ARCHIVE_KINDS
+            if not is_oa and not can_probe:
                 continue
             started = time.perf_counter()
             result = self.landing_extractor.extract(landing_url)
             error = ";".join(result.warnings)
-            source = f"landing_extractor:{result.archive_kind or archive_kind or 'oa'}"
+            source = f"landing_extractor:{result.archive_kind or archive_kind or (cfg.archive_kind if cfg else '') or 'oa'}"
             metrics.append(_metric(source, bool(result.pdf_url), 1 if result.pdf_url else 0, started, error))
             if result.pdf_url and _is_legal_pdf_url(result.pdf_url):
                 pdf_urls.append(result.pdf_url)
@@ -515,7 +539,34 @@ def _is_legal_pdf_url(url: str) -> bool:
     # article/download or article/view galley URLs without a .pdf suffix.
     if "ojs.aaai.org" in lower and re.search(r"/article/(?:download|view)/\d+/\d+", lower):
         return True
+    if "ieeexplore.ieee.org/stamp/stamp.jsp" in lower:
+        return True
     return False
+
+
+def _requires_download_verification(url: str) -> bool:
+    """Official non-OA publisher PDF URLs are usable only after a real PDF fetch.
+
+    ACM/IEEE/Springer landing pages often expose a /pdf URL even when the file
+    may still be gated. Keep the candidate URL so the downloader can try it, but
+    do not mark it as deep-readable until the bytes are validated.
+    """
+    lower = str(url or "").lower()
+    if not lower:
+        return False
+    is_oa, archive_kind, cfg = is_known_oa_landing(lower)
+    archive = archive_kind or (cfg.archive_kind if cfg else "")
+    if archive in PROBE_ONLY_ARCHIVE_KINDS and not is_oa:
+        return True
+    return any(
+        marker in lower
+        for marker in (
+            "dl.acm.org/doi/pdf",
+            "dl.acm.org/doi/epdf",
+            "ieeexplore.ieee.org/stamp/stamp.jsp",
+            "link.springer.com/content/pdf",
+        )
+    )
 
 
 def _pdf_source_label(url: str) -> str:

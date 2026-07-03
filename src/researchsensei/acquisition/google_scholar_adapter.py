@@ -9,7 +9,9 @@ import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import urlparse
 
+from researchsensei.acquisition.venue_registry import is_known_oa_landing
 from researchsensei.schemas import CandidatePaper
 
 _MCP_REPO_URL = "https://github.com/JackKuo666/Google-Scholar-MCP-Server.git"
@@ -76,6 +78,8 @@ class GoogleScholarAdapter:
         url = _field(row, "URL", "url", "Link", "link")
         abstract = _field(row, "Abstract", "abstract")
         parsed = _parse_google_scholar_author_line(author_line)
+        inferred_venue = _venue_from_url(url)
+        venue = _choose_venue(parsed["venue"], inferred_venue)
         scholar_id = _stable_id(title)
         arxiv_id = _arxiv_id_from_text(url)
         pdf_url = _pdf_url_from_text(url)
@@ -84,7 +88,7 @@ class GoogleScholarAdapter:
             title=title,
             authors=parsed["authors"],
             year=parsed["year"],
-            venue=parsed["venue"],
+            venue=venue,
             source="google_scholar",
             sources=["google_scholar"],
             source_ids={"google_scholar": scholar_id},
@@ -102,6 +106,7 @@ class GoogleScholarAdapter:
             raw_source_metadata={
                 "rank": index,
                 "mcp_project": "JackKuo666/Google-Scholar-MCP-Server",
+                "venue_inferred_from_url": bool(inferred_venue and inferred_venue == venue),
                 "raw_result": dict(row),
                 "note": "Google Scholar MCP is used for discovery; full text is resolved by legal OA/source resolvers.",
             },
@@ -255,11 +260,19 @@ def _parse_google_scholar_author_line(value: str) -> dict[str, object]:
     authors = _authors(parts[0] if parts else "")
     year = None
     venue = ""
-    if len(parts) >= 2:
-        match = re.search(r"\b(19|20)\d{2}\b", parts[1])
+    info_parts = parts[1:]
+    for part in info_parts:
+        match = re.search(r"\b(19|20)\d{2}\b", part)
         if match:
             year = int(match.group(0))
-        venue = re.sub(r"\b(19|20)\d{2}\b", "", parts[1]).strip(" ,")
+            break
+    for part in info_parts:
+        candidate = re.sub(r"\b(19|20)\d{2}\b", "", part).strip(" ,")
+        if candidate and not _looks_like_host(candidate):
+            venue = candidate
+            break
+    if not venue and info_parts:
+        venue = re.sub(r"\b(19|20)\d{2}\b", "", info_parts[0]).strip(" ,")
     return {"authors": authors, "year": year, "venue": venue}
 
 
@@ -282,7 +295,44 @@ def _pdf_url_from_text(text: str) -> str:
         return ""
     if "ojs.aaai.org" in lower and re.search(r"/article/(?:download|view)/\d+/\d+", lower):
         return value
+    if "ieeexplore.ieee.org/stamp/stamp.jsp" in lower:
+        return value
     return value if lower.endswith(".pdf") or "/pdf" in lower else ""
+
+
+def _venue_from_url(url: str) -> str:
+    value = str(url or "")
+    if not value:
+        return ""
+    _, _, cfg = is_known_oa_landing(value)
+    if cfg is not None:
+        return cfg.canonical_name
+    host = urlparse(value).netloc.lower()
+    host_map = {
+        "dl.acm.org": "ACM Digital Library",
+        "ieeexplore.ieee.org": "IEEE Xplore",
+        "link.springer.com": "Springer",
+        "proceedings.neurips.cc": "NeurIPS",
+        "proceedings.mlr.press": "PMLR",
+        "openreview.net": "OpenReview",
+        "aclanthology.org": "ACL Anthology",
+        "www.usenix.org": "USENIX",
+        "jmlr.org": "JMLR",
+    }
+    return host_map.get(host, "")
+
+
+def _choose_venue(parsed_venue: str, inferred_venue: str) -> str:
+    parsed = str(parsed_venue or "").strip()
+    inferred = str(inferred_venue or "").strip()
+    if inferred and (not parsed or _looks_like_host(parsed)):
+        return inferred
+    return parsed or inferred
+
+
+def _looks_like_host(value: str) -> bool:
+    lower = str(value or "").strip().lower()
+    return bool(re.fullmatch(r"(?:www\.)?[a-z0-9.-]+\.[a-z]{2,}(?:/.*)?", lower))
 
 
 def _stable_id(title: str) -> str:

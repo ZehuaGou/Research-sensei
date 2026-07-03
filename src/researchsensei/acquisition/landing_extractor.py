@@ -70,6 +70,7 @@ class LandingResult:
 # ---------------------------------------------------------------------------
 ExtractorFn = Callable[..., str | None]
 _EXTRACTOR_REGISTRY: dict[str, ExtractorFn] = {}
+PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other"}
 
 
 def register(archive_kind: str) -> Callable[[ExtractorFn], ExtractorFn]:
@@ -124,7 +125,7 @@ class LandingPdfExtractor:
         - Network/parse errors become (warnings, pdf_url="").
         """
         is_oa, archive_kind, _ = is_known_oa_landing(landing_url)
-        if not is_oa:
+        if not is_oa and archive_kind not in PROBE_ONLY_ARCHIVE_KINDS:
             return LandingResult(pdf_url="", warnings=("NOT_KNOWN_OA_VENUE",), archive_kind=archive_kind)
         warnings: list[str] = []
         try:
@@ -191,7 +192,7 @@ def _generic_extract(*, html: str, base_url: str, archive_kind: str = "") -> str
     for iframe in soup.find_all("iframe", src=True):
         src = str(iframe["src"] or "")
         absolute = urljoin(base_url, src)
-        if ".pdf" in absolute.lower():
+        if _looks_like_pdf_url(absolute):
             return absolute
     # anchor with .pdf href
     for a in soup.find_all("a", href=True):
@@ -199,9 +200,19 @@ def _generic_extract(*, html: str, base_url: str, archive_kind: str = "") -> str
         if not href:
             continue
         absolute = urljoin(base_url, href)
-        if ".pdf" in absolute.lower():
+        if _looks_like_pdf_url(absolute):
             return absolute
     return None
+
+
+def _looks_like_pdf_url(url: str) -> bool:
+    lower = str(url or "").lower()
+    return (
+        lower.endswith(".pdf")
+        or "/pdf" in lower
+        or "pdf" in lower
+        or "ieeexplore.ieee.org/stamp/stamp.jsp" in lower
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -410,4 +421,43 @@ def _extract_vldb(*, html: str, base_url: str, archive_kind: str = "") -> str | 
     return None
 
 
-# Remove the accidental Arabic string leftover from auto-replace; harmless comment.
+@register("acm_dl")
+def _extract_acm_dl(*, html: str, base_url: str, archive_kind: str = "") -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
+    if meta and meta.get("content"):
+        return urljoin(base_url, str(meta["content"]).strip())
+    for a in soup.find_all("a", href=True):
+        href = str(a["href"] or "")
+        full = urljoin(base_url, href)
+        if "/doi/pdf/" in full.lower() or "/doi/epdf/" in full.lower() or _looks_like_pdf_url(full):
+            return full
+    return None
+
+
+@register("ieee")
+def _extract_ieee(*, html: str, base_url: str, archive_kind: str = "") -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
+    if meta and meta.get("content"):
+        return urljoin(base_url, str(meta["content"]).strip())
+    for a in soup.find_all("a", href=True):
+        href = str(a["href"] or "")
+        full = urljoin(base_url, href)
+        if "stamp/stamp.jsp" in full.lower() or _looks_like_pdf_url(full):
+            return full
+    return None
+
+
+@register("springer")
+def _extract_springer(*, html: str, base_url: str, archive_kind: str = "") -> str | None:
+    soup = BeautifulSoup(html, "html.parser")
+    meta = soup.find("meta", attrs={"name": "citation_pdf_url"})
+    if meta and meta.get("content"):
+        return urljoin(base_url, str(meta["content"]).strip())
+    for a in soup.find_all("a", href=True):
+        href = str(a["href"] or "")
+        full = urljoin(base_url, href)
+        if "/content/pdf/" in full.lower() or _looks_like_pdf_url(full):
+            return full
+    return None

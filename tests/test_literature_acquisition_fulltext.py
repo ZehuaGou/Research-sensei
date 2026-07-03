@@ -8,6 +8,7 @@ from researchsensei.acquisition.arxiv_adapter import ArxivAdapter
 from researchsensei.acquisition import FullTextResolver
 from researchsensei.acquisition.google_scholar_adapter import GoogleScholarAdapter
 from researchsensei.acquisition.openalex_adapter import OpenAlexAdapter
+from researchsensei.acquisition.venue_registry import lookup_venue
 from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarAdapter
 from researchsensei.schemas import CandidatePaper
 from researchsensei.selection import SelectionService
@@ -31,6 +32,8 @@ class StubResponse:
 class HtmlResponse:
     def __init__(self, text: str, *, url: str, status_code: int = 200) -> None:
         self.text = text
+        self.content = text.encode("utf-8")
+        self.headers: dict[str, str] = {"content-type": "text/html"}
         self.url = url
         self.status_code = status_code
 
@@ -46,6 +49,33 @@ class LandingClient:
 
     def get(self, url: str, **kwargs: object) -> HtmlResponse:
         self.calls.append({"url": url, **kwargs})
+        return HtmlResponse(self.html, url=url)
+
+
+class BinaryResponse:
+    def __init__(self, content: bytes, *, url: str, content_type: str = "application/pdf", status_code: int = 200) -> None:
+        self.content = content
+        self.text = content.decode("latin1", errors="ignore")
+        self.headers = {"content-type": content_type, "content-length": str(len(content))}
+        self.url = url
+        self.status_code = status_code
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            raise RuntimeError(f"HTTP {self.status_code}")
+
+
+class LandingAndPdfClient:
+    def __init__(self, html: str, pdf_url: str, pdf_content: bytes = b"%PDF-1.4\n% test\n") -> None:
+        self.html = html
+        self.pdf_url = pdf_url
+        self.pdf_content = pdf_content
+        self.calls: list[dict[str, object]] = []
+
+    def get(self, url: str, **kwargs: object) -> HtmlResponse | BinaryResponse:
+        self.calls.append({"url": url, **kwargs})
+        if url == self.pdf_url:
+            return BinaryResponse(self.pdf_content, url=url)
         return HtmlResponse(self.html, url=url)
 
 
@@ -324,6 +354,28 @@ def test_google_scholar_mcp_aaai_url_feeds_fulltext_resolver() -> None:
     assert metrics == []
 
 
+def test_google_scholar_adapter_infers_venue_from_landing_url() -> None:
+    GoogleScholarAdapter.clear_cache()
+    adapter = GoogleScholarAdapter(
+        search_function=FakeGoogleScholarMcpSearch([
+            {
+                "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+                "Authors": "A Deng, B Hooi - 2021 - ojs.aaai.org",
+                "Abstract": "We study graph neural network anomaly detection.",
+                "URL": "https://ojs.aaai.org/index.php/AAAI/article/view/16523",
+            }
+        ]),
+        min_request_interval_seconds=0,
+        cache_ttl_seconds=0,
+    )
+
+    paper = adapter.search("graph neural network anomaly detection", max_results=5)[0]
+
+    assert paper.year == 2021
+    assert paper.venue == "AAAI"
+    assert paper.raw_source_metadata["venue_inferred_from_url"] is True
+
+
 def test_openalex_oa_pdf_is_recognized_as_fulltext_candidate() -> None:
     resolver = FullTextResolver(unpaywall_email="")
     candidate = paper(
@@ -392,7 +444,7 @@ def test_known_oa_venue_landing_is_extracted_to_pdf() -> None:
     assert client.calls[0]["url"] == "https://ojs.aaai.org/index.php/AAAI/article/view/12345"
 
 
-def test_paywalled_landing_is_not_treated_as_fulltext() -> None:
+def test_official_landing_without_public_pdf_is_not_treated_as_fulltext() -> None:
     resolver = FullTextResolver(http_client=NoNetworkClient(), unpaywall_email="")
 
     resolved, metrics = resolver.resolve(
@@ -414,7 +466,114 @@ def test_paywalled_landing_is_not_treated_as_fulltext() -> None:
     assert resolved.fulltext_status == "metadata_only"
     assert resolved.can_deep_read is False
     assert resolved.needs_user_upload is True
-    assert metrics == []
+    assert metrics[0]["source"] == "landing_extractor:acm_dl"
+    assert metrics[0]["success"] is False
+
+
+def test_acm_landing_pdf_url_requires_download_verification() -> None:
+    html = """
+    <html><head>
+      <meta name="citation_pdf_url" content="https://dl.acm.org/doi/pdf/10.1145/1234567">
+    </head><body><a href="/doi/pdf/10.1145/1234567">PDF</a></body></html>
+    """
+    client = LandingClient(html)
+    resolver = FullTextResolver(http_client=client, unpaywall_email="")
+
+    resolved, metrics = resolver.resolve(
+        paper(
+            landing_url="https://dl.acm.org/doi/10.1145/1234567",
+            raw_source_metadata={
+                "best_oa_location": {
+                    "pdf_url": "",
+                    "landing_page_url": "https://dl.acm.org/doi/10.1145/1234567",
+                    "source": {"display_name": "ACM CHI"},
+                }
+            },
+        )
+    )
+
+    assert resolved.fulltext_status == "metadata_only"
+    assert resolved.can_deep_read is False
+    assert resolved.fulltext_failure_reason == "PDF_URL_REQUIRES_DOWNLOAD_VERIFICATION"
+    assert resolved.selected_fulltext_source == "official_pdf_url_unverified"
+    assert resolved.selected_fulltext_url == "https://dl.acm.org/doi/pdf/10.1145/1234567"
+    assert resolved.pdf_url == "https://dl.acm.org/doi/pdf/10.1145/1234567"
+    assert metrics[0]["source"] == "landing_extractor:acm_dl"
+    assert metrics[0]["success"] is True
+
+
+def test_acm_landing_pdf_download_promotes_to_ready(tmp_path: Path) -> None:
+    pdf_url = "https://dl.acm.org/doi/pdf/10.1145/1234567"
+    html = f"""
+    <html><head>
+      <meta name="citation_pdf_url" content="{pdf_url}">
+    </head><body><a href="/doi/pdf/10.1145/1234567">PDF</a></body></html>
+    """
+    client = LandingAndPdfClient(html, pdf_url)
+    resolver = FullTextResolver(http_client=client, unpaywall_email="")
+
+    resolved, metrics = resolver.resolve(
+        paper(
+            landing_url="https://dl.acm.org/doi/10.1145/1234567",
+            raw_source_metadata={
+                "best_oa_location": {
+                    "pdf_url": "",
+                    "landing_page_url": "https://dl.acm.org/doi/10.1145/1234567",
+                    "source": {"display_name": "ACM CHI"},
+                }
+            },
+        ),
+        download=True,
+        run_dir=tmp_path,
+    )
+
+    assert resolved.fulltext_status == "pdf_ready"
+    assert resolved.can_deep_read is True
+    assert resolved.selected_fulltext_source == "publisher_oa_pdf"
+    assert resolved.selected_fulltext_url == pdf_url
+    assert (tmp_path / "source.pdf").exists()
+    assert [call["url"] for call in client.calls] == [
+        "https://dl.acm.org/doi/10.1145/1234567",
+        pdf_url,
+    ]
+    assert metrics[0]["source"] == "landing_extractor:acm_dl"
+
+
+def test_venue_registry_covers_2026_ccf_a_conferences_and_journals() -> None:
+    ccf_a_venues = [
+        "PPoPP", "FAST", "DAC", "HPCA", "MICRO", "SC", "ASPLOS", "ISCA", "ACM SIGOPS ATC", "EuroSys", "HPDC",
+        "SIGCOMM", "MobiCom", "INFOCOM", "NSDI",
+        "CCS", "EUROCRYPT", "IEEE Symposium on Security and Privacy", "CRYPTO", "USENIX Security", "NDSS",
+        "PLDI", "POPL", "FSE", "SOSP", "OOPSLA", "ASE", "ICSE", "ISSTA", "OSDI", "Formal Methods",
+        "SIGMOD", "SIGKDD", "ICDE", "SIGIR", "VLDB",
+        "STOC", "SODA", "CAV", "FOCS", "LICS",
+        "ACM MM", "SIGGRAPH", "IEEE VR", "IEEE VIS",
+        "AAAI", "NeurIPS", "ACL", "CVPR", "ICCV", "ICML", "ICLR",
+        "CSCW", "CHI", "UbiComp", "UIST", "WWW", "RTSS",
+        "ACM Transactions on Computer Systems", "ACM Transactions on Storage",
+        "IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems",
+        "IEEE Transactions on Computers", "IEEE Transactions on Parallel and Distributed Systems",
+        "ACM Transactions on Architecture and Code Optimization",
+        "IEEE Journal on Selected Areas in Communications", "IEEE Transactions on Mobile Computing",
+        "IEEE Transactions on Networking", "IEEE Transactions on Dependable and Secure Computing",
+        "IEEE Transactions on Information Forensics and Security", "Journal of Cryptology",
+        "ACM Transactions on Programming Languages and Systems",
+        "ACM Transactions on Software Engineering and Methodology", "IEEE Transactions on Software Engineering",
+        "IEEE Transactions on Services Computing", "ACM Transactions on Database Systems",
+        "ACM Transactions on Information Systems", "IEEE Transactions on Knowledge and Data Engineering",
+        "The VLDB Journal", "IEEE Transactions on Information Theory", "Information and Computation",
+        "SIAM Journal on Computing", "ACM Transactions on Graphics",
+        "IEEE Transactions on Image Processing", "IEEE Transactions on Visualization and Computer Graphics",
+        "IEEE Transactions on Multimedia", "Artificial Intelligence",
+        "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+        "International Journal of Computer Vision", "Journal of Machine Learning Research",
+        "ACM Transactions on Computer-Human Interaction", "International Journal of Human-Computer Studies",
+        "Journal of the ACM", "Proceedings of the IEEE", "Science China Information Sciences", "Bioinformatics",
+    ]
+
+    missing = [venue for venue in ccf_a_venues if lookup_venue(venue) is None]
+
+    assert missing == []
 
 
 def test_openalex_preserves_locations_for_arxiv_crosslink() -> None:
