@@ -39,8 +39,8 @@ function mockM4Fetch() {
         user_question: focus,
         expected_answer_points: ['问题：论文要解决的问题', '机制：方法机制', '证据：对应证据'],
         answer_format: focus
-          ? ['你的问题：先点明你正在问什么', '论文回答：再直接回答', '证据依据：最后补依据']
-          : ['问题：先说痛点', '机制：再说方法', '证据：最后补依据'],
+          ? ['先用一句自然话回答你真正想问的点', '再把论文里的机制或发现解释成能听懂的因果链', '最后补一句：这个判断主要靠哪类正文证据支撑']
+          : ['先说明论文真正卡住的地方', '再讲方法怎么接上这个困难', '最后补一句它依靠哪类正文证据'],
         evidence_refs: ['paper:b002'],
       })
     }
@@ -136,7 +136,7 @@ describe('AskPanel', () => {
     })
     expect(wrapper.text()).toContain('M4 的正文回答。')
     expect(wrapper.text()).toContain('围绕你的问题：为什么这个方法能处理稀疏证据？')
-    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('你的问题：先点明你正在问什么')
+    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('先用一句自然话回答你真正想问的点')
     expect(wrapper.text()).not.toContain('paper:b001')
     expect(wrapper.text()).not.toContain('paper:b002')
   })
@@ -157,7 +157,7 @@ describe('AskPanel', () => {
       advisor_mode: 'group_meeting',
     })
     expect(wrapper.text()).toContain('组会追问：为什么这个方法能回应论文问题？')
-    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('问题：先说痛点')
+    expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('先说明论文真正卡住的地方')
     expect(wrapper.text()).not.toContain('paper:b002')
 
     await wrapper.get('[data-testid="advisor-answer"]').setValue('这个方法用 attention 连接证据。')

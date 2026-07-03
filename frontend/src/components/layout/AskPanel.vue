@@ -368,7 +368,7 @@ watch(() => store.currentJobId, () => {
     </section>
 
     <div class="quick-row">
-      <button type="button" @click="quick('请用中文按“问题-核心机制-为什么有效-对应证据”讲清楚这篇论文的核心方法，结合正文细节，不要只给一句话。')">讲方法</button>
+      <button type="button" @click="quick('请像助教一样自然地讲清楚这篇论文的核心方法：先讲它想解决什么困惑，再讲方法怎么起作用，最后补一句主要证据。不要写成死板提纲。')">讲方法</button>
       <button type="button" @click="quick('这条结论对应哪条证据？')">找证据</button>
       <button type="button" data-testid="advisor-button" @click="requestAdvisorQuestion">按问题追问</button>
       <button type="button" @click="clearMemory">清空</button>

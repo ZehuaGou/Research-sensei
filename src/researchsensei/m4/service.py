@@ -180,6 +180,18 @@ class M4InteractionService:
                 used_context={"memory": False, "artifacts": False, "llm": False},
                 warnings=[_warning("M4_GENERAL_CHAT", "问题没有指向当前论文证据。")],
             )
+        if not selected_text and _is_underspecified_question(question):
+            paper_card = _as_dict(self.artifacts.get("paper_card"))
+            return InteractiveAnswer(
+                status="DEGRADED",
+                answer=_clarifying_question_answer(question, paper_card),
+                evidence_refs=[],
+                memory_refs=[],
+                uncertainty="这个问题还不够具体，M4 先追问澄清，避免把论文内容硬套到你的问题上。",
+                follow_up_suggestions=_clarifying_follow_ups(paper_card),
+                used_context={"memory": False, "artifacts": False, "llm": False},
+                warnings=[_warning("QUESTION_UNDERSPECIFIED", "问题太宽或指代不清，需要先澄清。")],
+            )
 
         is_formula_question = _is_formula_question(question, selected_text)
         ignore_selection = _should_ignore_selection(question, selected_text)
@@ -305,16 +317,16 @@ class M4InteractionService:
         )
         if user_question:
             expected_points = [
-                f"你的问题：先明确回答“{user_question}”，不要换成泛泛的论文概述。",
+                f"先直接回答“{user_question}”，不要换成泛泛的论文概述。",
                 *expected_points,
             ]
             answer_format = [
-                "你的问题：先点明你正在问什么",
-                "论文回答：再用当前论文的机制或发现直接回答",
-                "证据依据：最后说明正文、方法、实验或局限中的哪类证据支撑",
+                "先用一句自然话回答你真正想问的点",
+                "再把论文里的机制或发现解释成能听懂的因果链",
+                "最后补一句：这个判断主要靠哪类正文证据支撑",
             ]
         else:
-            answer_format = ["问题：先说论文要解决的具体痛点", "机制：再说方法怎样作用到这个痛点", "证据：最后补一句论文中哪类依据支持这个判断"]
+            answer_format = ["先说明论文真正卡住的地方", "再讲方法怎么接上这个困难", "最后补一句它依靠哪类正文证据"]
         result = AdvisorQuestion(
             question=question,
             user_question=user_question,
@@ -445,8 +457,8 @@ class M4InteractionService:
                 "如果 question 在问“为什么/怎么/能不能”，answer 必须给出因果链：论文要解决的障碍是什么、方法做了哪一步、这一步为什么能回应障碍。",
                 "每个段落至少落到一个具体对象，例如变量、模块、训练项、数据集、指标、约束或论文中的方法步骤。",
                 "解释公式时，如果 context 里有参数/符号或关键项，必须单独讲清楚它们各自的作用。",
-                "论文级方法、贡献、证据问题开头必须用“重点：...”一句话凸显最核心抓手。",
-                "随后用独立中文标签组织：问题：...；核心机制：...；为什么有效：...；对应证据：...。",
+                "不要固定使用“重点：”“问题：”“核心机制：”“对应证据：”这类标题式模板；更像助教自然讲解，可以用短自然段和顺口的承接句。",
+                "论文级方法、贡献、证据问题开头先直接给一句自然回答，然后再顺着讲背景、机制、原因和证据。",
                 "对应证据只写论文中的依据内容，不要写 evidence_ref、memory_ref、job id、b038、eq009、m4_xxx 等内部编号。",
                 "优先使用 paper_card 和 claim_evidence 细节。",
                 "不要只给一句概括；除非 context 不足，至少说明两个具体机制、数据集、指标或变量。",
@@ -468,6 +480,7 @@ class M4InteractionService:
                     "不要整段复制 LaTeX/KaTeX/公式源码；要把公式转成中文含义和作用。"
                     "理论和公式必须讲懂：先给直觉，再讲对象，再讲逻辑链，不要只堆术语或翻译英文。"
                     "回答要像真实助教，先直接解释用户问的点，再展开变量、机制、证据中的具体细节。"
+                    "不要机械使用“重点/问题/核心机制/对应证据”标题，除非用户明确要求列表。"
                     "如果用户问的是自己的疑问，要围绕这个疑问组织因果解释，不要退回成通用论文摘要。"
                     "论文级问题必须给正文细节，不要只回答标题、作者或一句摘要。"
                     "answer 字段面向用户，不能出现 evidence_ref、memory_ref、job id、b038、eq009、m4_xxx 等内部编号。"
@@ -496,7 +509,9 @@ class M4InteractionService:
             return None
         if not isinstance(data, dict):
             return None
-        answer = _strip_internal_refs_from_answer(_normalize_answer_text(data.get("answer"), max_chars=1800))
+        answer = _soften_mechanical_answer(
+            _strip_internal_refs_from_answer(_normalize_answer_text(data.get("answer"), max_chars=1800))
+        )
         refs = _string_list(data.get("evidence_refs"))
         if not answer or not refs:
             return None
@@ -924,6 +939,42 @@ def _paper_card_evidence_answer(paper_card: dict[str, object]) -> str:
     return "当前论文卡片中的主要依据可以这样看：" + "；".join(rendered) + "。"
 
 
+def _clarifying_question_answer(question: str, paper_card: dict[str, object]) -> str:
+    question_hint = _compact_user_text(question, max_chars=80) or "这个问题"
+    method = _teach_phrase(_claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea")))
+    problem = _teach_phrase(_claim_text(paper_card.get("problem")))
+    choices = _clarifying_follow_ups(paper_card)
+    anchor = ""
+    if method:
+        anchor = f"我看当前论文里最容易先讲的是方法这块：{method}"
+    elif problem:
+        anchor = f"我看当前论文里最容易先讲的是它要解决的困难：{problem}"
+    else:
+        anchor = "我可以先围绕论文的问题、方法、证据或公式来讲。"
+    return (
+        f"我先追问一下：你说的“{question_hint}”是想问哪一块？"
+        f"\n\n{anchor}"
+        "\n\n你可以直接回我其中一种："
+        f"\n1. {choices[0]}"
+        f"\n2. {choices[1]}"
+        f"\n3. {choices[2]}"
+        "\n\n如果你只是想让我先讲，我会默认从“方法为什么能解决问题”开始讲。"
+    )
+
+
+def _clarifying_follow_ups(paper_card: dict[str, object]) -> list[str]:
+    method = _teach_phrase(_claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea")))
+    if method:
+        method_question = "你先讲这个方法到底怎么起作用。"
+    else:
+        method_question = "你先讲论文的核心方法。"
+    return [
+        method_question,
+        "我想看它对应哪几条证据。",
+        "我想问公式、变量或理论假设是什么意思。",
+    ]
+
+
 def _selection_followup_answer(*, question: str, selected_text: str, claim_text: str, section: str) -> str:
     label = _user_facing_section_label(section)
     question_hint = _compact_user_text(question, max_chars=90)
@@ -952,14 +1003,14 @@ def _missing_limitation_answer(
 ) -> str:
     rows = _paper_card_claim_rows(paper_card)
     parts = [
-        f"重点：针对“{_compact_user_text(question, max_chars=90)}”，当前论文卡片没有给出可追踪的局限证据，所以不能硬编局限。",
+        f"这个问题要谨慎一点：你问的是“{_compact_user_text(question, max_chars=90)}”，但当前论文卡片没有给出可追踪的局限证据，所以这里不能硬编局限。",
     ]
     method = _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
     experiment = _claim_text(paper_card.get("experiment_summary"))
     if method:
-        parts.append(f"已有证据能确认的是方法机制：{_teach_phrase(method)}")
+        parts.append(f"现在能确认的是方法怎么做：{_teach_phrase(method)}")
     if experiment:
-        parts.append(f"已有实验相关证据：{_teach_phrase(experiment)}")
+        parts.append(f"实验材料里能看到的是：{_teach_phrase(experiment)}")
     focused = []
     seen: set[str] = set()
     for candidate in evidence_rows or []:
@@ -969,9 +1020,9 @@ def _missing_limitation_answer(
             focused.append(rendered)
             seen.add(key)
     if focused:
-        parts.append("可用证据边界：" + "；".join(focused[:3]))
+        parts.append("也就是说，能追到的证据边界只有这些：" + "；".join(focused[:3]))
     elif rows:
-        parts.append("可用证据边界：" + "；".join(f"{label}：{_teach_phrase(text)}" for label, text, _ref in rows[:3]))
+        parts.append("也就是说，能追到的证据边界只有这些：" + "；".join(f"{label}：{_teach_phrase(text)}" for label, text, _ref in rows[:3]))
     parts.append("更稳妥的回答是：这篇论文当前材料支持它的方法和实验设置，但没有足够依据判断具体局限。")
     return "\n\n".join(parts)
 
@@ -986,7 +1037,7 @@ def _structured_paper_answer(
     rows = _paper_card_claim_rows(paper_card)
     if not rows:
         summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
-        return f"重点：{summary}" if summary else ""
+        return f"我先按论文整体来讲：{_teach_phrase(summary)}" if summary else ""
     by_label = {label: text for label, text, _ref in rows}
     problem = _teach_phrase(by_label.get("研究问题", ""))
     idea = _teach_phrase(by_label.get("核心想法", ""))
@@ -1006,17 +1057,20 @@ def _structured_paper_answer(
         focus_text = limitations
 
     if question:
-        parts = [f"重点：针对“{_compact_user_text(question, max_chars=90)}”，这篇论文给出的抓手是：{focus_text}"]
+        parts = [f"我先按“{_compact_user_text(question, max_chars=90)}”来理解：这篇论文的抓手是{focus_text}"]
     else:
-        parts = [f"重点：{focus_text}"]
+        parts = [f"这篇论文的抓手是{focus_text}"]
     if problem:
-        parts.append(f"问题：{problem}")
+        parts.append(f"它先遇到的困难是{problem}")
     if idea or method:
-        mechanism = "；".join(item for item in [idea, method] if item)
-        parts.append(f"核心机制：{mechanism}")
+        mechanism = _join_distinct_phrases([idea, method])
+        parts.append(f"做法上，{mechanism}。")
     why_items = []
     if problem and method:
-        why_items.append(f"它不是空泛地说“提升检索”，而是把“{method}”作为具体步骤，用来回应“{problem}”这个困难")
+        why_items.append(
+            f"它不是空泛地说“提升检索”，而是把“{_strip_terminal_punctuation(method)}”作为具体步骤，"
+            f"用来回应“{_strip_terminal_punctuation(problem)}”这个困难"
+        )
     elif method:
         why_items.append("它把论文的方法主张落到可执行的建模步骤上")
     if experiment:
@@ -1024,7 +1078,7 @@ def _structured_paper_answer(
     if limitations:
         why_items.append(f"同时要注意局限：{limitations}")
     if why_items:
-        parts.append(f"为什么有效：{'；'.join(why_items)}")
+        parts.append(f"这一步之所以有用，是因为{'；'.join(why_items)}")
     evidence_lines = [f"{label}来自论文卡片中的正文依据：{_teach_phrase(text)}" for label, text, _ref in rows[:4]]
     focused_evidence: list[str] = []
     seen_focused_evidence: set[str] = set()
@@ -1038,9 +1092,9 @@ def _structured_paper_answer(
             seen_focused_evidence.add(key)
             seen_focused_bodies.add(body_key)
     if focused_evidence:
-        parts.append("贴着你的问题看：" + "；".join(focused_evidence[:3]))
+        parts.append("贴着你的问题看，可以追到这些依据：" + "；".join(focused_evidence[:3]))
     if evidence_lines:
-        parts.append("对应证据：" + "；".join(evidence_lines))
+        parts.append("更完整的证据边界是：" + "；".join(evidence_lines))
     return "\n\n".join(parts)
 
 
@@ -1076,15 +1130,15 @@ def _formula_full_explanation(formula: dict[str, object]) -> str:
     sensitivity = _teach_phrase(_clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect")))
 
     parts = [
-        f"一句话直觉：这条公式是在把论文里的一个理论对象变成可计算的分数或权重，方便模型判断它有多重要。",
-        f"先看目标：{purpose}",
+        f"可以先把这条公式看成一个“打分器”：它把论文里的理论对象变成可计算的分数或权重，方便模型判断哪部分更重要。",
+        f"放到这篇论文里，它的目标是{purpose}",
     ]
     if symbols:
-        parts.append(f"对象是什么：{symbols}")
+        parts.append(f"这里最重要的对象是：{symbols}")
     if terms:
-        parts.append(f"关键项：{terms}")
+        parts.append(f"如果拆开关键项，可以这样看：{terms}")
     if intuition and intuition != purpose:
-        parts.append(f"为什么这样做：{intuition}")
+        parts.append(f"为什么要这样做呢？{intuition}")
     if example:
         parts.append(f"例子：{example}")
     if removed:
@@ -1141,14 +1195,14 @@ def _formula_term_summary(formula: dict[str, object]) -> str:
 def _advisor_expected_points_from_claims(*, problem: str, method: str, core_idea: str) -> list[str]:
     points = []
     if problem:
-        points.append(f"问题：点明论文要解决的痛点是“{problem}”。")
+        points.append(f"先说清楚论文真正卡住的地方是“{problem}”。")
     if method:
-        points.append(f"机制：解释方法怎样发挥作用，而不是只复述名称；当前方法是“{method}”。")
+        points.append(f"讲方法时别只复述名称，要说明“{method}”到底怎样发挥作用。")
     elif core_idea:
-        points.append(f"机制：解释核心想法怎样发挥作用，而不是只复述名称；当前想法是“{core_idea}”。")
+        points.append(f"讲核心想法时别只复述名称，要说明“{core_idea}”到底怎样发挥作用。")
     if core_idea and core_idea != method:
-        points.append(f"连接：说明核心想法如何落到方法上；核心想法是“{core_idea}”。")
-    points.append("证据：补一句论文中哪类依据支持这个判断，例如正文方法描述、实验结果或局限分析。")
+        points.append(f"把核心想法“{core_idea}”和方法之间的关系讲顺。")
+    points.append("最后补一句论文中哪类依据支持这个判断，例如正文方法描述、实验结果或局限分析。")
     return points
 
 
@@ -1339,6 +1393,20 @@ def _strip_internal_refs_from_answer(value: str) -> str:
     return text
 
 
+def _soften_mechanical_answer(value: str) -> str:
+    text = value
+    replacements = [
+        (r"(?m)^重点[:：]\s*", "我先抓最核心的点："),
+        (r"(?m)^问题[:：]\s*", "它先遇到的困难是："),
+        (r"(?m)^核心机制[:：]\s*", "做法上，"),
+        (r"(?m)^为什么有效[:：]\s*", "这一步有用，是因为："),
+        (r"(?m)^对应证据[:：]\s*", "能追到的依据是："),
+    ]
+    for pattern, replacement in replacements:
+        text = re.sub(pattern, replacement, text)
+    return text.strip()
+
+
 def _looks_like_english_answer(value: str) -> bool:
     text = re.sub(r"`[^`]*`", "", value)
     latin_letters = len(re.findall(r"[A-Za-z]", text))
@@ -1392,6 +1460,39 @@ def _is_general_chat_question(question: str) -> bool:
         len(text) <= 14
         and any(marker in text for marker in ["你是谁", "你好吗", "讲笑话", "闲聊", "聊天"])
     )
+
+
+def _is_underspecified_question(question: str) -> bool:
+    text = re.sub(r"[\s，。！？,.!?]+", "", question.lower())
+    if not text:
+        return False
+    if _is_general_chat_question(question):
+        return False
+    vague_exact = {
+        "这个呢",
+        "这个",
+        "这个怎么说",
+        "这个怎么讲",
+        "这个怎么看",
+        "这个怎么理解",
+        "讲一下",
+        "讲讲",
+        "说一下",
+        "怎么看",
+        "不懂",
+        "没看懂",
+        "看不懂",
+        "啥意思",
+        "什么意思",
+        "为什么",
+        "怎么回事",
+    }
+    if text in vague_exact:
+        return True
+    if len(text) <= 12 and any(marker in text for marker in ["这个", "这块", "这里", "它", "为什么", "怎么", "讲一下", "不懂"]):
+        specific_markers = ["方法", "公式", "变量", "证据", "实验", "结果", "局限", "贡献", "问题", "理论", "假设"]
+        return not any(marker in text for marker in specific_markers)
+    return False
 
 
 def _is_evidence_question(question: str) -> bool:
@@ -1545,6 +1646,25 @@ def _has_redundant_body(body_key: str, seen_bodies: set[str]) -> bool:
         if len(shorter) >= 18 and shorter in longer:
             return True
     return False
+
+
+def _strip_terminal_punctuation(value: str) -> str:
+    return re.sub(r"[。.!！?？]+$", "", _clean(value))
+
+
+def _join_distinct_phrases(values: list[str]) -> str:
+    result: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        phrase = _strip_terminal_punctuation(value)
+        if not phrase:
+            continue
+        key = _normalize(phrase)
+        if key in seen or _has_redundant_body(key, seen):
+            continue
+        result.append(phrase)
+        seen.add(key)
+    return "；".join(result)
 
 
 def _user_facing_section_label(section: str) -> str:

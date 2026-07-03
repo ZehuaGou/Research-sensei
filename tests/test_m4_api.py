@@ -65,9 +65,9 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     )
     assert full_formula_response.status_code == 200
     full_formula = full_formula_response.json()
-    assert "一句话直觉" in full_formula["meaning"]
-    assert "先看目标" in full_formula["meaning"]
-    assert "对象是什么" in full_formula["meaning"]
+    assert "打分器" in full_formula["meaning"]
+    assert "目标是" in full_formula["meaning"]
+    assert "最重要的对象" in full_formula["meaning"]
     assert "证据片段的向量表示" in full_formula["meaning"]
     assert "注意力分数" in full_formula["meaning"]
     assert full_formula["symbol"] == ""
@@ -222,8 +222,8 @@ def test_m4_advisor_question_can_follow_user_focus(tmp_path: Path) -> None:
     assert "为什么这个方法能处理稀疏证据？" in data["question"]
     assert "你选中的这段内容" in data["question"]
     assert data["target_concept"] == "为什么这个方法能处理稀疏证据？"
-    assert data["expected_answer_points"][0].startswith("你的问题：")
-    assert data["answer_format"][0].startswith("你的问题：")
+    assert data["expected_answer_points"][0].startswith("先直接回答")
+    assert data["answer_format"][0].startswith("先用一句自然话")
     visible_text = json.dumps(
         {
             "question": data["question"],
@@ -353,13 +353,42 @@ def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: 
     data = response.json()
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert data["evidence_refs"] == ["paper:b001"]
-    assert data["answer"].startswith("重点：针对“为什么这个方法能处理稀疏证据？”")
-    assert "贴着你的问题看：" in data["answer"]
+    assert data["answer"].startswith("我先按“为什么这个方法能处理稀疏证据？”来理解")
+    assert "贴着你的问题看，可以追到这些依据" in data["answer"]
     assert "用注意力架构连接分散的证据片段" in data["answer"]
     assert "证据片段太分散" in data["answer"]
     assert "它不是空泛地说" in data["answer"]
+    assert "重点：" not in data["answer"]
+    assert "核心机制：" not in data["answer"]
     assert "attention architecture links sparse evidence passages" not in data["answer"]
     assert "paper:b001" not in data["answer"]
+
+
+def test_m4_ask_clarifies_underspecified_question(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这个怎么理解？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == []
+    assert data["used_context"] == {"memory": False, "artifacts": False, "llm": False}
+    assert data["warnings"][0]["code"] == "QUESTION_UNDERSPECIFIED"
+    assert "我先追问一下" in data["answer"]
+    assert "你说的“这个怎么理解？”是想问哪一块" in data["answer"]
+    assert "方法" in data["answer"]
+    assert data["follow_up_suggestions"]
 
 
 def test_m4_ask_limitation_question_does_not_invent_missing_limitations(tmp_path: Path) -> None:
@@ -548,9 +577,10 @@ def test_m4_ask_rejects_llm_answer_with_unknown_evidence_ref(tmp_path: Path) -> 
 
     assert response.status_code == 200
     data = response.json()
-    assert data["answer"].startswith("重点：")
-    assert "核心机制：" in data["answer"]
-    assert "对应证据：" in data["answer"]
+    assert data["answer"].startswith("我先按")
+    assert "做法上" in data["answer"]
+    assert "更完整的证据边界" in data["answer"]
+    assert "核心机制：" not in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert data["warnings"][0]["code"] == "M4_LLM_FALLBACK"
@@ -581,9 +611,10 @@ def test_m4_ask_rejects_english_heavy_llm_answer(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     data = response.json()
-    assert data["answer"].startswith("重点：")
-    assert "核心机制：" in data["answer"]
-    assert "对应证据：" in data["answer"]
+    assert data["answer"].startswith("我先按")
+    assert "做法上" in data["answer"]
+    assert "更完整的证据边界" in data["answer"]
+    assert "对应证据：" not in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert data["warnings"][0]["code"] == "M4_LLM_FALLBACK"
@@ -621,7 +652,8 @@ def test_m4_ask_strips_internal_refs_from_user_facing_answer(tmp_path: Path) -> 
     assert "paper:b001" not in data["answer"]
     assert "b001" not in data["answer"]
     assert "m4_old_answer" not in data["answer"]
-    assert "重点：" in data["answer"]
+    assert "我先抓最核心的点：" in data["answer"]
+    assert "重点：" not in data["answer"]
 
 
 def test_m4_paper_level_question_ignores_front_matter_selection(tmp_path: Path) -> None:
@@ -646,7 +678,8 @@ def test_m4_paper_level_question_ignores_front_matter_selection(tmp_path: Path) 
     data = response.json()
     assert data["evidence_refs"] == ["paper:b001"]
     assert "标题和作者" not in data["answer"]
-    assert "核心机制：" in data["answer"]
+    assert "做法上" in data["answer"]
+    assert "核心机制：" not in data["answer"]
 
 
 def test_m4_evidence_question_uses_structured_claim_refs_not_front_matter(tmp_path: Path) -> None:
@@ -668,7 +701,8 @@ def test_m4_evidence_question_uses_structured_claim_refs_not_front_matter(tmp_pa
     data = response.json()
     assert data["evidence_refs"] == ["paper:b001"]
     assert "paper:b000" not in data["evidence_refs"]
-    assert "对应证据：" in data["answer"]
+    assert "更完整的证据边界" in data["answer"]
+    assert "对应证据：" not in data["answer"]
     assert "paper:b001" not in data["answer"]
 
 
