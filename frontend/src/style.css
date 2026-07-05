@@ -1,15 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #f6f7f9;
-  --bg-secondary: #eef1f5;
+  --bg-primary: #f7f7f8;
+  --bg-secondary: #ececf1;
+  --bg-sidebar: #f0f0f3;
   --bg-card: #ffffff;
   --bg-elevated: #ffffff;
-  --border: rgba(18, 24, 38, 0.12);
-  --border-subtle: rgba(18, 24, 38, 0.08);
-  --text-primary: #172033;
-  --text-secondary: #4d5a6f;
-  --text-muted: #7d8798;
+  --bg-hover: rgba(32, 33, 35, 0.06);
+  --border: rgba(32, 33, 35, 0.14);
+  --border-subtle: rgba(32, 33, 35, 0.09);
+  --text-primary: #202123;
+  --text-secondary: #4e5058;
+  --text-muted: #747680;
   --accent: #2563eb;
   --accent-rgb: 37, 99, 235;
   --accent-light: rgba(37, 99, 235, 0.09);
@@ -17,22 +19,24 @@
   --success: #059669;
   --warning: #c47a06;
   --danger: #dc2626;
-  --panel-radius: 14px;
+  --panel-radius: 8px;
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 12px 30px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 22px 60px rgba(15, 23, 42, 0.14);
+  --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.16);
 }
 
 .dark {
-  --bg-primary: #101217;
-  --bg-secondary: #171a21;
-  --bg-card: #1e222b;
-  --bg-elevated: #242936;
+  --bg-primary: #1f2023;
+  --bg-secondary: #2a2b2f;
+  --bg-sidebar: #17181b;
+  --bg-card: #26272b;
+  --bg-elevated: #303136;
+  --bg-hover: rgba(255, 255, 255, 0.07);
   --border: rgba(255, 255, 255, 0.13);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --text-primary: #f6f7fb;
-  --text-secondary: #c6ccda;
-  --text-muted: #8b93a5;
+  --text-primary: #f5f5f6;
+  --text-secondary: #c9c9cf;
+  --text-muted: #8f9099;
   --accent: #60a5fa;
   --accent-rgb: 96, 165, 250;
   --accent-light: rgba(96, 165, 250, 0.13);
@@ -96,9 +100,7 @@ button:disabled {
 
 .app-shell {
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(37, 99, 235, 0.06), transparent 28rem),
-    linear-gradient(180deg, var(--bg-primary), var(--bg-secondary));
+  background: var(--bg-primary);
 }
 
 .surface {
@@ -119,7 +121,7 @@ button:disabled {
 .secondary-btn,
 .ghost-btn {
   min-height: 40px;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 0 16px;
   font-weight: 650;
   transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;

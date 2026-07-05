@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import SeedExpansionPanel from '../components/SeedExpansionPanel.vue'
 
 const router = useRouter()
+const route = useRoute()
 const query = ref('')
 const isLoading = ref(false)
 const error = ref('')
@@ -24,6 +25,21 @@ const queryPlanMode = computed(() => {
 })
 const queryVariants = computed(() => toTextList(queryPlan.value?.query_variants).slice(0, 6))
 const queryCoreTerms = computed(() => toTextList(queryPlan.value?.core_terms).slice(0, 8))
+
+onMounted(() => {
+  syncQueryFromRoute()
+})
+
+watch(() => route.query.q, () => {
+  syncQueryFromRoute()
+})
+
+function syncQueryFromRoute() {
+  const routedQuery = String(route.query.q || '').trim()
+  if (!routedQuery || routedQuery === query.value.trim()) return
+  query.value = routedQuery
+  void search()
+}
 
 async function search() {
   if (!query.value.trim() || isLoading.value) return
@@ -469,9 +485,9 @@ async function openDeepRead(paper: Record<string, any>) {
 
 <style scoped>
 .direction-page {
-  width: min(1120px, calc(100vw - 32px));
+  width: min(1040px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 28px 0 64px;
+  padding: 22px 0 54px;
 }
 
 .search-head {
@@ -487,7 +503,7 @@ async function openDeepRead(paper: Record<string, any>) {
 .search-head h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 900;
 }
 
@@ -669,7 +685,7 @@ async function openDeepRead(paper: Record<string, any>) {
 }
 
 .candidate-card {
-  padding: 18px;
+  padding: 15px;
 }
 
 .candidate-main {

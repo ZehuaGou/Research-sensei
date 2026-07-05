@@ -165,9 +165,9 @@ function formatDate(value: string | undefined) {
     <section class="library-head">
       <div>
         <p class="eyebrow">M1 Paper Library</p>
-        <h1>Downloaded papers</h1>
+        <h1>本地论文库</h1>
         <p class="intro">
-          Papers discovered by Google Scholar and downloaded by M1 are kept here for reuse before future downloads.
+          M1 已下载和复用的论文集中放在这里，可以直接进入 PaperWorkspace 解析。
         </p>
       </div>
       <div class="stats surface">
@@ -258,9 +258,9 @@ function formatDate(value: string | undefined) {
 
 <style scoped>
 .library-page {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1060px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 40px 0 72px;
+  padding: 22px 0 54px;
 }
 
 .library-head {
@@ -281,7 +281,7 @@ function formatDate(value: string | undefined) {
 h1 {
   margin: 4px 0 8px;
   color: var(--text-primary);
-  font-size: 36px;
+  font-size: 25px;
   font-weight: 900;
 }
 
@@ -296,7 +296,7 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px 14px;
-  padding: 16px;
+  padding: 14px;
 }
 
 .stats span {
@@ -357,7 +357,7 @@ h1 {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 16px;
   align-items: start;
-  padding: 16px;
+  padding: 14px;
 }
 
 .paper-title-line {

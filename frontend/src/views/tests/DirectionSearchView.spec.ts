@@ -6,6 +6,7 @@ const routerPush = vi.hoisted(() => vi.fn())
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
+  useRoute: () => ({ query: {} }),
 }))
 
 function directionResponse(overrides: Record<string, any> = {}) {

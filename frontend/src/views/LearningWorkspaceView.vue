@@ -539,21 +539,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .workspace-shell {
   display: grid;
-  grid-template-columns: 228px minmax(0, 1fr);
-  min-height: calc(100vh - 64px);
+  grid-template-columns: 218px minmax(0, 1fr);
+  min-height: 100%;
+  height: 100%;
   background: var(--bg-primary);
 }
 
 .workspace-shell.with-chat {
-  grid-template-columns: 228px minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-columns: 218px minmax(0, 1fr) minmax(330px, 380px);
 }
 
 .workspace-nav {
   position: sticky;
-  top: 64px;
-  height: calc(100vh - 64px);
+  top: 0;
+  height: 100%;
   border-right: 1px solid var(--border-subtle);
-  padding: 18px 14px;
+  padding: 14px 12px;
   background: var(--bg-secondary);
 }
 
@@ -588,7 +589,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 10px 12px;
   color: var(--text-secondary);
   font-size: 15px;
@@ -617,9 +618,9 @@ onBeforeUnmount(() => {
 }
 
 .reader-pane {
-  height: calc(100vh - 64px);
+  height: 100%;
   min-width: 0;
-  padding: 30px clamp(18px, 4vw, 52px) 64px;
+  padding: 22px clamp(18px, 4vw, 44px) 54px;
   overflow-y: auto;
 }
 
@@ -646,7 +647,7 @@ onBeforeUnmount(() => {
 .reader-title h1 {
   margin-top: 4px;
   color: var(--text-primary);
-  font-size: 28px;
+  font-size: 24px;
   font-weight: 900;
   line-height: 1.28;
   overflow-wrap: anywhere;
@@ -680,7 +681,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 12px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 10px 12px;
   background: var(--bg-card);
 }
@@ -711,7 +712,7 @@ onBeforeUnmount(() => {
 .empty-card {
   max-width: 780px;
   margin: 70px auto 0;
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 28px;
   color: var(--text-secondary);
   font-size: 16px;
@@ -729,7 +730,7 @@ onBeforeUnmount(() => {
   max-width: 860px;
   margin: 16px auto 24px;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--bg-card);
 }
 
@@ -751,7 +752,7 @@ onBeforeUnmount(() => {
 
 .status-details div {
   min-width: 0;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 9px 10px;
   background: var(--bg-secondary);
 }
@@ -970,8 +971,8 @@ onBeforeUnmount(() => {
 
 .chat-pane {
   position: sticky;
-  top: 64px;
-  height: calc(100vh - 64px);
+  top: 0;
+  height: 100%;
   min-width: 0;
   border-left: 1px solid var(--border-subtle);
   background: var(--bg-card);
@@ -1009,7 +1010,7 @@ onBeforeUnmount(() => {
 
   .reader-pane {
     height: auto;
-    min-height: calc(100vh - 64px);
+    min-height: 100%;
     overflow-y: visible;
   }
 
@@ -1028,11 +1029,11 @@ onBeforeUnmount(() => {
 
   .chat-pane {
     position: fixed;
-    inset: 76px 14px 14px;
+    inset: 62px 14px 14px;
     z-index: 90;
     height: auto;
     border: 1px solid var(--border);
-    border-radius: 18px;
+    border-radius: 8px;
     overflow: hidden;
     box-shadow: var(--shadow-lg);
   }

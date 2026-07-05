@@ -199,7 +199,7 @@ async function testConnection() {
 .settings-page {
   width: min(980px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 42px 0 72px;
+  padding: 22px 0 54px;
 }
 
 .settings-head {
@@ -215,7 +215,7 @@ async function testConnection() {
 .settings-head h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 34px;
+  font-size: 25px;
   font-weight: 900;
 }
 
@@ -236,7 +236,7 @@ async function testConnection() {
 
 .settings-panel,
 .status-panel {
-  padding: 22px;
+  padding: 16px;
 }
 
 .setting-row {

@@ -217,7 +217,7 @@ async function upload() {
 .upload-page {
   width: min(1060px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 42px 0 72px;
+  padding: 22px 0 54px;
 }
 
 .page-heading {
@@ -233,7 +233,7 @@ async function upload() {
 .page-heading h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 34px;
+  font-size: 25px;
   font-weight: 900;
 }
 
@@ -287,7 +287,7 @@ async function upload() {
 .source-panel {
   display: grid;
   gap: 18px;
-  padding: 24px;
+  padding: 16px;
 }
 
 .field {

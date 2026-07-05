@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import TopBar from './components/layout/TopBar.vue'
+import WorkbenchShell from './components/layout/WorkbenchShell.vue'
 </script>
 
 <template>
-  <div class="app-shell">
-    <TopBar />
+  <WorkbenchShell>
     <RouterView />
-  </div>
+  </WorkbenchShell>
 </template>
