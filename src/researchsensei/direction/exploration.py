@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import logging
 import re
+import asyncio
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Protocol
 
 from researchsensei.acquisition import (
     FullTextResolver,
-    GoogleScholarAdapter,
+    OpenAlexAdapter,
+    SemanticScholarAdapter,
+    make_default_search_adapter,
 )
+from researchsensei.library import PaperLibraryStore
+from researchsensei.ranking import PaperRanker, select_downloads
 from researchsensei.schemas import (
+    CanonicalQualityStatus,
     CandidatePaper,
     CandidatePool,
     DirectionBundle,
@@ -22,6 +29,7 @@ from researchsensei.schemas import (
     VerificationStatus,
 )
 from researchsensei.selection import SelectionService
+from researchsensei.query import QueryPlanningError
 from researchsensei.source_resolver import PaperSourceResolver
 from researchsensei.verification import CandidateVerifier
 
@@ -30,6 +38,11 @@ logger = logging.getLogger(__name__)
 
 class SearchAdapter(Protocol):
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
+        ...
+
+
+class QueryPlannerAdapter(Protocol):
+    async def plan(self, user_query: str) -> QueryPlan:
         ...
 
 
@@ -47,15 +60,27 @@ class DirectionExplorationService:
         sources: list[str] | None = None,
         max_results_per_source: int = 8,
         max_verify_candidates: int = 12,
+        max_download_candidates: int = 10,
+        max_search_queries: int = 12,
         source_download_dir: str | Path | None = None,
+        paper_library: PaperLibraryStore | None = None,
+        fallback_adapters: dict[str, SearchAdapter] | None = None,
+        paper_ranker: PaperRanker | None = None,
+        query_planner: QueryPlannerAdapter | None = None,
     ) -> None:
         if adapters is None:
             default_adapters: dict[str, SearchAdapter] = {
-                "google_scholar": GoogleScholarAdapter(),
+                "paper_search": make_default_search_adapter(),
+            }
+            default_fallback_adapters: dict[str, SearchAdapter] = {
+                "openalex_fallback": OpenAlexAdapter(),
+                "semantic_scholar_fallback": SemanticScholarAdapter(),
             }
         else:
             default_adapters = adapters
+            default_fallback_adapters = {}
         self.adapters = default_adapters
+        self.fallback_adapters = fallback_adapters if fallback_adapters is not None else default_fallback_adapters
         self.sources = sources or list(self.adapters.keys())
         self.selection_service = selection_service or SelectionService()
         self.verifier = verifier or CandidateVerifier(timeout_seconds=8.0)
@@ -63,7 +88,12 @@ class DirectionExplorationService:
         self.fulltext_resolver = fulltext_resolver or FullTextResolver(timeout_seconds=12.0)
         self.max_results_per_source = max_results_per_source
         self.max_verify_candidates = max_verify_candidates
+        self.max_download_candidates = max_download_candidates
+        self.max_search_queries = max(max_search_queries, 1)
         self.source_download_dir = Path(source_download_dir) if source_download_dir else None
+        self.paper_library = paper_library
+        self.paper_ranker = paper_ranker or PaperRanker()
+        self.query_planner = query_planner
 
     def explore(self, user_query: str) -> DirectionBundle:
         query = " ".join(user_query.split())
@@ -75,7 +105,7 @@ class DirectionExplorationService:
                 warnings=["EMPTY_QUERY"],
             )
 
-        query_plan = build_heuristic_query_plan(query)
+        query_plan = self._build_query_plan(query)
         search_query = query_plan.english_query or query_plan.direction_en or query_plan.user_query
         candidates, warnings, search_log, source_metrics = self._acquire(
             search_query,
@@ -92,13 +122,21 @@ class DirectionExplorationService:
         verified = self._verify(deduplicated)
         fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(verified, download_top_n=0)
         source_metrics = [*source_metrics, *fulltext_metrics]
+        ranked_candidates = self.paper_ranker.rank(search_query, fulltext_enriched)
+        download_queue = select_downloads(
+            ranked_candidates,
+            max_download_candidates=self.max_download_candidates,
+            paper_library=self.paper_library,
+        )
+        download_candidates = [candidate for candidate in download_queue if candidate.download_selected]
+        download_dir = _direction_download_dir(self.source_download_dir, query_plan)
         source_resolution = self.source_resolver.resolve_many(
             search_query,
-            fulltext_enriched,
-            download_dir=self.source_download_dir,
+            download_candidates,
+            download_dir=download_dir,
         )
-        resolved = self._apply_source_resolution(fulltext_enriched, source_resolution)
-        reading_plan = self.selection_service.build_reading_plan(query_plan, resolved)
+        resolved = self._apply_source_resolution(download_queue, source_resolution)
+        reading_plan = self.selection_service.build_reading_plan(query_plan, resolved, include_ignored=True)
         card_candidates = _candidate_cards_from_reading_plan(reading_plan)
         filtered_candidates = self.selection_service.build_candidate_pool(
             query=search_query,
@@ -113,11 +151,23 @@ class DirectionExplorationService:
             }
         )
 
+        download_attempt_count = len(source_resolution.items)
+        downloaded_count = sum(
+            1
+            for item in source_resolution.items
+            if item.has_valid_deep_reading_source and item.download_status == "downloaded"
+        )
+        download_quality_warnings = _download_attempt_warnings(download_attempt_count, downloaded_count)
         status, message = self._status_and_message(
             source_metrics=source_metrics,
             candidate_count=len(candidates),
-            visible_candidate_count=len(reading_plan.items),
+            visible_candidate_count=len(card_candidates),
+            recommended_candidate_count=sum(1 for item in reading_plan.items if item.priority != "D_IGNORE"),
             warning_count=len(warnings),
+            download_selected_count=sum(1 for candidate in resolved if candidate.download_selected),
+            downloaded_count=downloaded_count,
+            download_attempt_count=download_attempt_count,
+            download_failed_count=max(download_attempt_count - downloaded_count, 0),
         )
         overview = _overview(query_plan, len(reading_plan.items), status)
         key_sub_directions = _key_sub_directions(query_plan, reading_plan)
@@ -147,12 +197,27 @@ class DirectionExplorationService:
             warnings=(
                 query_plan.warnings
                 + warnings
+                + download_quality_warnings
                 + [warning.code for warning in source_resolution.warnings]
                 + reading_plan.warnings
             ),
             verification_summary=_verification_summary(resolved),
             relevance_summary=_relevance_summary(reading_plan),
         )
+
+    def _build_query_plan(self, query: str) -> QueryPlan:
+        if self.query_planner is None:
+            return build_heuristic_query_plan(query)
+
+        try:
+            plan = _run_query_planner(self.query_planner, query)
+            return _complete_query_plan(plan, fallback_query=query)
+        except QueryPlanningError as exc:
+            logger.warning("LLM query planner failed; falling back to heuristic query plan: %s", exc)
+            return _heuristic_with_planner_warning(query, exc)
+        except Exception as exc:
+            logger.warning("Unexpected query planner failure; falling back to heuristic query plan: %s", exc)
+            return _heuristic_with_planner_warning(query, exc)
 
     def _acquire(
         self,
@@ -165,7 +230,11 @@ class DirectionExplorationService:
         search_log: list[str] = []
         source_metrics: list[dict[str, object]] = []
 
-        queries_to_search = _prioritized_search_queries(query, query_variants or [])
+        queries_to_search = _prioritized_search_queries(
+            query,
+            query_variants or [],
+            limit=self.max_search_queries,
+        )
 
         for source_idx, source in enumerate(self.sources):
             # Polite delay between sources to avoid burst rate-limiting
@@ -191,6 +260,7 @@ class DirectionExplorationService:
             source_error = ""
             adapter_responded = False
             rate_limited = False
+            empty_response_count = 0
             for q_idx, q in enumerate(queries_to_search):
                 # Polite delay between variants
                 if q_idx > 0:
@@ -200,16 +270,25 @@ class DirectionExplorationService:
                     results = adapter.search(q, max_results=self.max_results_per_source)
                     source_candidates.extend(results)
                     adapter_responded = True
+                    if results:
+                        empty_response_count = 0
+                    else:
+                        empty_response_count += 1
                     latency_ms = int((time.perf_counter() - started) * 1000)
                     total_latency += latency_ms
                     search_log.append(f"{source}: searched '{q[:60]}' ({len(results)} results)")
-                    if results and (q_idx > 0 or len(queries_to_search) == 1):
+                    if _preserves_primary_search_order(source) and q_idx == 0 and results:
+                        search_log.append(f"{source}: primary query returned results; kept external result pool and skipped venue variants")
+                        break
+                    if _preserves_primary_search_order(source) and empty_response_count >= 2 and not source_candidates:
+                        search_log.append(f"{source}: skipped remaining variants after repeated empty results")
                         break
                 except Exception as exc:
                     latency_ms = int((time.perf_counter() - started) * 1000)
                     total_latency += latency_ms
                     is_rate_limit = "429" in str(exc) or "rate" in str(exc).lower()
                     is_transient_source_failure = _is_transient_source_failure(exc)
+                    is_blocked_source_failure = _is_blocked_source_failure(exc)
                     if is_rate_limit:
                         rate_limited = True
                     logger.warning("Direction acquisition failed for %s (%s): %s", source, q[:40], exc)
@@ -217,6 +296,9 @@ class DirectionExplorationService:
                     search_log.append(f"{source}: failed '{q[:40]}' ({type(exc).__name__})")
                     if is_rate_limit:
                         search_log.append(f"{source}: skipped remaining variants after rate limit")
+                        break
+                    if is_blocked_source_failure:
+                        search_log.append(f"{source}: skipped remaining variants after source blocked/captcha")
                         break
                     if is_transient_source_failure:
                         search_log.append(f"{source}: skipped remaining variants after transient source failure")
@@ -246,6 +328,90 @@ class DirectionExplorationService:
                     "rate_limited": rate_limited,
                 })
 
+        if not candidates and self.fallback_adapters:
+            primary_source = self.sources[0] if self.sources else "paper_search"
+            primary_warning = (
+                f"PRIMARY_DISCOVERY_BLOCKED:{primary_source}"
+                if _has_blocked_warning(warnings)
+                else f"PRIMARY_DISCOVERY_EMPTY:{primary_source}"
+            )
+            fallback_candidates, fallback_warnings, fallback_log, fallback_metrics = self._acquire_fallback(
+                query,
+                query_variants=query_variants,
+                primary_warning=primary_warning,
+                primary_source=primary_source,
+            )
+            candidates.extend(fallback_candidates)
+            warnings.extend(fallback_warnings)
+            search_log.extend(fallback_log)
+            source_metrics.extend(fallback_metrics)
+
+        return candidates, warnings, search_log, source_metrics
+
+    def _acquire_fallback(
+        self,
+        query: str,
+        *,
+        query_variants: list[str] | None = None,
+        primary_warning: str = "PRIMARY_DISCOVERY_EMPTY:paper_search",
+        primary_source: str = "paper_search",
+    ) -> tuple[list[CandidatePaper], list[str], list[str], list[dict[str, object]]]:
+        warnings = [primary_warning]
+        candidates: list[CandidatePaper] = []
+        search_log = [f"{primary_source}: {primary_warning}; trying fallback discovery"]
+        source_metrics: list[dict[str, object]] = []
+        queries_to_search = _prioritized_search_queries(
+            query,
+            query_variants or [],
+            limit=self.max_search_queries,
+        )
+        for source, adapter in self.fallback_adapters.items():
+            source_candidates: list[CandidatePaper] = []
+            total_latency = 0
+            source_error = ""
+            adapter_responded = False
+            for q_idx, q in enumerate(queries_to_search):
+                if q_idx > 0:
+                    time.sleep(0.25)
+                started = time.perf_counter()
+                try:
+                    results = adapter.search(q, max_results=self.max_results_per_source)
+                    source_candidates.extend(results)
+                    adapter_responded = True
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    total_latency += latency_ms
+                    search_log.append(f"{source}: fallback searched '{q[:60]}' ({len(results)} results)")
+                except Exception as exc:
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    total_latency += latency_ms
+                    logger.warning("Fallback acquisition failed for %s (%s): %s", source, q[:40], exc)
+                    source_error = f"{type(exc).__name__}: {str(exc)[:160]}"
+                    search_log.append(f"{source}: fallback failed '{q[:40]}' ({type(exc).__name__})")
+                    if _is_transient_source_failure(exc):
+                        search_log.append(f"{source}: skipped remaining fallback variants after transient source failure")
+                        break
+            if adapter_responded:
+                candidates.extend(source_candidates)
+                source_metrics.append({
+                    "source": source,
+                    "attempted": True,
+                    "success": True,
+                    "count": len(source_candidates),
+                    "latency_ms": total_latency,
+                    "error": "",
+                    "fallback": True,
+                })
+            else:
+                warnings.append(f"ACQUISITION_FAILED:{source}: {source_error or 'no results'}")
+                source_metrics.append({
+                    "source": source,
+                    "attempted": True,
+                    "success": False,
+                    "count": 0,
+                    "latency_ms": total_latency,
+                    "error": source_error or "no results",
+                    "fallback": True,
+                })
         return candidates, warnings, search_log, source_metrics
 
     def _verify(self, candidates: list[CandidatePaper]) -> list[CandidatePaper]:
@@ -289,6 +455,11 @@ class DirectionExplorationService:
         candidate_count: int,
         visible_candidate_count: int,
         warning_count: int,
+        recommended_candidate_count: int = 0,
+        download_selected_count: int = 0,
+        downloaded_count: int = 0,
+        download_attempt_count: int = 0,
+        download_failed_count: int = 0,
     ) -> tuple[str, str]:
         attempted = [metric for metric in source_metrics if metric.get("attempted")]
         successes = [metric for metric in attempted if metric.get("success")]
@@ -297,6 +468,18 @@ class DirectionExplorationService:
             return "BLOCKED", "No external paper source returned usable results."
         if visible_candidate_count == 0:
             return "EMPTY_RESULT", "Sources responded, but no candidate passed the relevance/readability filters."
+        if recommended_candidate_count == 0:
+            return "DEGRADED", "Direction exploration returned candidates, but all were marked low relevance or not recommended for the reading map."
+        if download_selected_count > 0 and downloaded_count > 0:
+            if download_attempt_count and (download_failed_count >= 4 or download_failed_count / download_attempt_count >= 0.4):
+                return (
+                    "DEGRADED",
+                    f"Direction exploration used the reranked download queue and downloaded {downloaded_count}/{download_attempt_count} attempted papers; too many downloads failed.",
+                )
+            return (
+                "SUCCESS",
+                f"Direction exploration used the reranked download queue and downloaded {downloaded_count}/{download_attempt_count} attempted papers.",
+            )
         if failures or warning_count:
             return "DEGRADED", "Direction exploration returned real candidates, but one or more sources or gates degraded."
         return "SUCCESS", "Direction exploration returned a structured bundle from real paper sources."
@@ -339,7 +522,12 @@ class DirectionExplorationService:
             pdf_downloaded = resolved.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
             source_downloaded = bool(resolved.has_valid_deep_reading_source and resolved.local_path and resolved.sha256)
             pdf_available = bool(candidate.pdf_url or resolved.pdf_url)
-            can_enter_m2 = source_downloaded
+            can_enter_m2 = bool(
+                candidate.m2_ready
+                and candidate.canonical_paper_path
+                and candidate.canonical_quality_status != CanonicalQualityStatus.FAIL
+                and resolved.has_valid_deep_reading_source
+            )
             source_confidence = "high" if source_downloaded else ("medium" if pdf_available else candidate.source_confidence)
             metadata_confidence = candidate.metadata_confidence
             if source_confidence == "high" and metadata_confidence == "low":
@@ -372,12 +560,59 @@ class DirectionExplorationService:
                                 "file_size": resolved.file_size,
                                 "content_type": resolved.content_type,
                                 "download_status": resolved.download_status,
+                                "error": resolved.error,
+                                "error_code": resolved.error_code,
                             },
                         },
                     }
                 )
             )
         return updated
+
+
+def _run_query_planner(query_planner: QueryPlannerAdapter, query: str) -> QueryPlan:
+    """Run the async planner from the sync FastAPI/service path."""
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(query_planner.plan(query))
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(lambda: asyncio.run(query_planner.plan(query))).result()
+
+
+def _complete_query_plan(plan: QueryPlan, *, fallback_query: str) -> QueryPlan:
+    english_query = " ".join((plan.english_query or plan.direction_en or plan.user_query or fallback_query).split())
+    defaults = build_heuristic_query_plan(english_query)
+    language = plan.language or ("zh" if any(ord(char) > 127 for char in fallback_query) else "en")
+    return plan.model_copy(
+        update={
+            "user_query": plan.user_query or fallback_query,
+            "language": language,
+            "direction_zh": plan.direction_zh or (fallback_query if language == "zh" else ""),
+            "direction_en": plan.direction_en or english_query,
+            "english_query": english_query,
+            "query_variants": _unique([english_query, *plan.query_variants, *defaults.query_variants]),
+            "core_terms": _unique([*plan.core_terms, *defaults.core_terms]),
+            "related_terms": _unique([*plan.related_terms, *defaults.related_terms]),
+            "search_intents": plan.search_intents or defaults.search_intents,
+            "sub_directions": _unique([*plan.sub_directions, *defaults.sub_directions]),
+            "warnings": [warning for warning in plan.warnings if warning != "HEURISTIC_QUERY_PLAN_NO_LLM"],
+        }
+    )
+
+
+def _heuristic_with_planner_warning(query: str, exc: Exception) -> QueryPlan:
+    fallback = build_heuristic_query_plan(query)
+    reason = str(exc).strip() or type(exc).__name__
+    return fallback.model_copy(
+        update={
+            "warnings": [
+                f"LLM_QUERY_PLAN_FAILED:{type(exc).__name__}: {reason}",
+                *fallback.warnings,
+            ]
+        }
+    )
 
 
 def build_heuristic_query_plan(user_query: str) -> QueryPlan:
@@ -411,8 +646,21 @@ def _translate_direction(query: str) -> str:
         "时序": "time series",
         "多变量": "multivariate",
         "多元": "multivariate",
+        "可解释异常检测": "explainable anomaly detection",
+        "异常解释": "explainable anomaly detection",
+        "异常归因": "anomaly attribution",
+        "异常根因": "anomaly root cause analysis",
         "异常检测": "anomaly detection",
         "异常识别": "anomaly detection",
+        "异常": "anomaly",
+        "根因分析": "root cause analysis",
+        "根因定位": "root cause localization",
+        "故障定位": "fault localization",
+        "故障诊断": "fault diagnosis",
+        "事故诊断": "incident diagnosis",
+        "日志分析": "log analysis",
+        "指标分析": "metric analysis",
+        "告警分析": "alert analysis",
         "预测": "forecasting",
         "预报": "forecasting",
         "分类": "classification",
@@ -445,7 +693,14 @@ def _core_terms(direction: str) -> list[str]:
     phrases = [
         "time series",
         "multivariate",
+        "explainable anomaly detection",
+        "anomaly explanation",
+        "anomaly attribution",
         "anomaly detection",
+        "root cause analysis",
+        "root cause localization",
+        "fault localization",
+        "fault diagnosis",
         "imputation",
         "graph neural network",
         "graph",
@@ -468,6 +723,16 @@ def _related_terms(direction: str) -> list[str]:
         terms += ["temporal", "sequence", "forecasting", "representation learning", "multivariate", "imputation"]
     if "anomaly" in lower:
         terms += ["outlier detection", "novelty detection", "industrial monitoring", "abnormal detection"]
+    if "explainable anomaly" in lower or "anomaly explanation" in lower or "anomaly attribution" in lower:
+        terms += [
+            "anomaly explanation",
+            "anomaly attribution",
+            "explainable AI",
+            "root cause analysis",
+            "fault localization",
+            "incident diagnosis",
+            "AIOps",
+        ]
     if "imputation" in lower:
         terms += ["missing data", "masking", "diffusion", "probabilistic"]
     if "graph" in lower:
@@ -478,6 +743,10 @@ def _related_terms(direction: str) -> list[str]:
         terms += ["attention", "self-attention", "transformer model"]
     if "diffusion" in lower:
         terms += ["score-based", "generative", "denoising"]
+    if "root cause" in lower or "rca" in lower:
+        terms += ["root cause localization", "fault localization", "failure diagnosis", "causal diagnosis"]
+    if "large language model" in lower or "llm" in lower:
+        terms += ["large language models", "agent", "log analysis", "diagnosis"]
     return _unique(terms)
 
 
@@ -499,6 +768,22 @@ def _default_sub_directions(direction: str) -> list[str]:
             "self-supervised graph representation",
             "explainability and benchmarks",
         ]
+    if "root cause" in lower or "rca" in lower:
+        return [
+            "metric and log based root cause localization",
+            "causal graph diagnosis",
+            "LLM-assisted incident analysis",
+            "time-series anomaly attribution",
+            "AIOps benchmarks and systems",
+        ]
+    if "explainable anomaly" in lower or "anomaly explanation" in lower or "anomaly attribution" in lower:
+        return [
+            "explainable anomaly detection methods",
+            "anomaly attribution and root cause localization",
+            "causal diagnosis for anomalies",
+            "log/metric incident explanation",
+            "benchmarks and evaluation protocols",
+        ]
     if "time series" in lower and "anomaly" in lower:
         return [
             "reconstruction-based detection",
@@ -519,6 +804,9 @@ def _default_sub_directions(direction: str) -> list[str]:
 def _query_variants(direction: str) -> list[str]:
     base = direction.lower()
     variants = [base]
+    variants.extend(_venue_targeted_variants(base))
+    variants.extend(_anomaly_explanation_variants(base))
+    variants.extend(_root_cause_variants(base))
     # Add abbreviation variants for compound queries
     _ABBREVS = {
         "graph neural network": "gnn",
@@ -563,13 +851,138 @@ def _query_variants(direction: str) -> list[str]:
     return _unique(variants)
 
 
-def _prioritized_search_queries(query: str, query_variants: list[str]) -> list[str]:
+def _prioritized_search_queries(query: str, query_variants: list[str], *, limit: int = 6) -> list[str]:
     """Primary query plus high-signal variants, capped to protect external APIs."""
     queries = [query]
     for variant in query_variants:
         if variant and variant.lower() != query.lower():
             queries.append(variant)
-    return _unique(queries)[:4]
+    return _unique(queries)[: max(limit, 1)]
+
+
+def _direction_download_dir(root: Path | None, query_plan: QueryPlan) -> Path | None:
+    if root is None:
+        return None
+    topic = query_plan.direction_zh or query_plan.direction_en or query_plan.user_query
+    return root / _safe_topic_folder(topic)
+
+
+def _safe_topic_folder(value: str) -> str:
+    safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", value or "").strip()
+    safe = re.sub(r"\s+", " ", safe)
+    safe = safe.rstrip(" .")
+    return safe[:120] or "direction_search"
+
+
+def _venue_targeted_variants(query: str) -> list[str]:
+    """Aim broad directions at CCF-heavy venues before generic survey terms."""
+    has_graph = "graph" in query or "gnn" in query
+    has_time = "time series" in query or "temporal" in query
+    has_anomaly = "anomaly" in query
+    if has_graph and has_time and has_anomaly:
+        task = "graph neural network multivariate time series anomaly detection"
+    elif has_time and has_anomaly:
+        task = "multivariate time series anomaly detection"
+    elif has_graph and has_anomaly:
+        task = "graph neural network anomaly detection"
+    elif has_graph and has_time:
+        task = "graph neural network time series"
+    else:
+        return []
+    return [
+        f"{task} {venue}"
+        for venue in (
+            "KDD",
+            "VLDB",
+            "SIGMOD",
+            "ICDE",
+            "WWW",
+            "IJCAI",
+            "AAAI",
+            "ICLR",
+            "NeurIPS",
+            "ICML",
+            "TPAMI",
+            "TKDE",
+        )
+    ]
+
+
+def _root_cause_variants(query: str) -> list[str]:
+    lower = query.lower()
+    has_rca = "root cause" in lower or "rca" in lower or "fault localization" in lower or "failure diagnosis" in lower
+    has_llm = "large language model" in lower or "llm" in lower or "foundation model" in lower
+    has_time = "time series" in lower or "multivariate" in lower or "temporal" in lower
+    has_anomaly = "anomaly" in lower
+    variants: list[str] = []
+    if has_rca:
+        if has_time and has_anomaly:
+            variants.extend([
+                "time series anomaly root cause localization",
+                "multivariate time series root cause analysis",
+                "causal root cause analysis for time series anomalies",
+                "AIOps root cause localization time series anomaly",
+            ])
+        variants.extend([
+            "root cause analysis anomaly detection",
+            "root cause localization failure diagnosis",
+            "causal graph root cause analysis",
+            "AIOps root cause analysis",
+        ])
+    if has_llm and has_rca:
+        variants.extend([
+            "large language model root cause analysis",
+            "LLM root cause analysis AIOps",
+            "large language models for incident diagnosis",
+            "LLM for fault localization and root cause analysis",
+        ])
+    elif has_llm and has_anomaly:
+        variants.extend([
+            "large language model anomaly detection",
+            "LLM for anomaly detection",
+            "large language models for AIOps anomaly detection",
+        ])
+    return variants
+
+
+def _anomaly_explanation_variants(query: str) -> list[str]:
+    lower = query.lower()
+    has_explanation = (
+        "explainable anomaly" in lower
+        or "anomaly explanation" in lower
+        or "anomaly attribution" in lower
+        or ("explainable" in lower and "anomaly" in lower)
+    )
+    has_root_cause = "root cause" in lower or "rca" in lower or "fault localization" in lower
+    has_time = "time series" in lower or "multivariate" in lower or "temporal" in lower
+    has_logs = "log" in lower or "metric" in lower or "aiops" in lower or "incident" in lower
+    if not (has_explanation or has_root_cause):
+        return []
+
+    variants = [
+        "explainable anomaly detection",
+        "anomaly explanation",
+        "anomaly attribution",
+        "root cause analysis anomaly detection",
+        "root cause localization anomalies",
+        "fault localization anomaly detection",
+        "causal diagnosis anomaly detection",
+        "AIOps root cause analysis",
+    ]
+    if has_time:
+        variants.extend([
+            "time series anomaly explanation",
+            "time series anomaly attribution",
+            "multivariate time series root cause localization",
+            "causal root cause analysis for time series anomalies",
+        ])
+    if has_logs:
+        variants.extend([
+            "log anomaly root cause analysis",
+            "metric anomaly root cause localization",
+            "incident diagnosis AIOps logs metrics",
+        ])
+    return variants
 
 
 def _semantic_variants(query: str) -> list[str]:
@@ -652,7 +1065,7 @@ def _overview(query_plan: QueryPlan, count: int, status: str) -> str:
     topic = query_plan.direction_en or query_plan.user_query
     return (
         f"{topic} is organized as a conservative reading landscape with {count} candidate papers. "
-        f"The bundle uses real source adapters and keeps PaperWorkspace entry gated by verified full-text/canonical readiness. "
+        f"The bundle uses PaperSearch MCP discovery, CCF venue screening, and legal full-text gates before PaperWorkspace. "
         f"Current direction status: {status}."
     )
 
@@ -688,7 +1101,11 @@ def _method_families(query_plan: QueryPlan, reading_plan: ReadingPlan) -> list[d
 
 def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[str, object]]:
     cards: list[dict[str, object]] = []
-    for index, item in enumerate(reading_plan.items, start=1):
+    ordered_items = sorted(
+        reading_plan.items,
+        key=lambda item: _search_rank(item.paper, fallback=reading_plan.items.index(item) + 1),
+    )
+    for index, item in enumerate(ordered_items, start=1):
         paper = item.paper.model_copy(
             update={
                 "relevance_score": item.scoring_breakdown.relevance_score,
@@ -697,13 +1114,26 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             }
         )
         priority = "A_READ_FOR_M2" if item.priority == "A_READ" and item.can_enter_m2 else item.priority
+        source_resolution = paper.raw_source_metadata.get("source_resolution")
+        source_resolution = source_resolution if isinstance(source_resolution, dict) else {}
         cards.append({
             "rank": index,
+            "search_rank": paper.search_rank or _search_rank(paper, fallback=index),
+            "download_queue_rank": paper.raw_source_metadata.get("download_queue_rank", index),
             "paper_id": paper.paper_id,
             "title": paper.title,
             "authors": paper.authors,
             "year": paper.year,
             "venue": paper.venue,
+            "venue_canonical_name": paper.venue_canonical_name,
+            "venue_rank": paper.venue_rank.value,
+            "download_selected": paper.download_selected,
+            "download_decision": paper.download_decision,
+            "download_reason": paper.download_reason,
+            "rerank_rank": paper.rerank_rank,
+            "rerank_score": paper.rerank_score,
+            "rank_score": paper.rank_score,
+            "rank_reason": paper.rank_reason,
             "source": paper.source,
             "sources": paper.sources,
             "discovery_sources": paper.sources,
@@ -721,6 +1151,9 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "selected_fulltext_url": paper.selected_fulltext_url,
             "fulltext_status": paper.fulltext_status,
             "fulltext_failure_reason": paper.fulltext_failure_reason,
+            "download_status": source_resolution.get("download_status", ""),
+            "download_error": source_resolution.get("error", "") or paper.degradation_reason,
+            "download_local_path": source_resolution.get("local_path", ""),
             "can_deep_read": paper.can_deep_read,
             "needs_user_upload": paper.needs_user_upload,
             "relevance_score": item.scoring_breakdown.relevance_score,
@@ -749,6 +1182,10 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
 
 
 def _reading_order(reading_plan: ReadingPlan) -> list[dict[str, object]]:
+    ordered_items = sorted(
+        [item for item in reading_plan.items if item.priority != "D_IGNORE"],
+        key=lambda item: _search_rank(item.paper, fallback=reading_plan.items.index(item) + 1),
+    )
     return [
         {
             "rank": index,
@@ -758,7 +1195,7 @@ def _reading_order(reading_plan: ReadingPlan) -> list[dict[str, object]]:
             "reason": item.selection_reason,
             "can_enter_m2": item.can_enter_m2,
         }
-        for index, item in enumerate(reading_plan.items, start=1)
+        for index, item in enumerate(ordered_items, start=1)
     ]
 
 
@@ -772,10 +1209,37 @@ def _verification_summary(candidates: list[CandidatePaper]) -> dict[str, int]:
 
 
 def _relevance_summary(reading_plan: ReadingPlan) -> dict[str, int]:
-    summary: dict[str, int] = {"candidate_count": len(reading_plan.items)}
+    summary: dict[str, int] = {
+        "candidate_count": len(reading_plan.items),
+        "download_selected_count": sum(1 for item in reading_plan.items if item.paper.download_selected),
+        "venue_ranked_count": sum(1 for item in reading_plan.items if item.paper.venue_rank.value != "unranked"),
+    }
     for item in reading_plan.items:
         summary[item.priority] = summary.get(item.priority, 0) + 1
     return summary
+
+
+def _search_rank(candidate: CandidatePaper, *, fallback: int) -> int:
+    metadata = candidate.raw_source_metadata or {}
+    for key in ("search_rank", "rank", "download_queue_rank"):
+        value = metadata.get(key)
+        try:
+            rank = int(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            continue
+        if rank > 0:
+            return rank
+    return fallback
+
+
+def _download_attempt_warnings(attempt_count: int, downloaded_count: int) -> list[str]:
+    if attempt_count <= 0:
+        return []
+    failed = max(attempt_count - downloaded_count, 0)
+    warnings = [f"DOWNLOAD_ATTEMPT_SUMMARY:{downloaded_count}/{attempt_count}"]
+    if failed >= 4 or failed / attempt_count >= 0.4:
+        warnings.append(f"DOWNLOAD_FAILURE_RATE_HIGH:{failed}/{attempt_count}")
+    return warnings
 
 
 def _role_hint(name: str) -> str:
@@ -831,12 +1295,16 @@ def _arxiv_url(paper: CandidatePaper) -> str:
 
 
 def _can_prepare_deep_read(paper: CandidatePaper) -> bool:
+    if not paper.download_selected:
+        return False
     return bool(paper.can_deep_read or paper.arxiv_id or paper.pdf_url or _arxiv_url(paper) or paper.doi)
 
 
 def _deep_read_unavailable_reason(paper: CandidatePaper) -> str:
     if _can_prepare_deep_read(paper):
         return ""
+    if paper.download_decision and paper.download_decision not in {"NOT_EVALUATED", "SELECTED_BY_RERANKER"}:
+        return paper.download_reason or "Candidate was not selected for automatic download."
     if paper.fulltext_failure_reason:
         return paper.fulltext_failure_reason
     if paper.doi:
@@ -860,6 +1328,27 @@ def _is_transient_source_failure(exc: Exception) -> bool:
         "service unavailable",
     )
     return any(term in message for term in transient_terms)
+
+
+def _is_blocked_source_failure(exc: Exception) -> bool:
+    message = str(exc).lower()
+    blocked_terms = (
+        "google_scholar_blocked",
+        "captcha",
+        "not a robot",
+        "anti-bot",
+        "blocked",
+    )
+    return any(term in message for term in blocked_terms)
+
+
+def _has_blocked_warning(warnings: list[str]) -> bool:
+    text = "\n".join(warnings).lower()
+    return any(term in text for term in ("blocked", "captcha", "anti-bot", "not a robot"))
+
+
+def _preserves_primary_search_order(source: str) -> bool:
+    return source == "paper_search"
 
 
 def _unique(values: list[str]) -> list[str]:

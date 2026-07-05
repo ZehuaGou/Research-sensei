@@ -27,6 +27,10 @@ function refOf(value: any) {
   return value?.evidence_ref || ''
 }
 
+function evidenceLabel(value: any) {
+  return refOf(value) ? '证据已定位' : ''
+}
+
 function ask(label: string, text: string) {
   store.setSelectedText(`${label}：${text}`)
   store.isAskPanelOpen = true
@@ -60,31 +64,43 @@ function copySummary() {
 
     <section class="claim-grid">
       <div class="claim-block">
-        <div class="claim-label">研究问题</div>
+        <div class="claim-title">
+          <span>01</span>
+          <div class="claim-label">研究问题</div>
+        </div>
         <p>{{ displayText(card.problem, skeleton?.problem?.plain || '暂无') }}</p>
         <button v-if="canAsk(card.problem)" type="button" @click="ask('解释研究问题', textOf(card.problem))">追问</button>
-        <span v-if="refOf(card.problem)" class="ref-chip">{{ refOf(card.problem) }}</span>
+        <span v-if="evidenceLabel(card.problem)" class="ref-chip" :title="refOf(card.problem)">{{ evidenceLabel(card.problem) }}</span>
       </div>
 
       <div class="claim-block">
-        <div class="claim-label">核心想法</div>
+        <div class="claim-title">
+          <span>02</span>
+          <div class="claim-label">核心想法</div>
+        </div>
         <p>{{ displayText(card.core_idea) }}</p>
         <button v-if="canAsk(card.core_idea)" type="button" @click="ask('解释核心想法', textOf(card.core_idea))">追问</button>
-        <span v-if="refOf(card.core_idea)" class="ref-chip">{{ refOf(card.core_idea) }}</span>
+        <span v-if="evidenceLabel(card.core_idea)" class="ref-chip" :title="refOf(card.core_idea)">{{ evidenceLabel(card.core_idea) }}</span>
       </div>
 
       <div class="claim-block">
-        <div class="claim-label">方法机制</div>
+        <div class="claim-title">
+          <span>03</span>
+          <div class="claim-label">方法机制</div>
+        </div>
         <p>{{ displayText(card.method_overview, skeleton?.mechanism?.plain || '暂无') }}</p>
         <button v-if="canAsk(card.method_overview)" type="button" @click="ask('解释方法机制', textOf(card.method_overview))">追问</button>
-        <span v-if="refOf(card.method_overview)" class="ref-chip">{{ refOf(card.method_overview) }}</span>
+        <span v-if="evidenceLabel(card.method_overview)" class="ref-chip" :title="refOf(card.method_overview)">{{ evidenceLabel(card.method_overview) }}</span>
       </div>
 
       <div class="claim-block">
-        <div class="claim-label">实验结论</div>
+        <div class="claim-title">
+          <span>04</span>
+          <div class="claim-label">实验结论</div>
+        </div>
         <p>{{ displayText(card.experiment_summary, card.deep_dive || '暂无') }}</p>
         <button v-if="canAsk(card.experiment_summary)" type="button" @click="ask('解释实验结论', textOf(card.experiment_summary))">追问</button>
-        <span v-if="refOf(card.experiment_summary)" class="ref-chip">{{ refOf(card.experiment_summary) }}</span>
+        <span v-if="evidenceLabel(card.experiment_summary)" class="ref-chip" :title="refOf(card.experiment_summary)">{{ evidenceLabel(card.experiment_summary) }}</span>
       </div>
     </section>
 
@@ -137,11 +153,30 @@ function copySummary() {
   background: var(--bg-card);
 }
 
+.claim-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.claim-title span {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
 .claim-label {
-  margin-bottom: 10px;
-  color: var(--text-muted);
-  font-size: 14px;
-  font-weight: 750;
+  color: var(--text-primary);
+  font-size: 15px;
+  font-weight: 850;
 }
 
 .claim-block p {
@@ -159,11 +194,14 @@ function copySummary() {
 }
 
 .ref-chip {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-muted);
+  display: inline-flex;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(5, 150, 105, 0.1);
+  color: var(--success);
+  font-weight: 750;
   font-size: 12px;
-  word-break: break-all;
 }
 
 .paper-actions {

@@ -68,6 +68,25 @@ const formulaNavItems = computed(() => formulaCardsList.value.map((formula: any,
   }
 }))
 
+const workspaceTitle = computed(() => {
+  const title = paperCard.value?.title || paperCard.value?.paper_title
+  return title || '论文深读'
+})
+
+const workspaceSubtitle = computed(() => {
+  if (paperCard.value?.one_sentence_summary) return paperCard.value.one_sentence_summary
+  if (paperCard.value?.thirty_second) return paperCard.value.thirty_second
+  if (status.value === 'BASELINE_ONLY') return '当前只有基础解析产物。'
+  if (status.value === 'BLOCKED_UNDERSTANDING') return '理解阶段被阻断，未展示半成品卡片。'
+  return jobId
+})
+
+const readerMetrics = computed(() => [
+  { label: '论文卡片', value: paperCard.value ? '已生成' : '缺失', tone: paperCard.value ? 'ready' : 'muted' },
+  { label: '公式', value: `${formulaCardsList.value.length}`, tone: formulaCardsList.value.length ? 'ready' : 'muted' },
+  { label: '教学卡片', value: `${teachingCards.value.length}`, tone: teachingCards.value.length ? 'ready' : 'muted' },
+])
+
 const statusRows = computed(() => {
   const details = paperWorkspaceStatus.value || {}
   const labels: Record<string, string> = {
@@ -348,7 +367,7 @@ onBeforeUnmount(() => {
   <div class="workspace-shell" :class="{ 'with-chat': store.isAskPanelOpen && canShowCards }">
     <aside class="workspace-nav">
       <div class="nav-title">
-        <strong>阅读区</strong>
+        <strong>深读工作台</strong>
         <span>{{ jobId }}</span>
       </div>
       <nav>
@@ -364,7 +383,7 @@ onBeforeUnmount(() => {
         </button>
       </nav>
       <button
-        v-if="canShowCards"
+        v-if="canShowCards && !store.isAskPanelOpen"
         type="button"
         class="secondary-btn chat-open"
         @click="store.isAskPanelOpen = true"
@@ -384,6 +403,26 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-else>
+        <section class="reader-header">
+          <div class="reader-title">
+            <span>ResearchSensei</span>
+            <h1>{{ workspaceTitle }}</h1>
+            <p>{{ workspaceSubtitle }}</p>
+          </div>
+          <div v-if="canShowCards && !store.isAskPanelOpen" class="reader-actions">
+            <button type="button" class="primary-btn" @click="store.isAskPanelOpen = true">
+              打开 M4
+            </button>
+          </div>
+        </section>
+
+        <div v-if="canShowCards" class="reader-metrics" data-testid="reader-metrics">
+          <div v-for="metric in readerMetrics" :key="metric.label" :class="metric.tone">
+            <span>{{ metric.label }}</span>
+            <strong>{{ metric.value }}</strong>
+          </div>
+        </div>
+
         <StatusBanner
           :status="status"
           :blockingReason="understandingStatus?.blocking_reason"
@@ -582,6 +621,88 @@ onBeforeUnmount(() => {
   min-width: 0;
   padding: 30px clamp(18px, 4vw, 52px) 64px;
   overflow-y: auto;
+}
+
+.reader-header {
+  display: grid;
+  max-width: 860px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin: 0 auto 14px;
+}
+
+.reader-title {
+  min-width: 0;
+}
+
+.reader-title > span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.reader-title h1 {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 900;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.reader-title p {
+  margin-top: 8px;
+  max-width: 780px;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.reader-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.reader-metrics {
+  display: grid;
+  max-width: 860px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 auto 16px;
+}
+
+.reader-metrics > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+}
+
+.reader-metrics span {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 780;
+}
+
+.reader-metrics strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.reader-metrics .ready strong {
+  color: var(--success);
+}
+
+.reader-metrics .muted {
+  opacity: 0.68;
 }
 
 .loading-state,
@@ -892,6 +1013,15 @@ onBeforeUnmount(() => {
     overflow-y: visible;
   }
 
+  .reader-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .reader-actions {
+    justify-content: flex-start;
+  }
+
   .workspace-nav nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -936,6 +1066,18 @@ onBeforeUnmount(() => {
 
   .reader-pane {
     padding-inline: 14px;
+  }
+
+  .reader-title h1 {
+    font-size: 23px;
+  }
+
+  .reader-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-fab {
+    display: none;
   }
 
   .status-details dl {

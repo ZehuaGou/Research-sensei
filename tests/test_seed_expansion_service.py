@@ -89,14 +89,14 @@ def _service(adapters: dict[str, object], *, sources: list[str] | None = None) -
     )
 
 
-def test_default_seed_expansion_source_is_google_scholar_mcp_only() -> None:
+def test_default_seed_expansion_source_is_paper_search_mcp() -> None:
     service = SeedExpansionService(
         verifier=StaticVerifier(),  # type: ignore[arg-type]
         max_results_per_source=1,
     )
 
-    assert set(service.adapters) == {"google_scholar"}
-    assert service.sources == ["google_scholar"]
+    assert set(service.adapters) == {"paper_search"}
+    assert service.sources == ["paper_search"]
 
 
 def test_seed_expansion_returns_structured_bundle() -> None:

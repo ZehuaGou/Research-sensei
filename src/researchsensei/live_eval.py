@@ -15,7 +15,6 @@ from researchsensei.direction import DirectionRunner
 from researchsensei.llm.client import LLMClient, parse_llm_json
 from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
 from researchsensei.query import QueryPlanner
-from researchsensei.relevance_judge import RelevanceJudge
 from researchsensei.schemas import PaperSourceStatus
 from researchsensei.source_resolver import PaperSourceResolver
 from researchsensei.verification import CandidateVerifier
@@ -238,16 +237,11 @@ def run_m1_live_search(
         s2_api_key=os.getenv("SEMANTIC_SCHOLAR_API_KEY", "")
         or os.getenv("S2_API_KEY", ""),
     )
-    relevance_judge = RelevanceJudge(
-        llm_client=llm_client,
-        enabled=True,
-    )
     runner = DirectionRunner(
         workspace=workspace,
         query_planner=QueryPlanner(llm_client=llm_client),
         source_resolver=source_resolver,
         verifier=verifier,
-        relevance_judge=relevance_judge,
         material_normalizer=MaterialNormalizer(
             marker_enabled=False,
             marker_trigger_mode="never",
@@ -319,10 +313,10 @@ def run_m1_live_search(
         reasons = []
         if p.verification_status != VS.VERIFIED:
             reasons.append(f"verification_status={p.verification_status.value}")
-        if p.llm_relevance_score < 0.65:
-            reasons.append(f"llm_relevance_score={p.llm_relevance_score}")
-        if p.llm_relevance_label not in ("HIGH", "MEDIUM"):
-            reasons.append(f"llm_relevance_label={p.llm_relevance_label}")
+        if not p.download_selected:
+            reasons.append(f"download_decision={p.download_decision}")
+        if p.venue_rank.value == "unranked":
+            reasons.append("venue_rank=unranked")
         if not p.should_a_read:
             reasons.append("should_a_read=false")
         if not p.pdf_downloaded:
@@ -372,6 +366,11 @@ def run_m1_live_search(
             "verification_method": p.verification_method,
             "verification_reason": p.verification_reason,
             "verification_confidence": p.verification_confidence,
+            "venue_canonical_name": p.venue_canonical_name,
+            "venue_rank": p.venue_rank.value,
+            "download_selected": p.download_selected,
+            "download_decision": p.download_decision,
+            "download_reason": p.download_reason,
             "rule_relevance_score": p.rule_relevance_score,
             "llm_relevance_score": p.llm_relevance_score,
             "llm_relevance_label": p.llm_relevance_label,
@@ -443,8 +442,8 @@ def run_m1_live_search(
         "verified_candidate_count": verification_summary.get("verified_candidate_count", 0),
         "unverified_candidate_count": verification_summary.get("unverified_candidate_count", 0),
         "verify_pending_count": verification_summary.get("verify_pending_count", 0),
-        "llm_judged_candidate_count": relevance_summary.get("llm_judged_candidate_count", 0),
-        "relevance_filtered_count": relevance_summary.get("relevance_filtered_count", 0),
+        "venue_ranked_count": relevance_summary.get("venue_ranked_count", 0),
+        "download_selected_count": relevance_summary.get("download_selected_count", 0),
         "a_read_count": len(a_read_items),
         "a_read_can_enter_m2_count": len(a_read_can_enter_m2),
         "reading_plan_status": bundle.reading_plan.status,
@@ -600,8 +599,8 @@ def _not_a_read_reason(item, bundle) -> str:
             reasons = []
             if p.verification_status.value != "verified":
                 reasons.append(f"verification={p.verification_status.value}")
-            if p.llm_relevance_score < 0.65:
-                reasons.append(f"llm_relevance={p.llm_relevance_score}")
+            if not p.download_selected:
+                reasons.append(f"download={p.download_decision}")
             if not p.should_a_read:
                 reasons.append("should_a_read=false")
             if pdf_meta != "passed":

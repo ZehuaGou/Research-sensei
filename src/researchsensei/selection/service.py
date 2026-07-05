@@ -4,7 +4,10 @@ import re
 from datetime import date
 from typing import Iterable
 
-from researchsensei.acquisition.venue_registry import venue_rank
+from researchsensei.selection.venue_rankings import (
+    venue_config_for_paper,
+    venue_score as venue_score_for_paper,
+)
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
@@ -18,36 +21,14 @@ from researchsensei.schemas import (
     VerificationStatus,
 )
 
-TOP_VENUE_TERMS = (
-    "aaai",
-    "kdd",
-    "sigkdd",
-    "vldb",
-    "pvldb",
-    "iclr",
-    "neurips",
-    "neural information processing systems",
-    "icml",
-    "ijcai",
-    "www",
-    "web conference",
-    "proceedings of the ieee",
-    "acl",
-    "emnlp",
-    "naacl",
-    "cvpr",
-    "iccv",
-    "eccv",
-    "sigmod",
-    "sigir",
-)
-
 SOURCE_RELIABILITY = {
+    "paper_search_mcp": 0.9,
+    "paper_search": 0.9,
     "semantic_scholar": 0.92,
+    "semantic": 0.92,
     "openalex": 0.9,
     "google_scholar": 0.86,
     "arxiv": 0.78,
-    "crossref": 0.74,
     "dblp": 0.72,
 }
 
@@ -106,7 +87,13 @@ class SelectionService:
 
         return result
 
-    def build_reading_plan(self, query_plan: QueryPlan, candidates: list[CandidatePaper]) -> ReadingPlan:
+    def build_reading_plan(
+        self,
+        query_plan: QueryPlan,
+        candidates: list[CandidatePaper],
+        *,
+        include_ignored: bool = False,
+    ) -> ReadingPlan:
         if not candidates:
             return ReadingPlan(
                 topic=self._topic(query_plan),
@@ -152,8 +139,9 @@ class SelectionService:
         if len(visible_items) < len(items):
             warnings.append(f"FILTERED_D_IGNORE:{len(items) - len(visible_items)}")
 
-        status = "OK" if a_read_count > 0 else ("DEGRADED" if visible_items else "FAILED")
-        return ReadingPlan(topic=self._topic(query_plan), items=visible_items, status=status, warnings=warnings)
+        output_items = items if include_ignored else visible_items
+        status = "OK" if a_read_count > 0 else ("DEGRADED" if output_items else "FAILED")
+        return ReadingPlan(topic=self._topic(query_plan), items=output_items, status=status, warnings=warnings)
 
     @staticmethod
     def _topic(query_plan: QueryPlan) -> str:
@@ -179,15 +167,15 @@ class SelectionService:
             min(
                 1.0,
                 0.28 * relevance
-                + 0.12 * venue_score
+                + 0.20 * venue_score
                 + 0.10 * citation_score
                 + 0.04 * code_score
                 + 0.10 * method_rep
                 + 0.08 * recency
                 + 0.14 * source_reliability
-                + 0.10 * open_access_score
+                + 0.06 * open_access_score
                 + 0.12 * pdf_available_score
-                + 0.08 * metadata_completeness
+                + 0.04 * metadata_completeness
                 + penalty,
             ),
         )
@@ -261,21 +249,13 @@ class SelectionService:
         return "METHOD"
 
     def _venue_prestige(self, paper: CandidatePaper) -> float:
-        venue = paper.venue.lower()
-        rank = venue_rank(venue)
-        if rank == VenueRank.A_STAR:
-            return 0.97
-        if rank == VenueRank.A:
-            return 0.9
-        if rank == VenueRank.B:
-            return 0.68
-        if rank == VenueRank.C:
-            return 0.55
-        if any(term in venue for term in TOP_VENUE_TERMS):
-            return 0.95
-        if venue and venue not in {"unknown", "arxiv"}:
-            return 0.55
-        return 0.2
+        """Delegate to the VENUE_REGISTRY-backed venue_score.
+
+        ``venue_score_for_paper`` handles canonical name short-circuit,
+        substring alias matching, and the empty/arxiv fallback bucket in
+        a single place; tests assert on the registry, not on this wrapper.
+        """
+        return venue_score_for_paper(paper)
 
     def _source_reliability(self, paper: CandidatePaper) -> float:
         sources = paper.sources or ([paper.source] if paper.source else [])
@@ -341,12 +321,12 @@ class SelectionService:
         - canonical_quality_status != FAIL
         - source_priority != METADATA_ONLY
 
-        Legacy gate (still checked):
+        Selection gate:
         - verification_status == VERIFIED
         - scoring_breakdown.relevance_score >= 0.45 (rule-based)
-        - llm_relevance_score >= 0.65 (LLM-based)
-        - llm_relevance_label in ("HIGH", "MEDIUM")
-        - should_a_read == True
+        - if LLM relevance exists, it must not reject the paper
+        - should_a_read == True or download_selected == True
+        - download_selected == True
         - source_confidence >= medium
         - metadata_confidence >= medium
         - role != "IRRELEVANT"
@@ -361,12 +341,13 @@ class SelectionService:
         quality_ok = paper.canonical_quality_status != CanonicalQualityStatus.FAIL
         not_metadata_only = paper.source_priority != SourcePriority.METADATA_ONLY
 
-        # Legacy checks
+        # Selection checks
         verified = paper.verification_status == VerificationStatus.VERIFIED
         relevant = sr.relevance_score >= 0.45
-        llm_relevant = paper.llm_relevance_score >= 0.65
-        llm_label_ok = paper.llm_relevance_label in ("HIGH", "MEDIUM")
-        should_read = paper.should_a_read is True
+        llm_relevant = paper.llm_relevance_score <= 0 or paper.llm_relevance_score >= 0.65
+        llm_label_ok = not paper.llm_relevance_label or paper.llm_relevance_label in ("HIGH", "MEDIUM")
+        should_read = paper.should_a_read is True or paper.download_selected is True
+        download_ok = paper.download_selected is True
         source_ok = _confidence_at_least(paper.source_confidence, "medium")
         meta_ok = _confidence_at_least(paper.metadata_confidence, "medium")
         role_ok = item.role != "IRRELEVANT"
@@ -378,12 +359,13 @@ class SelectionService:
             m2_ready,
             quality_ok,
             not_metadata_only,
-            # Legacy gate
+            # Selection gate
             verified,
             relevant,
             llm_relevant,
             llm_label_ok,
             should_read,
+            download_ok,
             source_ok,
             meta_ok,
             role_ok,
@@ -413,6 +395,8 @@ class SelectionService:
             parts.append("source_ready=yes")
         if breakdown.venue_prestige >= 0.9:
             parts.append("top-venue-signal")
+        if paper.venue_rank != VenueRank.UNRANKED:
+            parts.append(f"venue_rank={paper.venue_rank.value}")
         if breakdown.citation_score >= 0.1:
             parts.append(f"citations~{int(breakdown.citation_score * 1000)}")
         return "; ".join(parts)
@@ -424,11 +408,16 @@ class SelectionService:
         source_ids = dict(candidate.source_ids)
         if candidate.source and candidate.paper_id and candidate.source not in source_ids:
             source_ids[candidate.source] = candidate.paper_id
+        venue_cfg = venue_config_for_paper(candidate)
+        venue_rank = venue_cfg.rank if venue_cfg is not None else VenueRank.UNRANKED
+        venue_canonical_name = venue_cfg.canonical_name if venue_cfg is not None else candidate.venue_canonical_name
         return candidate.model_copy(
             update={
                 "normalized_title": normalized_title,
                 "sources": sources,
                 "source_ids": source_ids,
+                "venue_canonical_name": venue_canonical_name,
+                "venue_rank": venue_rank,
                 "pdf_available": bool(candidate.pdf_available or candidate.pdf_url),
                 "landing_url": candidate.landing_url or candidate.url,
             }

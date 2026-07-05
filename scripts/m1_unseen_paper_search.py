@@ -337,6 +337,27 @@ def main() -> int:
 
     queries = args.queries or QUERIES
 
+    if args.dry_run:
+        out.mkdir(parents=True, exist_ok=True)
+        print("=" * 60)
+        print("M1 Unseen Paper Search (dry-run)")
+        print(f"  max_results_per_query={args.max_results_per_query}")
+        print(f"  max_pdf_downloads={args.max_pdf_downloads}")
+        print(f"  full_parse_limit={args.full_parse_limit}")
+        print("  external_search=skipped")
+        print("=" * 60)
+        stats_a = {
+            "stage": "A",
+            "description": "Dry-run configuration check; external metadata search skipped",
+            "raw_candidate_count": 0,
+            "valid_candidate_count": 0,
+            "excluded_count": 0,
+            "elapsed_seconds": 0.0,
+            "pdf_downloaded_count": 0,
+        }
+        _write_outputs(out, [], None, stats_a, {}, args)
+        return 0
+
     print("=" * 60)
     print("M1 Unseen Paper Search (3-stage)")
     print(f"  max_results_per_query={args.max_results_per_query}")

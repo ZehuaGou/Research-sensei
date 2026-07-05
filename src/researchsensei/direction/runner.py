@@ -7,13 +7,16 @@ from pathlib import Path
 
 from researchsensei.acquisition import (
     ArxivAdapter,
-    GoogleScholarAdapter,
+    FullTextResolver,
     OpenAlexAdapter,
+    PaperSearchMcpAdapter,
     SemanticScholarAdapter,
+    make_default_search_adapter,
 )
 from researchsensei.canonical import MaterialNormalizer
 from researchsensei.query import QueryPlanner
-from researchsensei.relevance_judge import RelevanceJudge
+from researchsensei.query.planner import detect_venue_openalex_source_ids
+from researchsensei.ranking import PaperRanker, select_downloads
 from researchsensei.schemas import (
     CandidatePaper,
     CanonicalizationResult,
@@ -34,10 +37,10 @@ logger = logging.getLogger(__name__)
 
 
 class DirectionRunner:
-    """Orchestrates M1: query planning -> acquisition -> dedup -> verify -> relevance -> download -> reading plan.
+    """Orchestrates M1: query planning -> paper discovery -> rerank -> download -> canonical handoff.
 
-    Key ordering: verification + LLM relevance happen BEFORE PDF download.
-    Only verified+relevant candidates with should_download=true are downloaded.
+    Default product flow uses PaperSearch MCP discovery, FlashRank reranking,
+    and legal full-text gates before sending selected candidates to M2.
     """
 
     def __init__(
@@ -47,14 +50,16 @@ class DirectionRunner:
         arxiv_adapter: ArxivAdapter | None = None,
         openalex_adapter: OpenAlexAdapter | None = None,
         semantic_scholar_adapter: SemanticScholarAdapter | None = None,
-        google_scholar_adapter: GoogleScholarAdapter | None = None,
+        search_adapter: PaperSearchMcpAdapter | None = None,
         selection_service: SelectionService | None = None,
         source_resolver: PaperSourceResolver | None = None,
+        fulltext_resolver: FullTextResolver | None = None,
         verifier: CandidateVerifier | None = None,
-        relevance_judge: RelevanceJudge | None = None,
         material_normalizer: MaterialNormalizer | None = None,
+        paper_ranker: PaperRanker | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = 20,
+        max_download_candidates: int = 10,
         max_canonicalize_candidates: int | None = None,
     ) -> None:
         self.workspace = workspace
@@ -62,14 +67,16 @@ class DirectionRunner:
         self.arxiv_adapter = arxiv_adapter or ArxivAdapter()
         self.openalex_adapter = openalex_adapter or OpenAlexAdapter()
         self.semantic_scholar_adapter = semantic_scholar_adapter or SemanticScholarAdapter()
-        self.google_scholar_adapter = google_scholar_adapter or GoogleScholarAdapter()
+        self.search_adapter = search_adapter or make_default_search_adapter()
         self.selection_service = selection_service or SelectionService()
         self.source_resolver = source_resolver or PaperSourceResolver(network_enabled=True)
+        self.fulltext_resolver = fulltext_resolver or FullTextResolver(timeout_seconds=30.0)
         self.verifier = verifier or CandidateVerifier()
-        self.relevance_judge = relevance_judge or RelevanceJudge()
         self.material_normalizer = material_normalizer or MaterialNormalizer()
-        self.sources = sources or ["google_scholar"]
+        self.paper_ranker = paper_ranker or PaperRanker()
+        self.sources = sources or ["paper_search"]
         self.max_results_per_source = max_results_per_source
+        self.max_download_candidates = max_download_candidates
         self.max_canonicalize_candidates = max_canonicalize_candidates
 
     async def run(self, user_query: str, direction_id: str | None = None) -> DirectionBundle:
@@ -95,18 +102,26 @@ class DirectionRunner:
         # Step 3: Verify candidates (BEFORE download)
         verified_candidates = self.verifier.verify_batch(deduplicated)
 
-        # Step 4: LLM relevance judgment (BEFORE download)
-        llm_judged_candidates, relevance_metadata = await self.relevance_judge.judge_with_score(
-            query, verified_candidates
+        # Step 4: Resolve official/OA full-text URLs before download selection.
+        fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(
+            verified_candidates,
+            download_top_n=0,
+            workspace=Path(run_dir) / "fulltext_candidates",
         )
+        source_metrics = [*source_metrics, *fulltext_metrics]
 
-        # Step 5: Select candidates for download
-        # Download: verified/relevant + should_download=true, OR arxiv papers with PDF URLs
-        download_candidates = [
-            c for c in llm_judged_candidates
-            if self._should_download(c) or self._should_download_arxiv(c)
-        ]
-        download_ids = {c.paper_id for c in download_candidates}
+        # Step 5: rerank PaperSearch candidates before selecting download attempts.
+        # CCF is an annotation, not a hard download gate.
+        normalized_for_download = self.selection_service.build_candidate_pool(
+            query=query,
+            candidates=fulltext_enriched,
+        ).items
+        ranked_candidates = self.paper_ranker.rank(query, normalized_for_download)
+        screened_candidates = select_downloads(
+            ranked_candidates,
+            max_download_candidates=self.max_download_candidates,
+        )
+        download_candidates = [candidate for candidate in screened_candidates if candidate.download_selected]
 
         # Step 6: Download PDFs for selected candidates
         source_resolution = SourceResolutionResult(query=query, items=[], warnings=[])
@@ -118,7 +133,7 @@ class DirectionRunner:
             )
 
         # Step 7: Apply source resolution back to ALL candidates
-        resolved_candidates = self._apply_source_resolution(llm_judged_candidates, source_resolution)
+        resolved_candidates = self._apply_source_resolution(screened_candidates, source_resolution)
 
         # Step 7.5: Material normalization — generate canonical_paper.md for each candidate
         canonicalization_results = self._canonicalize_resolved_candidates(
@@ -138,8 +153,9 @@ class DirectionRunner:
             search_log=search_log + [
                 "dedup: applied before verification",
                 f"verified: {sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.VERIFIED)}/{len(resolved_candidates)}",
-                f"llm_judged: {relevance_metadata.get('llm_judged_candidate_count', 0)}",
-                f"download_selected: {len(download_candidates)}",
+                f"venue_ranked: {sum(1 for c in resolved_candidates if c.venue_rank.value != 'unranked')}",
+                f"download_selected: {sum(1 for c in resolved_candidates if c.download_selected)}",
+                f"reranker: {self.paper_ranker.last_status}",
             ],
             warnings=acquisition_warnings,
             source_metrics=source_metrics,
@@ -203,7 +219,11 @@ class DirectionRunner:
                 + reading_plan.warnings
             ),
             verification_summary=verification_summary,
-            relevance_summary=relevance_metadata,
+            relevance_summary={
+                "candidate_count": len(resolved_candidates),
+                "venue_ranked_count": sum(1 for c in resolved_candidates if c.venue_rank.value != "unranked"),
+                "download_selected_count": len(download_candidates),
+            },
         )
 
     def _canonicalize_resolved_candidates(
@@ -233,27 +253,6 @@ class DirectionRunner:
                 logger.warning("MaterialNormalizer failed for %s: %s", candidate.paper_id, exc)
         return canonicalization_results
 
-    @staticmethod
-    def _should_download(candidate: CandidatePaper) -> bool:
-        """Gate for PDF download: only verified + relevant + should_download."""
-        return (
-            candidate.verification_status == VerificationStatus.VERIFIED
-            and candidate.should_download is True
-            and candidate.llm_relevance_score >= 0.65
-            and candidate.llm_relevance_label in ("HIGH", "MEDIUM")
-            and candidate.rule_relevance_score >= 0.45
-        )
-
-    @staticmethod
-    def _should_download_arxiv(candidate: CandidatePaper) -> bool:
-        """Always try to download arXiv papers with PDF URLs (reliable source)."""
-        return (
-            candidate.verification_status == VerificationStatus.VERIFIED
-            and bool(candidate.arxiv_id)
-            and bool(candidate.pdf_url)
-            and candidate.rule_relevance_score >= 0.3
-        )
-
     def _acquire(
         self,
         query_plan: QueryPlan,
@@ -264,14 +263,35 @@ class DirectionRunner:
         search_log: list[str] = []
         source_metrics: list[dict[str, object]] = []
 
+        # Venue-targeted search: when the user query mentions venues whose
+        # OpenAlex source IDs we know, use search_by_venue to filter.
+        venue_source_ids = detect_venue_openalex_source_ids(query_plan.venue_targets)
+        year_from = query_plan.year_from
+        year_to = query_plan.year_to
+
         for source in self.sources:
             started = time.perf_counter()
             try:
                 adapter = self._adapter_for(source)
-                results = adapter.search(query, max_results=self.max_results_per_source)
+                if (
+                    source == "openalex"
+                    and venue_source_ids
+                    and hasattr(adapter, "search_by_venue")
+                ):
+                    results = adapter.search_by_venue(
+                        query,
+                        openalex_source_ids=tuple(venue_source_ids),
+                        year_from=year_from,
+                        year_to=year_to,
+                        max_results=self.max_results_per_source,
+                    )
+                    label_suffix = f" venue=[{','.join(query_plan.venue_targets)}]"
+                else:
+                    results = adapter.search(query, max_results=self.max_results_per_source)
+                    label_suffix = ""
                 candidates.extend(results)
                 latency_ms = int((time.perf_counter() - started) * 1000)
-                search_log.append(f"{source}: searched ({len(results)} results)")
+                search_log.append(f"{source}: searched ({len(results)} results){label_suffix}")
                 source_metrics.append(
                     {
                         "source": source,
@@ -302,14 +322,14 @@ class DirectionRunner:
         return candidates, warnings, search_log, source_metrics
 
     def _adapter_for(self, source: str):
+        if source == "paper_search":
+            return self.search_adapter
         if source == "arxiv":
             return self.arxiv_adapter
         if source == "openalex":
             return self.openalex_adapter
         if source == "semantic_scholar":
             return self.semantic_scholar_adapter
-        if source == "google_scholar":
-            return self.google_scholar_adapter
         raise ValueError(f"Unknown source: {source}")
 
     @staticmethod

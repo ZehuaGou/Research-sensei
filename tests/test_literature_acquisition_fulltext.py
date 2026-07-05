@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from researchsensei.acquisition.arxiv_adapter import ArxivAdapter
 from researchsensei.acquisition import FullTextResolver
-from researchsensei.acquisition.google_scholar_adapter import GoogleScholarAdapter
 from researchsensei.acquisition.openalex_adapter import OpenAlexAdapter
+from researchsensei.acquisition.paper_search_mcp_adapter import PaperSearchMcpAdapter
 from researchsensei.acquisition.venue_registry import lookup_venue
 from researchsensei.acquisition.semantic_scholar_adapter import SemanticScholarAdapter
 from researchsensei.schemas import CandidatePaper
@@ -110,16 +112,6 @@ class OpenAlexHttpClient:
     def get(self, url: str, **kwargs: object) -> StubResponse:
         self.calls.append({"url": url, **kwargs})
         return StubResponse({"results": self.rows})
-
-
-class FakeGoogleScholarMcpSearch:
-    def __init__(self, rows: list[dict[str, object]]) -> None:
-        self.rows = rows
-        self.calls: list[tuple[str, int]] = []
-
-    def __call__(self, query: str, num_results: int = 5) -> list[dict[str, object]]:
-        self.calls.append((query, num_results))
-        return self.rows[:num_results]
 
 
 class SemanticScholarClient:
@@ -237,7 +229,7 @@ def openalex_row(
     }
 
 
-def test_openalex_search_adds_ccf_venue_boost() -> None:
+def test_openalex_search_adds_ranked_venue_boost() -> None:
     generic = openalex_row(
         work_id="W-GENERIC",
         title="Generic Time Series Search Result",
@@ -255,8 +247,8 @@ def test_openalex_search_adds_ccf_venue_boost() -> None:
     adapter = OpenAlexAdapter(
         works=works,
         http_client=http_client,
-        ccf_venue_source_ids=["S4210191458"],
-        ccf_venue_boost_extra_results=4,
+        ranked_venue_source_ids=["S4210191458"],
+        ranked_venue_extra_results=4,
     )
 
     results = adapter.search("time series anomaly detection", max_results=1)
@@ -271,7 +263,30 @@ def test_openalex_search_adds_ccf_venue_boost() -> None:
     assert params["search"] == "time series anomaly detection"
 
 
-def test_openalex_ccf_venue_boost_can_cover_generic_search_failure() -> None:
+def test_openalex_search_uses_http_generic_without_explicit_works() -> None:
+    generic = openalex_row(
+        work_id="W-GENERIC",
+        title="Generic Time Series Search Result",
+        venue="arXiv.org",
+        source_id="S4210160352",
+    )
+    http_client = OpenAlexHttpClient([generic])
+    adapter = OpenAlexAdapter(
+        works=None,
+        http_client=http_client,
+        enable_ranked_venue_boost=False,
+    )
+
+    results = adapter.search("time series anomaly detection", max_results=1)
+
+    assert [paper.title for paper in results] == ["Generic Time Series Search Result"]
+    assert http_client.calls
+    params = http_client.calls[0]["params"]
+    assert params["search"] == "time series anomaly detection"
+    assert params["per-page"] == 1
+
+
+def test_openalex_ranked_venue_boost_can_cover_generic_search_failure() -> None:
     venue = openalex_row(
         work_id="W-AAAI",
         title="AAAI Time Series Anomaly Detection",
@@ -281,7 +296,7 @@ def test_openalex_ccf_venue_boost_can_cover_generic_search_failure() -> None:
     adapter = OpenAlexAdapter(
         works=OpenAlexWorksStub([], fail=True),
         http_client=OpenAlexHttpClient([venue]),
-        ccf_venue_source_ids=["S4210191458"],
+        ranked_venue_source_ids=["S4210191458"],
     )
 
     results = adapter.search("time series anomaly detection", max_results=3)
@@ -291,58 +306,142 @@ def test_openalex_ccf_venue_boost_can_cover_generic_search_failure() -> None:
     assert results[0].venue == "Proceedings of the AAAI Conference on Artificial Intelligence"
 
 
-def test_google_scholar_adapter_maps_mcp_results_to_candidates() -> None:
-    GoogleScholarAdapter.clear_cache()
-    search = FakeGoogleScholarMcpSearch([
-        {
-            "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
-            "Authors": "A Deng, B Hooi - Proceedings of the AAAI Conference on Artificial Intelligence, 2021 - ojs.aaai.org",
-            "Abstract": "We study graph neural network anomaly detection.",
-            "URL": "https://arxiv.org/pdf/2106.06947.pdf",
+def test_paper_search_mcp_adapter_maps_cli_json_to_candidates() -> None:
+    calls: list[list[str]] = []
+
+    def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        payload = {
+            "query": "graph anomaly detection",
+            "sources_used": ["openalex", "semantic"],
+            "source_results": {"openalex": 1, "semantic": 0},
+            "errors": {},
+            "total": 1,
+            "papers": [
+                {
+                    "paper_id": "W123",
+                    "title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+                    "authors": "A Deng; B Hooi",
+                    "abstract": "We study graph neural network anomaly detection.",
+                    "doi": "https://doi.org/10.1609/aaai.v35i5.16523",
+                    "published_date": "2021-05-18T00:00:00",
+                    "pdf_url": "https://ojs.aaai.org/index.php/AAAI/article/download/16523/16330",
+                    "url": "https://ojs.aaai.org/index.php/AAAI/article/view/16523",
+                    "source": "openalex",
+                    "categories": "Computer science; Artificial intelligence",
+                    "citations": 348,
+                }
+            ],
         }
-    ])
-    adapter = GoogleScholarAdapter(
-        search_function=search,
-        min_request_interval_seconds=0,
-        cache_ttl_seconds=0,
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(payload), stderr="")
+
+    adapter = PaperSearchMcpAdapter(
+        sources="openalex,semantic",
+        command=["paper-search"],
+        runner=runner,
     )
 
-    results = adapter.search("graph neural network anomaly detection", max_results=5)
+    results = adapter.search("graph anomaly detection", max_results=5)
 
-    assert search.calls == [("graph neural network anomaly detection", 5)]
+    assert calls[0] == ["paper-search", "search", "graph anomaly detection", "--max-results", "5", "--sources", "openalex,semantic"]
     assert len(results) == 1
     paper = results[0]
-    assert paper.source == "google_scholar"
-    assert paper.source_ids["google_scholar"] == "graph_neural_network_based_anomaly_detection_in_multivariate_time_series"
+    assert paper.source == "openalex"
+    assert paper.sources == ["paper_search_mcp", "openalex"]
     assert paper.title == "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series"
     assert paper.authors == ["A Deng", "B Hooi"]
     assert paper.year == 2021
-    assert paper.venue == "Proceedings of the AAAI Conference on Artificial Intelligence"
-    assert paper.abstract == "We study graph neural network anomaly detection."
-    assert paper.arxiv_id == "2106.06947"
-    assert paper.pdf_url == "https://arxiv.org/pdf/2106.06947.pdf"
-    assert paper.can_deep_read is False
-    assert "https://arxiv.org/pdf/2106.06947.pdf" in paper.candidate_pdf_urls
-    assert paper.raw_source_metadata["mcp_project"] == "JackKuo666/Google-Scholar-MCP-Server"
+    assert paper.venue == ""
+    assert paper.doi == "10.1609/aaai.v35i5.16523"
+    assert paper.pdf_url == "https://ojs.aaai.org/index.php/AAAI/article/download/16523/16330"
+    assert paper.citation_count == 348
+    assert paper.raw_source_metadata["provider"] == "paper-search-mcp"
+    assert paper.raw_source_metadata["rank"] == 1
+    assert paper.raw_source_metadata["categories"] == ["Computer science", "Artificial intelligence"]
 
 
-def test_google_scholar_mcp_aaai_url_feeds_fulltext_resolver() -> None:
-    GoogleScholarAdapter.clear_cache()
+def test_paper_search_mcp_adapter_reports_cli_failure() -> None:
+    def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args, 1, stdout="", stderr="source failed")
+
+    adapter = PaperSearchMcpAdapter(command=["paper-search"], runner=runner)
+
+    with pytest.raises(RuntimeError, match="paper-search-mcp search failed"):
+        adapter.search("time series anomaly detection", max_results=1)
+
+
+def test_paper_search_mcp_adapter_does_not_treat_doi_as_pdf_url() -> None:
+    def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        payload = {
+            "papers": [
+                {
+                    "paper_id": "YangZWYPL26",
+                    "title": "Learning From Graph-Graph Relationship",
+                    "authors": "Zhenyu Yang; Ge Zhang",
+                    "doi": "10.1109/TKDE.2025.3618929",
+                    "published_date": "2026-01-01T00:00:00",
+                    "pdf_url": "https://doi.org/10.1109/TKDE.2025.3618929",
+                    "url": "https://dblp.org/rec/journals/tkde/YangZWYPL26",
+                    "source": "dblp",
+                    "extra": "{'venue': 'IEEE Trans. Knowl. Data Eng.', 'year': '2026'}",
+                }
+            ],
+        }
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(payload), stderr="")
+
+    paper = PaperSearchMcpAdapter(command=["paper-search"], runner=runner).search("graph anomaly detection", max_results=1)[0]
+
+    assert paper.venue == "IEEE Trans. Knowl. Data Eng."
+    assert paper.pdf_url == ""
+    assert paper.pdf_available is False
+    assert "https://doi.org/10.1109/TKDE.2025.3618929" in paper.candidate_html_urls
+
+
+def test_paper_search_mcp_adapter_strips_result_type_prefix_from_title() -> None:
+    def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        payload = {
+            "papers": [
+                {
+                    "paper_id": "prefix-test",
+                    "title": "[PDF][PDF] GRELEN: Multivariate Time Series Anomaly Detection",
+                    "authors": "A Researcher",
+                    "published_date": "2025-01-01",
+                    "pdf_url": "https://example.org/paper.pdf",
+                    "url": "https://example.org/paper",
+                    "source": "openalex",
+                }
+            ],
+        }
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(payload), stderr="")
+
+    results = PaperSearchMcpAdapter(command=["paper-search"], runner=runner).search("grelen", max_results=5)
+
+    assert results[0].title == "GRELEN: Multivariate Time Series Anomaly Detection"
+
+
+def test_paper_search_mcp_aaai_url_feeds_fulltext_resolver() -> None:
     aaai_url = "https://ojs.aaai.org/index.php/AAAI/article/download/16523/16330"
-    adapter = GoogleScholarAdapter(
-        search_function=FakeGoogleScholarMcpSearch([
-            {
-                "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
-                "Authors": "A Deng, B Hooi - Proceedings of the AAAI Conference on Artificial Intelligence, 2021 - ojs.aaai.org",
-                "Abstract": "We study graph neural network anomaly detection.",
-                "URL": aaai_url,
-            }
-        ]),
-        min_request_interval_seconds=0,
-        cache_ttl_seconds=0,
-    )
 
-    paper = adapter.search("graph neural network anomaly detection", max_results=5)[0]
+    def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        payload = {
+            "papers": [
+                {
+                    "paper_id": "W123",
+                    "title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+                    "authors": "A Deng; B Hooi",
+                    "abstract": "We study graph neural network anomaly detection.",
+                    "doi": "10.1609/aaai.v35i5.16523",
+                    "published_date": "2021-05-18T00:00:00",
+                    "pdf_url": aaai_url,
+                    "url": "https://ojs.aaai.org/index.php/AAAI/article/view/16523",
+                    "source": "openalex",
+                    "categories": "Proceedings of the AAAI Conference on Artificial Intelligence",
+                }
+            ],
+        }
+        return subprocess.CompletedProcess(args, 0, stdout=json.dumps(payload), stderr="")
+
+    paper = PaperSearchMcpAdapter(command=["paper-search"], runner=runner).search("graph neural network anomaly detection", max_results=5)[0]
     resolved, metrics = FullTextResolver(unpaywall_email="").resolve(paper)
 
     assert paper.pdf_url == aaai_url
@@ -352,28 +451,6 @@ def test_google_scholar_mcp_aaai_url_feeds_fulltext_resolver() -> None:
     assert resolved.selected_fulltext_url == aaai_url
     assert resolved.can_deep_read is True
     assert metrics == []
-
-
-def test_google_scholar_adapter_infers_venue_from_landing_url() -> None:
-    GoogleScholarAdapter.clear_cache()
-    adapter = GoogleScholarAdapter(
-        search_function=FakeGoogleScholarMcpSearch([
-            {
-                "Title": "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
-                "Authors": "A Deng, B Hooi - 2021 - ojs.aaai.org",
-                "Abstract": "We study graph neural network anomaly detection.",
-                "URL": "https://ojs.aaai.org/index.php/AAAI/article/view/16523",
-            }
-        ]),
-        min_request_interval_seconds=0,
-        cache_ttl_seconds=0,
-    )
-
-    paper = adapter.search("graph neural network anomaly detection", max_results=5)[0]
-
-    assert paper.year == 2021
-    assert paper.venue == "AAAI"
-    assert paper.raw_source_metadata["venue_inferred_from_url"] is True
 
 
 def test_openalex_oa_pdf_is_recognized_as_fulltext_candidate() -> None:

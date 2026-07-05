@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useLearningStore } from '../../stores/learning'
 
 const store = useLearningStore()
@@ -10,6 +10,33 @@ const isAdvisorEvaluating = ref(false)
 const memoryCount = ref(0)
 const advisorAnswer = ref('')
 const advisorSession = ref<AdvisorSession | null>(null)
+const mode = ref<AskMode>('paper')
+
+type AskMode = 'paper' | 'evidence' | 'advisor'
+
+const modeOptions: Array<{ key: AskMode; label: string; hint: string }> = [
+  { key: 'paper', label: '讲论文', hint: '概念、方法、贡献' },
+  { key: 'evidence', label: '找证据', hint: '结论、依据、限制' },
+  { key: 'advisor', label: '组会', hint: '追问、反馈、补强' },
+]
+
+const modePrompts: Record<AskMode, string> = {
+  paper: '请像助教一样自然地讲清楚这篇论文的核心方法：先讲它想解决什么困惑，再讲方法怎么起作用，最后补一句主要证据。',
+  evidence: '这条结论对应哪条证据？',
+  advisor: '',
+}
+
+const inputPlaceholder = computed(() => {
+  if (mode.value === 'evidence') return '问证据，例如：这个结论靠哪类实验或正文段落支撑？'
+  if (mode.value === 'advisor') return '写下你想被追问的点；留空则按整篇论文生成组会问题'
+  return '问 M4，例如：这篇论文到底解决了什么问题？'
+})
+
+const submitLabel = computed(() => {
+  if (mode.value === 'evidence') return '找证据'
+  if (mode.value === 'advisor') return '生成追问'
+  return '发送'
+})
 
 type AdvisorSession = {
   question: string
@@ -369,14 +396,26 @@ async function clearMemory() {
   advisorAnswer.value = ''
 }
 
-function quick(text: string) {
-  input.value = text
+function chooseMode(nextMode: AskMode) {
+  mode.value = nextMode
+  const prompt = modePrompts[nextMode]
+  if (prompt && !input.value.trim()) {
+    input.value = prompt
+  }
+}
+
+async function submitActiveMode() {
+  if (mode.value === 'advisor') {
+    await requestAdvisorQuestion()
+    return
+  }
+  await send()
 }
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
-    void send()
+    void submitActiveMode()
   }
 }
 
@@ -392,6 +431,7 @@ watch(() => store.selectedText, (text) => {
       simplify: '请用更简单的中文讲这段话',
       example: '请给这段话配一个具体例子',
     }
+    mode.value = 'paper'
     input.value = `${promptMap[store.selectedIntent]}：${clipText(text, 260)}`
     store.isAskPanelOpen = true
   }
@@ -407,10 +447,24 @@ watch(() => store.currentJobId, () => {
     <header>
       <div>
         <h2>M4 论文助教</h2>
-        <p>论文问题基于当前证据回答</p>
+        <p>{{ store.selectedText ? '正在基于选中文本回答' : '正在基于当前论文回答' }}</p>
       </div>
       <button type="button" class="ghost-btn !min-h-9 !px-3" data-testid="ask-panel-toggle" @click="store.isAskPanelOpen = false">收起</button>
     </header>
+
+    <div class="mode-tabs" role="tablist" aria-label="M4 提问模式">
+      <button
+        v-for="option in modeOptions"
+        :key="option.key"
+        type="button"
+        :class="{ active: mode === option.key }"
+        :aria-pressed="mode === option.key"
+        @click="chooseMode(option.key)"
+      >
+        <span>{{ option.label }}</span>
+        <small>{{ option.hint }}</small>
+      </button>
+    </div>
 
     <div v-if="store.selectedText" class="selected" data-testid="selected-context">
       <span>已选中文本</span>
@@ -419,8 +473,8 @@ watch(() => store.currentJobId, () => {
 
     <div ref="chatContainer" class="messages">
       <div v-if="!store.chatHistory.length && !isLoading" class="empty">
-        <h3>从一个问题开始</h3>
-        <p>可以选中论文中的一句话，也可以直接问“这篇论文的核心贡献是什么？”</p>
+        <h3>还没有对话</h3>
+        <p>问题越具体，回答越容易贴住论文证据。</p>
       </div>
 
       <article
@@ -493,21 +547,19 @@ watch(() => store.currentJobId, () => {
     </section>
 
     <div class="quick-row">
-      <button type="button" @click="quick('请像助教一样自然地讲清楚这篇论文的核心方法：先讲它想解决什么困惑，再讲方法怎么起作用，最后补一句主要证据。不要写成死板提纲。')">讲方法</button>
-      <button type="button" @click="quick('这条结论对应哪条证据？')">找证据</button>
-      <button type="button" data-testid="advisor-button" @click="requestAdvisorQuestion">按问题追问</button>
-      <button type="button" @click="clearMemory">清空</button>
+      <button type="button" data-testid="advisor-button" @click="requestAdvisorQuestion">直接组会追问</button>
+      <button type="button" @click="clearMemory">清空对话</button>
     </div>
 
-    <form class="composer" @submit.prevent="send">
+    <form class="composer" @submit.prevent="submitActiveMode">
       <textarea
         v-model="input"
         data-testid="ask-input"
         rows="2"
-        placeholder="问 M4，例如：这篇论文到底解决了什么问题？"
+        :placeholder="inputPlaceholder"
         @keydown="handleKeydown"
       />
-      <button type="submit" data-testid="ask-submit" class="primary-btn" :disabled="!input.trim() || isLoading">发送</button>
+      <button type="submit" data-testid="ask-submit" class="primary-btn" :disabled="isLoading || (mode !== 'advisor' && !input.trim())">{{ submitLabel }}</button>
     </form>
   </section>
 </template>
@@ -540,6 +592,50 @@ header p {
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--bg-card) 94%, var(--bg-secondary));
+}
+
+.mode-tabs button {
+  display: grid;
+  min-height: 48px;
+  align-content: center;
+  gap: 1px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.mode-tabs button.active {
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.mode-tabs span {
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.2;
+}
+
+.mode-tabs small {
+  overflow: hidden;
+  color: inherit;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.74;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .selected {
@@ -643,7 +739,11 @@ header p {
 .empty {
   margin: 70px auto 0;
   max-width: 320px;
-  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 12px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--bg-secondary) 54%, transparent);
+  text-align: left;
 }
 
 .empty h3 {
@@ -826,12 +926,17 @@ header p {
 }
 
 .quick-row button {
-  border-radius: 999px;
-  padding: 6px 11px;
-  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 7px 11px;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 700;
+}
+
+.quick-row button:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .composer {

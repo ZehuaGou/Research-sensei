@@ -91,7 +91,7 @@ describe('AskPanel', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="selected-context"]').text()).toContain('attention architecture')
-    expect(wrapper.text()).toContain('论文问题基于当前证据回答')
+    expect(wrapper.text()).toContain('正在基于选中文本回答')
     expect(wrapper.text()).not.toContain('已记住')
 
     await wrapper.get('[data-testid="ask-input"]').setValue('How does it work?')

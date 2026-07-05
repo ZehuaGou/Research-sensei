@@ -25,9 +25,9 @@ def _make_success_status() -> dict:
         "allowed_for_user_display": True,
         "allowed_downstream": {
             "reading_display": True,
-            "phase12_patterns": False,
-            "phase12_drill": False,
-            "phase12_drill_degraded": False,
+            "learning_patterns": False,
+            "learning_drills": False,
+            "learning_drills_degraded": False,
             "advisor_questions": False,
         },
         "component_status": {
@@ -163,8 +163,8 @@ def _make_baseline_status() -> dict:
         "allowed_for_user_display": False,
         "allowed_downstream": {
             "reading_display": False,
-            "phase12_patterns": False,
-            "phase12_drill": False,
+            "learning_patterns": False,
+            "learning_drills": False,
             "advisor_questions": False,
         },
         "component_status": {
@@ -185,8 +185,8 @@ def _make_blocked_status() -> dict:
         "allowed_for_user_display": False,
         "allowed_downstream": {
             "reading_display": False,
-            "phase12_patterns": False,
-            "phase12_drill": False,
+            "learning_patterns": False,
+            "learning_drills": False,
             "advisor_questions": False,
         },
         "component_status": {
@@ -205,9 +205,9 @@ def _make_degraded_status() -> dict:
         "allowed_for_user_display": True,
         "allowed_downstream": {
             "reading_display": True,
-            "phase12_patterns": True,
-            "phase12_drill": False,
-            "phase12_drill_degraded": True,
+            "learning_patterns": True,
+            "learning_drills": False,
+            "learning_drills_degraded": True,
             "advisor_questions": True,
         },
         "component_status": {

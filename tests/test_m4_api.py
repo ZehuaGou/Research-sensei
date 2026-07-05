@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -760,9 +760,9 @@ def _write_m4_artifact_run(
     advisor_gate = user_display if advisor_questions is None else advisor_questions
     downstream = {
         "reading_display": user_display,
-        "phase12_patterns": user_display,
-        "phase12_drill": user_display,
-        "phase12_drill_degraded": False,
+        "learning_patterns": user_display,
+        "learning_drills": user_display,
+        "learning_drills_degraded": False,
         "advisor_questions": advisor_gate,
     }
     component_status = {

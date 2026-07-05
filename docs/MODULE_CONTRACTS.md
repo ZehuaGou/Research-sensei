@@ -12,29 +12,57 @@ Boundary: do not invent papers or source identifiers.
 
 ## acquisition
 
-Input: query variants and the Google Scholar MCP discovery source.
-Output: `CandidatePaper` objects normalized from Google Scholar MCP rows, plus
-legal full-text lookup metadata from official/OA resolver inputs.
+Input: query text and the configured PaperSearch MCP discovery source.
+Output: `CandidatePaper` objects normalized from PaperSearch MCP result rows,
+including title, authors, year, venue/journal, discovery URL, DOI/arXiv ID when
+known, plus legal full-text lookup metadata from official/OA resolver inputs.
 Boundary: adapters may fail independently; failures must become source metrics
-and warnings, not fake success.
+and warnings, not fake success. Direction acquisition should continue across
+fallback variants only when the primary PaperSearch query cannot produce usable
+candidates; when the primary external search returns results, M1 should preserve
+that order rather than injecting venue-targeted variants into the same result
+pool.
 
 ## selection
 
 Input: raw candidates from acquisition.
 Output: deduplicated candidates with relevance, confidence, `discovery_sources`,
-source IDs, DOI, arXiv ID, URL, and full-text readiness retained.
+source IDs, DOI, arXiv ID, URL, CCF venue rank, FlashRank/download queue fields
+(`search_rank`, `rerank_rank`, `rank_score`, `download_selected`,
+`download_decision`), and full-text readiness retained.
 Boundary: metadata-only high-value papers must not be discarded merely because
-they cannot immediately enter M2.
+they cannot immediately enter M2. The default M1 download queue is produced from
+the external PaperSearch result pool by the configured reranker, with the
+original external result position preserved as `search_rank`. CCF rank is
+retained as a quality annotation and reporting signal, not as a hard gate that
+blocks unranked but relevant search results from download attempts.
+
+## paper_library
+
+Input: downloaded M1 source-resolution items, candidate metadata, search query,
+and the direction folder under `workspace/m1_searches/`.
+Output: persistent paper records in `workspace/sensei.sqlite3`, including title,
+authors, year, venue/journal, CCF rank, DOI, arXiv ID, URL fields, SHA-256,
+local path, search-run membership, and delete state.
+Boundary: the library is a reuse and management layer, not a replacement search
+engine. M1 must still use PaperSearch MCP for fresh discovery, then use the
+library to avoid duplicate download and to reuse already downloaded legal full
+text. Soft-deleted papers must not be reused unless explicitly restored later.
 
 ## source_resolver
 
-Input: candidate payload, arXiv ID/URL, DOI, PDF URL, or uploaded file.
+Input: `download_selected` candidate payload, local paper-library match, arXiv
+ID/URL, DOI-resolved legal PDF, PDF URL, or uploaded file.
 Output: resolved source status, downloaded legal full text when available, and a
 preferred M2 input type such as `arxiv_source`, `arxiv_pdf`, `external_pdf`, or
 `metadata_only`.
 Boundary: arXiv source/e-print is preferred over PDF; DOI-only deep_read may
 resolve to a legal OA PDF through Unpaywall, otherwise it fails explicitly with
-`NO_LEGAL_OA_FULLTEXT_FOUND`; no paywall bypassing.
+`NO_LEGAL_OA_FULLTEXT_FOUND`; no paywall bypassing. Direction-search downloads
+are grouped by topic under `workspace/m1_searches/<direction>/`, with PDF files
+named from paper titles plus a manifest for reuse and duplicate avoidance.
+Before any network download, source_resolver must check the paper library; a hit
+returns `library_reuse` and records the current search run without redownloading.
 
 ## ingestion
 

@@ -6,7 +6,7 @@ from pydantic import Field
 
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.enums import CanonicalQualityStatus, CanonicalizationStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VerificationStatus
+from researchsensei.schemas.enums import CanonicalQualityStatus, CanonicalizationStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VenueRank, VerificationStatus
 
 
 class QueryPlan(SenseiModel):
@@ -45,6 +45,16 @@ class CandidatePaper(SenseiModel):
     authors: list[str] = Field(default_factory=list)
     year: int | None = None
     venue: str = ""
+    venue_canonical_name: str = ""
+    venue_rank: VenueRank = VenueRank.UNRANKED
+    download_selected: bool = False
+    download_decision: str = "NOT_EVALUATED"
+    download_reason: str = ""
+    search_rank: int | None = None
+    rerank_rank: int | None = None
+    rerank_score: float | None = None
+    rank_score: float | None = None
+    rank_reason: str = ""
     source: str = ""  # arxiv, openalex, etc.
     sources: list[str] = Field(default_factory=list)
     source_ids: dict[str, str] = Field(default_factory=dict)

@@ -5,7 +5,7 @@ import re
 import time
 from typing import Protocol
 
-from researchsensei.acquisition import GoogleScholarAdapter
+from researchsensei.acquisition import make_default_search_adapter
 from researchsensei.schemas import (
     CandidatePaper,
     SeedExpansionBundle,
@@ -55,7 +55,7 @@ class SeedExpansionService:
     ) -> None:
         if adapters is None:
             default_adapters: dict[str, SearchAdapter] = {
-                "google_scholar": GoogleScholarAdapter(),
+                "paper_search": make_default_search_adapter(),
             }
         else:
             default_adapters = adapters

@@ -553,9 +553,9 @@ def _build_success_status(
         allowed_for_user_display=True,
         allowed_downstream=DownstreamGates(
             reading_display=True,
-            phase12_patterns=True,
-            phase12_drill=True,
-            phase12_drill_degraded=False,
+            learning_patterns=True,
+            learning_drills=True,
+            learning_drills_degraded=False,
             advisor_questions=True,
         ),
         component_status={
@@ -594,9 +594,9 @@ def _build_degraded_status(
         allowed_for_user_display=True,
         allowed_downstream=DownstreamGates(
             reading_display=True,
-            phase12_patterns=True,
-            phase12_drill=teaching_succeeded,
-            phase12_drill_degraded=not teaching_succeeded,
+            learning_patterns=True,
+            learning_drills=teaching_succeeded,
+            learning_drills_degraded=not teaching_succeeded,
             advisor_questions=True,
         ),
         component_status={

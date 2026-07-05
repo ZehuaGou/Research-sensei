@@ -16,6 +16,13 @@ function directionResponse(overrides: Record<string, any> = {}) {
     overview: 'time series anomaly detection is organized as a conservative reading landscape.',
     seed_expansion_status: 'READY',
     warnings: [],
+    query_plan: {
+      user_query: '时间序列异常检测',
+      direction_en: 'time series anomaly detection',
+      english_query: 'time series anomaly detection',
+      core_terms: ['time series', 'anomaly detection'],
+      query_variants: ['time series anomaly detection', 'multivariate time series anomaly detection'],
+    },
     key_sub_directions: [
       { name: 'reconstruction-based detection', description: 'Track reconstruction papers.' },
     ],
@@ -95,6 +102,7 @@ describe('DirectionSearchView', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('检索完成')
+    expect(wrapper.get('[data-testid="query-plan"]').text()).toContain('time series anomaly detection')
     expect(wrapper.get('[data-testid="direction-overview"]').text()).toContain('保守的阅读地图')
     expect(wrapper.get('[data-testid="sub-directions"]').text()).toContain('reconstruction-based detection')
     expect(wrapper.get('[data-testid="method-families"]').text()).toContain('Transformer/attention methods')

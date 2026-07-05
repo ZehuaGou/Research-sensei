@@ -9,12 +9,14 @@ import re
 import shutil
 import tarfile
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 from urllib.parse import urlparse
 
 import httpx
 
+from researchsensei.library import PaperLibraryRecord, PaperLibraryStore
 from researchsensei.schemas import (
     CandidatePaper,
     PaperSourceStatus,
@@ -57,6 +59,7 @@ class PaperSourceResolver:
         timeout_seconds: float = 30.0,
         max_download_bytes: int = 80 * 1024 * 1024,
         external_resolver: Callable[[CandidatePaper], ResolvedPaperSource | None] | None = None,
+        paper_library: PaperLibraryStore | None = None,
     ) -> None:
         self.network_enabled = network_enabled
         self.download_dir = Path(download_dir).resolve() if download_dir else None
@@ -68,6 +71,7 @@ class PaperSourceResolver:
         self.timeout_seconds = timeout_seconds
         self.max_download_bytes = max_download_bytes
         self.external_resolver = external_resolver
+        self.paper_library = paper_library
 
     def resolve_many(
         self,
@@ -78,6 +82,15 @@ class PaperSourceResolver:
     ) -> SourceResolutionResult:
         actual_download_dir = Path(download_dir).resolve() if download_dir else self.download_dir
         items = [self.resolve_one(candidate, download_dir=actual_download_dir) for candidate in candidates]
+        if actual_download_dir is not None:
+            self._write_search_manifest(actual_download_dir, query, candidates, items)
+        if self.paper_library is not None:
+            self.paper_library.record_search(
+                query=query,
+                candidates=candidates,
+                items=items,
+                topic_folder=str(actual_download_dir or ""),
+            )
         warnings: list[WarningItem] = []
         if any(not item.has_valid_deep_reading_source for item in items):
             warnings.append(
@@ -94,6 +107,11 @@ class PaperSourceResolver:
         *,
         download_dir: str | Path | None = None,
     ) -> ResolvedPaperSource:
+        if self.paper_library is not None:
+            cached = self.paper_library.find_match(paper)
+            if cached is not None:
+                return self._library_reuse_result(paper, cached)
+
         try:
             if self.network_enabled and self.external_resolver is not None:
                 resolved = self.external_resolver(paper)
@@ -202,6 +220,34 @@ class PaperSourceResolver:
                 message="PDF URL must use http/https.",
             )
 
+        target = _paper_pdf_path(download_dir, paper)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        existing = self._existing_pdf_result(
+            paper,
+            target=target,
+            pdf_url=pdf_url,
+            source_url=source_url,
+            landing_url=landing_url,
+            source_type=source_type,
+            strategy="existing_named_pdf",
+        )
+        if existing is not None:
+            return existing
+        reusable = _find_reusable_pdf(download_dir, target.name, exclude=target)
+        if reusable is not None:
+            shutil.copy2(reusable, target)
+            reused = self._existing_pdf_result(
+                paper,
+                target=target,
+                pdf_url=pdf_url,
+                source_url=source_url,
+                landing_url=landing_url,
+                source_type=source_type,
+                strategy="reused_named_pdf",
+            )
+            if reused is not None:
+                return reused
+
         max_retries = 3
         backoff = [2.0, 4.0, 8.0]
         response = None
@@ -287,9 +333,6 @@ class PaperSourceResolver:
                 file_size=len(content),
             )
 
-        paper_dir = download_dir / _safe_name(paper.paper_id or paper.title)
-        paper_dir.mkdir(parents=True, exist_ok=True)
-        target = paper_dir / "source.pdf"
         target.write_bytes(content)
         sha256 = hashlib.sha256(content).hexdigest()
 
@@ -355,7 +398,7 @@ class PaperSourceResolver:
     ) -> ResolvedPaperSource | None:
         if not paper.arxiv_id or not source_url:
             return None
-        paper_dir = download_dir / _safe_name(paper.paper_id or paper.title)
+        paper_dir = _paper_source_dir(download_dir, paper)
         paper_dir.mkdir(parents=True, exist_ok=True)
         resolver = SourceResolver(
             http_client=self.http_client,
@@ -398,6 +441,153 @@ class PaperSourceResolver:
             latex_main_file=status.latex_main_file,
             latex_source_path=status.latex_source_path,
         )
+
+    def _existing_pdf_result(
+        self,
+        paper: CandidatePaper,
+        *,
+        target: Path,
+        pdf_url: str,
+        source_url: str,
+        landing_url: str,
+        source_type: PaperSourceType,
+        strategy: str,
+    ) -> ResolvedPaperSource | None:
+        if not target.exists() or not target.is_file():
+            return None
+        try:
+            content = target.read_bytes()
+        except OSError:
+            return None
+        if not content.startswith(PDF_BYTES):
+            return None
+        sha256 = hashlib.sha256(content).hexdigest()
+        meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
+            source_type=source_type,
+            source_url=source_url,
+            pdf_url=pdf_url,
+            landing_url=landing_url,
+            download_status="downloaded",
+            content_type="application/pdf",
+            file_size=target.stat().st_size,
+            sha256=sha256,
+            local_path=str(target),
+            pdf_metadata_check=meta_check,
+            pdf_title_match=title_match,
+            pdf_metadata_warning=meta_warning,
+            metadata={"resolution_strategy": strategy},
+        )
+
+    def _library_reuse_result(
+        self,
+        paper: CandidatePaper,
+        record: PaperLibraryRecord,
+    ) -> ResolvedPaperSource:
+        path = Path(record.local_path)
+        content = path.read_bytes()
+        sha256 = record.sha256 or hashlib.sha256(content).hexdigest()
+        is_pdf = content.startswith(PDF_BYTES)
+        meta_check = "skipped"
+        title_match = "unknown"
+        meta_warning = ""
+        if is_pdf:
+            meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
+        source_type = PaperSourceType.PDF if is_pdf else PaperSourceType.ARXIV_SOURCE
+        source_priority = SourcePriority.PDF if is_pdf else SourcePriority.LATEX_SOURCE
+        preferred_m2_input = "pdf" if is_pdf else "latex_source"
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED if is_pdf else PaperSourceStatus.RESOLVED,
+            source_type=source_type,
+            source_url=paper.source_url or record.pdf_url or record.landing_url,
+            pdf_url=paper.pdf_url or record.pdf_url,
+            landing_url=paper.landing_url or record.landing_url,
+            download_status="downloaded",
+            content_type="application/pdf" if is_pdf else "application/octet-stream",
+            file_size=record.file_size or path.stat().st_size,
+            sha256=sha256,
+            local_path=str(path),
+            pdf_metadata_check=meta_check,
+            pdf_title_match=title_match,
+            pdf_metadata_warning=meta_warning,
+            metadata={
+                "resolution_strategy": "library_reuse",
+                "library_paper_id": record.paper_id,
+            },
+            source_priority=source_priority,
+            preferred_m2_input=preferred_m2_input,
+            has_valid_deep_reading_source=True,
+        )
+
+    @staticmethod
+    def _write_search_manifest(
+        download_dir: Path,
+        query: str,
+        candidates: list[CandidatePaper],
+        items: list[ResolvedPaperSource],
+    ) -> None:
+        download_dir.mkdir(parents=True, exist_ok=True)
+        by_id = {item.paper_id: item for item in items}
+        papers: list[dict[str, object]] = []
+        for candidate in candidates:
+            item = by_id.get(candidate.paper_id)
+            papers.append({
+                "paper_id": candidate.paper_id,
+                "title": candidate.title,
+                "authors": candidate.authors,
+                "year": candidate.year,
+                "venue": candidate.venue,
+                "venue_canonical_name": candidate.venue_canonical_name,
+                "venue_rank": candidate.venue_rank.value,
+                "download_selected": candidate.download_selected,
+                "download_decision": candidate.download_decision,
+                "download_reason": candidate.download_reason,
+                "search_rank": candidate.search_rank,
+                "rerank_rank": candidate.rerank_rank,
+                "rerank_score": candidate.rerank_score,
+                "rank_score": candidate.rank_score,
+                "rank_reason": candidate.rank_reason,
+                "selected_fulltext_source": candidate.selected_fulltext_source,
+                "pdf_url": candidate.pdf_url,
+                "landing_url": candidate.landing_url or candidate.url,
+                "local_path": item.local_path if item is not None else "",
+                "download_status": item.download_status if item is not None else "not_attempted",
+                "source_status": item.status.value if item is not None else "",
+                "source_type": item.source_type.value if item is not None else "",
+                "sha256": item.sha256 if item is not None else "",
+            })
+        manifest = {
+            "query": query,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "download_dir": str(download_dir),
+            "paper_count": len(papers),
+            "downloaded_count": sum(1 for paper in papers if paper.get("download_status") == "downloaded"),
+            "papers": papers,
+        }
+        (download_dir / "manifest.json").write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        readme_lines = [
+            f"# {query}",
+            "",
+            f"- downloaded_count: {manifest['downloaded_count']}",
+            f"- paper_count: {manifest['paper_count']}",
+            "",
+            "| Paper | Venue | CCF | File |",
+            "|---|---|---:|---|",
+        ]
+        for paper in papers:
+            local_path = str(paper.get("local_path") or "")
+            filename = Path(local_path).name if local_path else ""
+            readme_lines.append(
+                f"| {paper.get('title') or ''} | {paper.get('venue_canonical_name') or paper.get('venue') or ''} | "
+                f"{paper.get('venue_rank') or ''} | {filename} |"
+            )
+        (download_dir / "README.md").write_text("\n".join(readme_lines) + "\n", encoding="utf-8")
 
     def _base_result(
         self,
@@ -969,6 +1159,41 @@ def _unique_warnings(values: list[str]) -> list[str]:
 def _safe_name(value: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", value).strip("._")
     return safe[:80] or "paper"
+
+
+def _paper_pdf_path(download_dir: Path, paper: CandidatePaper) -> Path:
+    return download_dir / f"{_safe_file_stem(paper.title or paper.paper_id)}.pdf"
+
+
+def _paper_source_dir(download_dir: Path, paper: CandidatePaper) -> Path:
+    return download_dir / f"{_safe_file_stem(paper.title or paper.paper_id)}__source"
+
+
+def _safe_file_stem(value: str) -> str:
+    safe = re.sub(r"^(?:\[[A-Z]+\]\s*)+", "", value or "").strip()
+    safe = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', " ", safe).strip()
+    safe = re.sub(r"\s+", " ", safe)
+    safe = safe.rstrip(" .")
+    return safe[:140] or _safe_name(value)
+
+
+def _find_reusable_pdf(download_dir: Path, filename: str, *, exclude: Path) -> Path | None:
+    root = download_dir.parent
+    if not root.exists():
+        return None
+    try:
+        exclude_resolved = exclude.resolve()
+    except OSError:
+        exclude_resolved = exclude
+    for candidate in root.glob(f"*/{filename}"):
+        try:
+            if candidate.resolve() == exclude_resolved:
+                continue
+            if candidate.is_file() and candidate.read_bytes().startswith(PDF_BYTES):
+                return candidate
+        except OSError:
+            continue
+    return None
 
 
 def _check_pdf_metadata(content: bytes, expected_title: str) -> tuple[str, str, str]:

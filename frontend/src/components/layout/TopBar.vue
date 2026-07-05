@@ -14,6 +14,7 @@ const theme = useThemeStore()
         </router-link>
 
         <nav class="hidden items-center gap-1 text-[15px] font-medium md:flex" style="color: var(--text-secondary);">
+          <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/papers/library">Library</router-link>
           <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/directions/new">找方向</router-link>
           <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/papers/upload">读论文</router-link>
           <router-link class="rounded-[10px] px-3 py-2 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]" to="/settings">模型设置</router-link>

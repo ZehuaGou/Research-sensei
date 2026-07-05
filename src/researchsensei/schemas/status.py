@@ -16,9 +16,9 @@ class EvidencePackSummary(SenseiModel):
 
 class DownstreamGates(SenseiModel):
     reading_display: bool = False
-    phase12_patterns: bool = False
-    phase12_drill: bool = False
-    phase12_drill_degraded: bool = False
+    learning_patterns: bool = False
+    learning_drills: bool = False
+    learning_drills_degraded: bool = False
     advisor_questions: bool = False
 
 

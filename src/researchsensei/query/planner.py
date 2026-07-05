@@ -58,6 +58,9 @@ Examples:
 - 用户输入: "图神经网络用于根因分析"
   english_query: "graph neural networks for root cause analysis"
   core_terms: ["graph neural networks", "root cause analysis"]
+- 用户输入: "异常解释"
+  english_query: "explainable anomaly detection"
+  core_terms: ["anomaly explanation", "anomaly attribution", "explainable anomaly detection"]
 
 Return JSON with this schema:
 {{
@@ -107,8 +110,8 @@ Return JSON with this schema:
 # ---------------------------------------------------------------------------
 # Venue + year detection helpers
 # ---------------------------------------------------------------------------
-_YEAR_RANGE_RE = re.compile(r"\b(20\d{2})\s*(?:[-–—]\s*(20\d{2}))?")
-_YEAR_RECENT_RE = re.compile(r"\b(recent|latest|new|近(?:期|年|最新)|最新|近期)\b", re.I)
+_YEAR_RANGE_RE = re.compile(r"\b(20\d{2})\s*(?:[-–—至到]\s*(20\d{2}))?")
+_YEAR_RECENT_RE = re.compile(r"\b(recent|latest|new|近三年|近年|最新|近期)\b", re.I)
 
 
 def _detect_venue_targets(raw_query: str, secondary_strings: list[str]) -> list[str]:

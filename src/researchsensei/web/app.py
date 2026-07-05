@@ -17,9 +17,11 @@ from researchsensei.core.config import ConfigService
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
+from researchsensei.library import PaperLibraryStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.types import LLMConfig
 from researchsensei.m4.service import M4InteractionService, M4_MEMORY_FILENAME
+from researchsensei.query import QueryPlanner
 from researchsensei.schemas import CandidatePaper, InteractiveAnswer, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.source_resolver import PaperSourceResolver, SourceResolver
 from researchsensei.workspace import WorkspaceStore
@@ -52,7 +54,9 @@ def create_app(
 ) -> FastAPI:
     app = FastAPI(title="ResearchSensei", version="0.5.0")
     workspace = WorkspaceStore(workspace_root)
-    jobs = JobStore(job_db_path or (workspace.root / "sensei.sqlite3"))
+    db_path = Path(job_db_path or (workspace.root / "sensei.sqlite3"))
+    jobs = JobStore(db_path)
+    paper_library = PaperLibraryStore(db_path)
     resolved_llm_client = llm_client or _configured_llm_client(
         enable_configured_llm=enable_configured_llm,
         provider_name=llm_provider,
@@ -73,16 +77,20 @@ def create_app(
         http_client=http_client,
         max_download_bytes=max_download_bytes,
     )
-    m1_source_dir = workspace.root / "m1_sources"
+    m1_source_dir = workspace.root / "m1_searches"
+    paper_library.import_manifests(m1_source_dir)
     resolved_direction_service = direction_service or DirectionExplorationService(
         source_resolver=PaperSourceResolver(
             network_enabled=True,
             download_dir=m1_source_dir,
             http_client=http_client,
             max_download_bytes=max_download_bytes,
+            paper_library=paper_library,
         ),
         fulltext_resolver=fulltext_resolver,
         source_download_dir=m1_source_dir,
+        paper_library=paper_library,
+        query_planner=QueryPlanner(resolved_llm_client) if resolved_llm_client is not None else None,
     )
     resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService()
 
@@ -253,6 +261,30 @@ def create_app(
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Job not found.") from error
         return {"status": "DELETED", "job_id": job_id}
+
+    @app.get("/api/v1/library/papers")
+    def list_library_papers(
+        query: str = "",
+        limit: int = 100,
+        include_deleted: bool = False,
+    ) -> dict[str, object]:
+        return {
+            "papers": paper_library.list_papers(
+                query=query,
+                limit=limit,
+                include_deleted=include_deleted,
+            )
+        }
+
+    @app.get("/api/v1/library/search_runs")
+    def list_library_search_runs(limit: int = 50) -> dict[str, object]:
+        return {"search_runs": paper_library.list_search_runs(limit=limit)}
+
+    @app.delete("/api/v1/library/papers/{paper_id}")
+    def delete_library_paper(paper_id: str, remove_file: bool = True) -> dict[str, object]:
+        if not paper_library.delete_paper(paper_id, remove_file=remove_file):
+            raise HTTPException(status_code=404, detail="Paper not found.")
+        return {"status": "DELETED", "paper_id": paper_id, "remove_file": remove_file}
 
     @app.get("/api/v1/jobs/{job_id}/artifacts")
     def get_job_artifacts(job_id: str) -> dict[str, object]:

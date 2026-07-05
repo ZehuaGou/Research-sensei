@@ -29,10 +29,10 @@ class CountingNormalizer:
         )
 
 
-def test_direction_runner_default_source_is_google_scholar_mcp_only(tmp_path) -> None:
+def test_direction_runner_default_source_is_paper_search_mcp(tmp_path) -> None:
     runner = DirectionRunner(workspace=WorkspaceStore(tmp_path / "workspace"))
 
-    assert runner.sources == ["google_scholar"]
+    assert runner.sources == ["paper_search"]
 
 
 def test_direction_runner_limits_live_canonicalization_to_source_candidates(tmp_path) -> None:

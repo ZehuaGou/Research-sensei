@@ -22,43 +22,63 @@ class OpenAlexAdapter:
         works: Works | None = None,
         *,
         http_client: httpx.Client | None = None,
-        enable_ccf_venue_boost: bool = True,
-        ccf_venue_boost_extra_results: int = 8,
-        ccf_venue_source_ids: list[str] | None = None,
+        enable_ranked_venue_boost: bool = True,
+        ranked_venue_extra_results: int = 8,
+        ranked_venue_source_ids: list[str] | None = None,
     ) -> None:
-        self.works = works or Works()
+        self.works = works
         self.http_client = http_client or httpx.Client(follow_redirects=True, trust_env=True)
-        self.enable_ccf_venue_boost = enable_ccf_venue_boost
-        self.ccf_venue_boost_extra_results = max(ccf_venue_boost_extra_results, 0)
-        self.ccf_venue_source_ids = ccf_venue_source_ids or _ccf_venue_source_ids()
+        self.enable_ranked_venue_boost = enable_ranked_venue_boost
+        self.ranked_venue_extra_results = max(ranked_venue_extra_results, 0)
+        self.ranked_venue_source_ids = ranked_venue_source_ids or _ranked_venue_source_ids()
 
     def search(self, query: str, max_results: int = 20) -> list[CandidatePaper]:
         generic_error: Exception | None = None
         try:
-            generic_rows = self.works.search(query).get(per_page=min(max_results, 50))
+            if self.works is not None:
+                generic_rows = self.works.search(query).get(per_page=min(max_results, 50))
+            else:
+                generic_rows = self.search_generic(query, max_results=max_results)
         except Exception as exc:
             generic_rows = []
             generic_error = exc
 
         venue_rows: list[dict] = []
-        if self.enable_ccf_venue_boost:
-            venue_rows = self.search_ccf_venues(query, max_results=max(max_results, self.ccf_venue_boost_extra_results))
+        if self.enable_ranked_venue_boost:
+            venue_rows = self.search_ranked_venues(query, max_results=max(max_results, self.ranked_venue_extra_results))
 
         if generic_error and not generic_rows and not venue_rows:
             raise generic_error
 
         rows = _dedupe_rows([*venue_rows, *generic_rows])
-        limit = max_results + (self.ccf_venue_boost_extra_results if venue_rows else 0)
+        limit = max_results + (self.ranked_venue_extra_results if venue_rows else 0)
         return [self._to_candidate(row) for row in rows[:limit] if row.get("title")]
 
-    def search_ccf_venues(self, query: str, max_results: int = 20) -> list[dict]:
-        """Search OpenAlex within known CCF A/A* venues via source-id filtering.
+    def search_generic(self, query: str, max_results: int = 20) -> list[dict]:
+        """Search OpenAlex directly with mailto-aware HTTP parameters."""
+        if not query.strip():
+            return []
+        params = {
+            "search": query,
+            "per-page": min(max(max_results, 1), 50),
+        }
+        mailto = _mailto()
+        if mailto:
+            params["mailto"] = mailto
+        response = self.http_client.get(_OPENALEX_WORKS_API, params=params, timeout=20.0)
+        response.raise_for_status()
+        data = response.json()
+        rows = data.get("results") if isinstance(data, dict) else []
+        return [row for row in (rows or []) if isinstance(row, dict)]
+
+    def search_ranked_venues(self, query: str, max_results: int = 20) -> list[dict]:
+        """Search OpenAlex within known high-ranked venues via source-id filtering.
 
         This complements ordinary OpenAlex search: many strong CS papers are
         easier to retrieve when the search space is restricted to known venue
         sources instead of all scholarly full text.
         """
-        source_ids = _unique([_normalize_openalex_source_id(value) for value in self.ccf_venue_source_ids])
+        source_ids = _unique([_normalize_openalex_source_id(value) for value in self.ranked_venue_source_ids])
         if not query.strip() or not source_ids:
             return []
         params = {
@@ -66,7 +86,7 @@ class OpenAlexAdapter:
             "filter": f"primary_location.source.id:{'|'.join(source_ids)}",
             "per-page": min(max_results, 50),
         }
-        mailto = os.getenv("OPENALEX_EMAIL", "").strip() or os.getenv("RESEARCHSENSEI_CONTACT_EMAIL", "").strip()
+        mailto = _mailto()
         if mailto:
             params["mailto"] = mailto
         try:
@@ -74,10 +94,65 @@ class OpenAlexAdapter:
             response.raise_for_status()
             data = response.json()
         except Exception as exc:
-            logger.info("OpenAlex CCF venue boost failed for %s: %s", query[:80], exc)
+            logger.info("OpenAlex ranked-venue boost failed for %s: %s", query[:80], exc)
             return []
         rows = data.get("results") if isinstance(data, dict) else []
         return [row for row in (rows or []) if isinstance(row, dict)]
+
+    def search_by_venue(
+        self,
+        query: str,
+        *,
+        openalex_source_ids: tuple[str, ...] = (),
+        year_from: int | None = None,
+        year_to: int | None = None,
+        max_results: int = 50,
+    ) -> list[CandidatePaper]:
+        """Venue-targeted search via OpenAlex primary_location.source.id filter.
+
+        When `openalex_source_ids` is empty, falls back to a generic free-text
+        search and the year filter still applies (client-side).
+
+        Year filter is client-side because combining a source-id OR filter
+        with a publication_year filter in a single pyalex chain is brittle.
+        """
+        if not query.strip():
+            return []
+        clean_ids = _unique([_normalize_openalex_source_id(v) for v in openalex_source_ids])
+
+        params: dict[str, object] = {
+            "search": query,
+            "per-page": min(max(max_results, 1), 200),
+        }
+        if clean_ids:
+            params["filter"] = f"primary_location.source.id:{'|'.join(clean_ids)}"
+        mailto = _mailto()
+        if mailto:
+            params["mailto"] = mailto
+
+        try:
+            response = self.http_client.get(_OPENALEX_WORKS_API, params=params, timeout=20.0)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as exc:
+            logger.warning("OpenAlex venue-targeted search failed for %s: %s; fallback", query[:80], exc)
+            return self.search(query, max_results=max_results)
+
+        rows = data.get("results") if isinstance(data, dict) else []
+        rows = [row for row in (rows or []) if isinstance(row, dict)]
+        if year_from is not None or year_to is not None:
+            filtered = []
+            for row in rows:
+                py = row.get("publication_year")
+                if py is None:
+                    continue
+                if year_from is not None and py < year_from:
+                    continue
+                if year_to is not None and py > year_to:
+                    continue
+                filtered.append(row)
+            rows = filtered
+        return [self._to_candidate(row) for row in rows if row.get("title")]
 
     def _to_candidate(self, row: dict) -> CandidatePaper:
         work_id = str(row.get("id") or "")
@@ -185,11 +260,15 @@ def _metadata_confidence(row: dict, pdf_url: str) -> str:
     return "low"
 
 
+def _mailto() -> str:
+    return os.getenv("OPENALEX_EMAIL", "").strip() or os.getenv("RESEARCHSENSEI_CONTACT_EMAIL", "").strip()
+
+
 def _stable_id(title: object) -> str:
     return "openalex_" + "_".join(str(title or "").lower().split())[:50]
 
 
-def _ccf_venue_source_ids() -> list[str]:
+def _ranked_venue_source_ids() -> list[str]:
     ids: list[str] = []
     for cfg in VENUE_REGISTRY.values():
         if cfg.rank in {VenueRank.A_STAR, VenueRank.A}:

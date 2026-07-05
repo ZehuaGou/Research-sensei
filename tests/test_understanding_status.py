@@ -23,9 +23,9 @@ from researchsensei.workspace import WorkspaceStore
 def test_downstream_gates_defaults_all_false() -> None:
     gates = DownstreamGates()
     assert gates.reading_display is False
-    assert gates.phase12_patterns is False
-    assert gates.phase12_drill is False
-    assert gates.phase12_drill_degraded is False
+    assert gates.learning_patterns is False
+    assert gates.learning_drills is False
+    assert gates.learning_drills_degraded is False
     assert gates.advisor_questions is False
 
 
@@ -80,8 +80,8 @@ def test_baseline_only_status_has_no_downstream_access() -> None:
 
     assert status.allowed_for_user_display is False
     assert status.allowed_downstream.reading_display is False
-    assert status.allowed_downstream.phase12_patterns is False
-    assert status.allowed_downstream.phase12_drill is False
+    assert status.allowed_downstream.learning_patterns is False
+    assert status.allowed_downstream.learning_drills is False
     assert status.allowed_downstream.advisor_questions is False
 
 
@@ -144,8 +144,8 @@ def test_pipeline_baseline_writes_understanding_status(tmp_path: Path) -> None:
     assert data["blocking_reason"] == "NO_LLM_CLIENT"
     assert data["allowed_for_user_display"] is False
     assert data["allowed_downstream"]["reading_display"] is False
-    assert data["allowed_downstream"]["phase12_patterns"] is False
-    assert data["allowed_downstream"]["phase12_drill"] is False
+    assert data["allowed_downstream"]["learning_patterns"] is False
+    assert data["allowed_downstream"]["learning_drills"] is False
     assert data["allowed_downstream"]["advisor_questions"] is False
 
 

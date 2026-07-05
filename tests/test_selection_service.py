@@ -159,6 +159,23 @@ def test_selection_service_venue_registry_covers_ccf_a_systems_and_security() ->
     assert sp_score >= 0.95
 
 
+def test_selection_service_infers_venue_rank_from_known_oa_url() -> None:
+    service = SelectionService()
+    candidate = _make_paper_full(
+        "Graph Neural Network-Based Anomaly Detection in Multivariate Time Series",
+        venue="",
+        source="paper_search",
+        pdf_url="https://ojs.aaai.org/index.php/AAAI/article/download/16523/16330",
+        landing_url="https://ojs.aaai.org/index.php/AAAI/article/view/16523",
+        pdf_available=True,
+    )
+
+    pool = service.build_candidate_pool("time series anomaly detection", [candidate])
+
+    assert pool.items[0].venue_canonical_name == "AAAI"
+    assert pool.items[0].venue_rank.value == "A*"
+
+
 def test_selection_service_recency_bonus() -> None:
     service = SelectionService()
     query = _make_query(["test"])

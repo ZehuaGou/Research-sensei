@@ -1,4 +1,4 @@
-{
+﻿{
   "queries": [
     {
       "query": "time series anomaly detection",
@@ -6,7 +6,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Core M1/M2/M3 main-chain domain; should retain non-arXiv candidates and legal fulltext."
     },
     {
@@ -15,7 +15,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Graph-domain acquisition coverage."
     },
     {
@@ -24,7 +24,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Known to produce PDF fallback or blocked M2 jobs; M1 should still find candidates."
     },
     {
@@ -33,7 +33,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Graph neural network anomaly detection acquisition coverage."
     },
     {
@@ -42,7 +42,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Previously audit-blocked in M2, now used as regression for source_latex path."
     },
     {
@@ -51,7 +51,7 @@
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
-      "expected_attempted_sources": ["google_scholar"],
+      "expected_attempted_sources": ["paper_search"],
       "notes": "Transformer/time-series acquisition coverage."
     }
   ]

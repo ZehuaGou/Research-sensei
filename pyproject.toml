@@ -21,7 +21,8 @@ dependencies = [
   "habanero>=1.2",
   "beautifulsoup4>=4.12",
   "requests>=2.31",
-  "scholarly>=1.7",
+  "paper-search-mcp>=0.1.4",
+  "flashrank>=0.2.10",
 ]
 
 [project.optional-dependencies]

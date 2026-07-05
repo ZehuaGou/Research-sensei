@@ -1,6 +1,6 @@
 # ResearchSensei Status
 
-Last updated: 2026-07-03.
+Last updated: 2026-07-05.
 
 This is the single authoritative status file for ResearchSensei. README,
 DESIGN, DEVELOPMENT, module contracts, development notes, and historical docs
@@ -12,7 +12,8 @@ ResearchSensei is a PhD-style research-reading simulator for the path:
 
 ```text
 research direction
-  -> Google Scholar MCP paper discovery
+  -> PaperSearch MCP multi-source paper discovery
+  -> FlashRank semantic reranking and local library reuse
   -> seed expansion
   -> official/OA source-backed deep_read handoff
   -> M2 evidence-backed paper understanding
@@ -32,6 +33,128 @@ engine, or full drill generator.
 M5 is currently an engineering reliability contract, not a product-facing
 business module or route. It defines regression, live acceptance, configuration,
 security, and reporting discipline for M1-M4 surfaces.
+
+## 2026-07-05 M1 PaperSearch MCP Integration
+
+- M1 broad discovery now defaults to the external MIT-licensed
+  `openags/paper-search-mcp` package through `PaperSearchMcpAdapter`.
+  ResearchSensei invokes the `paper-search` CLI, parses its JSON output, and
+  normalizes returned rows into `CandidatePaper`.
+- Default PaperSearch sources are
+  `openalex,semantic,crossref,dblp,arxiv,core`, configurable via
+  `RESEARCHSENSEI_PAPER_SEARCH_SOURCES`. PaperSearch MCP also exposes a
+  `google_scholar` source, but ResearchSensei does not enable it by default
+  because direct Scholar automation still needs a working proxy/session
+  strategy.
+- The previous native Google Scholar MCP adapter and native SerpAPI Scholar
+  adapter were removed. SerpAPI is no longer a
+  ResearchSensei product default; the default no-paid-key path is PaperSearch
+  MCP multi-source discovery plus local CCF/venue annotation, library reuse, and
+  official/OA full-text resolution.
+- PaperSearch MCP was installed in the project `.venv` and added to
+  `pyproject.toml` as `paper-search-mcp>=0.1.4`.
+- M1 candidate download selection now uses FlashRank (`ms-marco-MiniLM-L-12-v2`
+  by default) after PaperSearch/full-text metadata enrichment. The external
+  search position is retained as `search_rank`; the selected download queue is
+  exposed through `download_selected`, `download_decision`, `download_reason`,
+  `rerank_rank`, and `rank_score`.
+- `RESEARCHSENSEI_RERANKER_ENABLED=0` disables reranking and preserves the
+  external search order. `RESEARCHSENSEI_RERANKER_MODEL` and
+  `RESEARCHSENSEI_RERANKER_MAX_LENGTH` override the local reranker settings.
+- Live smoke evidence:
+  `paper_search_mcp.cli sources` listed arXiv, OpenAlex, Semantic Scholar,
+  Crossref, DBLP, CORE, Google Scholar, and other supported sources. A real
+  `graph anomaly detection` search with `openalex,dblp,arxiv` returned
+  OpenAlex/DBLP/arXiv candidates including graph anomaly surveys, GDN, TKDE/KDD
+  DBLP rows, and arXiv PDFs. A direct `PaperSearchMcpAdapter` smoke for
+  `time series anomaly detection` returned 9 candidates across OpenAlex, DBLP,
+  and arXiv.
+- FlashRank/full-text smoke evidence after reranker integration:
+  `time series anomaly detection root cause analysis` returned 32 final
+  candidates, selected 4/4 downloadable papers, and ranked an AAAI A* OA PDF
+  plus source-ready RCA papers in the Top 4. `large language model root cause
+  analysis AIOps` returned 21 final candidates and selected 4/4 source-ready
+  papers. `graph anomaly detection` returned 35 final candidates and selected
+  4/4 downloadable papers, including two AAAI A* OA PDFs. All three smokes
+  returned PASS through PaperSearch MCP -> FlashRank -> legal full-text
+  resolution.
+- Product-style DirectionExploration smoke for `graph anomaly detection`
+  returned SUCCESS and wrote a direction folder under
+  `workspace/m1_product_smoke/graph anomaly detection/` with manifest/README
+  plus title-named source folders. It downloaded 2/3 attempted papers; one IEEE
+  PDF returned 404 and was reported as `PARTIAL_SOURCE_RESOLUTION` rather than
+  silently treated as downloaded.
+- Validation: focused M1 tests passed:
+  `pytest tests/test_paper_ranker.py tests/test_literature_acquisition_fulltext.py tests/test_direction_exploration_service.py tests/test_seed_expansion_service.py tests/test_m1_live_eval_canonical_limit.py tests/test_paper_library_store.py tests/test_paper_library_api.py tests/test_m1_source_resolver_source_fields.py tests/test_selection_service.py -q`
+  = 101 passed.
+
+## 2026-07-04 M1 Literature Library And Reuse Pass
+
+- M1 now has a persistent local paper library in `workspace/sensei.sqlite3`.
+  It records downloaded paper title, authors, year, venue/journal, CCF rank,
+  DOI, arXiv ID, PDF/landing URLs, SHA-256, file size, local path, search-run
+  membership, and soft-delete state.
+- Direction search used Google Scholar MCP for discovery and ranking at this
+  checkpoint. This was later replaced by PaperSearch MCP as the default
+  discovery layer on 2026-07-05, and the old native adapter was removed.
+- The local library avoids duplicate downloads by reusing an already-downloaded
+  Scholar-ranked paper in place. M1 does not skip a top-ranked reusable paper
+  just to prefer a new lower-ranked paper.
+- M1 records the primary-search/top-N download attempts directly: downloaded,
+  reused, failed, landing-only, or missing-PDF outcomes are visible in
+  `search_runs`. If four or more, or at least 40%, of the attempted papers fail
+  to resolve to validated full text, the direction search reports a degraded
+  download outcome instead of silently padding with lower-ranked papers.
+- Direction-search PDFs are grouped under
+  `workspace/m1_searches/<direction-or-topic>/` and named from paper titles,
+  with `manifest.json` and `README.md` for each search folder.
+- New management APIs:
+  `GET /api/v1/library/papers`,
+  `GET /api/v1/library/search_runs`,
+  `DELETE /api/v1/library/papers/{paper_id}`.
+- A lightweight paper-library page is available at `/papers/library` for
+  listing, filtering, path inspection, search-run review, and delete actions.
+- Follow-up formal smoke on 2026-07-04 found the old Google Scholar MCP path
+  returning repeated empty-success results for several broad directions. The
+  current default no longer uses that path; PaperSearch MCP is the default
+  primary discovery source, with OpenAlex and Semantic Scholar retained as
+  fallback adapters if primary discovery returns no candidates.
+- If the primary PaperSearch query returns results, venue-targeted variants such
+  as AAAI/KDD/IJCAI are skipped for that run to avoid contaminating the external
+  search order. Fallback discovery remains labeled as degraded when primary
+  discovery returns no candidates.
+- Live MCP investigation on 2026-07-05 found the upstream
+  `JackKuo666/Google-Scholar-MCP-Server` scraper returning empty lists because
+  Google Scholar serves an anti-bot/CAPTCHA page with HTTP 200 and no
+  `div.gs_ri` result blocks. ResearchSensei now diagnoses this as
+  `GOOGLE_SCHOLAR_BLOCKED` / `PRIMARY_DISCOVERY_BLOCKED:google_scholar`
+  instead of accepting a silent empty response. `scholarly.search_pubs` also
+  failed in the same environment, so restoring real Scholar-first ordering
+  requires a usable Scholar SERP provider, proxy/cookie-backed access, or a
+  manually verified browser/session strategy rather than the original fixed-UA
+  requests scraper alone.
+- `dww911/Paper-Tracker` was inspected as a strategy reference. Its relevant
+  lesson was that reliable Google Scholar SERP access typically moves through
+  paid/proxy-backed providers such as SerpAPI rather than direct scraping.
+  ResearchSensei does not ship a native SerpAPI path now; PaperSearch MCP is the
+  default external search integration.
+- Additional GitHub survey on 2026-07-05 did not find a free, stable,
+  automated Google Scholar replacement. Representative projects either require
+  proxies/browser anti-bot handling for Scholar or recommend SerpAPI for
+  reliable Scholar SERP access. The practical no-paid-key path is therefore
+  free-first multi-source discovery: OpenAlex + Semantic Scholar first-class
+  fallback, plus existing CCF/venue filtering, local paper-library reuse, and
+  legal full-text resolution.
+- Formal smoke report:
+  `output/m1_formal_smoke/m1_formal_smoke_full_20260704_143313.json`. Tested
+  `time series anomaly detection`, `time series anomaly detection root cause
+  analysis`, `graph anomaly detection`, `large language model root cause
+  analysis AIOps`, and `large language model time series anomaly detection root
+  cause analysis`. All returned SUCCESS after fallback; RCA/LLM relevance remains
+  broader than desired and can mix in forecasting/benchmark/log-analysis papers.
+- Validation for this checkpoint: focused M1/library tests passed:
+  `pytest tests/test_paper_library_store.py tests/test_paper_library_api.py tests/test_m1_source_resolver_source_fields.py tests/test_direction_exploration_service.py -q`
+  = 24 passed.
 
 ## 2026-07-03 M1 Search And M4 Advisor Feedback Pass
 
@@ -215,7 +338,8 @@ security, and reporting discipline for M1-M4 surfaces.
 | Module | Surface | Current state | Evidence | Strict judgement |
 |---|---|---|---|---|
 | M1 | Focused acquisition / selected-paper canonical handoff | implemented | selected real-paper acceptance | Narrow verified only. Direction and Seed were separate gaps and are now minimal loops, not full M1 completion. |
-| M1 | Google Scholar MCP literature acquisition | implemented | source metrics + legal full-text smoke | DEGRADED_SMOKE. Default discovery is Google Scholar MCP only; arXiv, OA venue pages, OpenAlex/Semantic Scholar OA metadata, and Unpaywall participate as full-text resolution inputs or explicit diagnostics. |
+| M1 | PaperSearch MCP literature acquisition | implemented | source metrics + legal full-text smoke + focused library tests | DEGRADED_SMOKE. Default discovery is PaperSearch MCP with OpenAlex/Semantic/Crossref/DBLP/arXiv/CORE sources, followed by FlashRank reranking, top-N download attempts, CCF venue annotation, and local library reuse; legal full-text resolution still verifies OA/official source paths before M2 handoff. |
+| M1 | Local paper library and duplicate avoidance | implemented | focused backend/API/frontend tests | UNIT_TESTED. Stores paper metadata, search runs, local paths, and delete state; used before network download; lightweight management page lives at `/papers/library`. |
 | M1 | arXiv source-first | implemented | source/e-print handoff smoke | PARTIAL_REAL_E2E_VERIFIED for narrow arXiv candidates. Source/e-print is preferred over PDF; fallback stays explicit. |
 | M1 | Direction Exploration | implemented minimal loop | backend + frontend tests + source smoke | DEGRADED_SMOKE. Returns overview, sub-directions, method families, candidates, source metrics, and reading order. |
 | M1 | Seed Expansion | implemented minimal loop | backend + frontend tests + narrow smoke | DEGRADED_SMOKE. Returns grouped expansion papers and weak relation labels when citation graph is not verified. |
@@ -234,12 +358,14 @@ Current acquisition stack:
 
 | Source/tool | Runtime status | Current role | Full-text capability | Strict note |
 |---|---|---|---|---|
-| Google Scholar MCP | invoked by default | broad discovery rows and candidate URLs | metadata + candidate URL/PDF URL | Wrapped through `JackKuo666/Google-Scholar-MCP-Server`; ResearchSensei loads its `google_scholar_web_search.py` module from an installed module, configured checkout, or `.cache` clone because upstream direct pip packaging currently fails. |
+| PaperSearch MCP | invoked by default | broad multi-source discovery rows and candidate URLs | metadata + candidate URL/PDF URL when exposed by the source | Wrapped through the external MIT-licensed `openags/paper-search-mcp` package. ResearchSensei invokes its CLI and normalizes JSON rows into `CandidatePaper`; CCF is an annotation layer, while downloads follow the FlashRank reranked queue. |
+| FlashRank | invoked by default after discovery | local semantic reranking for download queue selection | no full-text capability | Default model is `ms-marco-MiniLM-L-12-v2`; it is a practical local reranker, not a venue-quality oracle. Disable with `RESEARCHSENSEI_RERANKER_ENABLED=0`. |
+| Local paper library | invoked before download | duplicate avoidance, reuse, search-run inventory | local legal full-text path | Stored in `workspace/sensei.sqlite3`; checked by DOI, arXiv ID, normalized title, and known URLs before any HTTP download. |
 | arXiv | resolver input | arXiv ID/URL -> source/e-print/PDF | source_ready/pdf_ready | Source-first is implemented and preferred over PDF. Not a default search source. |
-| OpenAlex | resolver metadata / explicit diagnostics | DOI, OA location metadata | OA PDF/landing metadata | Not a default search source. Existing OA metadata still feeds full-text resolution. |
-| Semantic Scholar | resolver metadata / explicit diagnostics | openAccessPdf metadata | OA PDF metadata | Not a default search source. 429/rate limits degrade explicit diagnostic source only. |
-| Crossref | explicit diagnostics | DOI/venue/publisher/year metadata | metadata-only | Never treated as fulltext-ready by itself. |
-| DBLP | explicit diagnostics | CS venue metadata discovery | metadata-only | Helps diagnostics/venue only, not download. |
+| OpenAlex | PaperSearch source / resolver metadata / explicit diagnostics | DOI, OA location metadata | OA PDF/landing metadata | Included in the default PaperSearch source set and still feeds full-text resolution. |
+| Semantic Scholar | PaperSearch source / resolver metadata / explicit diagnostics | openAccessPdf metadata | OA PDF metadata | Included in the default PaperSearch source set; rate limits degrade explicitly. |
+| Crossref | PaperSearch source / explicit diagnostics | DOI/venue/publisher/year metadata | metadata-only | Included in the default PaperSearch source set; never treated as fulltext-ready by itself. |
+| DBLP | PaperSearch source / explicit diagnostics | CS venue metadata discovery | metadata-only | Included in the default PaperSearch source set for CS venue metadata; download still requires a legal source path. |
 | Unpaywall | invoked when email configured | DOI -> legal OA location | publisher/repository OA PDF or landing | Requires `UNPAYWALL_EMAIL` or `RESEARCHSENSEI_CONTACT_EMAIL`. |
 | local upload | implemented | fallback for valuable metadata-only papers | user-provided PDF/canonical | Required when legal full text cannot be fetched automatically. |
 
@@ -355,10 +481,10 @@ Three non-arXiv legal OA PDF candidates were tested through the existing
 - `/artifacts` remains debug/admin oriented.
 
 For user-facing SUCCESS runs, `allowed_downstream.reading_display`,
-`phase12_patterns`, `phase12_drill`, and `advisor_questions` are enabled.
+`learning_patterns`, `learning_drills`, and `advisor_questions` are enabled.
 DEGRADED_STRUCTURAL runs can enable M4 v1 when paper/formula artifacts are
-available; `phase12_drill` requires successful teaching cards, otherwise
-`phase12_drill_degraded` records the degraded drill path. M4 API routes also
+available; `learning_drills` requires successful teaching cards, otherwise
+`learning_drills_degraded` records the degraded drill path. M4 API routes also
 check `allowed_for_user_display` before reading artifacts, and advisor routes
 require `allowed_downstream.advisor_questions`.
 
@@ -419,7 +545,7 @@ $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
 ### Cache Behavior
 
 - Cache stores direction search metadata only (paper titles, arxiv_ids, DOIs, source URLs). PDFs, source archives, and LLM outputs are never cached.
-- Cache hit means the direction search step is skipped entirely; no Google Scholar MCP call is made for that query.
+- Cache hit means the direction search step is skipped entirely; no PaperSearch MCP call is made for that query.
 - Seed expansion, deep_read, M2 parsing, and LLM card building are NEVER cached. Only the initial direction discovery is cached.
 - Cache validation: `--use-cache` without `--refresh-cache` reads cached entries. A secondary `--use-cache` run should produce the same direction candidates as the original `--refresh-cache` run, with zero external API calls during direction search.
 - Cache TTL is 6 hours (`_CACHE_TTL_SECONDS = 3600 * 6`).
@@ -446,23 +572,23 @@ matrix, not broad REAL_E2E.
 
 Summary: 10/12 SUCCESS, 2/12 DEGRADED_STRUCTURAL, 0/12 BLOCKED, 0 direction_search FAIL.
 0 MISSING_METHOD_EVIDENCE. Both DEGRADED cases are PDF-fallback formula provenance
-limitations â€” correct fail-closed behavior, not regressions.
+limitations â€?correct fail-closed behavior, not regressions.
 
-### Remaining Two Non-SUCCESS â€” Diagnosis
+### Remaining Two Non-SUCCESS â€?Diagnosis
 
-**1. `multivariate time series imputation` â€” FORMULA_DERIVATION_BLOCKED**
+**1. `multivariate time series imputation` â€?FORMULA_DERIVATION_BLOCKED**
 - Selected paper: "Graphs with Time Series Attention Transformer" (arxiv_pdf, pdf_fallback).
 - Root cause: the arXiv paper does not have downloadable LaTeX source (source/e-print not available or download failed). The selector picks the best arXiv candidate from direction search, but the arXiv submission is PDF-only.
 - When the source resolver falls back to arxiv_pdf, MinerU parses the PDF. Formula origins are `pdf_extracted`/`pdf_ocr` instead of `source_latex`. The quality auditor's FSA-5 correctly blocks detailed formula derivation for unknown/weak provenance formulas.
 - Result: paper_card + teaching_cards succeed (200), formula cards blocked. Correct fail-closed behavior.
-- No code change needed â€” this is an inherent limitation of PDF-only arXiv papers.
+- No code change needed â€?this is an inherent limitation of PDF-only arXiv papers.
 - Alternative candidate with source_latex: not available among the top seed expansion candidates for this query.
 
-**2. `diffusion models for forecasting` â€” FORMULA_DERIVATION_BLOCKED**
+**2. `diffusion models for forecasting` â€?FORMULA_DERIVATION_BLOCKED**
 - Selected paper: "Rise of Diffusion Models in Time-Series Forecasting" (arxiv_pdf, pdf_fallback).
-- Root cause: same mechanism as above. The arXiv paper has no downloadable LaTeX source. PDF fallback â†’ OCR/extracted formula origins â†’ FSA-5 blocks derivation.
+- Root cause: same mechanism as above. The arXiv paper has no downloadable LaTeX source. PDF fallback â†?OCR/extracted formula origins â†?FSA-5 blocks derivation.
 - Cards returned 200 with paper + teaching components. Formula cards blocked.
-- During the 2026-06-18 live run, this query produced PAPER_CARD_FAILED (experiment_summary.evidence_ref missing from LLM output) â€” this is a transient LLM output quality issue. The LLM sometimes omits required evidence_ref fields; the validator correctly rejects the output. Gate behavior is correct.
+- During the 2026-06-18 live run, this query produced PAPER_CARD_FAILED (experiment_summary.evidence_ref missing from LLM output) â€?this is a transient LLM output quality issue. The LLM sometimes omits required evidence_ref fields; the validator correctly rejects the output. Gate behavior is correct.
 - For PDF papers, the LLM has less structured evidence and is more likely to produce invalid evidence_refs. This is a known limitation that does not warrant gate relaxation.
 - No code change needed.
 
@@ -476,7 +602,7 @@ candidate-scoring improvement). These are M1 improvements, not M2/M3 gate issues
 ### Cache Verification Notes
 
 Cache hit/miss verification requires two sequential runs:
-1. `--refresh-cache` (live, makes external API calls) â€” produces baseline.
+1. `--refresh-cache` (live, makes external API calls) â€?produces baseline.
 2. `--use-cache` (reuses cached direction results, skips direction APIs).
 
 During the 2026-06-18 live attempt, the first pass timed out due to arXiv and
@@ -501,7 +627,7 @@ Cache does not reduce LLM or M2/M3 processing time. Only direction search is cac
    degradation is handled, and the adapter now has in-process success caching
    plus a shared polite throttle. Broad live matrix behavior still needs
    re-verification under real API pressure.
-4. Formula cards still degrade on non-source_latex or weak provenance â€” correct
+4. Formula cards still degrade on non-source_latex or weak provenance â€?correct
    fail-closed behavior for both PDF-fallback queries in the current matrix.
 5. Main-chain positive evidence is narrow; source-first success is promising but
    not broad reliability. Matrix runner provides repeatable acceptance tooling.

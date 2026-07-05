@@ -22,7 +22,8 @@ from researchsensei.core.env_loader import load_runtime_env  # noqa: E402
 
 load_runtime_env(suppress_errors=True)
 
-from researchsensei.acquisition import ArxivAdapter, DBLPAdapter, FullTextResolver, GoogleScholarAdapter, OpenAlexAdapter, SemanticScholarAdapter  # noqa: E402
+from researchsensei.acquisition import ArxivAdapter, DBLPAdapter, FullTextResolver, OpenAlexAdapter, PaperSearchMcpAdapter, SemanticScholarAdapter  # noqa: E402
+from researchsensei.ranking import PaperRanker, select_downloads  # noqa: E402
 from researchsensei.schemas import CandidatePaper  # noqa: E402
 from researchsensei.selection import SelectionService  # noqa: E402
 
@@ -33,14 +34,18 @@ class SearchAdapter(Protocol):
 
 
 SOURCE_ALIASES = {
+    "papersearch": "paper_search",
+    "paper-search": "paper_search",
+    "paper-search-mcp": "paper_search",
+    "paper_search_mcp": "paper_search",
     "semanticscholar": "semantic_scholar",
     "semantic-scholar": "semantic_scholar",
     "s2": "semantic_scholar",
-    "googlescholar": "google_scholar",
-    "google-scholar": "google_scholar",
-    "scholar": "google_scholar",
+    "googlescholar": "paper_search",
+    "google-scholar": "paper_search",
+    "scholar": "paper_search",
 }
-SEARCH_SOURCE_ORDER = ["google_scholar", "arxiv", "openalex", "semantic_scholar", "dblp", "crossref"]
+SEARCH_SOURCE_ORDER = ["paper_search", "arxiv", "openalex", "semantic_scholar", "dblp", "crossref"]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -51,8 +56,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--download-top-n", type=int, default=5)
     parser.add_argument(
         "--sources",
-        default="google-scholar,unpaywall",
-        help="Comma-separated sources. Default M1 chain is google-scholar,unpaywall; legacy diagnostics may pass arxiv/openalex/semanticscholar/dblp explicitly.",
+        default="paper-search,unpaywall",
+        help="Comma-separated sources. Default M1 chain is paper-search,unpaywall; diagnostics may pass arxiv/openalex/semanticscholar/dblp explicitly.",
     )
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "literature_acquisition_acceptance"))
     return parser.parse_args(argv)
@@ -174,16 +179,31 @@ def run_literature_acquisition_acceptance(
     selection = SelectionService()
     deduplicated = selection.deduplicate(candidates)
     resolver = fulltext_resolver or FullTextResolver(timeout_seconds=30.0)
+    paper_ranker = PaperRanker()
     resolved, fulltext_metrics = resolver.resolve_many(
         deduplicated,
-        download_top_n=download_top_n,
+        download_top_n=0,
         workspace=workspace / _safe_name(query),
     )
+    normalized = selection.build_candidate_pool(query=query, candidates=resolved).items
+    ranked = paper_ranker.rank(query, normalized)
+    screened = select_downloads(ranked, max_download_candidates=download_top_n)
+    selected_for_download = [candidate for candidate in screened if candidate.download_selected]
+    downloaded: list[CandidatePaper] = []
+    download_metrics: list[dict[str, Any]] = []
+    if selected_for_download and download_top_n > 0:
+        downloaded, download_metrics = resolver.resolve_many(
+            selected_for_download,
+            download_top_n=min(download_top_n, len(selected_for_download)),
+            workspace=workspace / _safe_name(query),
+        )
+    final_candidates = _merge_downloaded_candidates(screened, downloaded)
+    fulltext_metrics = [*fulltext_metrics, *download_metrics]
     if "unpaywall" in sources:
         source_metrics.extend(fulltext_metrics)
 
-    summary = _summary(query, sources, source_metrics, candidates, resolved, warnings)
-    summary["top_candidates"] = [_candidate_row(candidate) for candidate in resolved[:20]]
+    summary = _summary(query, sources, source_metrics, candidates, final_candidates, warnings)
+    summary["top_candidates"] = [_candidate_row(candidate) for candidate in final_candidates[:20]]
     summary["verdict"] = _verdict(summary)
     return summary
 
@@ -225,6 +245,8 @@ def _summary(
         "metadata_only_count": status_counts.get("metadata_only", 0),
         "metadata_only_after_unpaywall_count": sum(1 for candidate in candidates if candidate.doi and candidate.fulltext_status == "metadata_only"),
         "failed_count": status_counts.get("failed", 0),
+        "venue_ranked_count": sum(1 for candidate in candidates if candidate.venue_rank.value != "unranked"),
+        "download_selected_count": sum(1 for candidate in candidates if candidate.download_selected),
         "selected_fulltext_source_counts": dict(selected_source_counts.most_common()),
         "oa_pdf_found_count": sum(
             selected_source_counts.get(source, 0)
@@ -242,6 +264,16 @@ def _candidate_row(candidate: CandidatePaper) -> dict[str, Any]:
         "title": candidate.title,
         "year": candidate.year,
         "venue": candidate.venue,
+        "venue_canonical_name": candidate.venue_canonical_name,
+        "venue_rank": candidate.venue_rank.value,
+        "download_selected": candidate.download_selected,
+        "download_decision": candidate.download_decision,
+        "download_reason": candidate.download_reason,
+        "search_rank": candidate.search_rank,
+        "rerank_rank": candidate.rerank_rank,
+        "rerank_score": candidate.rerank_score,
+        "rank_score": candidate.rank_score,
+        "rank_reason": candidate.rank_reason,
         "discovery_sources": candidate.sources or ([candidate.source] if candidate.source else []),
         "doi": candidate.doi,
         "arxiv_id": candidate.arxiv_id,
@@ -271,6 +303,16 @@ def _source_counts(metrics: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
                 bucket["errors"].append(error)
         bucket["count"] = int(bucket["count"]) + int(metric.get("count") or 0)
     return result
+
+
+def _merge_downloaded_candidates(
+    base: list[CandidatePaper],
+    downloaded: list[CandidatePaper],
+) -> list[CandidatePaper]:
+    if not downloaded:
+        return base
+    by_id = {candidate.paper_id: candidate for candidate in downloaded}
+    return [by_id.get(candidate.paper_id, candidate) for candidate in base]
 
 
 def _verdict(summary: dict[str, Any]) -> str:
@@ -327,9 +369,9 @@ def _parse_sources(value: str) -> list[str]:
 
 def _default_adapters() -> dict[str, SearchAdapter]:
     return {
+        "paper_search": PaperSearchMcpAdapter(),
         "arxiv": ArxivAdapter(timeout=12.0),
         "openalex": OpenAlexAdapter(),
-        "google_scholar": GoogleScholarAdapter(),
         "semantic_scholar": SemanticScholarAdapter(timeout=12.0),
         "dblp": DBLPAdapter(timeout=12.0),
     }

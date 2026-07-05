@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from datetime import datetime, timezone
 import re
@@ -870,14 +870,14 @@ class QualityAuditor:
                     artifact="understanding_status",
                     field="allowed_downstream.advisor_questions",
                 ))
-            if downstream.get("phase12_drill") is True and comp.get("teaching_cards") != "SUCCESS":
+            if downstream.get("learning_drills") is True and comp.get("teaching_cards") != "SUCCESS":
                 findings.append(AuditFinding(
                     code="F-5",
                     severity="P1",
                     effect="BLOCK",
-                    message="DEGRADED_STRUCTURAL allows phase12_drill without successful teaching_cards",
+                    message="DEGRADED_STRUCTURAL allows learning_drills without successful teaching_cards",
                     artifact="understanding_status",
-                    field="allowed_downstream.phase12_drill",
+                    field="allowed_downstream.learning_drills",
                 ))
 
         return findings

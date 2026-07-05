@@ -15,6 +15,15 @@ const status = computed(() => result.value?.direction_workspace_status || result
 const warnings = computed(() => normalizeWarnings(result.value?.warnings || []))
 const papers = computed(() => result.value?.papers || result.value?.candidate_cards || [])
 const hasEmptyResult = computed(() => ['EMPTY_RESULT', 'BLOCKED'].includes(String(status.value)))
+const queryPlan = computed(() => result.value?.query_plan || null)
+const queryPlanMode = computed(() => {
+  if (!queryPlan.value) return ''
+  if (warnings.value.some((warning) => warning.code === 'HEURISTIC_QUERY_PLAN_NO_LLM')) return '本地规划'
+  if (warnings.value.some((warning) => warning.code === 'LLM_QUERY_PLAN_FAILED')) return 'LLM 降级'
+  return 'LLM 规划'
+})
+const queryVariants = computed(() => toTextList(queryPlan.value?.query_variants).slice(0, 6))
+const queryCoreTerms = computed(() => toTextList(queryPlan.value?.core_terms).slice(0, 8))
 
 async function search() {
   if (!query.value.trim() || isLoading.value) return
@@ -58,6 +67,12 @@ function normalizeWarnings(raw: any[]): Array<{ code: string; message: string }>
   })
 }
 
+function toTextList(raw: unknown): string[] {
+  return Array.isArray(raw)
+    ? raw.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+}
+
 function warningText(warning: { code: string; message: string }) {
   const code = warning.code || ''
   const message = warning.message || ''
@@ -69,8 +84,10 @@ function warningText(warning: { code: string; message: string }) {
   if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
   if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '当前没有候选同时满足深读全文下载与质量门槛。'
   if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
-  if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已隐藏。`
+  if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已标记为暂不推荐。`
   if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
+  if (code === 'DOWNLOAD_ATTEMPT_SUMMARY') return `全文下载尝试：${message || '待确认'}`
+  if (code === 'LLM_QUERY_PLAN_FAILED') return `LLM 查询规划失败，已降级到本地规划：${message}`
   return message ? `${code}：${message}` : code
 }
 
@@ -89,6 +106,12 @@ function directionMessage(value: unknown) {
   const text = String(value || '')
   if (text.includes('returned real candidates')) return '已返回真实候选论文，但部分外部来源或全文门槛发生降级。'
   if (text.includes('structured bundle')) return '已从真实论文来源生成结构化方向包。'
+  if (text.includes('used the reranked download queue')) {
+    const match = text.match(/downloaded\s+(\d+)\/(\d+)\s+attempted papers/i)
+    return match
+      ? `已完成候选重排，并下载 ${match[1]}/${match[2]} 篇尝试论文。`
+      : '已完成候选重排，并尝试下载可深读全文。'
+  }
   if (text.includes('No external paper source')) return '外部论文来源没有返回可用结果。'
   if (text.includes('no candidate passed')) return '外部来源有响应，但没有候选通过相关性或可读性筛选。'
   return text
@@ -317,6 +340,23 @@ async function openDeepRead(paper: Record<string, any>) {
       </div>
     </section>
 
+    <section v-if="queryPlan" class="query-plan surface" data-testid="query-plan">
+      <div class="query-plan-head">
+        <span>{{ queryPlanMode }}</span>
+        <strong>{{ queryPlan.english_query || queryPlan.direction_en || queryPlan.user_query }}</strong>
+      </div>
+      <div class="query-plan-body">
+        <div>
+          <small>核心词</small>
+          <p>{{ queryCoreTerms.length ? queryCoreTerms.join(' / ') : '待确认' }}</p>
+        </div>
+        <div>
+          <small>检索变体</small>
+          <p>{{ queryVariants.length ? queryVariants.join(' / ') : '待确认' }}</p>
+        </div>
+      </div>
+    </section>
+
     <section v-if="result?.overview" class="overview" data-testid="direction-overview">
       <h2>方向概览</h2>
       <p>{{ overviewText(result.overview) }}</p>
@@ -431,23 +471,23 @@ async function openDeepRead(paper: Record<string, any>) {
 .direction-page {
   width: min(1120px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 42px 0 72px;
+  padding: 28px 0 64px;
 }
 
 .search-head {
-  margin-bottom: 22px;
+  margin-bottom: 16px;
 }
 
 .search-head > p {
   color: var(--accent);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
 .search-head h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 900;
 }
 
@@ -462,8 +502,8 @@ async function openDeepRead(paper: Record<string, any>) {
   width: 100%;
   outline: none;
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px 16px;
+  border-radius: 8px;
+  padding: 12px 14px;
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 16px;
@@ -471,7 +511,7 @@ async function openDeepRead(paper: Record<string, any>) {
 
 .error-box,
 .empty-result {
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 14px 16px;
   font-size: 15px;
   line-height: 1.7;
@@ -486,8 +526,8 @@ async function openDeepRead(paper: Record<string, any>) {
 .status-card {
   display: grid;
   gap: 10px;
-  margin-bottom: 24px;
-  padding: 16px;
+  margin-bottom: 12px;
+  padding: 14px;
 }
 
 .status-card div:first-child {
@@ -513,6 +553,64 @@ async function openDeepRead(paper: Record<string, any>) {
 .warning-list {
   display: grid;
   gap: 4px;
+}
+
+.query-plan {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 14px;
+}
+
+.query-plan-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.query-plan-head span {
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.query-plan-head strong {
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.query-plan-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.35fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.query-plan-body div {
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--bg-secondary);
+}
+
+.query-plan-body small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.query-plan-body p {
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .overview,
@@ -608,7 +706,7 @@ async function openDeepRead(paper: Record<string, any>) {
 }
 
 .meta-grid span {
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 8px 10px;
   background: var(--bg-secondary);
   color: var(--text-secondary);
@@ -648,7 +746,7 @@ async function openDeepRead(paper: Record<string, any>) {
   height: 30px;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--accent-light);
   color: var(--accent);
   font-weight: 900;
@@ -672,6 +770,7 @@ async function openDeepRead(paper: Record<string, any>) {
 
   .mini-grid,
   .mini-grid.three,
+  .query-plan-body,
   .meta-grid {
     grid-template-columns: 1fr;
   }
