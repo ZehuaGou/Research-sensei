@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
 
                 <aside class="formula-rail surface" :class="{ collapsed: formulaRailCollapsed }" aria-label="当前公式与目录">
                   <button type="button" class="rail-toggle" @click="formulaRailCollapsed = !formulaRailCollapsed">
-                    {{ formulaRailCollapsed ? '展开' : '收起' }}
+                    {{ formulaRailCollapsed ? `公式 ${activeFormulaEntry?.index || '…'}` : '收起' }}
                   </button>
                   <template v-if="!formulaRailCollapsed">
                   <section v-if="activeFormulaEntry" class="active-formula-card">
@@ -971,8 +971,29 @@ onBeforeUnmount(() => {
 }
 
 .formula-rail.collapsed {
-  max-height: none;
-  overflow: visible;
+  width: 72px;
+  min-width: 72px;
+  height: 48px;
+  min-height: 48px;
+  overflow: hidden;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.formula-rail.collapsed .rail-toggle {
+  position: static;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: 13px;
+  font-weight: 720;
+  border-radius: 12px;
+  cursor: pointer;
 }
 
 .rail-toggle {
@@ -1167,25 +1188,29 @@ onBeforeUnmount(() => {
 
 @media (min-width: 1121px) {
   .formula-rail {
-    position: sticky;
-    top: 16px;
-    right: auto;
-    z-index: 1;
-    width: auto;
-    max-height: calc(100vh - 32px);
-    box-shadow: none;
+    position: fixed;
+    top: 88px;
+    right: 28px;
+    z-index: 70;
+    width: 300px;
+    max-height: calc(100vh - 112px);
+    overflow-y: auto;
+    box-shadow: var(--shadow-md);
   }
+}
+
+.workspace-shell.with-chat .formula-rail {
+  position: fixed;
+  top: 88px;
+  right: 396px;
+  width: 280px;
+  max-height: calc(100vh - 112px);
+  overflow-y: auto;
+  z-index: 70;
 }
 
 .workspace-shell.with-chat .formula-workspace {
   grid-template-columns: minmax(0, 1fr);
-}
-
-.workspace-shell.with-chat .formula-rail {
-  position: static;
-  order: -1;
-  max-height: none;
-  overflow: visible;
 }
 
 .active-formula-card > span {
