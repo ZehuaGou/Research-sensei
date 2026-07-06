@@ -26,15 +26,60 @@ const formulaIndexListRef = ref<HTMLElement>()
 let formulaObserver: IntersectionObserver | null = null
 let scrollGuard = false
 
-/** Auto-scroll sidebar to keep the active formula entry visible. */
+// --- Auto-follow: scroll sidebar to keep active entry visible ---
 function revealActiveIndex() {
   if (scrollGuard || !formulaIndexListRef.value) return
   scrollGuard = true
   requestAnimationFrame(() => {
-    const active = formulaIndexListRef.value?.querySelector('.formula-index-list .active') as HTMLElement | null
+    const active = formulaIndexListRef.value?.querySelector('.active') as HTMLElement | null
     if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     scrollGuard = false
   })
+}
+
+// --- Drag-to-scroll: grab the list and drag to scroll ---
+let dragStartX = 0
+let dragStartY = 0
+let dragScrollL = 0
+let dragScrollT = 0
+let dragMoved = false
+
+function onIndexMouseDown(e: MouseEvent) {
+  const el = formulaIndexListRef.value
+  if (!el) return
+  dragMoved = false
+  dragStartX = e.clientX
+  dragStartY = e.clientY
+  dragScrollL = el.scrollLeft
+  dragScrollT = el.scrollTop
+  el.classList.add('dragging')
+  document.addEventListener('mousemove', onIndexMouseMove)
+  document.addEventListener('mouseup', onIndexMouseUp)
+}
+
+function onIndexMouseMove(e: MouseEvent) {
+  const el = formulaIndexListRef.value
+  if (!el) return
+  const dx = e.clientX - dragStartX
+  const dy = e.clientY - dragStartY
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) dragMoved = true
+  el.scrollLeft = dragScrollL - dx
+  el.scrollTop = dragScrollT - dy
+}
+
+function onIndexMouseUp() {
+  formulaIndexListRef.value?.classList.remove('dragging')
+  document.removeEventListener('mousemove', onIndexMouseMove)
+  document.removeEventListener('mouseup', onIndexMouseUp)
+  if (dragMoved) {
+    // Swallow the click that fires right after mouseup from a drag
+    const swallow = (ev: MouseEvent) => {
+      ev.preventDefault()
+      ev.stopPropagation()
+      document.removeEventListener('click', swallow, true)
+    }
+    document.addEventListener('click', swallow, true)
+  }
 }
 
 const status = computed(() => understandingStatus.value?.status || '')
@@ -476,6 +521,7 @@ onBeforeUnmount(() => {
                   <div
                     ref="formulaIndexListRef"
                     class="formula-index-list"
+                    @mousedown="onIndexMouseDown"
                   >
                     <button
                       v-for="item in formulaNavItems"
@@ -856,13 +902,21 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 2px;
   overflow-y: auto;
-  padding-right: 2px;
+  padding-right: 4px;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.formula-index-list.dragging {
+  cursor: grabbing;
+  scroll-behavior: auto;
 }
 
 .formula-index-list::-webkit-scrollbar {
-  width: 4px;
+  width: 5px;
 }
 
 .formula-index-list::-webkit-scrollbar-track {
@@ -916,11 +970,6 @@ onBeforeUnmount(() => {
   background: var(--bg-secondary);
   color: inherit;
   font-size: 12px;
-}
-
-.formula-index button.active b {
-  background: var(--accent);
-  color: var(--accent-contrast);
 }
 
 .formula-index button span {
