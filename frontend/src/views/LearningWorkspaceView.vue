@@ -580,7 +580,7 @@ onBeforeUnmount(() => {
                     </div>
                   </section>
 
-                  <nav class="formula-index" :class="{ 'chat-open': store.isAskPanelOpen }" data-testid="formula-index" aria-label="公式目录">
+                  <nav class="formula-index" data-testid="formula-index" aria-label="公式目录">
                     <header>
                       <div>
                         <strong>公式目录</strong>
@@ -690,15 +690,6 @@ onBeforeUnmount(() => {
 
 .workspace-shell.with-chat {
   grid-template-columns: 210px minmax(0, 1fr) minmax(330px, 380px);
-}
-
-.workspace-shell.with-chat .formula-workspace {
-  grid-template-columns: 1fr;
-}
-
-.workspace-shell.with-chat .formula-rail {
-  position: static;
-  max-height: 160px;
 }
 
 .workspace-shell.formula-mode {
