@@ -22,7 +22,9 @@ const isLoading = ref(true)
 const error = ref('')
 const activeTab = ref<'paper' | 'formulas' | 'teaching'>('paper')
 const activeFormulaAnchor = ref('')
+const formulaIndexRef = ref<HTMLElement>()
 let formulaObserver: IntersectionObserver | null = null
+let scrollGuard = false
 
 const status = computed(() => understandingStatus.value?.status || '')
 const canShowCards = computed(() => ['SUCCESS', 'DEGRADED_STRUCTURAL'].includes(status.value))
@@ -65,6 +67,7 @@ const formulaNavItems = computed(() => formulaCardsList.value.map((formula: any,
     id: formulaAnchor(formula, index),
     index: index + 1,
     title: clipLabel(card.display_title || card.purpose || card.problem || `公式 ${index + 1}`, 46),
+    formula_latex: card.formula_latex || card.formula_raw || '',
   }
 }))
 
@@ -265,6 +268,16 @@ function scrollToFormula(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+function ensureActiveVisible() {
+  if (!formulaIndexRef.value || scrollGuard) return
+  scrollGuard = true
+  nextTick(() => {
+    const active = formulaIndexRef.value?.querySelector('.formula-index-list .active') as HTMLElement | null
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    scrollGuard = false
+  })
+}
+
 function setupFormulaObserver() {
   formulaObserver?.disconnect()
   formulaObserver = null
@@ -357,6 +370,7 @@ onMounted(() => {
 })
 
 watch([activeTab, formulaCardsList], () => setupFormulaObserver(), { flush: 'post' })
+watch(activeFormulaAnchor, () => ensureActiveVisible())
 
 onBeforeUnmount(() => {
   formulaObserver?.disconnect()
@@ -455,10 +469,10 @@ onBeforeUnmount(() => {
               <div class="formula-workspace">
                 <nav class="formula-index surface" data-testid="formula-index" aria-label="公式目录">
                   <header>
-                    <span>公式目录</span>
-                    <strong>{{ formulaCardsList.length }} 个公式</strong>
+                    <strong>公式目录</strong>
+                    <span>{{ formulaCardsList.length }}</span>
                   </header>
-                  <div class="formula-index-list">
+                  <div ref="formulaIndexRef" class="formula-index-list">
                     <button
                       v-for="item in formulaNavItems"
                       :key="item.id"
@@ -797,13 +811,12 @@ onBeforeUnmount(() => {
   top: 16px;
   z-index: 20;
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   max-height: min(540px, calc(100vh - 128px));
-  overflow: hidden;
   padding: 12px;
   background: color-mix(in srgb, var(--bg-card) 96%, transparent);
   backdrop-filter: blur(14px);
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .formula-index header {
@@ -812,15 +825,24 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 6px;
 }
 
-.formula-index header span {
+.formula-index header strong {
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 720;
 }
 
-.formula-index header strong {
+.formula-index header span {
+  display: flex;
+  width: 26px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--bg-secondary);
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 650;
@@ -847,14 +869,19 @@ onBeforeUnmount(() => {
   text-align: left;
 }
 
-.formula-index button:hover,
-.formula-index button.active {
+.formula-index button:hover {
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
 
 .formula-index button.active {
-  box-shadow: inset 3px 0 0 var(--text-primary);
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--text-primary);
+}
+
+.formula-index button.active b {
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .formula-index b {
@@ -893,19 +920,30 @@ onBeforeUnmount(() => {
 
 .workspace-shell.with-chat .formula-index {
   top: 0;
-  max-height: 128px;
+  max-height: 160px;
 }
 
 .workspace-shell.with-chat .formula-index-list {
   display: flex;
   overflow-x: auto;
   overflow-y: hidden;
+  gap: 4px;
   padding-bottom: 6px;
 }
 
 .workspace-shell.with-chat .formula-index button {
-  width: min(60vw, 260px);
+  width: min(60vw, 220px);
   flex: 0 0 auto;
+  min-height: 34px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 6px;
+  padding: 5px 8px;
+}
+
+.workspace-shell.with-chat .formula-index b {
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
 }
 
 .empty-card h2,
@@ -1047,19 +1085,27 @@ onBeforeUnmount(() => {
 
   .formula-index {
     top: 0;
-    max-height: 128px;
+    max-height: 160px;
   }
 
   .formula-index-list {
     display: flex;
     overflow-x: auto;
     overflow-y: hidden;
+    gap: 4px;
     padding-bottom: 6px;
   }
 
   .formula-index button {
-    width: min(72vw, 260px);
+    width: min(72vw, 220px);
     flex: 0 0 auto;
+    min-height: 34px;
+  }
+
+  .formula-index b {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
   }
 }
 

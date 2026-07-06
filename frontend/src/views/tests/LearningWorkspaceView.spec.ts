@@ -185,7 +185,7 @@ describe('LearningWorkspaceView', () => {
     expect(wrapper.text()).toContain('MinerU LaTeX')
 
     await tab(wrapper, '公式拆解').trigger('click')
-    expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('2 个公式')
+    expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('公式目录')
     expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('Formula purpose')
     expect(wrapper.get('[data-testid="formula-index"]').text()).toContain('Second formula purpose')
     expect(wrapper.findAll('[data-testid="formula-card"]')).toHaveLength(2)
