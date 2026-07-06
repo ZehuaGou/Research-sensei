@@ -33,7 +33,28 @@ const formulaOrder = ref<string[]>([])
 const collapsedFormulas = ref<Record<string, boolean>>({})
 const focusedFormula = ref<{ card: any; index: number } | null>(null)
 const formulaRailCollapsed = ref(false)
+const readerPaneRef = ref<HTMLElement | null>(null)
+const tabScrollTop = ref<Record<'paper' | 'formulas' | 'teaching', number>>({
+  paper: 0,
+  formulas: 0,
+  teaching: 0,
+})
 let formulaObserver: IntersectionObserver | null = null
+
+function saveCurrentTabScroll() {
+  if (!readerPaneRef.value) return
+  tabScrollTop.value[activeTab.value] = readerPaneRef.value.scrollTop
+}
+
+function switchTab(tab: 'paper' | 'formulas' | 'teaching') {
+  saveCurrentTabScroll()
+  activeTab.value = tab
+  nextTick(() => {
+    if (readerPaneRef.value) {
+      readerPaneRef.value.scrollTop = tabScrollTop.value[tab] || 0
+    }
+  })
+}
 
 const status = computed(() => understandingStatus.value?.status || '')
 const canShowCards = computed(() => ['SUCCESS', 'DEGRADED_STRUCTURAL'].includes(status.value))
@@ -355,7 +376,7 @@ function setupFormulaObserver() {
       if (visible?.target.id) {
         activeFormulaAnchor.value = visible.target.id
       }
-    }, { rootMargin: '-45% 0px -45% 0px', threshold: 0.01 })
+    }, { root: readerPaneRef.value, rootMargin: '-35% 0px -55% 0px', threshold: 0.01 })
     nodes.forEach((node: HTMLElement) => formulaObserver?.observe(node))
   })
 }
@@ -454,7 +475,7 @@ onBeforeUnmount(() => {
           :key="tab.key"
           :disabled="tab.disabled"
           :class="{ active: activeTab === tab.key }"
-          @click="activeTab = tab.key"
+          @click="switchTab(tab.key)"
         >
           <span>{{ tab.label }}</span>
           <small>{{ tab.count }}</small>
@@ -470,7 +491,7 @@ onBeforeUnmount(() => {
       </button>
     </aside>
 
-    <main class="reader-pane">
+    <main ref="readerPaneRef" class="reader-pane">
       <div v-if="isLoading" class="loading-state">
         正在加载论文工作台...
       </div>
@@ -531,87 +552,42 @@ onBeforeUnmount(() => {
           <template v-else-if="activeTab === 'formulas'">
             <template v-if="formulaCardsList.length > 0">
               <div class="formula-workspace">
-                <section class="formula-reader">
-                  <section class="formula-board-toolbar surface" aria-label="公式阅读器">
-                    <div>
-                      <strong>公式阅读器</strong>
-                      <span>按正文顺序阅读；当前公式会在右侧停靠，滚动时公式标题会留在顶部。</span>
-                    </div>
-                    <button type="button" class="secondary-btn" @click="resetFormulaLayout">重置</button>
-                  </section>
-
-                  <div class="formula-list" data-testid="formula-board">
-                    <article
-                      v-for="entry in orderedFormulaEntries"
-                      :id="entry.id"
-                      :key="entry.id"
-                      class="formula-board-card"
-                      :class="{
-                        collapsed: collapsedFormulas[entry.id],
-                        active: activeFormulaAnchor === entry.id,
-                      }"
-                      data-testid="formula-board-card"
-                    >
-                      <header class="formula-card-bar">
-                        <div class="formula-card-number">{{ entry.index }}</div>
-                        <div>
-                          <span>公式 {{ entry.index }}</span>
-                          <strong>{{ entry.title }}</strong>
-                        </div>
-                        <div class="formula-card-actions">
-                          <button type="button" @click="openFormulaFocus(entry.card, entry.index)">单独查看</button>
-                          <button type="button" @click="toggleFormulaCollapsed(entry.id)">
-                            {{ collapsedFormulas[entry.id] ? '展开' : '折叠' }}
-                          </button>
-                        </div>
-                      </header>
-                      <FormulaCard v-if="!collapsedFormulas[entry.id]" :card="entry.card" />
-                    </article>
+                <section class="formula-board-toolbar surface" aria-label="公式阅读器">
+                  <div>
+                    <strong>公式阅读器</strong>
+                    <span>按正文顺序阅读；当前公式会在右侧停靠，滚动时公式标题会留在顶部。</span>
                   </div>
+                  <button type="button" class="secondary-btn" @click="resetFormulaLayout">重置</button>
                 </section>
 
-                <aside class="formula-rail surface" :class="{ collapsed: formulaRailCollapsed }" aria-label="当前公式与目录">
-                  <button type="button" class="rail-toggle" @click="formulaRailCollapsed = !formulaRailCollapsed">
-                    {{ formulaRailCollapsed ? `公式 ${activeFormulaEntry?.index || '…'}` : '收起' }}
-                  </button>
-                  <template v-if="!formulaRailCollapsed">
-                  <section v-if="activeFormulaEntry" class="active-formula-card">
-                    <span>当前公式</span>
-                    <strong>{{ activeFormulaEntry.title }}</strong>
-                    <small>公式 {{ activeFormulaEntry.index }}</small>
-                    <div class="active-formula-actions">
-                      <button type="button" @click="openFormulaFocus(activeFormulaEntry.card, activeFormulaEntry.index)">点开看</button>
-                      <button type="button" @click="scrollToFormula(activeFormulaEntry.id)">回到正文</button>
-                    </div>
-                  </section>
-
-                  <nav class="formula-index" data-testid="formula-index" aria-label="公式目录">
-                    <header>
+                <div class="formula-list" data-testid="formula-board">
+                  <article
+                    v-for="entry in orderedFormulaEntries"
+                    :id="entry.id"
+                    :key="entry.id"
+                    class="formula-board-card"
+                    :class="{
+                      collapsed: collapsedFormulas[entry.id],
+                      active: activeFormulaAnchor === entry.id,
+                    }"
+                    data-testid="formula-board-card"
+                  >
+                    <header class="formula-card-bar">
+                      <div class="formula-card-number">{{ entry.index }}</div>
                       <div>
-                        <strong>公式目录</strong>
-                        <small>{{ formulaCardsList.length }} 张卡片</small>
+                        <span>公式 {{ entry.index }}</span>
+                        <strong>{{ entry.title }}</strong>
                       </div>
-                      <div class="formula-index-actions">
-                        <button type="button" @click="setAllFormulaCollapsed(true)">折叠</button>
-                        <button type="button" @click="setAllFormulaCollapsed(false)">展开</button>
+                      <div class="formula-card-actions">
+                        <button type="button" @click="openFormulaFocus(entry.card, entry.index)">单独查看</button>
+                        <button type="button" @click="toggleFormulaCollapsed(entry.id)">
+                          {{ collapsedFormulas[entry.id] ? '展开' : '折叠' }}
+                        </button>
                       </div>
                     </header>
-                    <div class="formula-index-list">
-                      <button
-                        v-for="item in formulaNavItems"
-                        :key="item.id"
-                        type="button"
-                        :class="{ active: activeFormulaAnchor === item.id }"
-                        :title="item.title"
-                        @click="scrollToFormula(item.id)"
-                      >
-                        <b>{{ item.index }}</b>
-                        <span>{{ item.title }}</span>
-                      </button>
-                    </div>
-                  </nav>
-                  </template>
-                </aside>
+                    <FormulaCard v-if="!collapsedFormulas[entry.id]" :card="entry.card" />
+                  </article>
+                </div>
               </div>
             </template>
             <div v-else class="empty-card" data-testid="formula-degraded-message">
@@ -645,6 +621,54 @@ onBeforeUnmount(() => {
         </section>
       </template>
     </main>
+
+    <aside
+      v-if="activeTab === 'formulas' && formulaCardsList.length > 0"
+      class="formula-rail surface"
+      :class="{ collapsed: formulaRailCollapsed }"
+      aria-label="当前公式与目录"
+    >
+      <button type="button" class="rail-toggle" @click="formulaRailCollapsed = !formulaRailCollapsed">
+        {{ formulaRailCollapsed ? `公式 ${activeFormulaEntry?.index || '…'}` : '收起' }}
+      </button>
+      <template v-if="!formulaRailCollapsed">
+      <section v-if="activeFormulaEntry" class="active-formula-card">
+        <span>当前公式</span>
+        <strong>{{ activeFormulaEntry.title }}</strong>
+        <small>公式 {{ activeFormulaEntry.index }}</small>
+        <div class="active-formula-actions">
+          <button type="button" @click="openFormulaFocus(activeFormulaEntry.card, activeFormulaEntry.index)">点开看</button>
+          <button type="button" @click="scrollToFormula(activeFormulaEntry.id)">回到正文</button>
+        </div>
+      </section>
+
+      <nav class="formula-index" data-testid="formula-index" aria-label="公式目录">
+        <header>
+          <div>
+            <strong>公式目录</strong>
+            <small>{{ formulaCardsList.length }} 张卡片</small>
+          </div>
+          <div class="formula-index-actions">
+            <button type="button" @click="setAllFormulaCollapsed(true)">折叠</button>
+            <button type="button" @click="setAllFormulaCollapsed(false)">展开</button>
+          </div>
+        </header>
+        <div class="formula-index-list">
+          <button
+            v-for="item in formulaNavItems"
+            :key="item.id"
+            type="button"
+            :class="{ active: activeFormulaAnchor === item.id }"
+            :title="item.title"
+            @click="scrollToFormula(item.id)"
+          >
+            <b>{{ item.index }}</b>
+            <span>{{ item.title }}</span>
+          </button>
+        </div>
+      </nav>
+      </template>
+    </aside>
 
     <Transition name="slide-right">
       <aside v-if="store.isAskPanelOpen && canShowCards" class="chat-pane">
@@ -688,41 +712,39 @@ onBeforeUnmount(() => {
 <style scoped>
 .workspace-shell {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
-  min-height: 100%;
-  height: 100%;
+  grid-template-columns: 170px minmax(0, 1fr);
+  height: 100dvh;
+  overflow: hidden;
   background: var(--bg-primary);
 }
 
-.workspace-shell.with-chat {
-  grid-template-columns: 56px minmax(0, 1fr) 380px;
+.workspace-shell.formula-mode {
+  grid-template-columns: 170px minmax(0, 1fr) 280px;
 }
 
-.workspace-shell.formula-mode {
-  grid-template-columns: 166px minmax(0, 1fr);
+.workspace-shell.with-chat {
+  grid-template-columns: 170px minmax(0, 1fr) 380px;
 }
 
 .workspace-shell.formula-mode.with-chat {
-  grid-template-columns: 56px minmax(0, 1fr) 380px;
+  grid-template-columns: 160px minmax(0, 1fr) 260px 380px;
 }
 
-/* Nav collapses to narrow icon bar when chat open */
-.workspace-shell.with-chat .workspace-nav {
-  width: 56px;
-  padding: 12px 6px;
+/* Each panel scrolls independently */
+.workspace-nav,
+.reader-pane,
+.formula-rail,
+.chat-pane {
+  height: 100dvh;
+  overflow-y: auto;
+}
+
+.chat-pane {
   overflow: hidden;
-}
-
-.workspace-shell.with-chat .nav-title span,
-.workspace-shell.with-chat .nav-title strong,
-.workspace-shell.with-chat .workspace-nav nav button span,
-.workspace-shell.with-chat .workspace-nav nav small {
-  display: none;
-}
-
-.workspace-shell.with-chat .workspace-nav nav button {
-  justify-content: center;
-  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-card);
 }
 
 .workspace-nav {
@@ -965,28 +987,18 @@ onBeforeUnmount(() => {
 
 .formula-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 790px) minmax(240px, 300px);
-  align-items: start;
-  justify-content: center;
-  gap: 18px;
-}
-
-.formula-reader {
-  display: grid;
   min-width: 0;
   gap: 14px;
 }
 
 .formula-rail {
-  position: sticky;
-  top: 16px;
   display: grid;
-  max-height: calc(100vh - 32px);
+  grid-template-rows: auto 1fr;
   min-width: 0;
   gap: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-card);
 }
 
 .formula-rail.collapsed {
@@ -1218,53 +1230,32 @@ onBeforeUnmount(() => {
   }
 }
 
-/* When M4 is open, formula-rail becomes a sticky top bar */
-.workspace-shell.with-chat .formula-workspace {
-  grid-template-columns: minmax(0, 1fr);
-}
+/* Mid-size (1121px-1499px): formula-rail becomes floating pill when chat open */
+@media (min-width: 1121px) and (max-width: 1499px) {
+  .workspace-shell.formula-mode.with-chat {
+    grid-template-columns: 160px minmax(0, 1fr) 380px;
+  }
 
-.workspace-shell.with-chat .formula-rail {
-  position: sticky;
-  top: 12px;
-  right: auto;
-  width: auto;
-  max-height: none;
-  z-index: 25;
-  overflow: visible;
-  box-shadow: var(--shadow-sm);
-  border-radius: 10px;
-  order: -1;
-  display: grid;
-}
+  .workspace-shell.formula-mode.with-chat .formula-rail {
+    position: fixed;
+    right: 400px;
+    bottom: 20px;
+    width: 86px;
+    height: 44px;
+    z-index: 80;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+  }
 
-.workspace-shell.with-chat .formula-rail.collapsed {
-  width: auto;
-  min-width: 0;
-  display: inline-flex;
-  position: fixed;
-  bottom: 20px;
-  right: 400px;
-  top: auto;
-  z-index: 90;
-}
-
-.workspace-shell.with-chat .active-formula-card {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-bottom: 0;
-}
-
-.workspace-shell.with-chat .formula-index {
-  max-height: 220px;
-  overflow-y: auto;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.workspace-shell.with-chat .rail-toggle {
-  position: static;
+  .workspace-shell.formula-mode.with-chat .formula-rail:not(.collapsed) {
+    width: 280px;
+    height: auto;
+    max-height: 70vh;
+    bottom: 76px;
+    overflow-y: auto;
+    border-radius: 12px;
+  }
 }
 
 .active-formula-card > span {
