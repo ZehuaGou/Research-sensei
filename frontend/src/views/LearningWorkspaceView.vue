@@ -22,9 +22,43 @@ const isLoading = ref(true)
 const error = ref('')
 const activeTab = ref<'paper' | 'formulas' | 'teaching'>('paper')
 const activeFormulaAnchor = ref('')
-const formulaIndexRef = ref<HTMLElement>()
+const formulaIndexListRef = ref<HTMLElement>()
 let formulaObserver: IntersectionObserver | null = null
-let scrollGuard = false
+
+// Drag-to-scroll for formula index sidebar
+let indexDragStartX = 0
+let indexDragStartY = 0
+let indexDragScrollL = 0
+let indexDragScrollT = 0
+let indexDragging = false
+
+function onIndexDragStart(e: MouseEvent) {
+  const el = formulaIndexListRef.value
+  if (!el) return
+  indexDragging = true
+  indexDragStartX = e.clientX
+  indexDragStartY = e.clientY
+  indexDragScrollL = el.scrollLeft
+  indexDragScrollT = el.scrollTop
+  el.style.cursor = 'grabbing'
+  document.addEventListener('mousemove', onIndexDragMove)
+  document.addEventListener('mouseup', onIndexDragEnd)
+}
+
+function onIndexDragMove(e: MouseEvent) {
+  if (!indexDragging || !formulaIndexListRef.value) return
+  const dx = e.clientX - indexDragStartX
+  const dy = e.clientY - indexDragStartY
+  formulaIndexListRef.value.scrollLeft = indexDragScrollL - dx
+  formulaIndexListRef.value.scrollTop = indexDragScrollT - dy
+}
+
+function onIndexDragEnd() {
+  indexDragging = false
+  if (formulaIndexListRef.value) formulaIndexListRef.value.style.cursor = ''
+  document.removeEventListener('mousemove', onIndexDragMove)
+  document.removeEventListener('mouseup', onIndexDragEnd)
+}
 
 const status = computed(() => understandingStatus.value?.status || '')
 const canShowCards = computed(() => ['SUCCESS', 'DEGRADED_STRUCTURAL'].includes(status.value))
@@ -268,16 +302,6 @@ function scrollToFormula(id: string) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-function ensureActiveVisible() {
-  if (!formulaIndexRef.value || scrollGuard) return
-  scrollGuard = true
-  nextTick(() => {
-    const active = formulaIndexRef.value?.querySelector('.formula-index-list .active') as HTMLElement | null
-    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-    scrollGuard = false
-  })
-}
-
 function setupFormulaObserver() {
   formulaObserver?.disconnect()
   formulaObserver = null
@@ -370,7 +394,6 @@ onMounted(() => {
 })
 
 watch([activeTab, formulaCardsList], () => setupFormulaObserver(), { flush: 'post' })
-watch(activeFormulaAnchor, () => ensureActiveVisible())
 
 onBeforeUnmount(() => {
   formulaObserver?.disconnect()
@@ -472,7 +495,11 @@ onBeforeUnmount(() => {
                     <strong>公式目录</strong>
                     <span>{{ formulaCardsList.length }}</span>
                   </header>
-                  <div ref="formulaIndexRef" class="formula-index-list">
+                  <div
+                    ref="formulaIndexListRef"
+                    class="formula-index-list"
+                    @mousedown="onIndexDragStart"
+                  >
                     <button
                       v-for="item in formulaNavItems"
                       :key="item.id"
@@ -854,6 +881,13 @@ onBeforeUnmount(() => {
   overflow-y: auto;
   padding-right: 2px;
   overscroll-behavior: contain;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.formula-index-list:active {
+  cursor: grabbing;
 }
 
 .formula-index button {
