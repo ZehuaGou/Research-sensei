@@ -204,8 +204,7 @@ select:focus {
 
 .katex-display {
   margin: 16px 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  overflow: visible;
 }
 
 .fade-enter-active,
