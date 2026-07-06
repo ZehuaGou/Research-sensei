@@ -30,34 +30,45 @@ let indexDragStartX = 0
 let indexDragStartY = 0
 let indexDragScrollL = 0
 let indexDragScrollT = 0
-let indexDragging = false
+let indexDraged = false
 
-function onIndexDragStart(e: MouseEvent) {
+function onIndexMouseDown(e: MouseEvent) {
   const el = formulaIndexListRef.value
   if (!el) return
-  indexDragging = true
+  indexDraged = false
   indexDragStartX = e.clientX
   indexDragStartY = e.clientY
   indexDragScrollL = el.scrollLeft
   indexDragScrollT = el.scrollTop
   el.style.cursor = 'grabbing'
-  document.addEventListener('mousemove', onIndexDragMove)
-  document.addEventListener('mouseup', onIndexDragEnd)
+  document.addEventListener('mousemove', onIndexMouseMove)
+  document.addEventListener('mouseup', onIndexMouseUp)
 }
 
-function onIndexDragMove(e: MouseEvent) {
-  if (!indexDragging || !formulaIndexListRef.value) return
+function onIndexMouseMove(e: MouseEvent) {
+  const el = formulaIndexListRef.value
+  if (!el) return
   const dx = e.clientX - indexDragStartX
   const dy = e.clientY - indexDragStartY
-  formulaIndexListRef.value.scrollLeft = indexDragScrollL - dx
-  formulaIndexListRef.value.scrollTop = indexDragScrollT - dy
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) indexDraged = true
+  el.scrollLeft = indexDragScrollL - dx
+  el.scrollTop = indexDragScrollT - dy
 }
 
-function onIndexDragEnd() {
-  indexDragging = false
-  if (formulaIndexListRef.value) formulaIndexListRef.value.style.cursor = ''
-  document.removeEventListener('mousemove', onIndexDragMove)
-  document.removeEventListener('mouseup', onIndexDragEnd)
+function onIndexMouseUp() {
+  const el = formulaIndexListRef.value
+  if (el) el.style.cursor = ''
+  document.removeEventListener('mousemove', onIndexMouseMove)
+  document.removeEventListener('mouseup', onIndexMouseUp)
+  // If we dragged, prevent the subsequent click on the button
+  if (indexDraged) {
+    const prevent = (ce: MouseEvent) => {
+      ce.preventDefault()
+      ce.stopImmediatePropagation()
+      document.removeEventListener('click', prevent, true)
+    }
+    document.addEventListener('click', prevent, true)
+  }
 }
 
 const status = computed(() => understandingStatus.value?.status || '')
@@ -498,7 +509,7 @@ onBeforeUnmount(() => {
                   <div
                     ref="formulaIndexListRef"
                     class="formula-index-list"
-                    @mousedown="onIndexDragStart"
+                    @mousedown="onIndexMouseDown"
                   >
                     <button
                       v-for="item in formulaNavItems"
