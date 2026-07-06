@@ -168,11 +168,13 @@ def create_app(
                 original_filename=file.filename,
                 content_type=file.content_type or "",
             )
+            source_identity = (arxiv_id or doi or "").strip()
             job = await run_in_threadpool(
                 runner.run,
-                incoming_path,
+                source_status.resolved_path,
                 job_id=job_id,
                 source_status=source_status,
+                source_identity=source_identity,
             )
             return _job_parse_response(job)
 
@@ -503,6 +505,16 @@ def create_app(
     async def direction_deep_read(payload: dict[str, object]) -> dict[str, object]:
         candidate = _direction_candidate_payload(payload)
         title, doi, pdf_url, arxiv_id, arxiv_url = _direction_handoff_inputs(candidate)
+
+        # Compute source identity for job dedup: arxiv_id first, then doi
+        source_identity = (arxiv_id or doi or "").strip()
+
+        # Check for existing SUCCEEDED job for the same paper
+        if source_identity:
+            existing = jobs.find_by_source_identity(source_identity)
+            if existing is not None:
+                return _existing_job_response(existing, source_identity)
+
         job_id = uuid.uuid4().hex[:12]
         run_dir = workspace.new_run_dir(job_id)
 
@@ -1517,6 +1529,21 @@ def _record_failed_source_job(
         artifacts=[WorkspaceArtifact(artifact_type="source_status", path=str(source_status_path))],
     )
     return jobs.create(job)
+
+
+def _existing_job_response(job: JobRecord, source_identity: str) -> dict[str, object]:
+    """Return response for an existing SUCCEEDED job (skip re-ingestion)."""
+    understanding_status = _job_understanding_status(job)
+    response: dict[str, object] = {
+        **_job_parse_response(job),
+        "status": "JOB_REUSED",
+        "handoff_status": "JOB_REUSED",
+    }
+    if understanding_status:
+        response["understanding_status"] = understanding_status
+        response["paper_workspace_status"] = _paper_workspace_status(job, understanding_status)
+        response["final_status"] = understanding_status.get("status", "")
+    return response
 
 
 def _job_parse_response(job: JobRecord) -> dict[str, object]:

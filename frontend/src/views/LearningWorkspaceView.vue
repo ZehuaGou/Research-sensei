@@ -539,14 +539,14 @@ onBeforeUnmount(() => {
 <style scoped>
 .workspace-shell {
   display: grid;
-  grid-template-columns: 218px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   min-height: 100%;
   height: 100%;
   background: var(--bg-primary);
 }
 
 .workspace-shell.with-chat {
-  grid-template-columns: 218px minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-columns: 210px minmax(0, 1fr) minmax(330px, 380px);
 }
 
 .workspace-nav {
@@ -554,7 +554,7 @@ onBeforeUnmount(() => {
   top: 0;
   height: 100%;
   border-right: 1px solid var(--border-subtle);
-  padding: 14px 12px;
+  padding: 12px 10px;
   background: var(--bg-secondary);
 }
 
@@ -567,7 +567,8 @@ onBeforeUnmount(() => {
 
 .nav-title strong {
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 14px;
+  font-weight: 720;
 }
 
 .nav-title span {
@@ -580,26 +581,26 @@ onBeforeUnmount(() => {
 
 .workspace-nav nav {
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .workspace-nav nav button {
   display: flex;
-  min-height: 44px;
+  min-height: 38px;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .workspace-nav nav button.active,
 .workspace-nav nav button:hover:not(:disabled) {
-  background: var(--accent-light);
-  color: var(--accent);
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .workspace-nav nav button:disabled {
@@ -620,7 +621,7 @@ onBeforeUnmount(() => {
 .reader-pane {
   height: 100%;
   min-width: 0;
-  padding: 22px clamp(18px, 4vw, 44px) 54px;
+  padding: 34px clamp(18px, 4vw, 44px) 56px;
   overflow-y: auto;
 }
 
@@ -638,17 +639,17 @@ onBeforeUnmount(() => {
 }
 
 .reader-title > span {
-  color: var(--accent);
+  color: var(--text-muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 650;
   letter-spacing: 0;
 }
 
 .reader-title h1 {
   margin-top: 4px;
   color: var(--text-primary);
-  font-size: 24px;
-  font-weight: 900;
+  font-size: 26px;
+  font-weight: 720;
   line-height: 1.28;
   overflow-wrap: anywhere;
 }
@@ -657,8 +658,8 @@ onBeforeUnmount(() => {
   margin-top: 8px;
   max-width: 780px;
   color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.75;
+  font-size: 14px;
+  line-height: 1.72;
 }
 
 .reader-actions {
@@ -682,20 +683,20 @@ onBeforeUnmount(() => {
   gap: 12px;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 9px 11px;
   background: var(--bg-card);
 }
 
 .reader-metrics span {
   color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 780;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .reader-metrics strong {
   color: var(--text-primary);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 .reader-metrics .ready strong {
@@ -722,8 +723,9 @@ onBeforeUnmount(() => {
 .error-state {
   display: grid;
   gap: 16px;
-  background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.07);
+  color: var(--danger);
 }
 
 .status-details {
@@ -738,8 +740,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
   padding: 13px 16px;
   color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .status-details dl {
@@ -760,7 +762,7 @@ onBeforeUnmount(() => {
 .status-details dt {
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .status-details dd {
@@ -814,14 +816,14 @@ onBeforeUnmount(() => {
 
 .formula-index header span {
   color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 720;
 }
 
 .formula-index header strong {
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .formula-index-list {
@@ -835,7 +837,7 @@ onBeforeUnmount(() => {
 .formula-index button {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
-  min-height: 42px;
+  min-height: 38px;
   align-items: center;
   gap: 8px;
   border-radius: 8px;
@@ -852,7 +854,7 @@ onBeforeUnmount(() => {
 }
 
 .formula-index button.active {
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: inset 3px 0 0 var(--text-primary);
 }
 
 .formula-index b {
@@ -869,14 +871,14 @@ onBeforeUnmount(() => {
 
 .formula-index button.active b {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .formula-index button span {
   min-width: 0;
   overflow: hidden;
   font-size: 13px;
-  font-weight: 760;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -910,7 +912,7 @@ onBeforeUnmount(() => {
 .no-cards h2 {
   color: var(--text-primary);
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 .empty-card p,
@@ -943,16 +945,17 @@ onBeforeUnmount(() => {
 
 .teaching-card strong {
   color: var(--text-primary);
-  font-size: 17px;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 .teaching-card span {
   border-radius: 999px;
   padding: 4px 8px;
   background: var(--accent-light);
-  color: var(--accent);
+  color: var(--text-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .teaching-card p {
@@ -988,11 +991,11 @@ onBeforeUnmount(() => {
   height: 54px;
   align-items: center;
   justify-content: center;
-  border-radius: 18px;
+  border-radius: 8px;
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
   box-shadow: var(--shadow-lg);
-  font-weight: 900;
+  font-weight: 720;
 }
 
 @media (max-width: 1120px) {

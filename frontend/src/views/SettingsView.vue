@@ -197,9 +197,9 @@ async function testConnection() {
 
 <style scoped>
 .settings-page {
-  width: min(980px, calc(100vw - 32px));
+  width: min(980px, calc(100vw - 36px));
   margin: 0 auto;
-  padding: 22px 0 54px;
+  padding: 34px 0 60px;
 }
 
 .settings-head {
@@ -207,16 +207,17 @@ async function testConnection() {
 }
 
 .settings-head p {
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .settings-head h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 25px;
-  font-weight: 900;
+  font-size: 30px;
+  font-weight: 720;
+  line-height: 1.18;
 }
 
 .settings-head span {
@@ -224,14 +225,14 @@ async function testConnection() {
   max-width: 760px;
   margin-top: 8px;
   color: var(--text-secondary);
-  font-size: 16px;
-  line-height: 1.8;
+  font-size: 14px;
+  line-height: 1.72;
 }
 
 .settings-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 18px;
+  gap: 12px;
 }
 
 .settings-panel,
@@ -242,22 +243,22 @@ async function testConnection() {
 .setting-row {
   display: grid;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .setting-row label {
   color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .setting-row input {
   width: 100%;
   outline: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 15px;
 }
@@ -266,9 +267,9 @@ async function testConnection() {
   width: 100%;
   outline: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 15px;
 }
@@ -293,7 +294,7 @@ async function testConnection() {
   gap: 5px;
   margin: -2px 0 18px;
   border: 1px solid var(--border-subtle);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 11px 12px;
   background: var(--bg-secondary);
 }
@@ -301,7 +302,7 @@ async function testConnection() {
 .route-note strong {
   color: var(--text-primary);
   font-size: 14px;
-  font-weight: 850;
+  font-weight: 720;
 }
 
 .route-note span,
@@ -314,8 +315,8 @@ async function testConnection() {
 }
 
 .save-result {
-  color: var(--accent) !important;
-  font-weight: 800;
+  color: var(--text-primary) !important;
+  font-weight: 690;
 }
 
 .test-button {
@@ -324,7 +325,7 @@ async function testConnection() {
 
 .test-result {
   margin-top: 14px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px 14px;
   background: var(--bg-secondary);
   color: var(--text-secondary);
@@ -335,8 +336,8 @@ async function testConnection() {
 .status-panel h2 {
   margin-bottom: 16px;
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 900;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 .status-item {
@@ -354,19 +355,19 @@ async function testConnection() {
 
 .status-item strong {
   color: #d97706;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .status-item strong.ok {
-  color: #059669;
+  color: var(--success);
 }
 
 .status-item strong.bad {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .notice {
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px 14px;
   background: rgba(245, 158, 11, 0.1);
   color: #92400e;

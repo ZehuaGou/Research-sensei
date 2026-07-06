@@ -119,25 +119,33 @@ function copySummary() {
 .paper-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 20px;
-  padding: 28px;
+  padding: 22px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.paper-head > button {
+  justify-self: end;
+  align-self: start;
+  white-space: nowrap;
 }
 
 .paper-head h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: clamp(24px, 3vw, 36px);
+  font-size: clamp(22px, 3vw, 30px);
   line-height: 1.25;
   letter-spacing: 0;
+  font-weight: 720;
 }
 
 .summary {
   max-width: 900px;
-  margin-top: 14px;
+  margin-top: 12px;
   color: var(--text-secondary);
-  font-size: 18px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.72;
 }
 
 .claim-grid {
@@ -148,8 +156,8 @@ function copySummary() {
 }
 
 .claim-block {
-  min-height: 220px;
-  padding: 24px;
+  min-height: 190px;
+  padding: 20px;
   background: var(--bg-card);
 }
 
@@ -168,29 +176,29 @@ function copySummary() {
   justify-content: center;
   border-radius: 8px;
   background: var(--bg-secondary);
-  color: var(--accent);
+  color: var(--text-primary);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 .claim-label {
   color: var(--text-primary);
-  font-size: 15px;
-  font-weight: 850;
+  font-size: 14px;
+  font-weight: 720;
 }
 
 .claim-block p {
-  min-height: 92px;
+  min-height: 82px;
   color: var(--text-primary);
-  font-size: 17px;
-  line-height: 1.85;
+  font-size: 15px;
+  line-height: 1.78;
 }
 
 .claim-block button {
   margin-top: 16px;
-  color: var(--accent);
+  color: var(--text-primary);
   background: transparent;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .ref-chip {
@@ -208,7 +216,7 @@ function copySummary() {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  padding: 20px 28px;
+  padding: 16px 22px;
   background: var(--bg-secondary);
 }
 

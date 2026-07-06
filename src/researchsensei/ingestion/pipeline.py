@@ -87,6 +87,7 @@ class SinglePaperIngestionRunner:
         source_path: str | Path,
         job_id: str | None = None,
         source_status: SourceStatus | None = None,
+        source_identity: str = "",
     ) -> JobRecord:
         source = Path(source_path)
         actual_job_id = job_id or source.stem
@@ -100,6 +101,7 @@ class SinglePaperIngestionRunner:
             job_id=actual_job_id,
             source_path=str(copied_source),
             run_dir=str(run_dir),
+            source_identity=source_identity,
             current_step="ingestion_started",
         )
         self.jobs.create(job)
@@ -301,54 +303,89 @@ class SinglePaperIngestionRunner:
         paper_skeleton,
         evidence_pack_summary: EvidencePackSummary,
     ) -> tuple[dict, UnderstandingStatus]:
-        """Execute LLM card builders and return card artifacts + status."""
+        """Execute LLM card builders and return card artifacts + status.
+
+        paper_card and formula_cards have no data dependency, so they run
+        in parallel under a single event loop. teaching_cards depends on
+        paper_card and runs after both complete.
+        """
         llm_client = self.llm_client
         assert llm_client is not None
 
-        # Paper card
-        try:
-            paper_card = _run_async_builder(
+        async def _run_all() -> tuple[dict, UnderstandingStatus]:
+            # paper_card and formula_cards are independent — run in parallel
+            paper_task = asyncio.create_task(
                 build_paper_card(evidence_pack, paper_skeleton, llm_client)
             )
-        except Exception as exc:
-            logger.warning("paper_card failed: %s", exc)
-            return {}, _build_blocked_status(
-                paper_id,
-                blocking_reason="PAPER_CARD_FAILED",
-                component_status=_component_status(
-                    blocked=True,
-                    paper_card="FAILED",
-                    evidence_pack="SUCCESS",
-                ),
-                evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"paper_card: {exc}")],
-            )
-
-        # Formula cards
-        try:
-            formula_cards = _run_async_builder(
+            formula_task = asyncio.create_task(
                 build_formula_cards(formula_evidence_pack, paper_skeleton, llm_client)
             )
-        except Exception as exc:
-            logger.warning("formula_cards failed: %s", exc)
-            return {}, _build_blocked_status(
-                paper_id,
-                blocking_reason="FORMULA_CARDS_FAILED",
-                component_status=_component_status(
-                    blocked=True,
-                    paper_card="SUCCESS",
-                    formula_cards="FAILED",
-                    evidence_pack="SUCCESS",
-                ),
-                evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"formula_cards: {exc}")],
-            )
 
-        # Teaching cards
-        try:
-            teaching_cards = _run_async_builder(
-                build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client)
-            )
+            paper_card: PaperCard | None = None
+            paper_error: Exception | None = None
+            formula_cards = None
+            formula_error: Exception | None = None
+
+            try:
+                paper_card = await paper_task
+            except Exception as exc:
+                paper_error = exc
+                logger.warning("paper_card failed: %s", exc)
+
+            try:
+                formula_cards = await formula_task
+            except Exception as exc:
+                formula_error = exc
+                logger.warning("formula_cards failed: %s", exc)
+
+            # Handle paper_card failure (teaching_cards depends on it)
+            if paper_error is not None:
+                return {}, _build_blocked_status(
+                    paper_id,
+                    blocking_reason="PAPER_CARD_FAILED",
+                    component_status=_component_status(
+                        blocked=True,
+                        paper_card="FAILED",
+                        evidence_pack="SUCCESS",
+                    ),
+                    evidence_pack_summary=evidence_pack_summary,
+                    warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"paper_card: {paper_error}")],
+                )
+
+            # Handle formula_cards failure (pipeline stops before teaching_cards)
+            if formula_error is not None:
+                return {}, _build_blocked_status(
+                    paper_id,
+                    blocking_reason="FORMULA_CARDS_FAILED",
+                    component_status=_component_status(
+                        blocked=True,
+                        paper_card="SUCCESS",
+                        formula_cards="FAILED",
+                        evidence_pack="SUCCESS",
+                    ),
+                    evidence_pack_summary=evidence_pack_summary,
+                    warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"formula_cards: {formula_error}")],
+                )
+
+            # Both succeeded — run teaching_cards
+            try:
+                teaching_cards = await build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client)  # type: ignore[arg-type]
+            except Exception as exc:
+                logger.warning("teaching_cards failed: %s", exc)
+                return {}, _build_blocked_status(
+                    paper_id,
+                    blocking_reason="TEACHING_CARDS_FAILED",
+                    component_status=_component_status(
+                        blocked=True,
+                        paper_card="SUCCESS",
+                        formula_cards="SUCCESS",
+                        teaching_cards="FAILED",
+                        evidence_pack="SUCCESS",
+                    ),
+                    evidence_pack_summary=evidence_pack_summary,
+                    warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
+                )
+
             # Success
             card_artifacts = {
                 "paper_card": paper_card,
@@ -374,22 +411,7 @@ class SinglePaperIngestionRunner:
                 )
             return card_artifacts, understanding_status
 
-        except Exception as exc:
-            logger.warning("teaching_cards failed: %s", exc)
-            # Teaching cards are core M2 output; fail closed instead of exposing partial cards.
-            return {}, _build_blocked_status(
-                paper_id,
-                blocking_reason="TEACHING_CARDS_FAILED",
-                component_status=_component_status(
-                    blocked=True,
-                    paper_card="SUCCESS",
-                    formula_cards="SUCCESS",
-                    teaching_cards="FAILED",
-                    evidence_pack="SUCCESS",
-                ),
-                evidence_pack_summary=evidence_pack_summary,
-                warnings=[WarningItem(code="CARD_BUILDER_FAILED", message=f"teaching_cards: {exc}")],
-            )
+        return _run_async_builder(_run_all())
 
     def _write_artifacts(
         self,

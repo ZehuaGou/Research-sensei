@@ -142,94 +142,93 @@ function statusText(status: string) {
 
 <style scoped>
 .home-shell {
-  width: min(1100px, calc(100vw - 32px));
+  width: min(980px, calc(100vw - 36px));
   margin: 0 auto;
-  padding: 56px 0 72px;
+  padding: 48px 0 64px;
 }
 
 .home-intro {
-  max-width: 780px;
-  margin-bottom: 28px;
+  max-width: 720px;
+  margin: 0 auto 28px;
+  text-align: center;
 }
 
 .eyebrow {
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 h1 {
   margin-top: 10px;
   color: var(--text-primary);
-  font-size: clamp(32px, 5vw, 56px);
-  font-weight: 900;
-  line-height: 1.1;
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 720;
+  line-height: 1.14;
 }
 
 .intro-copy {
-  margin-top: 18px;
+  margin-top: 14px;
   color: var(--text-secondary);
-  font-size: 18px;
-  line-height: 1.8;
+  font-size: 15px;
+  line-height: 1.75;
 }
 
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 10px;
+  margin-bottom: 26px;
 }
 
 .entry-card {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 22px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 16px;
   background: var(--bg-card);
-  box-shadow: var(--shadow-sm);
   text-align: left;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
 
 .entry-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 36%, var(--border));
-  box-shadow: var(--shadow-md);
+  border-color: var(--border);
+  background: var(--bg-elevated);
 }
 
 .entry-icon {
   display: flex;
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
   align-items: center;
   justify-content: center;
-  border-radius: 14px;
+  border-radius: 8px;
   background: var(--accent-light);
-  color: var(--accent);
-  font-size: 22px;
-  font-weight: 900;
+  color: var(--text-primary);
+  font-size: 17px;
+  font-weight: 720;
 }
 
 .entry-icon.green {
   background: rgba(16, 185, 129, 0.12);
-  color: #059669;
+  color: var(--success);
 }
 
 .entry-card strong {
   display: block;
   color: var(--text-primary);
-  font-size: 19px;
+  font-size: 16px;
 }
 
 .entry-card small {
   display: block;
   margin-top: 6px;
   color: var(--text-secondary);
-  font-size: 15px;
-  line-height: 1.7;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .recent {
@@ -246,8 +245,8 @@ h1 {
 
 .recent h2 {
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 .delete-message {
@@ -270,7 +269,7 @@ h1 {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 14px 16px;
 }
 
@@ -286,7 +285,7 @@ h1 {
   overflow: hidden;
   color: var(--text-primary);
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -305,7 +304,7 @@ h1 {
 }
 
 .danger {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .danger:hover:not(:disabled) {

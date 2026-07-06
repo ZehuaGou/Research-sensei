@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import logging
 
-from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
-from researchsensei.llm.prompt_builder import PromptBuilder
-from researchsensei.llm.types import ChatMessage
 from researchsensei.schemas import (
     CardClaim,
     ClaimEvidence,
@@ -29,25 +26,6 @@ def build_paper_card(
 ) -> PaperCard:
     """Build a paper card from skeleton and evidence index (rule-based only)."""
     claims_by_section = _index_claims(evidence_index)
-    return _build_rule_based(skeleton, evidence_index, claims_by_section)
-
-
-async def build_paper_card_with_llm(
-    skeleton: PaperSkeleton,
-    evidence_index: EvidenceIndex,
-    llm_client: LLMClient,
-) -> PaperCard:
-    """Build a paper card with optional LLM enhancement.
-
-    Falls back to rule-based on LLM failure.
-    """
-    claims_by_section = _index_claims(evidence_index)
-
-    try:
-        return await _build_llm_enhanced(skeleton, evidence_index, claims_by_section, llm_client)
-    except Exception as exc:
-        logger.warning("LLM-enhanced card failed, falling back to rule-based: %s", exc)
-
     return _build_rule_based(skeleton, evidence_index, claims_by_section)
 
 
@@ -92,103 +70,6 @@ def _build_rule_based(
         confidence=skeleton.confidence,
         warnings=warnings,
         evidence_status=overall_status,
-    )
-
-
-async def _build_llm_enhanced(
-    skeleton: PaperSkeleton,
-    evidence_index: EvidenceIndex,
-    claims_by_section: dict[str, list[ClaimEvidence]],
-    llm_client: LLMClient,
-) -> PaperCard:
-    """LLM-enhanced card builder: uses LLM for summaries within evidence constraints."""
-    rule_card = _build_rule_based(skeleton, evidence_index, claims_by_section)
-
-    evidence_text = _format_evidence_for_prompt(evidence_index)
-    skeleton_text = skeleton.model_dump_json()
-
-    prompt_builder = PromptBuilder()
-    messages = prompt_builder.build_simple(
-        system=(
-            "你是 ResearchSensei 的论文卡片生成引擎。\n"
-            "根据论文骨架和证据，生成一句话总结和核心要点。\n"
-            "严格约束：\n"
-            "1. 不得生成证据之外的内容\n"
-            "2. 证据不足时必须标注 INSUFFICIENT_EVIDENCE\n"
-            "3. 每个核心 claim 必须给出 evidence_ref\n"
-            "4. 不要自由发挥，只基于提供的材料改写和总结\n"
-            "输出 JSON 格式。"
-        ),
-        user=f"""论文骨架:
-{skeleton_text[:4000]}
-
-证据索引:
-{evidence_text[:3000]}
-
-要求输出 JSON:
-{{
-  "one_sentence_summary": "一句话说清论文在做什么，为什么重要",
-  "problem": {{"text": "论文要解决什么问题", "evidence_ref": "对应证据引用"}},
-  "core_idea": {{"text": "核心创新点是什么", "evidence_ref": "对应证据引用"}},
-  "method_overview": {{"text": "方法概述", "evidence_ref": "对应证据引用"}},
-  "experiment_summary": {{"text": "实验结果概述", "evidence_ref": "对应证据引用"}},
-  "limitations": {{"text": "局限性", "evidence_ref": "对应证据引用或空字符串"}}
-}}""",
-    )
-
-    response = await llm_client.chat(messages)
-    try:
-        data = parse_llm_json(response.content)
-    except LLMResponseError:
-        raise  # Let outer handler catch this
-    except Exception as exc:
-        raise LLMResponseError(f"Failed to parse LLM output: {exc}") from exc
-
-    # Merge LLM output with rule-based card, enforcing evidence constraints
-    return _merge_llm_into_card(rule_card, data, evidence_index)
-
-
-def _merge_llm_into_card(
-    rule_card: PaperCard,
-    llm_data: dict,
-    evidence_index: EvidenceIndex,
-) -> PaperCard:
-    """Merge LLM output into rule-based card, enforcing evidence constraints."""
-    valid_refs = {claim.evidence_ref for claim in evidence_index.claims}
-
-    def _safe_claim(data: dict, fallback: CardClaim) -> CardClaim:
-        text = data.get("text", fallback.text)
-        ref = data.get("evidence_ref", "")
-        if ref and ref not in valid_refs:
-            ref = ""  # LLM hallucinated a ref
-        if not ref:
-            return CardClaim(
-                text=text,
-                evidence_type=EvidenceType.INSUFFICIENT_EVIDENCE,
-                confidence=0.2,
-            )
-        # Find the matching claim for evidence type
-        matching = next((c for c in evidence_index.claims if c.evidence_ref == ref), None)
-        return CardClaim(
-            text=text,
-            evidence_ref=ref,
-            evidence_type=matching.evidence_type if matching else EvidenceType.UNVERIFIED,
-            confidence=matching.confidence if matching else 0.3,
-        )
-
-    one_sentence = llm_data.get("one_sentence_summary", rule_card.one_sentence_summary)
-    if not one_sentence or one_sentence == "UNKNOWN":
-        one_sentence = rule_card.one_sentence_summary
-
-    return rule_card.model_copy(
-        update={
-            "one_sentence_summary": one_sentence,
-            "problem": _safe_claim(llm_data.get("problem", {}), rule_card.problem),
-            "core_idea": _safe_claim(llm_data.get("core_idea", {}), rule_card.core_idea),
-            "method_overview": _safe_claim(llm_data.get("method_overview", {}), rule_card.method_overview),
-            "experiment_summary": _safe_claim(llm_data.get("experiment_summary", {}), rule_card.experiment_summary),
-            "limitations": _safe_claim(llm_data.get("limitations", {}), rule_card.limitations),
-        }
     )
 
 
@@ -321,12 +202,4 @@ def _overall_evidence_status(evidence_index: EvidenceIndex) -> EvidenceType:
     return EvidenceType.UNVERIFIED
 
 
-def _format_evidence_for_prompt(evidence_index: EvidenceIndex) -> str:
-    """Format evidence claims for inclusion in LLM prompt."""
-    lines: list[str] = []
-    for claim in evidence_index.claims[:20]:  # limit to avoid token overflow
-        lines.append(
-            f"- [{claim.evidence_type.value}] {claim.evidence_ref}: "
-            f"{claim.quote_or_summary[:200]}"
-        )
-    return "\n".join(lines)
+

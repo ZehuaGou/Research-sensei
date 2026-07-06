@@ -315,7 +315,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 .seed-panel {
   display: grid;
   gap: 16px;
-  padding: 18px;
+  padding: 16px;
 }
 
 .seed-head,
@@ -328,16 +328,16 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
 .seed-head h2 {
   color: var(--text-primary);
-  font-size: 19px;
-  font-weight: 900;
+  font-size: 17px;
+  font-weight: 720;
 }
 
 .seed-head span {
   display: inline-flex;
   margin-top: 6px;
-  color: #b45309;
+  color: var(--warning);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .seed-form {
@@ -349,9 +349,9 @@ async function prepareDeepRead(paper: Record<string, any>) {
 .seed-form input {
   outline: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 11px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 14px;
 }
@@ -372,14 +372,14 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
 .error-text,
 .paper-note.danger {
-  color: #dc2626;
+  color: var(--danger);
 }
 
 .seed-empty {
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px 14px;
   background: rgba(245, 158, 11, 0.1);
-  color: #92400e;
+  color: var(--warning);
 }
 
 .seed-results {
@@ -391,7 +391,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
   margin-bottom: 10px;
   color: var(--text-primary);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 .seed-paper-list {
@@ -401,7 +401,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
 .seed-paper {
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 14px;
   background: var(--bg-secondary);
 }
@@ -409,7 +409,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 .paper-top h4 {
   color: var(--text-primary);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 720;
   line-height: 1.5;
 }
 
@@ -430,7 +430,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 }
 
 .paper-meta span {
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 7px 9px;
   background: var(--bg-card);
   color: var(--text-secondary);
@@ -443,7 +443,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
 .paper-note {
   margin-top: 8px;
-  color: #b45309;
+  color: var(--warning);
 }
 
 .seed-results ul,

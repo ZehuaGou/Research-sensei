@@ -43,6 +43,19 @@ class JobStore:
         if deleted == 0:
             raise JobNotFoundError(f"Job not found: {job_id}")
 
+    def find_by_source_identity(self, source_identity: str) -> JobRecord | None:
+        """Return the most recent SUCCEEDED job for a source identity, or None."""
+        if not source_identity:
+            return None
+        with self._connect() as conn:
+            row = conn.execute(
+                "select * from jobs where source_identity = ? and status = ? order by created_at desc limit 1",
+                (source_identity, JobStatus.SUCCEEDED.value),
+            ).fetchone()
+        if row is None:
+            return None
+        return self._from_row(row)
+
     def list_recent(self, limit: int = 20) -> list[JobRecord]:
         with self._connect() as conn:
             rows = conn.execute("select * from jobs order by created_at desc limit ?", (limit,)).fetchall()
@@ -127,10 +140,15 @@ class JobStore:
             "artifacts": "text not null default '[]'",
             "created_at": "text not null default ''",
             "updated_at": "text not null default ''",
+            "source_identity": "text not null default ''",
         }
         for column, definition in required_columns.items():
             if column not in columns:
                 conn.execute(f"alter table jobs add column {column} {definition}")
+        # Ensure index for source_identity lookups
+        existing_indexes = {row["name"] for row in conn.execute("pragma index_list(jobs)").fetchall()}
+        if "idx_jobs_source_identity" not in existing_indexes:
+            conn.execute("create index idx_jobs_source_identity on jobs(source_identity)")
 
     def _to_row(self, job: JobRecord) -> tuple[str, ...]:
         return (
@@ -190,4 +208,5 @@ def _to_column_values(job: JobRecord) -> dict[str, str]:
         "artifacts": _dump_models(job.artifacts),
         "created_at": job.created_at,
         "updated_at": job.updated_at,
+        "source_identity": job.source_identity,
     }

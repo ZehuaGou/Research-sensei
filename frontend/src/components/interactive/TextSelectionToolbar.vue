@@ -102,7 +102,7 @@ onUnmounted(() => {
   gap: 6px;
   max-width: calc(100vw - 28px);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 6px;
   background: var(--bg-elevated);
   box-shadow: var(--shadow-lg);
@@ -110,10 +110,10 @@ onUnmounted(() => {
 
 .toolbar-btn {
   min-height: 36px;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 7px 12px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 650;
   background: var(--bg-secondary);
   color: var(--text-secondary);
   white-space: nowrap;
@@ -121,7 +121,7 @@ onUnmounted(() => {
 
 .toolbar-btn.primary {
   background: var(--accent);
-  color: white;
+  color: var(--accent-contrast);
 }
 
 @media (max-width: 719px) {

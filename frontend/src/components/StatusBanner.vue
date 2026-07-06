@@ -137,13 +137,13 @@ function valueText(value: any) {
 
 <style scoped>
 .status-banner {
-  padding: 18px;
+  padding: 16px;
   margin-bottom: 18px;
 }
 
 .status-banner.success,
 .status-pill.success {
-  background: rgba(5, 150, 105, 0.1);
+  background: rgba(21, 128, 61, 0.1);
   color: var(--success);
 }
 
@@ -161,6 +161,6 @@ function valueText(value: any) {
 
 .status-pill.neutral {
   background: var(--accent-light);
-  color: var(--accent);
+  color: var(--text-primary);
 }
 </style>

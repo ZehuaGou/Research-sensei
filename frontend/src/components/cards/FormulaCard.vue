@@ -14,28 +14,49 @@ onMounted(async () => {
   await renderFormula()
 })
 
-async function renderFormula() {
-  const latex = props.card.formula_latex || props.card.formula_raw || ''
-  if (!formulaEl.value || !latex) return
-  formulaEl.value.className = ''
-  if (shouldRenderPlainFormula(latex)) {
-    formulaEl.value.textContent = latex
-    formulaEl.value.classList.add('plain-formula')
-    return
-  }
+/** Clean LaTeX that KaTeX doesn't support but has no visual effect. */
+function cleanKatexIncompatible(latex: string): string {
+  return latex
+    .replace(/\\label\{[^}]*\}/g, '')
+    .replace(/\\ref\{[^}]*\}/g, '')
+    .replace(/\\eqref\{[^}]*\}/g, '')
+    .replace(/\\tag\{([^}]*)\}\s*$/g, '')
+    .replace(/\\cite\{[^}]*\}/g, '')
+    .replace(/\\(?:begin|end)\{document\}/g, '')
+}
+
+/** Try KaTeX render; returns true on success. */
+function tryKatex(el: HTMLElement, latex: string): boolean {
   try {
-    katex.render(latex, formulaEl.value, { displayMode: true, throwOnError: false })
+    el.innerHTML = ''
+    katex.render(latex, el, { displayMode: true, throwOnError: false })
+    return !el.querySelector('.katex-error')
   } catch {
-    renderError.value = true
+    el.innerHTML = ''
+    return false
   }
 }
 
-function shouldRenderPlainFormula(value: unknown) {
-  const text = String(value || '')
-  if (props.card.formula_origin === 'raw_formula_text' || hasInsufficientSource()) return true
-  const letters = (text.match(/[A-Za-z]/g) || []).length
-  const spaces = (text.match(/\s/g) || []).length
-  return text.length > 60 && letters > 30 && spaces > 4 && !/[\\_^{}]/.test(text)
+async function renderFormula() {
+  const raw = props.card.formula_latex || props.card.formula_raw || ''
+  if (!formulaEl.value || !raw) return
+  formulaEl.value.className = ''
+  renderError.value = false
+
+  const cleaned = cleanKatexIncompatible(raw)
+
+  // 1. Try as-is
+  if (tryKatex(formulaEl.value, cleaned)) return
+
+  // 2. Wrap alignment markers in \begin{aligned}
+  if (/[&\\]/.test(cleaned)
+    && !/\\begin\{(aligned|gather|matrix|cases|bmatrix|pmatrix|vmatrix)\b/.test(cleaned)) {
+    if (tryKatex(formulaEl.value, `\\begin{aligned}${cleaned}\\end{aligned}`)) return
+  }
+
+  // 3. Fallback: plain text
+  formulaEl.value.textContent = raw
+  formulaEl.value.classList.add('plain-formula')
 }
 
 async function explainFormula() {
@@ -199,7 +220,6 @@ function mathLabelHtml(value: unknown) {
 
 <style scoped>
 .formula-card {
-  overflow: hidden;
   min-width: 0;
 }
 
@@ -237,12 +257,15 @@ h2 {
 }
 
 .formula-box {
-  margin: 18px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  margin: 0;
+  padding: 15px 20px;
   overflow-x: auto;
-  max-width: calc(100% - 40px);
-  border-radius: 10px;
-  padding: 15px;
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-subtle);
   color: var(--text-primary);
 }
 
@@ -259,7 +282,7 @@ h2 {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1px;
-  margin: 0 20px 18px;
+  margin: 16px 20px 18px;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -328,7 +351,7 @@ h2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  padding: 0 20px 20px;
+  padding: 16px 20px 20px;
 }
 
 .formula-explain > div {

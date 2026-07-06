@@ -18,6 +18,7 @@ class JobRecord(SenseiModel):
     job_id: str
     source_path: str
     run_dir: str
+    source_identity: str = ""
     status: JobStatus = JobStatus.PENDING
     current_step: str = "created"
     error: str = ""

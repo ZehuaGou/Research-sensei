@@ -1,49 +1,63 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #f7f7f8;
-  --bg-secondary: #ececf1;
-  --bg-sidebar: #f0f0f3;
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f6f4;
+  --bg-sidebar: #f4f4f2;
   --bg-card: #ffffff;
-  --bg-elevated: #ffffff;
-  --bg-hover: rgba(32, 33, 35, 0.06);
-  --border: rgba(32, 33, 35, 0.14);
-  --border-subtle: rgba(32, 33, 35, 0.09);
-  --text-primary: #202123;
-  --text-secondary: #4e5058;
-  --text-muted: #747680;
-  --accent: #2563eb;
-  --accent-rgb: 37, 99, 235;
-  --accent-light: rgba(37, 99, 235, 0.09);
-  --accent-hover: rgba(37, 99, 235, 0.14);
-  --success: #059669;
-  --warning: #c47a06;
-  --danger: #dc2626;
+  --bg-elevated: #fbfbfa;
+  --bg-hover: rgba(32, 32, 28, 0.055);
+  --border: rgba(32, 32, 28, 0.15);
+  --border-subtle: rgba(32, 32, 28, 0.085);
+  --text-primary: #1f1f1d;
+  --text-secondary: #4f4f4a;
+  --text-muted: #88867f;
+  --text-placeholder: #b7b5ae;
+  --accent: #1f1f1d;
+  --accent-rgb: 31, 31, 29;
+  --accent-contrast: #ffffff;
+  --accent-light: rgba(31, 31, 29, 0.065);
+  --accent-hover: rgba(31, 31, 29, 0.11);
+  --sidebar-surface: #e8e8e5;
+  --sidebar-hover: #e9e9e6;
+  --sidebar-text: #343431;
+  --sidebar-muted: #8b8981;
+  --sidebar-border: rgba(32, 32, 28, 0.075);
+  --success: #16a34a;
+  --warning: #b45309;
+  --danger: #ef4444;
   --panel-radius: 8px;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 18px 48px rgba(15, 23, 42, 0.16);
+  --shadow-sm: 0 1px 1px rgba(18, 18, 16, 0.035);
+  --shadow-md: 0 12px 34px rgba(18, 18, 16, 0.08);
+  --shadow-lg: 0 24px 68px rgba(18, 18, 16, 0.16);
 }
 
 .dark {
-  --bg-primary: #1f2023;
-  --bg-secondary: #2a2b2f;
-  --bg-sidebar: #17181b;
-  --bg-card: #26272b;
-  --bg-elevated: #303136;
+  --bg-primary: #141414;
+  --bg-secondary: #202020;
+  --bg-sidebar: #0f0f0f;
+  --bg-card: #1b1b1b;
+  --bg-elevated: #232323;
   --bg-hover: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.13);
+  --border: rgba(255, 255, 255, 0.14);
   --border-subtle: rgba(255, 255, 255, 0.08);
-  --text-primary: #f5f5f6;
-  --text-secondary: #c9c9cf;
-  --text-muted: #8f9099;
-  --accent: #60a5fa;
-  --accent-rgb: 96, 165, 250;
-  --accent-light: rgba(96, 165, 250, 0.13);
-  --accent-hover: rgba(96, 165, 250, 0.2);
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 22px 60px rgba(0, 0, 0, 0.45);
+  --text-primary: #f4f4f1;
+  --text-secondary: #c9c8c3;
+  --text-muted: #8f8d86;
+  --text-placeholder: #6e6c65;
+  --accent: #f4f4f1;
+  --accent-rgb: 244, 244, 241;
+  --accent-contrast: #111111;
+  --accent-light: rgba(244, 244, 241, 0.08);
+  --accent-hover: rgba(244, 244, 241, 0.14);
+  --sidebar-surface: #1c1c1c;
+  --sidebar-hover: #292929;
+  --sidebar-text: #f4f4f1;
+  --sidebar-muted: #9d9b95;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 12px 34px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.52);
 }
 
 * {
@@ -59,9 +73,9 @@ body {
   min-width: 320px;
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.7;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -83,7 +97,7 @@ button:disabled {
 }
 
 ::selection {
-  background: rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.18);
 }
 
 ::-webkit-scrollbar {
@@ -107,7 +121,6 @@ button:disabled {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--panel-radius);
-  box-shadow: var(--shadow-sm);
 }
 
 .elevated {
@@ -120,21 +133,27 @@ button:disabled {
 .primary-btn,
 .secondary-btn,
 .ghost-btn {
-  min-height: 40px;
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
   border-radius: 8px;
-  padding: 0 16px;
+  padding: 0 14px;
+  font-size: 14px;
   font-weight: 650;
-  transition: background 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+  text-decoration: none;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease, opacity 0.14s ease;
 }
 
 .primary-btn {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .secondary-btn {
   background: var(--accent-light);
-  color: var(--accent);
+  color: var(--text-primary);
 }
 
 .ghost-btn {
@@ -146,17 +165,41 @@ button:disabled {
 .primary-btn:hover,
 .secondary-btn:hover,
 .ghost-btn:hover {
-  transform: translateY(-1px);
+  background: var(--accent-hover);
+}
+
+.primary-btn:hover {
+  background: color-mix(in srgb, var(--accent) 88%, var(--bg-card));
+  opacity: 1;
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.ghost-btn:disabled {
+  opacity: 0.45;
 }
 
 .status-pill {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
+  min-height: 26px;
   border-radius: 999px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 0 9px;
+  font-size: 12px;
   font-weight: 650;
+}
+
+input,
+textarea,
+select {
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.08);
 }
 
 .katex-display {

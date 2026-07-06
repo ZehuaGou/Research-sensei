@@ -215,9 +215,9 @@ async function upload() {
 
 <style scoped>
 .upload-page {
-  width: min(1060px, calc(100vw - 32px));
+  width: min(980px, calc(100vw - 36px));
   margin: 0 auto;
-  padding: 22px 0 54px;
+  padding: 36px 0 60px;
 }
 
 .page-heading {
@@ -225,47 +225,48 @@ async function upload() {
 }
 
 .page-heading p {
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .page-heading h1 {
   margin-top: 6px;
   color: var(--text-primary);
-  font-size: 25px;
-  font-weight: 900;
+  font-size: 30px;
+  font-weight: 720;
+  line-height: 1.18;
 }
 
 .page-heading span {
   display: block;
   margin-top: 8px;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: 14px;
 }
 
 .upload-layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: 244px minmax(0, 1fr);
+  gap: 12px;
 }
 
 .source-list {
   display: grid;
   align-self: start;
-  gap: 6px;
+  gap: 2px;
   padding: 8px;
 }
 
 .source-list button {
-  border-radius: 12px;
-  padding: 13px 14px;
+  border-radius: 8px;
+  padding: 11px 12px;
   text-align: left;
 }
 
 .source-list button.active,
 .source-list button:hover {
-  background: var(--accent-light);
+  background: var(--bg-secondary);
 }
 
 .source-list strong,
@@ -275,18 +276,19 @@ async function upload() {
 
 .source-list strong {
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 690;
 }
 
 .source-list small {
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .source-panel {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   padding: 16px;
 }
 
@@ -297,45 +299,45 @@ async function upload() {
 
 .field label {
   color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .field input {
   width: 100%;
   outline: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 13px 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: 15px;
 }
 
 .mode-title h2 {
   color: var(--text-primary);
-  font-size: 22px;
-  font-weight: 900;
+  font-size: 19px;
+  font-weight: 720;
 }
 
 .mode-title p {
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .drop-zone {
-  border: 2px dashed var(--border);
-  border-radius: 16px;
-  padding: 42px 24px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 40px 22px;
   background: var(--bg-secondary);
   text-align: center;
-  transition: transform 0.16s ease, border-color 0.16s ease;
+  transition: background 0.14s ease, border-color 0.14s ease;
 }
 
 .drop-zone.dragging {
-  transform: scale(1.01);
   border-color: var(--accent);
+  background: var(--bg-elevated);
 }
 
 .drop-zone label {
@@ -349,13 +351,13 @@ async function upload() {
 
 .drop-zone strong {
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .drop-zone span {
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .submit {
@@ -366,7 +368,7 @@ async function upload() {
 .error-box {
   display: grid;
   gap: 6px;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 13px 14px;
   font-size: 14px;
   line-height: 1.7;
@@ -382,8 +384,9 @@ async function upload() {
 }
 
 .error-box {
-  background: rgba(239, 68, 68, 0.08);
-  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.07);
+  color: var(--danger);
 }
 
 @media (max-width: 820px) {

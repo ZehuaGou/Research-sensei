@@ -3,10 +3,11 @@ import { flushPromises, mount } from '@vue/test-utils'
 import DirectionSearchView from '../DirectionSearchView.vue'
 
 const routerPush = vi.hoisted(() => vi.fn())
+const routeState = vi.hoisted(() => ({ query: {} as Record<string, any> }))
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
-  useRoute: () => ({ query: {} }),
+  useRoute: () => routeState,
 }))
 
 function directionResponse(overrides: Record<string, any> = {}) {
@@ -90,7 +91,47 @@ function mockFetch(data: Record<string, any>, ok = true) {
 describe('DirectionSearchView', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    routeState.query = {}
     routerPush.mockReset()
+  })
+
+  it('opens a historical direction run without re-running direction search', async () => {
+    routeState.query = { run_id: 'run-1' }
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        search_runs: [
+          {
+            run_id: 'run-1',
+            query: 'time series anomaly detection',
+            candidate_count: 2,
+            downloaded_count: 1,
+            reused_count: 0,
+            created_at: '2026-07-04T00:00:00Z',
+            papers: [
+              {
+                paper_id: 'p1',
+                title: 'Reusable Historical Paper',
+                search_rank: 1,
+                action: 'downloaded',
+                venue: 'ICML',
+                venue_rank: 'A*',
+                local_path: 'D:\\workspace\\paper.pdf',
+              },
+            ],
+          },
+        ],
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(DirectionSearchView)
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/library/search_runs?limit=200')
+    expect(wrapper.get('[data-testid="direction-history"]').text()).toContain('Reusable Historical Paper')
+    expect(wrapper.get('[data-testid="history-deep-read"]').text()).toContain('深读')
   })
 
   it('submits a query and renders the direction bundle', async () => {

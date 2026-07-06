@@ -258,9 +258,9 @@ function formatDate(value: string | undefined) {
 
 <style scoped>
 .library-page {
-  width: min(1060px, calc(100vw - 32px));
+  width: min(1040px, calc(100vw - 36px));
   margin: 0 auto;
-  padding: 22px 0 54px;
+  padding: 34px 0 60px;
 }
 
 .library-head {
@@ -272,23 +272,24 @@ function formatDate(value: string | undefined) {
 }
 
 .eyebrow {
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 800;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
   letter-spacing: 0;
 }
 
 h1 {
   margin: 4px 0 8px;
   color: var(--text-primary);
-  font-size: 25px;
-  font-weight: 900;
+  font-size: 30px;
+  font-weight: 720;
+  line-height: 1.18;
 }
 
 .intro {
   max-width: 760px;
   color: var(--text-secondary);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.7;
 }
 
@@ -296,13 +297,13 @@ h1 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px 14px;
-  padding: 14px;
+  padding: 12px;
 }
 
 .stats span {
   color: var(--text-primary);
-  font-size: 24px;
-  font-weight: 850;
+  font-size: 20px;
+  font-weight: 720;
 }
 
 .stats small {
@@ -312,10 +313,10 @@ h1 {
 
 .toolbar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
   margin-bottom: 16px;
-  padding: 12px;
+  padding: 10px;
 }
 
 .toolbar input {
@@ -323,7 +324,7 @@ h1 {
   flex: 1;
   min-height: 42px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 0 12px;
   background: var(--bg-elevated);
   color: var(--text-primary);
@@ -332,7 +333,7 @@ h1 {
 .notice,
 .error-box {
   margin: 0 0 14px;
-  border-radius: 10px;
+  border-radius: 8px;
   padding: 10px 12px;
   font-size: 14px;
 }
@@ -343,21 +344,22 @@ h1 {
 }
 
 .error-box {
+  border: 1px solid rgba(220, 38, 38, 0.18);
   background: rgba(220, 38, 38, 0.1);
   color: var(--danger);
 }
 
 .paper-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .paper-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: 14px;
   align-items: start;
-  padding: 14px;
+  padding: 14px 16px;
 }
 
 .paper-title-line {
@@ -370,8 +372,8 @@ h1 {
   min-width: 0;
   margin: 0;
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 820;
+  font-size: 16px;
+  font-weight: 720;
   line-height: 1.35;
 }
 
@@ -380,9 +382,9 @@ h1 {
   border-radius: 999px;
   padding: 3px 8px;
   background: var(--accent-light);
-  color: var(--accent);
+  color: var(--text-primary);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .paper-main p {
@@ -439,14 +441,14 @@ code {
 
 .runs {
   margin-top: 20px;
-  padding: 16px;
+  padding: 14px;
 }
 
 .runs h2 {
   margin: 0 0 12px;
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 820;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 .run-list {

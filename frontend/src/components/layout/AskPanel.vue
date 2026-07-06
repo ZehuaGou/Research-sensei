@@ -579,13 +579,13 @@ header {
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border-subtle);
-  padding: 18px;
+  padding: 14px 16px;
 }
 
 h2 {
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 800;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 header p {
@@ -597,34 +597,34 @@ header p {
 .mode-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 4px;
   border-bottom: 1px solid var(--border-subtle);
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: color-mix(in srgb, var(--bg-card) 94%, var(--bg-secondary));
 }
 
 .mode-tabs button {
   display: grid;
-  min-height: 48px;
+  min-height: 42px;
   align-content: center;
   gap: 1px;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 7px 8px;
+  padding: 6px 8px;
   background: transparent;
   color: var(--text-secondary);
   text-align: left;
 }
 
 .mode-tabs button.active {
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  background: var(--accent-light);
-  color: var(--accent);
+  border-color: var(--border-subtle);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .mode-tabs span {
   font-size: 13px;
-  font-weight: 850;
+  font-weight: 650;
   line-height: 1.2;
 }
 
@@ -640,15 +640,15 @@ header p {
 
 .selected {
   margin: 14px 18px 0;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 12px;
   background: var(--accent-light);
 }
 
 .selected span {
-  color: var(--accent);
+  color: var(--text-primary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .selected p {
@@ -667,7 +667,7 @@ header p {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 18px;
+  padding: 18px 16px;
 }
 
 .advisor-card {
@@ -683,9 +683,9 @@ header p {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--accent);
+  color: var(--text-primary);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 .advisor-head strong {
@@ -740,7 +740,7 @@ header p {
   margin: 70px auto 0;
   max-width: 320px;
   border: 1px dashed var(--border-subtle);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 18px;
   background: color-mix(in srgb, var(--bg-secondary) 54%, transparent);
   text-align: left;
@@ -748,8 +748,8 @@ header p {
 
 .empty h3 {
   color: var(--text-primary);
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 17px;
+  font-weight: 720;
 }
 
 .empty p {
@@ -760,13 +760,13 @@ header p {
 
 .message {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  margin-bottom: 18px;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 9px;
+  margin-bottom: 16px;
 }
 
 .message.user {
-  grid-template-columns: minmax(0, 1fr) 34px;
+  grid-template-columns: minmax(0, 1fr) 30px;
 }
 
 .message.user .avatar {
@@ -784,25 +784,25 @@ header p {
 
 .avatar {
   display: flex;
-  height: 34px;
-  width: 34px;
+  height: 30px;
+  width: 30px;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-secondary);
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 650;
 }
 
 .bubble {
   max-width: 100%;
   min-width: 0;
-  border-radius: 14px;
-  padding: 12px 14px;
+  border-radius: 8px;
+  padding: 10px 12px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.75;
   letter-spacing: 0;
   overflow-wrap: break-word;
@@ -813,7 +813,7 @@ header p {
 .answer-bubble {
   display: grid;
   gap: 8px;
-  padding: 10px;
+  padding: 9px;
   background: color-mix(in srgb, var(--bg-secondary) 92%, var(--bg-card));
   white-space: normal;
 }
@@ -827,13 +827,13 @@ header p {
   padding: 8px 10px 8px 11px;
   background: var(--answer-bg);
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.78;
 }
 
 .answer-block.tone-lead {
-  --answer-accent: #2563eb;
-  --answer-bg: rgba(37, 99, 235, 0.08);
+  --answer-accent: var(--text-primary);
+  --answer-bg: var(--bg-card);
   font-weight: 650;
 }
 
@@ -843,7 +843,7 @@ header p {
 }
 
 .answer-block.tone-evidence {
-  --answer-accent: #b45309;
+  --answer-accent: var(--warning);
   --answer-bg: rgba(180, 83, 9, 0.1);
 }
 
@@ -853,8 +853,8 @@ header p {
 }
 
 .answer-block.tone-followup {
-  --answer-accent: #7c3aed;
-  --answer-bg: rgba(124, 58, 237, 0.08);
+  --answer-accent: var(--text-muted);
+  --answer-bg: color-mix(in srgb, var(--bg-card) 62%, transparent);
 }
 
 .answer-block.tone-plain {
@@ -867,7 +867,7 @@ header p {
   margin-right: 8px;
   color: var(--answer-accent);
   font-size: 12px;
-  font-weight: 850;
+  font-weight: 650;
   line-height: inherit;
 }
 
@@ -880,7 +880,7 @@ header p {
   padding: 0 0.18em;
   background: color-mix(in srgb, var(--answer-accent) 16%, transparent);
   color: color-mix(in srgb, var(--answer-accent) 88%, var(--text-primary));
-  font-weight: 850;
+  font-weight: 720;
 }
 
 :global(.dark) .answer-block.tone-lead {
@@ -904,8 +904,8 @@ header p {
 }
 
 :global(.dark) .answer-block.tone-followup {
-  --answer-accent: #c4b5fd;
-  --answer-bg: rgba(196, 181, 253, 0.11);
+  --answer-accent: var(--text-muted);
+  --answer-bg: rgba(255, 255, 255, 0.06);
 }
 
 .message.user .bubble.compact {
@@ -922,7 +922,7 @@ header p {
   flex-wrap: wrap;
   gap: 8px;
   border-top: 1px solid var(--border-subtle);
-  padding: 12px 18px;
+  padding: 10px 16px;
 }
 
 .quick-row button {
@@ -931,7 +931,7 @@ header p {
   background: transparent;
   color: var(--text-secondary);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 650;
 }
 
 .quick-row button:hover {
@@ -943,7 +943,7 @@ header p {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 10px;
-  padding: 0 18px 18px;
+  padding: 0 16px 16px;
 }
 
 textarea {
@@ -951,11 +951,11 @@ textarea {
   resize: none;
   outline: none;
   border: 1px solid var(--border-subtle);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 12px 14px;
-  background: var(--bg-secondary);
+  background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.6;
 }
 </style>

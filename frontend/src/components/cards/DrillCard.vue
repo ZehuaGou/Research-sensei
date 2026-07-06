@@ -44,16 +44,16 @@ header span {
   border-radius: 999px;
   padding: 4px 9px;
   background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  color: var(--danger);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 header h3 {
   margin-top: 10px;
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 900;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 section {
@@ -64,7 +64,7 @@ section {
 h4 {
   color: var(--text-primary);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 ol {

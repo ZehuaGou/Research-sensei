@@ -36,16 +36,16 @@ header > span {
   border-radius: 999px;
   padding: 4px 9px;
   background: rgba(245, 158, 11, 0.12);
-  color: #b45309;
+  color: var(--warning);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 650;
 }
 
 h3 {
   margin-top: 10px;
   color: var(--text-primary);
-  font-size: 18px;
-  font-weight: 900;
+  font-size: 16px;
+  font-weight: 720;
 }
 
 p {
@@ -63,7 +63,7 @@ section {
 h4 {
   color: var(--text-primary);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 720;
 }
 
 .chips {
