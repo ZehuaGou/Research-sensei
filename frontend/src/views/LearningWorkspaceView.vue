@@ -32,6 +32,7 @@ const activeFormulaAnchor = ref('')
 const formulaOrder = ref<string[]>([])
 const collapsedFormulas = ref<Record<string, boolean>>({})
 const focusedFormula = ref<{ card: any; index: number } | null>(null)
+const formulaRailCollapsed = ref(false)
 let formulaObserver: IntersectionObserver | null = null
 
 const status = computed(() => understandingStatus.value?.status || '')
@@ -569,7 +570,11 @@ onBeforeUnmount(() => {
                   </div>
                 </section>
 
-                <aside class="formula-rail surface" aria-label="当前公式与目录">
+                <aside class="formula-rail surface" :class="{ collapsed: formulaRailCollapsed }" aria-label="当前公式与目录">
+                  <button type="button" class="rail-toggle" @click="formulaRailCollapsed = !formulaRailCollapsed">
+                    {{ formulaRailCollapsed ? '展开' : '收起' }}
+                  </button>
+                  <template v-if="!formulaRailCollapsed">
                   <section v-if="activeFormulaEntry" class="active-formula-card">
                     <span>当前公式</span>
                     <strong>{{ activeFormulaEntry.title }}</strong>
@@ -605,6 +610,7 @@ onBeforeUnmount(() => {
                       </button>
                     </div>
                   </nav>
+                  </template>
                 </aside>
               </div>
             </template>
@@ -689,7 +695,7 @@ onBeforeUnmount(() => {
 }
 
 .workspace-shell.with-chat {
-  grid-template-columns: 210px minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-columns: 210px minmax(0, 1fr);
 }
 
 .workspace-shell.formula-mode {
@@ -697,7 +703,7 @@ onBeforeUnmount(() => {
 }
 
 .workspace-shell.formula-mode.with-chat {
-  grid-template-columns: 166px minmax(0, 1fr) minmax(330px, 380px);
+  grid-template-columns: 166px minmax(0, 1fr);
 }
 
 .workspace-nav {
@@ -964,6 +970,31 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 
+.formula-rail.collapsed {
+  max-height: none;
+  overflow: visible;
+}
+
+.rail-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 3px 10px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.rail-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
 .formula-list {
   display: grid;
   min-width: 0;
@@ -1136,14 +1167,25 @@ onBeforeUnmount(() => {
 
 @media (min-width: 1121px) {
   .formula-rail {
-    position: fixed;
-    top: 88px;
-    right: 28px;
-    z-index: 70;
-    width: 300px;
-    max-height: calc(100vh - 112px);
-    box-shadow: var(--shadow-md);
+    position: sticky;
+    top: 16px;
+    right: auto;
+    z-index: 1;
+    width: auto;
+    max-height: calc(100vh - 32px);
+    box-shadow: none;
   }
+}
+
+.workspace-shell.with-chat .formula-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-shell.with-chat .formula-rail {
+  position: static;
+  order: -1;
+  max-height: none;
+  overflow: visible;
 }
 
 .active-formula-card > span {
@@ -1393,11 +1435,13 @@ onBeforeUnmount(() => {
 }
 
 .chat-pane {
-  position: sticky;
+  position: fixed;
   top: 0;
-  height: 100%;
-  min-width: 0;
-  z-index: 2;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  z-index: 100;
+  height: 100dvh;
   border-left: 1px solid var(--border-subtle);
   background: var(--bg-card);
 }

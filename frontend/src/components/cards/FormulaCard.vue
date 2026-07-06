@@ -16,11 +16,22 @@ onMounted(async () => {
 
 /** Clean LaTeX that KaTeX doesn't support but has no visual effect. */
 function cleanKatexIncompatible(latex: string): string {
-  return latex
-    .replace(/\\label\{[^}]*\}/g, '')
-    .replace(/\\ref\{[^}]*\}/g, '')
-    .replace(/\\eqref\{[^}]*\}/g, '')
-    .replace(/\\cite\{[^}]*\}/g, '')
+  let s = latex
+  // Strip outer display-math delimiters: $$...$$, \[...\]
+  s = s.replace(/^\s*\$\$\s*([\s\S]*?)\s*\$\$\s*$/g, '$1')
+  s = s.replace(/^\s*\\\[\s*([\s\S]*?)\s*\\\]\s*$/g, '$1')
+  // Strip \begin{equation}...\end{equation} etc, keep inner content
+  s = s.replace(/\\begin\{(equation|align|gather|split|multline|eqnarray)\*?\}[\s\S]*?\\end\{(equation|align|gather|split|multline|eqnarray)\*?\}/g, (m) => {
+    return m.replace(/\\begin\{[^}]*\}\s*/g, '').replace(/\s*\\end\{[^}]*\}/g, '')
+  })
+  // Remove \label, \ref, \eqref, \cite, \tag, \nonumber
+  s = s.replace(/\\label\{[^}]*\}/g, '')
+  s = s.replace(/\\ref\{[^}]*\}/g, '')
+  s = s.replace(/\\eqref\{[^}]*\}/g, '')
+  s = s.replace(/\\cite\{[^}]*\}/g, '')
+  s = s.replace(/\\tag\{[^}]*\}/g, '')
+  s = s.replace(/\\nonumber\s*/g, '')
+  return s
 }
 
 /** Try KaTeX render; returns true on success. */
@@ -45,6 +56,7 @@ async function renderFormula() {
   }
   formulaEl.value.textContent = raw
   formulaEl.value.classList.add('plain-formula')
+  renderError.value = true
 }
 
 async function explainFormula() {
