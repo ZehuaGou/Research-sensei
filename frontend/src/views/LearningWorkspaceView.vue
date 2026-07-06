@@ -695,7 +695,7 @@ onBeforeUnmount(() => {
 }
 
 .workspace-shell.with-chat {
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr) 380px;
 }
 
 .workspace-shell.formula-mode {
@@ -703,7 +703,26 @@ onBeforeUnmount(() => {
 }
 
 .workspace-shell.formula-mode.with-chat {
-  grid-template-columns: 166px minmax(0, 1fr);
+  grid-template-columns: 56px minmax(0, 1fr) 380px;
+}
+
+/* Nav collapses to narrow icon bar when chat open */
+.workspace-shell.with-chat .workspace-nav {
+  width: 56px;
+  padding: 12px 6px;
+  overflow: hidden;
+}
+
+.workspace-shell.with-chat .nav-title span,
+.workspace-shell.with-chat .nav-title strong,
+.workspace-shell.with-chat .workspace-nav nav button span,
+.workspace-shell.with-chat .workspace-nav nav small {
+  display: none;
+}
+
+.workspace-shell.with-chat .workspace-nav nav button {
+  justify-content: center;
+  padding: 8px 0;
 }
 
 .workspace-nav {
@@ -1199,18 +1218,53 @@ onBeforeUnmount(() => {
   }
 }
 
-.workspace-shell.with-chat .formula-rail {
-  position: fixed;
-  top: 88px;
-  right: 396px;
-  width: 280px;
-  max-height: calc(100vh - 112px);
-  overflow-y: auto;
-  z-index: 70;
-}
-
+/* When M4 is open, formula-rail becomes a sticky top bar */
 .workspace-shell.with-chat .formula-workspace {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace-shell.with-chat .formula-rail {
+  position: sticky;
+  top: 12px;
+  right: auto;
+  width: auto;
+  max-height: none;
+  z-index: 25;
+  overflow: visible;
+  box-shadow: var(--shadow-sm);
+  border-radius: 10px;
+  order: -1;
+  display: grid;
+}
+
+.workspace-shell.with-chat .formula-rail.collapsed {
+  width: auto;
+  min-width: 0;
+  display: inline-flex;
+  position: fixed;
+  bottom: 20px;
+  right: 400px;
+  top: auto;
+  z-index: 90;
+}
+
+.workspace-shell.with-chat .active-formula-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 0;
+}
+
+.workspace-shell.with-chat .formula-index {
+  max-height: 220px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.workspace-shell.with-chat .rail-toggle {
+  position: static;
 }
 
 .active-formula-card > span {
@@ -1460,15 +1514,15 @@ onBeforeUnmount(() => {
 }
 
 .chat-pane {
-  position: fixed;
+  position: sticky;
   top: 0;
-  right: 0;
-  bottom: 0;
-  width: 380px;
-  z-index: 100;
   height: 100dvh;
+  z-index: 30;
   border-left: 1px solid var(--border-subtle);
   background: var(--bg-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .chat-fab {
