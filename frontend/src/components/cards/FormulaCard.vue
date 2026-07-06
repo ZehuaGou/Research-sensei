@@ -1,18 +1,43 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import katex from 'katex'
 import { useLearningStore } from '../../stores/learning'
 
 const props = defineProps<{ card: any }>()
 const store = useLearningStore()
 const formulaEl = ref<HTMLElement>()
+const formulaWrap = ref<HTMLElement>()
 const renderError = ref(false)
 const formulaExplainLoading = ref(false)
+const isPinned = ref(false)
+
+let observer: IntersectionObserver | null = null
 
 onMounted(async () => {
   await nextTick()
   await renderFormula()
+  setupPin()
 })
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  observer = null
+})
+
+function setupPin() {
+  observer?.disconnect()
+  if (!formulaWrap.value) return
+  // root=null means viewport; threshold=0 triggers as soon as element leaves
+  observer = new IntersectionObserver(
+    ([entry]) => {
+      // When the sentinel (placed right below the formula box) exits viewport
+      // from the top, pin the formula; when it re-enters, unpin.
+      isPinned.value = !entry.isIntersecting
+    },
+    { rootMargin: '-1px 0px 0px 0px', threshold: 0 },
+  )
+  observer.observe(formulaWrap.value)
+}
 
 /** Clean LaTeX that KaTeX doesn't support but has no visual effect. */
 function cleanKatexIncompatible(latex: string): string {
@@ -165,9 +190,13 @@ function mathLabelHtml(value: unknown) {
       <h2>{{ card.display_title || card.purpose || card.problem || '公式解释' }}</h2>
     </header>
 
-    <div class="formula-box">
-      <div ref="formulaEl"></div>
-      <code v-if="renderError" class="block whitespace-pre-wrap text-sm">{{ card.formula_latex || card.formula_raw }}</code>
+    <div ref="formulaWrap" class="formula-wrap" :class="{ pinned: isPinned }">
+      <div class="formula-box">
+        <div ref="formulaEl"></div>
+        <code v-if="renderError" class="block whitespace-pre-wrap text-sm">{{ card.formula_latex || card.formula_raw }}</code>
+      </div>
+      <!-- sentinel: when this leaves viewport, formula pins -->
+      <div class="pin-sentinel"></div>
     </div>
 
     <section v-if="card.symbols?.length || card.terms?.length" class="term-grid">
@@ -256,17 +285,33 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.formula-wrap {
+  position: relative;
+}
+
+.pin-sentinel {
+  height: 0;
+}
+
 .formula-box {
-  position: sticky;
-  top: 0;
-  z-index: 10;
   margin: 0;
   padding: 15px 20px;
   overflow-x: auto;
-  background: color-mix(in srgb, var(--bg-secondary) 94%, transparent);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
   color: var(--text-primary);
+  border-radius: 10px;
+}
+
+.formula-wrap.pinned .formula-box {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  width: min(860px, 100% - 40px);
+  margin: 0 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  border-radius: 0 0 10px 10px;
 }
 
 .formula-box :deep(.plain-formula) {
