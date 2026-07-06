@@ -46,12 +46,65 @@ class ScriptedFormulaLLM:
         }
 
 
+class BatchFormulaLLM:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.batch_sizes: list[int] = []
+
+    async def chat_json(self, messages, *, config=None):
+        self.calls += 1
+        text = "\n".join(message.content for message in messages)
+        refs = _allowed_refs(text)
+        self.batch_sizes.append(len(refs))
+        return {
+            "formula_cards": [
+                {
+                    "formula_id": f"llm_{index}",
+                    "formula_origin": "parser_latex",
+                    "formula_ocr_status": "not_required",
+                    "formula_explanation_status": "parser_derived",
+                    "purpose": f"Formula {index} defines one part of the objective.",
+                    "symbols": [{"symbol": f"x_{index}", "meaning": "state variable"}],
+                    "terms": [
+                        {
+                            "term": f"term_{index}",
+                            "meaning": "objective component",
+                            "encourages": "stable optimization",
+                            "penalizes": "unstable assignments",
+                            "if_removed": "the objective loses one constraint",
+                        }
+                    ],
+                    "intuition": "Each term explains one formula slot.",
+                    "numeric_example": "INSUFFICIENT_EVIDENCE",
+                    "what_if_removed": "INSUFFICIENT_EVIDENCE",
+                    "weight_sensitivity": "INSUFFICIENT_EVIDENCE",
+                    "plain_summary": "The formula is explained from its evidence.",
+                    "evidence_ref": ref,
+                }
+                for index, ref in enumerate(refs, start=1)
+            ]
+        }
+
+
 class FailingFormulaLLM:
     calls = 0
 
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         raise AssertionError("Unknown/raw formula evidence must not be sent for detailed LLM derivation")
+
+
+def _allowed_refs(prompt: str) -> list[str]:
+    refs: list[str] = []
+    for line in prompt.splitlines():
+        line = line.strip()
+        if line.startswith("- evidence_ref:"):
+            value = line.split(":", 1)[1].strip()
+            if value:
+                refs.append(value)
+    if refs:
+        return refs
+    return [_first_allowed_ref(prompt)]
 
 
 def _first_allowed_ref(prompt: str) -> str:
@@ -87,17 +140,23 @@ def _skeleton() -> PaperSkeleton:
     )
 
 
-def _formula_item(*, origin: str = "", ocr_status: str = "") -> EvidencePackItem:
+def _formula_item(
+    *,
+    origin: str = "",
+    ocr_status: str = "",
+    evidence_ref: str = "paper:eq001",
+    formula_id: str = "formula_001",
+) -> EvidencePackItem:
     return EvidencePackItem(
-        claim_id="c_formula",
+        claim_id=f"c_{formula_id}",
         claim_type="FORMULA_CONTEXT",
-        evidence_ref="paper:eq001",
-        passage_id="p_formula",
+        evidence_ref=evidence_ref,
+        passage_id=f"p_{formula_id}",
         passage_text="Formula: L = x + y. Context before: method objective. Context after: optimization step.",
         confidence=0.7,
         token_count=12,
         formula_origin=origin,
-        formula_id="formula_001",
+        formula_id=formula_id,
         formula_ocr_status=ocr_status,
     )
 
@@ -158,6 +217,32 @@ def test_formula_card_preserves_evidence_origin_over_llm_output() -> None:
     assert card.formula_ocr_status == "not_required"
     assert card.formula_explanation_status == "parser_derived"
     assert card.purpose == "This formula defines the parser-derived objective."
+
+
+def test_formula_cards_batch_ten_derivable_formulas_in_one_llm_call() -> None:
+    client = BatchFormulaLLM()
+    pack = EvidencePack(
+        paper_id="paper",
+        items=[
+            _formula_item(
+                origin="parser_latex",
+                ocr_status="not_required",
+                evidence_ref=f"paper:eq{i:03d}",
+                formula_id=f"formula_{i:03d}",
+            )
+            for i in range(1, 11)
+        ],
+    )
+
+    bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
+
+    assert client.calls == 1
+    assert client.batch_sizes == [10]
+    assert len(bundle.formula_cards) == 10
+    assert {card.evidence_ref for card in bundle.formula_cards} == {
+        f"paper:eq{i:03d}" for i in range(1, 11)
+    }
+    assert not any("LLM_CARD_MISSING_FOR_FORMULA" in warning for warning in bundle.warnings)
 
 
 def test_parser_latex_formula_with_evidence_ref_can_keep_detailed_explanation() -> None:

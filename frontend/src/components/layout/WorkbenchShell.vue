@@ -301,13 +301,6 @@ function formatCount(run: SearchRun) {
         </section>
       </div>
 
-      <footer class="sidebar-account">
-        <div class="account-mark">PL</div>
-        <div>
-          <strong>paul Lee</strong>
-          <span>Plus</span>
-        </div>
-      </footer>
     </aside>
 
     <section class="workbench-frame">
@@ -392,7 +385,7 @@ function formatCount(run: SearchRun) {
 
 .workbench-sidebar {
   display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
   border-right: 1px solid var(--sidebar-border);
@@ -411,8 +404,7 @@ function formatCount(run: SearchRun) {
   padding: 2px 2px 12px;
 }
 
-.brand-mark,
-.account-mark {
+.brand-mark {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -430,30 +422,25 @@ function formatCount(run: SearchRun) {
   text-decoration: none;
 }
 
-.brand-text,
-.sidebar-account div {
+.brand-text {
   min-width: 0;
 }
 
 .brand-text strong,
-.brand-text span,
-.sidebar-account strong,
-.sidebar-account span {
+.brand-text span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.brand-text strong,
-.sidebar-account strong {
+.brand-text strong {
   color: var(--sidebar-text);
   font-size: 14px;
   font-weight: 620;
 }
 
-.brand-text span,
-.sidebar-account span {
+.brand-text span {
   color: var(--sidebar-muted);
   font-size: 12px;
 }
@@ -628,23 +615,6 @@ function formatCount(run: SearchRun) {
   color: var(--sidebar-muted);
   font-size: 13px;
   line-height: 1.5;
-}
-
-.sidebar-account {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  border-top: 1px solid var(--sidebar-border);
-  padding: 10px 6px 2px;
-}
-
-.account-mark {
-  width: 34px;
-  height: 34px;
-  background: #26384f;
-  color: #fff;
-  font-size: 12px;
 }
 
 .workbench-frame {
@@ -835,13 +805,11 @@ function formatCount(run: SearchRun) {
 .codex-shell.collapsed .brand-text,
 .codex-shell.collapsed .utility-nav button span:last-child,
 .codex-shell.collapsed .workspace-nav a span,
-.codex-shell.collapsed .sidebar-history,
-.codex-shell.collapsed .sidebar-account div {
+.codex-shell.collapsed .sidebar-history {
   display: none;
 }
 
 .codex-shell.collapsed .sidebar-brand,
-.codex-shell.collapsed .sidebar-account,
 .codex-shell.collapsed .utility-nav button,
 .codex-shell.collapsed .workspace-nav a {
   grid-template-columns: 1fr;
@@ -871,13 +839,11 @@ function formatCount(run: SearchRun) {
   .codex-shell.collapsed .brand-text,
   .codex-shell.collapsed .utility-nav button span:last-child,
   .codex-shell.collapsed .workspace-nav a span,
-  .codex-shell.collapsed .sidebar-history,
-  .codex-shell.collapsed .sidebar-account div {
+  .codex-shell.collapsed .sidebar-history {
     display: block;
   }
 
   .codex-shell.collapsed .sidebar-brand,
-  .codex-shell.collapsed .sidebar-account,
   .codex-shell.collapsed .utility-nav button,
   .codex-shell.collapsed .workspace-nav a {
     grid-template-columns: 34px minmax(0, 1fr);

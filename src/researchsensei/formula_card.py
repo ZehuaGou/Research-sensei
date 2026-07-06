@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
-from researchsensei.llm.runtime_config import card_timeout_seconds
+from researchsensei.llm.runtime_config import (
+    card_max_retries,
+    card_retry_delay_seconds,
+    card_timeout_seconds,
+    formula_card_batch_size,
+)
 from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_formula_cards_llm_output
 from researchsensei.schemas import (
@@ -17,7 +22,7 @@ from researchsensei.schemas.evidence import EvidencePack, EvidencePackItem
 from researchsensei.schemas.llm_output import FormulaCardLLMOutput, FormulaCardsLLMOutput
 
 
-FORMULA_CARD_BATCH_SIZE = 3
+DEFAULT_FORMULA_CARD_BATCH_SIZE = 10
 DERIVATION_BLOCKED_ORIGINS = {"raw_formula_text", "unknown", "unresolved"}
 
 
@@ -48,8 +53,9 @@ async def build_formula_cards(
     ]
     llm_cards: list[FormulaCardLLMOutput] = []
     warnings: list[str] = []
-    for start in range(0, len(derivable_items), FORMULA_CARD_BATCH_SIZE):
-        batch = derivable_items[start:start + FORMULA_CARD_BATCH_SIZE]
+    batch_size = formula_card_batch_size(DEFAULT_FORMULA_CARD_BATCH_SIZE)
+    for start in range(0, len(derivable_items), batch_size):
+        batch = derivable_items[start:start + batch_size]
         batch_pack = EvidencePack(
             paper_id=evidence_pack.paper_id,
             items=batch,
@@ -61,9 +67,9 @@ async def build_formula_cards(
             temperature=0.2,
             max_tokens=12000,
             json_mode=True,
-            timeout=card_timeout_seconds(300.0),
-            max_retries=1,
-            retry_delay=1.0,
+            timeout=card_timeout_seconds(75.0),
+            max_retries=card_max_retries(0),
+            retry_delay=card_retry_delay_seconds(0.5),
             disable_thinking=True,
         )
         refs = ", ".join(item.evidence_ref for item in batch if item.evidence_ref)

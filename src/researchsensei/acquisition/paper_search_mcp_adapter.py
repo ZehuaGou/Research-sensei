@@ -160,7 +160,37 @@ def _default_command() -> list[str]:
     configured = os.getenv("RESEARCHSENSEI_PAPER_SEARCH_COMMAND", "").strip()
     if configured:
         return _split_command(configured)
+    if _python_can_import_paper_search(sys.executable):
+        return [sys.executable, "-m", "paper_search_mcp.cli"]
+    venv_python = _project_venv_python()
+    if venv_python and _python_can_import_paper_search(str(venv_python)):
+        return [str(venv_python), "-m", "paper_search_mcp.cli"]
     return [sys.executable, "-m", "paper_search_mcp.cli"]
+
+
+def _project_venv_python() -> Path | None:
+    root = Path(__file__).resolve().parents[3]
+    candidates = [
+        root / ".venv" / "Scripts" / "python.exe",
+        root / ".venv" / "bin" / "python",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _python_can_import_paper_search(python_executable: str) -> bool:
+    try:
+        completed = subprocess.run(
+            [python_executable, "-c", "import paper_search_mcp.cli"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+    except Exception:
+        return False
+    return completed.returncode == 0
 
 
 def _split_command(command: str) -> list[str]:

@@ -360,6 +360,24 @@ def test_paper_search_mcp_adapter_maps_cli_json_to_candidates() -> None:
     assert paper.raw_source_metadata["categories"] == ["Computer science", "Artificial intelligence"]
 
 
+def test_paper_search_default_command_falls_back_to_project_venv(monkeypatch) -> None:
+    from researchsensei.acquisition import paper_search_mcp_adapter as adapter_module
+
+    monkeypatch.delenv("RESEARCHSENSEI_PAPER_SEARCH_COMMAND", raising=False)
+    monkeypatch.setattr(adapter_module.sys, "executable", "C:/missing/python.exe")
+    monkeypatch.setattr(adapter_module, "_project_venv_python", lambda: Path("D:/project/.venv/Scripts/python.exe"))
+    monkeypatch.setattr(
+        adapter_module,
+        "_python_can_import_paper_search",
+        lambda executable: str(executable).replace("\\", "/").endswith(".venv/Scripts/python.exe"),
+    )
+
+    command = adapter_module._default_command()
+
+    assert command[0].replace("\\", "/") == "D:/project/.venv/Scripts/python.exe"
+    assert command[1:] == ["-m", "paper_search_mcp.cli"]
+
+
 def test_paper_search_mcp_adapter_reports_cli_failure() -> None:
     def runner(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(args, 1, stdout="", stderr="source failed")

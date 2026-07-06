@@ -26,6 +26,51 @@ def test_parse_upload_markdown_creates_job_and_artifact(tmp_path: Path) -> None:
     assert isinstance(data["warnings"], list)
 
 
+def test_parse_upload_reuses_existing_job_for_same_content(tmp_path: Path) -> None:
+    client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
+    payload = b"# Paper\n## Abstract\nWe study anomaly detection."
+
+    first = client.post(
+        "/api/v1/documents/parse",
+        files={"file": ("paper.md", payload, "text/markdown")},
+    )
+    second = client.post(
+        "/api/v1/documents/parse",
+        files={"file": ("renamed.md", payload, "text/markdown")},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_data = first.json()
+    second_data = second.json()
+    assert second_data["status"] == "JOB_REUSED"
+    assert second_data["cache_hit"] is True
+    assert second_data["job_id"] == first_data["job_id"]
+    assert second_data["source_identity"] == first_data["source_identity"]
+
+
+def test_parse_local_path_reuses_existing_job_by_file_hash(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    source = workspace / "paper.md"
+    source.write_text("# Paper\n## Abstract\nA local cache test.", encoding="utf-8")
+    client = TestClient(create_app(workspace_root=workspace))
+
+    first = client.post("/api/v1/documents/parse", data={"local_path": str(source)})
+    second = client.post("/api/v1/documents/parse", data={"local_path": str(source)})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_data = first.json()
+    second_data = second.json()
+    assert second_data["status"] == "JOB_REUSED"
+    assert second_data["cache_hit"] is True
+    assert second_data["job_id"] == first_data["job_id"]
+    assert second_data["source_identity"] == first_data["source_identity"]
+    recent = client.get("/api/v1/jobs").json()["jobs"]
+    assert [job["job_id"] for job in recent].count(first_data["job_id"]) == 1
+
+
 def test_parse_upload_markdown_generates_phase6_artifacts(tmp_path: Path) -> None:
     client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
 
@@ -96,6 +141,33 @@ def test_parse_doi_resolves_legal_oa_pdf_and_creates_job(tmp_path: Path, monkeyp
     job = client.get(f"/api/v1/jobs/{data['job_id']}").json()
     assert any(artifact["artifact_type"] == "source_status" for artifact in job["artifacts"])
     assert any("api.unpaywall.org" in url for url in http_client.urls)
+
+
+def test_parse_doi_reuses_existing_job_before_unpaywall_lookup(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("UNPAYWALL_EMAIL", "test@example.org")
+    http_client = UnpaywallOaHttpClient(_sample_pdf_bytes())
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        http_client=http_client,
+        config_service=_isolated_config(tmp_path),
+    ))
+
+    first = client.post(
+        "/api/v1/documents/parse",
+        data={"title": "Example Paper", "doi": "10.1145/example"},
+    )
+    http_client.urls.clear()
+    second = client.post(
+        "/api/v1/documents/parse",
+        data={"title": "Example Paper", "doi": "10.1145/EXAMPLE"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["status"] == "JOB_REUSED"
+    assert second.json()["cache_hit"] is True
+    assert second.json()["job_id"] == first.json()["job_id"]
+    assert http_client.urls == []
 
 
 def test_parse_doi_without_oa_pdf_returns_source_status(tmp_path: Path, monkeypatch) -> None:

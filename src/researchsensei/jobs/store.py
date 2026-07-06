@@ -170,6 +170,7 @@ class JobStore:
             status=JobStatus(row["status"]),
             source_path=row["source_path"],
             run_dir=row["run_dir"],
+            source_identity=row["source_identity"] if "source_identity" in row.keys() else "",
             current_step=row["current_step"],
             error=row["error"],
             warnings=[WarningItem(**item) for item in json.loads(row["warnings"] or "[]")],

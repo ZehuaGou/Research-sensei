@@ -130,6 +130,14 @@ function mathLabelHtml(value: unknown) {
     return ''
   }
 }
+
+function detailItemCount() {
+  return (props.card.symbols?.length || 0) + (props.card.terms?.length || 0)
+}
+
+function shouldOpenTermDetails() {
+  return detailItemCount() <= 6
+}
 </script>
 
 <template>
@@ -148,27 +156,37 @@ function mathLabelHtml(value: unknown) {
       <code v-if="renderError" class="block whitespace-pre-wrap text-sm">{{ card.formula_latex || card.formula_raw }}</code>
     </div>
 
-    <section v-if="card.symbols?.length || card.terms?.length" class="term-grid">
-      <div v-if="card.symbols?.length" class="term-section-title">符号</div>
-      <div v-for="symbol in card.symbols || []" :key="symbol.symbol" class="term-item">
-        <strong class="term-label">
-          <span v-if="mathLabelHtml(symbol.symbol)" v-html="mathLabelHtml(symbol.symbol)"></span>
-          <span v-else>{{ symbol.symbol }}</span>
-        </strong>
-        <span class="term-copy">{{ symbol.meaning }}</span>
-      </div>
-      <div v-if="card.terms?.length" class="term-section-title">关键项</div>
-      <div v-for="term in card.terms || []" :key="term.term" class="term-item rich">
-        <strong class="term-label">
-          <span v-if="mathLabelHtml(term.term)" v-html="mathLabelHtml(term.term)"></span>
-          <span v-else>{{ term.term }}</span>
-        </strong>
-        <div class="term-copy">
-          <span>{{ term.meaning }}</span>
-          <small v-for="detail in termDetail(term)" :key="detail">{{ detail }}</small>
+    <details
+      v-if="card.symbols?.length || card.terms?.length"
+      class="term-details"
+      :open="shouldOpenTermDetails()"
+    >
+      <summary>
+        <strong>符号与关键项</strong>
+        <span>{{ detailItemCount() }}</span>
+      </summary>
+      <section class="term-grid">
+        <div v-if="card.symbols?.length" class="term-section-title">符号</div>
+        <div v-for="symbol in card.symbols || []" :key="symbol.symbol" class="term-item">
+          <strong class="term-label">
+            <span v-if="mathLabelHtml(symbol.symbol)" v-html="mathLabelHtml(symbol.symbol)"></span>
+            <span v-else>{{ symbol.symbol }}</span>
+          </strong>
+          <span class="term-copy">{{ symbol.meaning }}</span>
         </div>
-      </div>
-    </section>
+        <div v-if="card.terms?.length" class="term-section-title">关键项</div>
+        <div v-for="term in card.terms || []" :key="term.term" class="term-item rich">
+          <strong class="term-label">
+            <span v-if="mathLabelHtml(term.term)" v-html="mathLabelHtml(term.term)"></span>
+            <span v-else>{{ term.term }}</span>
+          </strong>
+          <div class="term-copy">
+            <span>{{ term.meaning }}</span>
+            <small v-for="detail in termDetail(term)" :key="detail">{{ detail }}</small>
+          </div>
+        </div>
+      </section>
+    </details>
 
     <section class="formula-explain">
       <div>
@@ -231,7 +249,7 @@ h2 {
   margin: 14px 0 0;
   color: var(--text-primary);
   font-size: 20px;
-  line-height: 1.6;
+  line-height: 1.55;
   overflow-wrap: anywhere;
 }
 
@@ -240,7 +258,7 @@ h2 {
   overflow-x: auto;
   max-width: calc(100% - 40px);
   border-radius: 10px;
-  padding: 15px;
+  padding: 16px;
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
@@ -249,24 +267,50 @@ h2 {
   white-space: pre-wrap;
   color: var(--text-secondary);
   font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.7;
   overflow-wrap: anywhere;
+}
+
+.term-details {
+  margin: 0 20px 18px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-card);
+}
+
+.term-details summary {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 13px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+  user-select: none;
+}
+
+.term-details summary span {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .term-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 1px;
-  margin: 0 20px 18px;
+  margin: 0;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
+  border-top: 1px solid var(--border-subtle);
   background: var(--border-subtle);
 }
 
 .term-section-title {
-  padding: 7px 12px;
+  padding: 8px 12px;
   background: var(--bg-secondary);
   color: var(--text-muted);
   font-size: 12px;
@@ -275,11 +319,11 @@ h2 {
 
 .term-item {
   display: grid;
-  grid-template-columns: minmax(92px, 0.32fr) minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 0.32fr) minmax(0, 1fr);
   min-width: 0;
   align-items: start;
   gap: 10px;
-  padding: 9px 12px;
+  padding: 10px 12px;
   background: var(--bg-card);
   color: var(--text-secondary);
 }
@@ -292,7 +336,7 @@ h2 {
   padding: 3px 5px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.5;
   white-space: nowrap;
 }
@@ -314,7 +358,7 @@ h2 {
   gap: 3px;
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.58;
 }
 
 .term-copy small {
@@ -332,7 +376,7 @@ h2 {
 
 .formula-explain > div {
   border-radius: 8px;
-  padding: 11px 12px;
+  padding: 12px;
   background: var(--bg-secondary);
 }
 
@@ -346,11 +390,12 @@ h2 {
 .formula-explain p {
   color: var(--text-secondary);
   font-size: 14px;
-  line-height: 1.75;
+  line-height: 1.72;
 }
 
 footer {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-subtle);

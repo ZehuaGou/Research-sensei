@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import sqlite3
@@ -168,7 +169,14 @@ def create_app(
                 original_filename=file.filename,
                 content_type=file.content_type or "",
             )
-            source_identity = (arxiv_id or doi or "").strip()
+            source_identity = _request_source_identity(
+                doi=doi,
+                arxiv_id=arxiv_id,
+                arxiv_url=arxiv_url,
+            ) or _path_cache_identity(str(incoming_path))
+            existing = jobs.find_by_source_identity(source_identity)
+            if existing is not None:
+                return _existing_job_response(existing, source_identity)
             job = await run_in_threadpool(
                 runner.run,
                 source_status.resolved_path,
@@ -188,6 +196,17 @@ def create_app(
             )
             if m2_artifact_job is not None:
                 return _job_parse_response(m2_artifact_job)
+
+        request_identity = _request_source_identity(
+            doi=doi,
+            pdf_url=pdf_url,
+            arxiv_id=arxiv_id,
+            arxiv_url=arxiv_url,
+        )
+        if request_identity:
+            existing = jobs.find_by_source_identity(request_identity)
+            if existing is not None:
+                return _existing_job_response(existing, request_identity)
 
         if doi.strip() and not any(value.strip() for value in [local_path, pdf_url, arxiv_id, arxiv_url]):
             resolved_pdf_url, resolve_error = _resolve_doi_to_legal_pdf(
@@ -217,6 +236,11 @@ def create_app(
                     },
                 )
 
+        request_identity = request_identity or _request_source_identity(
+            pdf_url=pdf_url,
+            arxiv_id=arxiv_id,
+            arxiv_url=arxiv_url,
+        )
         source_status = _resolve_source(
             resolver=resolver,
             run_dir=run_dir,
@@ -237,11 +261,17 @@ def create_app(
                 },
             )
 
+        source_identity = _source_status_identity(source_status, request_identity)
+        existing = jobs.find_by_source_identity(source_identity)
+        if existing is not None:
+            return _existing_job_response(existing, source_identity)
+
         job = await run_in_threadpool(
             runner.run,
             source_status.resolved_path,
             job_id=job_id,
             source_status=source_status,
+            source_identity=source_identity,
         )
         return _job_parse_response(job)
 
@@ -506,8 +536,14 @@ def create_app(
         candidate = _direction_candidate_payload(payload)
         title, doi, pdf_url, arxiv_id, arxiv_url = _direction_handoff_inputs(candidate)
 
-        # Compute source identity for job dedup: arxiv_id first, then doi
-        source_identity = (arxiv_id or doi or "").strip()
+        # Compute source identity for job dedup: arXiv/DOI/pdf URL first, then
+        # resolved file hash after source resolution.
+        source_identity = _request_source_identity(
+            doi=doi,
+            pdf_url=pdf_url,
+            arxiv_id=arxiv_id,
+            arxiv_url=arxiv_url,
+        )
 
         # Check for existing SUCCEEDED job for the same paper
         if source_identity:
@@ -565,11 +601,17 @@ def create_app(
                 detail=_direction_handoff_failure(job, source_status),
             )
 
+        source_identity = _source_status_identity(source_status, source_identity)
+        existing = jobs.find_by_source_identity(source_identity)
+        if existing is not None:
+            return _existing_job_response(existing, source_identity)
+
         job = await run_in_threadpool(
             runner.run,
             source_status.resolved_path,
             job_id=job_id,
             source_status=source_status,
+            source_identity=source_identity,
         )
         if job.status == JobStatus.FAILED:
             raise HTTPException(
@@ -1509,6 +1551,73 @@ def _resolve_source(
     return resolver.resolve_arxiv_url(arxiv_url.strip(), run_dir)
 
 
+def _request_source_identity(
+    *,
+    doi: str = "",
+    local_path: str = "",
+    pdf_url: str = "",
+    arxiv_id: str = "",
+    arxiv_url: str = "",
+) -> str:
+    if arxiv_id.strip():
+        return f"arxiv:{_normalize_arxiv_id(arxiv_id)}"
+    if arxiv_url.strip():
+        extracted = _extract_arxiv_id(arxiv_url)
+        return f"arxiv:{extracted}" if extracted else f"arxiv_url:{arxiv_url.strip()}"
+    if doi.strip():
+        return f"doi:{doi.strip().lower()}"
+    if pdf_url.strip():
+        return f"pdf_url:{pdf_url.strip()}"
+    if local_path.strip():
+        return _path_cache_identity(local_path.strip())
+    return ""
+
+
+def _source_status_identity(source_status: SourceStatus, fallback: str = "") -> str:
+    if fallback:
+        return fallback
+    status = source_status.model_dump(mode="json")
+    original = str(status.get("original_input") or "")
+    resolved = str(status.get("resolved_path") or "")
+    source_type = str(status.get("source_type") or "")
+    if source_type in {"arxiv_id", "arxiv_pdf", "arxiv_source", "arxiv_url"} and original:
+        extracted = _extract_arxiv_id(original)
+        return f"arxiv:{extracted}" if extracted else f"{source_type}:{original}"
+    if source_type == "doi" and original:
+        return f"doi:{original.lower()}"
+    if source_type == "pdf_url" and original:
+        return f"pdf_url:{original}"
+    if resolved:
+        return _path_cache_identity(resolved)
+    return ""
+
+
+def _path_cache_identity(path_text: str) -> str:
+    try:
+        path = Path(path_text).resolve(strict=True)
+    except OSError:
+        return f"local_path:{path_text}"
+    if path.is_file():
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return f"sha256:{digest.hexdigest()}"
+    return f"local_path:{str(path).lower()}"
+
+
+def _normalize_arxiv_id(value: str) -> str:
+    return value.strip().lower().removeprefix("arxiv:").strip()
+
+
+def _extract_arxiv_id(value: str) -> str:
+    text = value.strip()
+    match = re.search(r"arxiv\.org/(?:abs|pdf)/([^?#/]+)", text, flags=re.I)
+    if match:
+        return _normalize_arxiv_id(match.group(1).removesuffix(".pdf"))
+    return _normalize_arxiv_id(text)
+
+
 def _record_failed_source_job(
     workspace: WorkspaceStore,
     jobs: JobStore,
@@ -1538,6 +1647,8 @@ def _existing_job_response(job: JobRecord, source_identity: str) -> dict[str, ob
         **_job_parse_response(job),
         "status": "JOB_REUSED",
         "handoff_status": "JOB_REUSED",
+        "cache_hit": True,
+        "source_identity": source_identity,
     }
     if understanding_status:
         response["understanding_status"] = understanding_status
@@ -1551,6 +1662,7 @@ def _job_parse_response(job: JobRecord) -> dict[str, object]:
         "job_id": job.job_id,
         "status": job.status.value,
         "current_step": job.current_step,
+        "source_identity": job.source_identity,
         "artifacts": [artifact.model_dump(mode="json") for artifact in job.artifacts],
         "warnings": [warning.model_dump(mode="json") for warning in job.warnings],
         "degraded": job.current_step == "ingestion_degraded",
@@ -1563,6 +1675,7 @@ def _job_response(job: JobRecord) -> dict[str, object]:
         "status": job.status.value,
         "source_path": job.source_path,
         "run_dir": job.run_dir,
+        "source_identity": job.source_identity,
         "current_step": job.current_step,
         "error": job.error,
         "warnings": [warning.model_dump(mode="json") for warning in job.warnings],

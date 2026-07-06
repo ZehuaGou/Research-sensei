@@ -941,7 +941,7 @@ def test_single_paper_uses_all_formula_evidence_pack_for_formula_cards(tmp_path:
 
     formula_cards = cards["formula_cards"].formula_cards
     assert status.status == "SUCCESS"
-    assert [len(batch) for batch in client.formula_prompt_refs] == [3, 3, 1]
+    assert [len(batch) for batch in client.formula_prompt_refs] == [7]
     assert len(formula_cards) == 7
     assert {card.formula_id for card in formula_cards} == {f"formula_{i:03d}" for i in range(1, 8)}
     assert all(card.coverage_status == "LLM_EXPLAINED" for card in formula_cards)

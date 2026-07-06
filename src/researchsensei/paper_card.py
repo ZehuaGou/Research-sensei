@@ -4,7 +4,11 @@ import re
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
-from researchsensei.llm.runtime_config import card_timeout_seconds
+from researchsensei.llm.runtime_config import (
+    card_max_retries,
+    card_retry_delay_seconds,
+    card_timeout_seconds,
+)
 from researchsensei.llm.types import LLMConfig
 from researchsensei.llm.validator import validate_paper_card_llm_output
 from researchsensei.schemas import (
@@ -72,9 +76,9 @@ async def build_paper_card(
         temperature=0.2,
         max_tokens=12000,
         json_mode=True,
-        timeout=card_timeout_seconds(300.0),
-        max_retries=1,
-        retry_delay=1.0,
+        timeout=card_timeout_seconds(75.0),
+        max_retries=card_max_retries(0),
+        retry_delay=card_retry_delay_seconds(0.5),
         disable_thinking=True,
     )
     try:
