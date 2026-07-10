@@ -152,6 +152,7 @@ class M4InteractionService:
     def answer_question(self, payload: dict[str, object]) -> InteractiveAnswer:
         question = _compact_user_text(payload.get("question") or payload.get("user_question"), max_chars=1200)
         selected_text = _compact_user_text(payload.get("selected_text"), max_chars=2000)
+        conversation_history = _conversation_history(payload.get("conversation_history"))
         if not question and selected_text:
             question = f"请解释这段内容：{selected_text}"
         if not question:
@@ -198,11 +199,13 @@ class M4InteractionService:
         memory_hit = self._memory_hit(question=question, selected_text=selected_text)
         if (
             memory_hit is not None
+            and self.llm_client is None
             and not is_formula_question
             and not _looks_like_english_answer(memory_hit.answer)
             and not _is_low_quality_memory_answer(memory_hit)
             and not _is_too_thin_paper_level_memory_answer(memory_hit, question)
             and not _answer_exposes_internal_refs(memory_hit.answer)
+            and not _looks_like_mojibake_answer(memory_hit.answer)
             and not _memory_conflicts_with_paper_intent(memory_hit, question)
         ):
             return InteractiveAnswer(
@@ -233,22 +236,30 @@ class M4InteractionService:
             seed_refs=evidence_refs,
         )
         used_context = {"memory": False, "artifacts": True, "llm": False}
-        llm_result = self._answer_with_llm(
+        llm_result = self._answer_with_freeform_llm(
             question=question,
             selected_text=selected_text,
             fallback_answer=answer,
             allowed_evidence_refs=llm_evidence_refs or evidence_refs,
+            conversation_history=conversation_history,
         )
-        if llm_result is not None:
+        if llm_result.get("ok"):
             answer = llm_result["answer"]
             evidence_refs = llm_result["evidence_refs"]
             used_context = {"memory": False, "artifacts": True, "llm": True}
             confidence = max(confidence, float(llm_result.get("confidence", 0.0)))
-        elif self.llm_client is not None and evidence_refs:
-            warnings = [
-                *warnings,
-                _warning("M4_LLM_FALLBACK", "大模型回答不可用或没有通过证据校验，已改用卡片证据回答。"),
-            ]
+        elif self.llm_client is not None:
+            code = str(llm_result.get("code") or "M4_LLM_FAILED")
+            message = str(llm_result.get("message") or "LLM did not return a usable answer.")
+            return InteractiveAnswer(
+                status="DEGRADED",
+                answer=_llm_failure_answer(code=code, message=message),
+                evidence_refs=llm_evidence_refs or evidence_refs,
+                uncertainty="M4 已经拿到论文上下文，但 LLM 没有返回可用解释；本次没有改用本地兜底答案。",
+                follow_up_suggestions=_follow_ups(),
+                used_context={"memory": False, "artifacts": bool(llm_evidence_refs or evidence_refs), "llm": False},
+                warnings=[*warnings, _warning(code, message)],
+            )
 
         status = "SUCCESS" if evidence_refs else "DEGRADED"
         result = InteractiveAnswer(
@@ -410,9 +421,15 @@ class M4InteractionService:
         question: str,
         selected_text: str,
         seed_refs: list[str],
-        limit: int = 6,
+        limit: int = 8,
     ) -> list[str]:
-        refs = list(seed_refs)
+        refs = _unique(seed_refs)
+        if _should_include_formula_context(question, selected_text):
+            for ref in self._formula_card_refs(limit=5):
+                if ref not in refs:
+                    refs.append(ref)
+                if len(refs) >= limit:
+                    break
         query = f"{question} {selected_text}".strip()
         for candidate, score in self._ranked_evidence_candidates(query):
             ref = _clean(candidate.get("evidence_ref"))
@@ -426,6 +443,93 @@ class M4InteractionService:
         if not refs:
             refs.extend(self._paper_card_refs())
         return _unique(refs)[:limit]
+
+    def _answer_with_freeform_llm(
+        self,
+        *,
+        question: str,
+        selected_text: str,
+        fallback_answer: str,
+        allowed_evidence_refs: list[str],
+        conversation_history: list[dict[str, str]],
+    ) -> dict[str, object]:
+        if self.llm_client is None:
+            return _llm_error_result("M4_LLM_DISABLED", "当前没有启用 M4 LLM 客户端。")
+        if not allowed_evidence_refs:
+            return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的论文证据引用。")
+
+        allowed = set(allowed_evidence_refs)
+        context = {
+            "paper": self._paper_overview_context(),
+            "retrieved_evidence": self._llm_context(allowed),
+            "recent_memory": self._memory_context(),
+            "conversation_history": conversation_history[-10:],
+            "allowed_evidence_refs": allowed_evidence_refs,
+        }
+        if not context["paper"] and not context["retrieved_evidence"]:
+            return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的论文上下文。")
+
+        user_prompt = (
+            "你正在回答当前论文的深读问题。下面是论文上下文、检索到的证据、最近对话和用户问题。\n"
+            "请直接用简体中文自然回答，不要输出 JSON，不要复述内部 evidence_ref，不要把 LaTeX 源码整段抄给用户。\n"
+            "如果问题要求例子，就给一个具体输入、步骤和输出的例子；如果问题问解决了什么问题，就先说清楚具体任务和困难。\n"
+            "如果回答涉及公式、阈值或数值例子，必须优先使用 context 里的 formula_cards 或 claim_evidence 公式，不要把论文公式替换成外部通用规则。\n"
+            "尤其不要把论文的阈值判断改写成 μ+3σ、均值加标准差或其他上下文没有出现的启发式阈值。\n"
+            "如果上下文不足以回答某个细节，请明确说缺少哪类证据，不要编。\n\n"
+            f"用户问题：{_compact_user_text(question, max_chars=900)}\n"
+            f"用户选中文本：{_compact_user_text(selected_text, max_chars=900) or '无'}\n"
+            f"后端本地检索草稿（只作为线索，可纠正，不要照抄）：{_normalize_answer_text(fallback_answer, max_chars=900)}\n\n"
+            "论文上下文：\n"
+            f"{json.dumps(context, ensure_ascii=False, indent=2)}"
+        )
+        messages = [
+            ChatMessage(
+                role="system",
+                content=(
+                    "你是 ResearchSensei 的 M4 论文助教。你的任务是基于当前论文上下文回答用户的深读问题。"
+                    "回答要像真实助教：先直接回答，再解释机制、变量、证据边界和例子。"
+                    "不要机械套模板，不要输出 JSON，不要暴露 evidence_ref、memory_ref、job id 等内部编号。"
+                    "公式问题要解释符号含义和作用，不要只翻译 LaTeX。"
+                    "举例时可以使用玩具数字，但计算规则必须来自论文上下文；不要引入 μ+3σ、均值加标准差等上下文没有的外部规则。"
+                ),
+            ),
+            ChatMessage(role="user", content=user_prompt),
+        ]
+        try:
+            response = _run_async_llm(
+                self.llm_client.chat(
+                    messages,
+                    config=LLMConfig(
+                        temperature=0.25,
+                        max_tokens=5000,
+                        json_mode=False,
+                        timeout=150,
+                        max_retries=1,
+                        retry_delay=1.0,
+                        disable_thinking=True,
+                    ),
+                )
+            )
+        except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
+            return _llm_error_result("M4_LLM_REQUEST_FAILED", _compact_user_text(str(exc), max_chars=800))
+
+        answer = _soften_mechanical_answer(
+            _strip_internal_refs_from_answer(_normalize_answer_text(response.content, max_chars=2600))
+        )
+        if not answer:
+            return _llm_error_result("M4_LLM_EMPTY", "LLM 返回了空内容。")
+        if _looks_like_english_answer(answer):
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回了英文占比过高的回答。")
+        if _looks_like_thin_llm_answer(answer):
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回的回答过于空泛。")
+        if _should_reject_llm_answer_for_question(question, answer, context=context):
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 回答没有满足当前问题的证据约束或具体性要求。")
+        return {
+            "ok": True,
+            "answer": answer,
+            "evidence_refs": _unique(allowed_evidence_refs)[:8],
+            "confidence": 0.88,
+        }
 
     def _answer_with_llm(
         self,
@@ -455,6 +559,8 @@ class M4InteractionService:
                 "理论类和公式类问题必须按“直觉-对象-逻辑链-证据边界”讲：先用一句话说明它在解决什么困惑，再解释每个对象是什么，最后说明为什么这一步有用。",
                 "回答要像真实助教：先直接回答问题，不要用“可以这样理解”“这段内容说明了”这类空泛开场。",
                 "如果 question 在问“为什么/怎么/能不能”，answer 必须给出因果链：论文要解决的障碍是什么、方法做了哪一步、这一步为什么能回应障碍。",
+                "如果 question 要求“举例子/详细说明/example”，answer 必须给一个明确玩具例子，包含具体输入、步骤和输出；不要只复述论文流程。",
+                "如果 question 问“解决了什么问题”，先用一句话说清楚具体任务和困难，再讲方法怎样解决，避免只说抽象贡献。",
                 "每个段落至少落到一个具体对象，例如变量、模块、训练项、数据集、指标、约束或论文中的方法步骤。",
                 "解释公式时，如果 context 里有参数/符号或关键项，必须单独讲清楚它们各自的作用。",
                 "不要固定使用“重点：”“问题：”“核心机制：”“对应证据：”这类标题式模板；更像助教自然讲解，可以用短自然段和顺口的承接句。",
@@ -535,6 +641,16 @@ class M4InteractionService:
             for candidate, score in self._ranked_evidence_candidates(question)
             if score >= 0.08 and not _is_front_matter_candidate(candidate)
         ][:3]
+        if _question_wants_example(question):
+            answer = _example_driven_paper_answer(paper_card, question=question, evidence_rows=ranked_evidence)
+            refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
+            if answer and refs:
+                return answer, refs[:4], 0.82, []
+        if _is_problem_solution_question(question):
+            answer = _problem_solution_answer(paper_card, question=question, evidence_rows=ranked_evidence)
+            refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
+            if answer and refs:
+                return answer, refs[:4], 0.84, []
         if _is_limitation_question(question) and not _claim_text(paper_card.get("limitations")):
             refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
             return (
@@ -634,6 +750,51 @@ class M4InteractionService:
         warnings = [] if evidence_ref else [_warning("FORMULA_EVIDENCE_MISSING", "这张公式卡片没有 evidence_ref。")]
         return _formula_full_explanation(formula), _list_of_one(evidence_ref), 0.84 if evidence_ref else 0.35, warnings
 
+    def _paper_overview_context(self) -> dict[str, object]:
+        paper_card = _as_dict(self.artifacts.get("paper_card"))
+        overview: dict[str, object] = {}
+        for key in [
+            "title",
+            "one_sentence_summary",
+            "thirty_second",
+            "problem",
+            "core_idea",
+            "method_overview",
+            "experiment_summary",
+            "limitations",
+            "background",
+            "bottleneck",
+        ]:
+            value = paper_card.get(key)
+            if isinstance(value, dict):
+                text = _claim_text(value)
+                if text:
+                    overview[key] = {
+                        "text": _compact_user_text(text, max_chars=1000),
+                        "evidence_ref": _claim_ref(value),
+                    }
+            else:
+                text = _clean(value)
+                if text:
+                    overview[key] = _compact_user_text(text, max_chars=1000)
+        return overview
+
+    def _memory_context(self, limit: int = 4) -> list[dict[str, object]]:
+        rows: list[dict[str, object]] = []
+        for record in reversed(self._read_memory().records):
+            if record.memory_type != "interactive_answer":
+                continue
+            if _is_low_quality_memory_answer(record) or _looks_like_mojibake_answer(record.answer):
+                continue
+            rows.append({
+                "question": _compact_user_text(record.question, max_chars=500),
+                "answer": _compact_user_text(record.answer, max_chars=800),
+                "evidence_refs": record.evidence_refs[:4],
+            })
+            if len(rows) >= limit:
+                break
+        return rows
+
     def _llm_context(self, allowed_refs: set[str]) -> list[dict[str, str]]:
         rows: list[dict[str, str]] = []
         paper_card = _as_dict(self.artifacts.get("paper_card"))
@@ -669,6 +830,21 @@ class M4InteractionService:
             if len(unique_rows) >= 8:
                 break
         return unique_rows
+
+    def _formula_card_refs(self, limit: int = 5) -> list[str]:
+        refs: list[str] = []
+        formulas = _as_dict(self.artifacts.get("formula_cards")).get("formula_cards", [])
+        if not isinstance(formulas, list):
+            return refs
+        for formula in formulas:
+            if not isinstance(formula, dict):
+                continue
+            ref = _clean(formula.get("evidence_ref"))
+            if ref:
+                refs.append(ref)
+            if len(_unique(refs)) >= limit:
+                break
+        return _unique(refs)[:limit]
 
     def _best_evidence(self, text: str) -> dict[str, object]:
         candidates = self._evidence_candidates()
@@ -888,6 +1064,34 @@ def _paper_claims(paper_card: dict[str, object]) -> list[tuple[str, object]]:
     return [(field, paper_card.get(field)) for field in fields if paper_card.get(field)]
 
 
+def _conversation_history(value: object) -> list[dict[str, str]]:
+    if not isinstance(value, list):
+        return []
+    history: list[dict[str, str]] = []
+    for item in value[-12:]:
+        if not isinstance(item, dict):
+            continue
+        role = _clean(item.get("role")).lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = _compact_user_text(item.get("content"), max_chars=1200)
+        if content:
+            history.append({"role": role, "content": content})
+    return history
+
+
+def _llm_error_result(code: str, message: str) -> dict[str, object]:
+    return {"ok": False, "code": code, "message": message}
+
+
+def _llm_failure_answer(*, code: str, message: str) -> str:
+    return (
+        "M4 这次没有拿到可用的大模型解释，所以没有改用本地卡片兜底。\n\n"
+        f"失败原因：{code}。{message}\n\n"
+        "你可以先点“新对话/清空记忆”清掉这篇论文的 M4 记忆；如果是公式卡片解析失败，建议重新解析论文，让公式卡片重新走一次 LLM。"
+    )
+
+
 def _run_async_llm(coro):
     try:
         asyncio.get_running_loop()
@@ -1096,6 +1300,88 @@ def _structured_paper_answer(
     if evidence_lines:
         parts.append("更完整的证据边界是：" + "；".join(evidence_lines))
     return "\n\n".join(parts)
+
+
+def _problem_solution_answer(
+    paper_card: dict[str, object],
+    *,
+    question: str,
+    evidence_rows: list[dict[str, object]] | None = None,
+) -> str:
+    problem = _teach_phrase(_claim_text(paper_card.get("problem")))
+    idea = _teach_phrase(_claim_text(paper_card.get("core_idea")))
+    method = _teach_phrase(_claim_text(paper_card.get("method_overview")))
+    experiment = _teach_phrase(_claim_text(paper_card.get("experiment_summary")))
+    summary = _teach_phrase(_clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second")))
+    if not any([problem, idea, method, summary]):
+        return ""
+
+    lead_target = problem or summary
+    parts = [f"它解决的不是一个泛泛的“效果提升”问题，而是：{lead_target}"]
+    if method:
+        parts.append(f"它的解法可以抓成一条线：{method}")
+    elif idea:
+        parts.append(f"它的核心想法是：{idea}")
+    if problem and (method or idea):
+        mechanism = method or idea
+        parts.append(
+            f"这条线能回应问题，是因为它把“{_strip_terminal_punctuation(problem)}”"
+            f"转成了“{_strip_terminal_punctuation(mechanism)}”这样可执行的步骤。"
+        )
+    if experiment:
+        parts.append(f"论文给出的效果依据是：{experiment}")
+    focused = _focused_evidence_lines(evidence_rows)
+    if focused:
+        parts.append("能追到的正文依据包括：" + "；".join(focused[:2]))
+    return "\n\n".join(parts)
+
+
+def _example_driven_paper_answer(
+    paper_card: dict[str, object],
+    *,
+    question: str,
+    evidence_rows: list[dict[str, object]] | None = None,
+) -> str:
+    text = " ".join(
+        _clean(value)
+        for value in [
+            _claim_text(paper_card.get("problem")),
+            _claim_text(paper_card.get("core_idea")),
+            _claim_text(paper_card.get("method_overview")),
+            _claim_text(paper_card.get("experiment_summary")),
+            _clean(paper_card.get("one_sentence_summary")),
+        ]
+    ).lower()
+    if any(marker in text for marker in ["time series", "anomaly", "spectral", "fourier", "fft", "时间序列", "异常", "傅里叶", "谱残差"]):
+        parts = [
+            "举个小例子：假设服务器某个指标连续是 [10, 11, 10, 60, 11]。肉眼看 60 很突兀，但算法不能靠肉眼，它要把每个时间点自动标成正常或异常。",
+            "这篇论文的做法可以理解为：先把序列做傅里叶变换，得到幅度谱和相位谱；再用平均滤波器估计“普通背景谱”；把原始对数幅度减去背景谱，得到谱残差；最后逆变换回时间轴，60 附近会得到更高的显著性分数。",
+            "最后用论文自己的阈值公式判断：把某点显著性减去它的局部平均显著性，再除以局部平均显著性；如果这个相对偏离超过阈值 τ，就输出 1 表示异常，否则输出 0。这个例子是教学用的玩具数字，不是论文实验数据。",
+        ]
+    else:
+        problem = _teach_phrase(_claim_text(paper_card.get("problem"))) or "论文要处理的任务"
+        method = _teach_phrase(_claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))) or "论文提出的方法"
+        parts = [
+            f"举个简化例子：先把任务想成一个具体场景，里面的困难是“{problem}”。",
+            f"论文方法做的事是“{method}”。也就是说，它不是直接给结论，而是把原问题拆成一个可执行的中间步骤，再用这个步骤产生判断。",
+            "如果要自己复述，可以按三句讲：输入是什么、方法先算什么中间量、这个中间量怎样帮助输出最终判断。这个例子用于理解机制，不等同于论文原始实验。",
+        ]
+    focused = _focused_evidence_lines(evidence_rows)
+    if focused:
+        parts.append("对应到正文证据，能看到：" + "；".join(focused[:2]))
+    return "\n\n".join(parts)
+
+
+def _focused_evidence_lines(evidence_rows: list[dict[str, object]] | None) -> list[str]:
+    focused: list[str] = []
+    seen: set[str] = set()
+    for candidate in evidence_rows or []:
+        rendered = _candidate_user_facing_evidence(candidate)
+        key = _normalize(rendered)
+        if rendered and key not in seen:
+            focused.append(rendered)
+            seen.add(key)
+    return focused
 
 
 def _formula_context_text(formula: dict[str, object]) -> str:
@@ -1432,6 +1718,129 @@ def _looks_like_thin_llm_answer(value: str) -> bool:
         "没有足够上下文",
     ]
     return any(marker in text for marker in thin_markers)
+
+
+def _should_reject_llm_answer_for_question(
+    question: str,
+    answer: str,
+    *,
+    context: dict[str, object] | None = None,
+) -> bool:
+    if _looks_like_mojibake_answer(answer):
+        return True
+    if _uses_unsupported_external_threshold_rule(answer, context=context):
+        return True
+    if _question_wants_example(question) and not _answer_has_concrete_example(answer):
+        return True
+    if _is_problem_solution_question(question) and _answer_too_abstract_for_problem(answer):
+        return True
+    return False
+
+
+def _should_include_formula_context(question: str, selected_text: str) -> bool:
+    text = f"{question} {selected_text}".lower()
+    compact = re.sub(r"\s+", "", text)
+    return (
+        _question_wants_example(text)
+        or _is_formula_question(question, selected_text)
+        or any(marker in compact for marker in ["公式", "阈值", "变量", "机制", "方法", "怎么算", "如何判断", "example", "threshold"])
+    )
+
+
+def _uses_unsupported_external_threshold_rule(
+    answer: str,
+    *,
+    context: dict[str, object] | None = None,
+) -> bool:
+    answer_text = _normalize_math_text(answer)
+    if not _has_external_threshold_marker(answer_text):
+        return False
+    context_text = _normalize_math_text(json.dumps(context or {}, ensure_ascii=False))
+    return not _has_external_threshold_marker(context_text)
+
+
+def _has_external_threshold_marker(text: str) -> bool:
+    markers = [
+        "μ+3σ",
+        "mean+3标准差",
+        "均值加3倍标准差",
+        "平均值加3倍标准差",
+        "三倍标准差",
+        "3σ",
+    ]
+    if any(marker in text for marker in markers):
+        return True
+    return bool(re.search(r"(?:μ|mu|mean|均值|平均值).{0,8}3(?:倍)?.{0,4}(?:σ|标准差)", text))
+
+
+def _normalize_math_text(value: object) -> str:
+    text = _clean(value).lower()
+    replacements = {
+        "µ": "μ",
+        "mu": "μ",
+        "sigma": "σ",
+        "\\sigma": "σ",
+        "std": "标准差",
+        "standarddeviation": "标准差",
+    }
+    for source, target in replacements.items():
+        text = text.replace(source, target)
+    return re.sub(r"[\s_{}()（）\\]+", "", text)
+
+
+def _question_wants_example(question: str) -> bool:
+    text = question.lower()
+    return any(marker in text for marker in ["举例", "例子", "示例", "详细说明", "具体说明", "example", "concrete"])
+
+
+def _answer_has_concrete_example(answer: str) -> bool:
+    text = _clean(answer)
+    if not any(marker in text for marker in ["例如", "比如", "假设", "举个", "例子", "输入", "输出", "序列"]):
+        return False
+    has_number_or_formula_step = bool(re.search(r"\d|=|>|<|\[[^\]]+\]", text))
+    has_step_marker = any(marker in text for marker in ["第一", "先", "再", "最后", "步骤", "得到", "输出"])
+    return has_number_or_formula_step and has_step_marker
+
+
+def _is_problem_solution_question(question: str) -> bool:
+    text = question.lower()
+    compact = re.sub(r"\s+", "", text)
+    return any(marker in compact for marker in ["解决什么问题", "解决了什么问题", "问题是什么", "要解决什么", "solve", "problem"])
+
+
+def _answer_too_abstract_for_problem(answer: str) -> bool:
+    text = _clean(answer)
+    if len(text) < 120:
+        return True
+    concrete_markers = [
+        "时间序列",
+        "异常",
+        "傅里叶",
+        "FFT",
+        "谱",
+        "阈值",
+        "数据集",
+        "实验",
+        "指标",
+        "attention",
+        "retrieval",
+        "变量",
+        "公式",
+        "训练",
+        "模型",
+    ]
+    return not any(marker.lower() in text.lower() for marker in concrete_markers)
+
+
+def _looks_like_mojibake_answer(value: str) -> bool:
+    text = _clean(value)
+    if not text:
+        return False
+    markers = [chr(codepoint) for codepoint in (0x6D93, 0x9359, 0x93B4, 0x951B, 0x7ECB, 0x9225, 0x20AC)]
+    markers.append(chr(0x4FD3) + "n")
+    hit_count = sum(text.count(marker) for marker in markers)
+    chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    return hit_count >= 4 and hit_count > max(3, chinese_chars // 12)
 
 
 def _is_general_chat_question(question: str) -> bool:

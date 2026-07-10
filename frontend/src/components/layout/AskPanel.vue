@@ -11,6 +11,8 @@ const memoryCount = ref(0)
 const advisorAnswer = ref('')
 const advisorSession = ref<AdvisorSession | null>(null)
 const mode = ref<AskMode>('paper')
+const fontStorageKey = 'researchsensei.m4.fontSize'
+const fontSize = ref(initialM4FontSize())
 
 type AskMode = 'paper' | 'evidence' | 'advisor'
 
@@ -37,6 +39,10 @@ const submitLabel = computed(() => {
   if (mode.value === 'advisor') return '生成追问'
   return '发送'
 })
+
+const askPanelStyle = computed<Record<string, string>>(() => ({
+  '--m4-font-size': `${fontSize.value}px`,
+}))
 
 type AdvisorSession = {
   question: string
@@ -100,6 +106,16 @@ function compactInlineText(value: string) {
     .replace(/\s+([,.;:，。；：、）\]\}])/g, '$1')
     .replace(/([（\[\{])\s+/g, '$1')
     .trim()
+}
+
+function initialM4FontSize() {
+  if (typeof localStorage === 'undefined') return 14
+  const saved = Number(localStorage.getItem(fontStorageKey))
+  return Number.isFinite(saved) ? Math.min(Math.max(saved, 13), 18) : 14
+}
+
+function setFontSize(nextSize: number) {
+  fontSize.value = Math.min(Math.max(nextSize, 13), 18)
 }
 
 function clipText(value: string, maxLength: number) {
@@ -202,6 +218,16 @@ function stringList(value: unknown) {
     : []
 }
 
+function conversationHistoryPayload(limit = 10) {
+  return store.chatHistory
+    .slice(-limit)
+    .map(message => ({
+      role: message.role,
+      content: clipText(message.content, 1200),
+    }))
+    .filter(message => message.content.length > 0)
+}
+
 function advisorPromptText(session: AdvisorSession) {
   const focus = session.userQuestion ? `围绕你的问题：${session.userQuestion}\n\n` : ''
   const points = session.expectedAnswerPoints.length
@@ -232,6 +258,7 @@ async function send() {
   const question = compactInlineText(input.value)
   if (!question || isLoading.value || !store.currentJobId) return
   const selectedText = selectedPayloadText()
+  const conversationHistory = conversationHistoryPayload()
   store.addMessage({ role: 'user', content: question, timestamp: Date.now() })
   input.value = ''
   isLoading.value = true
@@ -245,6 +272,7 @@ async function send() {
         question,
         selected_text: selectedText,
         context_scope: selectedText ? 'selection' : 'paper',
+        conversation_history: conversationHistory,
       }),
     })
     const data = await res.json().catch(() => ({}))
@@ -270,6 +298,7 @@ async function requestAdvisorQuestion() {
   if (!store.currentJobId || isLoading.value) return
   const focusQuestion = compactInlineText(input.value)
   const selectedText = selectedPayloadText()
+  const conversationHistory = conversationHistoryPayload()
   if (focusQuestion) {
     store.addMessage({ role: 'user', content: focusQuestion, timestamp: Date.now() })
     input.value = ''
@@ -285,6 +314,7 @@ async function requestAdvisorQuestion() {
           question: focusQuestion,
           selected_text: selectedText,
           context_scope: selectedText ? 'selection' : 'paper',
+          conversation_history: conversationHistory,
         }),
       })
       const answerData = await answerRes.json().catch(() => ({}))
@@ -440,16 +470,28 @@ watch(() => store.selectedText, (text) => {
 watch(() => store.currentJobId, () => {
   void loadMemory()
 }, { immediate: true })
+
+watch(fontSize, (value) => {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(fontStorageKey, String(value))
+})
 </script>
 
 <template>
-  <section class="ask-panel" data-testid="ask-panel">
+  <section class="ask-panel" data-testid="ask-panel" :style="askPanelStyle">
     <header>
       <div>
         <h2>M4 论文助教</h2>
         <p>{{ store.selectedText ? '正在基于选中文本回答' : '正在基于当前论文回答' }}</p>
       </div>
-      <button type="button" class="ghost-btn !min-h-9 !px-3" data-testid="ask-panel-toggle" @click="store.isAskPanelOpen = false">收起</button>
+      <div class="header-actions">
+        <div class="font-controls" aria-label="M4 字体大小">
+          <button type="button" aria-label="减小 M4 字体" @click="setFontSize(fontSize - 1)">A-</button>
+          <span>{{ fontSize }}</span>
+          <button type="button" aria-label="增大 M4 字体" @click="setFontSize(fontSize + 1)">A+</button>
+        </div>
+        <button type="button" class="ghost-btn !min-h-9 !px-3" data-testid="ask-panel-toggle" @click="store.isAskPanelOpen = false">收起</button>
+      </div>
     </header>
 
     <div class="mode-tabs" role="tablist" aria-label="M4 提问模式">
@@ -584,14 +626,52 @@ header {
 
 h2 {
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: calc(var(--m4-font-size, 14px) + 2px);
   font-weight: 720;
 }
 
 header p {
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: calc(var(--m4-font-size, 14px) - 1px);
+}
+
+.header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.font-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 2px;
+  background: var(--bg-secondary);
+}
+
+.font-controls button {
+  min-height: 28px;
+  min-width: 30px;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.font-controls button:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}
+
+.font-controls span {
+  min-width: 18px;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
 }
 
 .mode-tabs {
@@ -656,7 +736,7 @@ header p {
   max-height: 118px;
   overflow-y: auto;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
   line-height: 1.7;
   overflow-wrap: break-word;
   white-space: normal;
@@ -696,7 +776,7 @@ header p {
 .advisor-question {
   margin-top: 8px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
   line-height: 1.65;
 }
 
@@ -706,7 +786,7 @@ header p {
   margin-top: 8px;
   padding-left: 18px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(var(--m4-font-size, 14px) - 1px);
   line-height: 1.55;
 }
 
@@ -722,7 +802,7 @@ header p {
   min-height: 54px;
   border-radius: 8px;
   background: var(--bg-card);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
 }
 
 .advisor-feedback {
@@ -732,7 +812,7 @@ header p {
   border-left: 3px solid var(--accent);
   padding-left: 10px;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: calc(var(--m4-font-size, 14px) - 1px);
   line-height: 1.55;
 }
 
@@ -755,7 +835,7 @@ header p {
 .empty p {
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: calc(var(--m4-font-size, 14px) + 1px);
 }
 
 .message {
@@ -802,7 +882,7 @@ header p {
   padding: 10px 12px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
   line-height: 1.75;
   letter-spacing: 0;
   overflow-wrap: break-word;
@@ -827,7 +907,7 @@ header p {
   padding: 8px 10px 8px 11px;
   background: var(--answer-bg);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
   line-height: 1.78;
 }
 
@@ -866,7 +946,7 @@ header p {
   display: inline-flex;
   margin-right: 8px;
   color: var(--answer-accent);
-  font-size: 12px;
+  font-size: calc(var(--m4-font-size, 14px) - 2px);
   font-weight: 650;
   line-height: inherit;
 }
@@ -955,7 +1035,7 @@ textarea {
   padding: 12px 14px;
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--m4-font-size, 14px);
   line-height: 1.6;
 }
 </style>

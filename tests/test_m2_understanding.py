@@ -564,7 +564,19 @@ class ScriptedM2LLMClient:
                         "numeric_example": "INSUFFICIENT_EVIDENCE",
                         "plain_summary": "该公式描述注意力计算。",
                         "evidence_ref": "demo_paper:b_f1",
-                    }
+                    },
+                    {
+                        "formula_id": "formula_002",
+                        "formula_raw": r"\mathcal{L}_{rec}=||Y-\hat{Y}||_2^2",
+                        "formula_origin": "mineru_latex",
+                        "formula_ocr_status": "not_required",
+                        "formula_explanation_status": "parser_derived",
+                        "purpose": "解释重构误差如何衡量预测和真实序列的差距。",
+                        "intuition": "预测越接近真实序列，损失越小。",
+                        "numeric_example": "如果真实值是 3、预测值是 2，平方误差就是 1。",
+                        "plain_summary": "该公式把重构误差转成可优化的训练信号。",
+                        "evidence_ref": "demo_paper:b_f2",
+                    },
                 ]
             }
         if "teaching_cards" in text:
@@ -624,9 +636,10 @@ def test_m2_full_pipeline_llm_path_preserves_formula_origin_and_passes_audit(tmp
     assert first["equation_group_id"] == "eq_method_attention"
     second = by_id["formula_002"]
     assert second["evidence_ref"] == "demo_paper:b_f2"
-    assert second["coverage_status"] == "SUMMARY_ONLY"
-    assert second["derivation_status"] == "summary_only"
-    assert "LLM_CARD_MISSING" in second["warnings"]
+    assert second["coverage_status"] == "LLM_EXPLAINED"
+    assert second["derivation_status"] == "parser_derived"
+    assert "INSUFFICIENT_EVIDENCE" not in second["numeric_example"]
+    assert "LLM_CARD_MISSING" not in second["warnings"]
     quality = json.loads((output_dir / "quality_report.json").read_text(encoding="utf-8"))
     assert not [finding for finding in quality["findings"] if finding["effect"] == "BLOCK"]
 
@@ -636,6 +649,46 @@ def test_m2_paper_card_failure_falls_back_to_evidence_pack(tmp_path: Path) -> No
 
     class EmptyPaperCardLLM:
         async def chat_json(self, messages, *, config=None):
+            text = "\n".join(message.content for message in messages)
+            if "formula_cards" in text and ("Formula evidence" in text or "公式证据" in text):
+                return {
+                    "formula_cards": [
+                        {
+                            "formula_id": "formula_001",
+                            "formula_origin": "mineru_latex",
+                            "formula_ocr_status": "not_required",
+                            "formula_explanation_status": "parser_derived",
+                            "purpose": "解释注意力块如何组合 Q/K/V。",
+                            "intuition": "用 Q 和 K 计算权重，再加权 V。",
+                            "numeric_example": "INSUFFICIENT_EVIDENCE",
+                            "plain_summary": "该公式描述注意力计算。",
+                            "evidence_ref": "demo_paper:b_f1",
+                        },
+                        {
+                            "formula_id": "formula_002",
+                            "formula_origin": "mineru_latex",
+                            "formula_ocr_status": "not_required",
+                            "formula_explanation_status": "parser_derived",
+                            "purpose": "解释重构误差如何衡量预测和真实序列的差距。",
+                            "intuition": "预测越接近真实序列，损失越小。",
+                            "numeric_example": "如果真实值是 3、预测值是 2，平方误差就是 1。",
+                            "plain_summary": "该公式把重构误差转成可优化的训练信号。",
+                            "evidence_ref": "demo_paper:b_f2",
+                        },
+                    ]
+                }
+            if "teaching_cards" in text:
+                return {
+                    "teaching_cards": [
+                        {
+                            "target_type": "concept",
+                            "title": "Attention block",
+                            "human_explanation": "注意力块用于连接相关片段。",
+                            "paper_role_explanation": "它支撑方法部分的核心计算。",
+                            "evidence_ref": "demo_paper:b_text",
+                        }
+                    ]
+                }
             raise RuntimeError("LLM returned empty content")
 
     input_dir = _write_m1_bundle(tmp_path / "m1")

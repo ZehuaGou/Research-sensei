@@ -54,7 +54,7 @@ async function renderFormula() {
   if (/[&\\]/.test(cleaned) && !/\\begin\{(aligned|gather|matrix|cases|bmatrix|pmatrix|vmatrix)\b/.test(cleaned)) {
     if (tryKatex(formulaEl.value, `\\begin{aligned}${cleaned}\\end{aligned}`)) return
   }
-  formulaEl.value.textContent = raw
+  formulaEl.value.textContent = '公式暂时无法渲染。'
   formulaEl.value.classList.add('plain-formula')
   renderError.value = true
 }
@@ -88,7 +88,7 @@ async function explainFormula() {
 }
 
 function askFormula() {
-  const formulaLabel = props.card.purpose || props.card.plain_summary || props.card.formula_id || props.card.evidence_ref || '当前公式'
+  const formulaLabel = displayTitle() || props.card.formula_id || props.card.evidence_ref || '当前公式'
   store.setSelectedText(`解释这个公式：${formulaLabel}`)
   store.isAskPanelOpen = true
 }
@@ -110,10 +110,28 @@ function isInsufficientText(value: unknown) {
     || /raw\/unknown formula text/i.test(text)
 }
 
+function isRawFormulaText(value: unknown) {
+  const text = String(value || '').trim()
+  return /Formula evidence preserved from M1 context/i.test(text)
+    || /\\begin\{(?:cases|aligned|matrix|bmatrix|pmatrix|equation|align)/.test(text)
+    || /\\(?:frac|overline|underline|label|text|tau|sum|prod|int)\b/.test(text)
+}
+
+function displayTitle() {
+  const candidates = [
+    props.card.display_title,
+    props.card.purpose,
+    props.card.problem,
+  ].map((value: unknown) => String(value || '').replace(/\s+/g, ' ').trim())
+  return candidates.find(text => text && !isInsufficientText(text) && !isRawFormulaText(text))
+    || '公式解释'
+}
+
 function readableText(value: unknown, fallback: string) {
   const text = String(value || '').trim()
   if (!text) return fallback
   if (isInsufficientText(text)) return '证据不足，暂不推导。'
+  if (isRawFormulaText(text)) return fallback
   return text
 }
 
@@ -121,6 +139,9 @@ function hasInsufficientSource() {
   return isInsufficientText(props.card.purpose)
     || isInsufficientText(props.card.plain_summary)
     || isInsufficientText(props.card.intuition)
+    || isRawFormulaText(props.card.purpose)
+    || isRawFormulaText(props.card.plain_summary)
+    || isRawFormulaText(props.card.intuition)
 }
 
 function isMathLikeLabel(value: unknown) {
@@ -160,12 +181,15 @@ function shouldOpenTermDetails() {
         <span v-if="hasInsufficientSource()" class="status-pill warning">来源不足</span>
         <span v-else-if="card.evidence_status || card.evidence_ref" class="status-pill success">证据已绑定</span>
       </div>
-      <h2>{{ card.display_title || card.purpose || card.problem || '公式解释' }}</h2>
+      <h2>{{ displayTitle() }}</h2>
     </header>
 
     <div class="formula-box">
       <div ref="formulaEl"></div>
-      <code v-if="renderError" class="block whitespace-pre-wrap text-sm">{{ card.formula_latex || card.formula_raw }}</code>
+      <details v-if="renderError" class="raw-formula-fallback">
+        <summary>查看原始 LaTeX</summary>
+        <code>{{ card.formula_latex || card.formula_raw }}</code>
+      </details>
     </div>
 
     <details
@@ -278,10 +302,37 @@ h2 {
 .formula-box :deep(.plain-formula) {
   white-space: pre-wrap;
   color: var(--text-secondary);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-family: inherit;
   font-size: 14px;
   line-height: 1.7;
   overflow-wrap: anywhere;
+}
+
+.raw-formula-fallback {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.raw-formula-fallback summary {
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.raw-formula-fallback code {
+  display: block;
+  margin-top: 8px;
+  overflow-x: auto;
+  border-radius: 8px;
+  padding: 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .term-details {

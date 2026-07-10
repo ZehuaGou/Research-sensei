@@ -154,6 +154,7 @@ def create_app(
         pdf_url: str = Form(""),
         arxiv_id: str = Form(""),
         arxiv_url: str = Form(""),
+        force: bool = Form(False),
     ) -> dict[str, object]:
         job_id = uuid.uuid4().hex[:12]
         if file is not None and file.filename:
@@ -175,7 +176,7 @@ def create_app(
                 arxiv_url=arxiv_url,
             ) or _path_cache_identity(str(incoming_path))
             existing = jobs.find_by_source_identity(source_identity)
-            if existing is not None:
+            if existing is not None and not force:
                 return _existing_job_response(existing, source_identity)
             job = await run_in_threadpool(
                 runner.run,
@@ -203,7 +204,7 @@ def create_app(
             arxiv_id=arxiv_id,
             arxiv_url=arxiv_url,
         )
-        if request_identity:
+        if request_identity and not force:
             existing = jobs.find_by_source_identity(request_identity)
             if existing is not None:
                 return _existing_job_response(existing, request_identity)
@@ -263,7 +264,7 @@ def create_app(
 
         source_identity = _source_status_identity(source_status, request_identity)
         existing = jobs.find_by_source_identity(source_identity)
-        if existing is not None:
+        if existing is not None and not force:
             return _existing_job_response(existing, source_identity)
 
         job = await run_in_threadpool(
@@ -285,6 +286,42 @@ def create_app(
             return _job_response(jobs.get(job_id))
         except KeyError as error:
             raise HTTPException(status_code=404, detail="Job not found.") from error
+
+    @app.post("/api/v1/jobs/{job_id}/reparse")
+    async def reparse_job(job_id: str) -> dict[str, object]:
+        original = _get_job_or_404(jobs, job_id)
+        source_path = Path(original.source_path)
+        if not source_path.exists() or source_path.is_dir():
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "status": "SOURCE_UNAVAILABLE",
+                    "message": "The original job source is not a reusable file path.",
+                    "source_path": original.source_path,
+                },
+            )
+
+        new_job_id = uuid.uuid4().hex[:12]
+        source_status = SourceStatus(
+            source_type="reparse",
+            original_input=original.source_path,
+            resolved_path=str(source_path),
+            status="resolved",
+        )
+        source_identity = f"{original.source_identity or _path_cache_identity(str(source_path))}:reparse:{new_job_id}"
+        job = await run_in_threadpool(
+            runner.run,
+            str(source_path),
+            job_id=new_job_id,
+            source_status=source_status,
+            source_identity=source_identity,
+        )
+        return {
+            **_job_parse_response(job),
+            "status": "JOB_CREATED",
+            "handoff_status": "JOB_CREATED",
+            "source_job_id": job_id,
+        }
 
     @app.delete("/api/v1/jobs/{job_id}")
     def delete_job(job_id: str) -> dict[str, object]:
@@ -534,6 +571,7 @@ def create_app(
     @app.post("/api/v1/directions/deep_read")
     async def direction_deep_read(payload: dict[str, object]) -> dict[str, object]:
         candidate = _direction_candidate_payload(payload)
+        force = bool(payload.get("force"))
         title, doi, pdf_url, arxiv_id, arxiv_url = _direction_handoff_inputs(candidate)
 
         # Compute source identity for job dedup: arXiv/DOI/pdf URL first, then
@@ -546,7 +584,7 @@ def create_app(
         )
 
         # Check for existing SUCCEEDED job for the same paper
-        if source_identity:
+        if source_identity and not force:
             existing = jobs.find_by_source_identity(source_identity)
             if existing is not None:
                 return _existing_job_response(existing, source_identity)
@@ -603,7 +641,7 @@ def create_app(
 
         source_identity = _source_status_identity(source_status, source_identity)
         existing = jobs.find_by_source_identity(source_identity)
-        if existing is not None:
+        if existing is not None and not force:
             return _existing_job_response(existing, source_identity)
 
         job = await run_in_threadpool(

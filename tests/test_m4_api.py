@@ -7,25 +7,38 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ModelProviderConfig
 from researchsensei.llm.client import LLMClient
+from researchsensei.llm.types import ChatResponse
 from researchsensei.web.app import create_app
 
 
 class ScriptedM4LLM:
-    def __init__(self, *, evidence_refs: list[str] | None = None, answer: str = "这是 M4 基于证据生成的中文回答。") -> None:
+    def __init__(
+        self,
+        *,
+        evidence_refs: list[str] | None = None,
+        answer: str = "这篇论文用注意力结构把分散的证据片段连接起来，核心作用是让检索时不只看单个片段，而是聚合相关上下文。证据边界是当前卡片只支持方法机制，不能推出额外实验结论。",
+    ) -> None:
         self.calls = 0
         self.evidence_refs = evidence_refs or ["paper:b001"]
         self.answer = answer
         self.messages = []
 
-    async def chat_json(self, messages, *, config=None):
+    async def chat(self, messages, *, config=None):
         self.calls += 1
         self.messages.append(messages)
-        return {
-            "answer": self.answer,
-            "evidence_refs": self.evidence_refs,
-            "uncertainty": "Bound to supplied evidence.",
-            "follow_up_suggestions": ["Name the evidence ref."],
-        }
+        return ChatResponse(content=self.answer)
+
+    async def chat_json(self, messages, *, config=None):
+        raise AssertionError("M4 ask should use freeform chat, not chat_json")
+
+
+class FailingM4LLM:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    async def chat(self, messages, *, config=None):
+        self.calls += 1
+        raise RuntimeError("simulated llm outage")
 
 
 def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) -> None:
@@ -291,7 +304,8 @@ def test_m4_ask_uses_llm_when_client_is_configured(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     data = response.json()
-    assert data["answer"] == "这是 M4 基于证据生成的中文回答。"
+    assert "注意力结构" in data["answer"]
+    assert "证据边界" in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": True}
     assert data["warnings"] == []
@@ -326,12 +340,12 @@ def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": True}
     assert data["evidence_refs"] == ["paper:b001"]
     assert "稀疏证据" in data["answer"]
-    prompt = json.loads(llm.messages[0][1].content)
-    context_text = json.dumps(prompt["context"], ensure_ascii=False)
-    assert prompt["allowed_evidence_refs"] == ["paper:b001"]
-    assert "sparse evidence passages" in context_text
-    assert "attention architecture" in context_text
-    assert "front_matter" not in context_text
+    prompt_text = llm.messages[0][1].content
+    assert "allowed_evidence_refs" in prompt_text
+    assert "paper:b001" in prompt_text
+    assert "sparse evidence passages" in prompt_text
+    assert "attention architecture" in prompt_text
+    assert "front_matter" not in prompt_text
 
 
 def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: Path) -> None:
@@ -595,9 +609,9 @@ def test_m4_user_facing_fallbacks_do_not_contain_mojibake(tmp_path: Path) -> Non
         _assert_no_mojibake(response.json())
 
 
-def test_m4_ask_rejects_llm_answer_with_unknown_evidence_ref(tmp_path: Path) -> None:
+def test_m4_ask_reports_llm_request_failure_without_local_fallback(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
-    llm = ScriptedM4LLM(evidence_refs=["paper:made_up"])
+    llm = FailingM4LLM()
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
@@ -614,13 +628,12 @@ def test_m4_ask_rejects_llm_answer_with_unknown_evidence_ref(tmp_path: Path) -> 
 
     assert response.status_code == 200
     data = response.json()
-    assert data["answer"].startswith("我先按")
-    assert "做法上" in data["answer"]
-    assert "更完整的证据边界" in data["answer"]
-    assert "核心机制：" not in data["answer"]
+    assert data["status"] == "DEGRADED"
+    assert "没有拿到可用的大模型解释" in data["answer"]
+    assert "没有改用本地卡片兜底" in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_FALLBACK"
+    assert data["warnings"][0]["code"] == "M4_LLM_REQUEST_FAILED"
     assert llm.calls == 1
 
 
@@ -648,14 +661,95 @@ def test_m4_ask_rejects_english_heavy_llm_answer(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     data = response.json()
-    assert data["answer"].startswith("我先按")
-    assert "做法上" in data["answer"]
-    assert "更完整的证据边界" in data["answer"]
-    assert "对应证据：" not in data["answer"]
+    assert data["status"] == "DEGRADED"
+    assert "没有拿到可用的大模型解释" in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_FALLBACK"
+    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
     assert llm.calls == 1
+
+
+def test_m4_example_question_rejects_abstract_llm_answer(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    llm = ScriptedM4LLM(answer="这篇论文通过一个方法解决问题，并且整体效果更好。")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "举个例子详细说明"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert "没有拿到可用的大模型解释" in data["answer"]
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
+    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
+    assert llm.calls == 1
+
+
+def test_m4_example_question_includes_formula_context_and_rejects_external_threshold_rule(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    _write_json(artifact_dir / "formula_cards.json", {
+        "paper_id": "paper",
+        "formula_cards": [
+            {
+                "formula_id": "sr_threshold",
+                "purpose": "用显著性相对局部平均值的偏离判断时间点是否异常。",
+                "plain_summary": "如果显著性相对局部平均值超过阈值 tau，就输出异常标签。",
+                "symbols": [
+                    {"symbol": "S(x_i)", "meaning": "第 i 个时间点的显著性分数。"},
+                    {"symbol": "\\overline{S(x_i)}", "meaning": "第 i 个时间点附近的局部平均显著性。"},
+                    {"symbol": "\\tau", "meaning": "异常判定阈值。"},
+                ],
+                "terms": [],
+                "intuition": "它判断的是某个点是否比附近背景显著得多。",
+                "numeric_example": "INSUFFICIENT_EVIDENCE",
+                "what_if_removed": "方法会缺少从显著性分数到异常标签的判定步骤。",
+                "weight_sensitivity": "阈值越大，越少时间点会被判成异常。",
+                "formula_origin": "source_latex",
+                "formula_ocr_status": "not_required",
+                "formula_explanation_status": "source_exact",
+                "evidence_ref": "paper:eq003",
+            }
+        ],
+    })
+    llm = ScriptedM4LLM(
+        answer=(
+            "举个例子：输入 [10, 11, 10, 60, 11]。第一步先得到每个点的显著性分数，"
+            "第二步如果 S_i > μ_S + 3σ_S 就输出 1，否则输出 0。"
+        )
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "举个具体例子详细说明。"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
+    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
+    prompt_text = llm.messages[0][1].content
+    assert "paper:eq003" in prompt_text
+    assert "\\overline{S(x_i)}" in prompt_text
+    assert "不要把论文的阈值判断改写成 μ+3σ" in prompt_text
 
 
 def test_m4_ask_strips_internal_refs_from_user_facing_answer(tmp_path: Path) -> None:

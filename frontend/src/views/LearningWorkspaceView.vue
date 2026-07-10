@@ -26,6 +26,7 @@ const cards = ref<Record<string, any> | null>(null)
 const degraded = ref(false)
 const missingComponents = ref<string[]>([])
 const isLoading = ref(true)
+const isReparsing = ref(false)
 const error = ref('')
 const activeTab = ref<'paper' | 'formulas' | 'teaching'>('paper')
 const activeFormulaAnchor = ref('')
@@ -34,25 +35,38 @@ const collapsedFormulas = ref<Record<string, boolean>>({})
 const focusedFormula = ref<{ card: any; index: number } | null>(null)
 const formulaRailCollapsed = ref(false)
 const readerPaneRef = ref<HTMLElement | null>(null)
+const topbarTargetReady = ref(false)
 const tabScrollTop = ref<Record<'paper' | 'formulas' | 'teaching', number>>({
   paper: 0,
   formulas: 0,
   teaching: 0,
 })
+const formulaDockPosition = ref({ x: 24, y: 72 })
+const formulaDockCustomized = ref(false)
+const formulaDockDragging = ref(false)
+const chatPaneWidth = ref(380)
 let formulaObserver: IntersectionObserver | null = null
+let formulaDockDragState: {
+  startX: number
+  startY: number
+  originX: number
+  originY: number
+  fromToggle: boolean
+} | null = null
+let formulaDockMovedDuringDrag = false
+let suppressNextFormulaDockToggle = false
+let chatResizeState: { startX: number; startWidth: number } | null = null
 
-function saveCurrentTabScroll() {
-  if (!readerPaneRef.value) return
-  tabScrollTop.value[activeTab.value] = readerPaneRef.value.scrollTop
-}
+const formulaDockStorageKey = 'researchsensei.learningWorkspace.formulaDock'
+const chatWidthStorageKey = 'researchsensei.learningWorkspace.chatWidth'
 
-function switchTab(tab: 'paper' | 'formulas' | 'teaching') {
-  saveCurrentTabScroll()
-  activeTab.value = tab
-  nextTick(() => {
-    if (readerPaneRef.value) {
-      readerPaneRef.value.scrollTop = tabScrollTop.value[tab] || 0
+function nextFrame() {
+  return new Promise<void>((resolve) => {
+    if (typeof requestAnimationFrame === 'undefined') {
+      resolve()
+      return
     }
+    requestAnimationFrame(() => resolve())
   })
 }
 
@@ -90,6 +104,15 @@ const tabs = computed(() => [
   { key: 'formulas' as const, label: '公式拆解', count: formulaCardsList.value.length, disabled: formulaTabDisabled.value },
   { key: 'teaching' as const, label: '教学卡片', count: teachingCards.value.length, disabled: teachingCards.value.length === 0 },
 ])
+
+const workspaceShellStyle = computed<Record<string, string>>(() => ({
+  '--chat-pane-width': `${chatPaneWidth.value}px`,
+}))
+
+const formulaDockStyle = computed<Record<string, string>>(() => ({
+  left: `${formulaDockPosition.value.x}px`,
+  top: `${formulaDockPosition.value.y}px`,
+}))
 
 const formulaNavItems = computed(() => formulaCardsList.value.map((formula: any, index: number) => {
   const card = normalizeFormulaCard(formula, index)
@@ -273,17 +296,21 @@ function isUsableFormulaCard(card: any) {
 function normalizeFormulaCard(card: any, index = 0): any {
   if (!card) return card
   const displayTitle = formulaDisplayTitle(card, index)
-  const noisyPurpose = isNoisyFormulaText(card.purpose)
+  const purpose = safeFormulaCopy(card.purpose)
+  const problem = safeFormulaCopy(card.problem)
+  const plainSummary = safeFormulaCopy(card.plain_summary)
+  const intuition = safeFormulaCopy(card.intuition)
   return {
     ...card,
     display_title: displayTitle,
     formula_latex: card.formula_latex || card.formula_raw || '',
-    purpose: noisyPurpose ? displayTitle : (card.purpose || displayTitle),
-    problem: card.problem || displayTitle,
+    purpose: purpose || displayTitle,
+    problem: problem || displayTitle,
     formula_ref: card.formula_ref || card.location || card.formula_id || '',
     remove_effect: card.remove_effect || card.what_if_removed || '',
     weight_change_effect: card.weight_change_effect || card.weight_sensitivity || '',
-    plain_summary: card.plain_summary || card.intuition || '',
+    plain_summary: plainSummary || intuition || '',
+    intuition: intuition || '',
   }
 }
 
@@ -296,9 +323,20 @@ function formulaDisplayTitle(card: any, index: number) {
   ].map((value: unknown) => String(value || '').replace(/\s+/g, ' ').trim())
   const readable = candidates.find(value => value && !isNoisyFormulaText(value))
   if (readable) return readable
+  return fallbackFormulaTitle(card, index)
+}
+
+function safeFormulaCopy(value: unknown) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim()
+  return text && !isNoisyFormulaText(text) ? text : ''
+}
+
+function fallbackFormulaTitle(card: any, index: number) {
   const raw = String(card.formula_latex || card.formula_raw || '').replace(/\s+/g, ' ').trim()
-  const hint = raw ? `：${clipLabel(raw, 28)}` : ''
-  return `公式 ${index + 1} 来源不足，暂不推导${hint}`
+  if (/\\begin\{cases\}/.test(raw) || /otherwise/i.test(raw)) return `公式 ${index + 1}：分段判定规则`
+  if (/\\frac/.test(raw) || /\\overline/.test(raw)) return `公式 ${index + 1}：比例与阈值关系`
+  if (/\\sum|\\prod|\\int/.test(raw)) return `公式 ${index + 1}：聚合计算关系`
+  return `公式 ${index + 1}：公式卡片`
 }
 
 function isNoisyFormulaText(value: unknown) {
@@ -306,9 +344,12 @@ function isNoisyFormulaText(value: unknown) {
   return !text
     || /^INSUFFICIENT_EVIDENCE\b/i.test(text)
     || /^UNKNOWN$/i.test(text)
+    || /Formula evidence preserved from M1 context/i.test(text)
     || /M2 preserved this formula slot/i.test(text)
     || /blocked detailed derivation/i.test(text)
     || /raw\/unknown formula text/i.test(text)
+    || /\\begin\{(?:cases|aligned|matrix|bmatrix|pmatrix|equation|align)/.test(text)
+    || /\\(?:frac|overline|underline|label|text|tau|sum|prod|int)\b/.test(text)
 }
 
 function clipLabel(value: unknown, maxLength: number) {
@@ -352,9 +393,212 @@ function openFormulaFocus(card: any, index: number) {
   focusedFormula.value = { card, index }
 }
 
+function loadWorkspaceLayoutPrefs() {
+  if (typeof localStorage === 'undefined') return
+
+  const savedWidthRaw = localStorage.getItem(chatWidthStorageKey)
+  if (savedWidthRaw) {
+    const savedWidth = Number(savedWidthRaw)
+    if (Number.isFinite(savedWidth)) {
+      chatPaneWidth.value = clamp(savedWidth, 320, 540)
+    }
+  }
+
+  try {
+    const savedDock = JSON.parse(localStorage.getItem(formulaDockStorageKey) || '{}')
+    if (Number.isFinite(savedDock.x) && Number.isFinite(savedDock.y)) {
+      formulaDockPosition.value = normalizeFormulaDockPosition({ x: savedDock.x, y: savedDock.y })
+      formulaDockCustomized.value = true
+    }
+    if (typeof savedDock.collapsed === 'boolean') {
+      formulaRailCollapsed.value = savedDock.collapsed
+      formulaDockCustomized.value = true
+    }
+  } catch {
+    // Ignore old or malformed layout prefs.
+  }
+}
+
+function saveFormulaDockPrefs() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(formulaDockStorageKey, JSON.stringify({
+    x: Math.round(formulaDockPosition.value.x),
+    y: Math.round(formulaDockPosition.value.y),
+    collapsed: formulaRailCollapsed.value,
+  }))
+}
+
+function saveChatPaneWidth() {
+  if (typeof localStorage === 'undefined') return
+  localStorage.setItem(chatWidthStorageKey, String(Math.round(chatPaneWidth.value)))
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function currentFormulaDockWidth() {
+  return formulaRailCollapsed.value ? 96 : 300
+}
+
+function formulaDockReservedRight() {
+  return store.isAskPanelOpen && canShowCards.value ? chatPaneWidth.value + 18 : 18
+}
+
+function normalizeFormulaDockPosition(position: { x: number; y: number }) {
+  return {
+    x: Number.isFinite(position.x) ? position.x : 24,
+    y: Number.isFinite(position.y) ? position.y : 72,
+  }
+}
+
+function defaultFormulaDockPosition() {
+  if (typeof window === 'undefined') return formulaDockPosition.value
+  return normalizeFormulaDockPosition({
+    x: Math.max(14, window.innerWidth - formulaDockReservedRight() - currentFormulaDockWidth()),
+    y: 78,
+  })
+}
+
+function syncFormulaDockPosition(force = false) {
+  if (force || !formulaDockCustomized.value) {
+    formulaDockPosition.value = defaultFormulaDockPosition()
+    return
+  }
+  formulaDockPosition.value = normalizeFormulaDockPosition(formulaDockPosition.value)
+}
+
+function toggleFormulaDockCollapsed() {
+  if (suppressNextFormulaDockToggle) {
+    suppressNextFormulaDockToggle = false
+    return
+  }
+  formulaRailCollapsed.value = !formulaRailCollapsed.value
+  formulaDockCustomized.value = true
+  void nextTick(() => {
+    saveFormulaDockPrefs()
+  })
+}
+
+function startFormulaDockDrag(event: PointerEvent) {
+  if (event.button !== 0) return
+  const target = event.target as HTMLElement | null
+  const fromToggle = Boolean(target?.closest('.rail-toggle'))
+  if (target?.closest('a, input, textarea, select')) return
+  if (target?.closest('button') && !fromToggle) return
+  if (fromToggle && !formulaRailCollapsed.value) return
+
+  if (!fromToggle) event.preventDefault()
+  formulaDockDragging.value = true
+  formulaDockCustomized.value = true
+  formulaDockMovedDuringDrag = false
+  formulaDockDragState = {
+    startX: event.clientX,
+    startY: event.clientY,
+    originX: formulaDockPosition.value.x,
+    originY: formulaDockPosition.value.y,
+    fromToggle,
+  }
+  window.addEventListener('pointermove', moveFormulaDock)
+  window.addEventListener('pointerup', stopFormulaDockDrag)
+}
+
+function moveFormulaDock(event: PointerEvent) {
+  if (!formulaDockDragState) return
+  const dx = event.clientX - formulaDockDragState.startX
+  const dy = event.clientY - formulaDockDragState.startY
+  if (Math.abs(dx) + Math.abs(dy) > 5) {
+    formulaDockMovedDuringDrag = true
+  }
+  formulaDockPosition.value = normalizeFormulaDockPosition({
+    x: formulaDockDragState.originX + event.clientX - formulaDockDragState.startX,
+    y: formulaDockDragState.originY + event.clientY - formulaDockDragState.startY,
+  })
+}
+
+function stopFormulaDockDrag() {
+  if (!formulaDockDragState) return
+  if (formulaDockMovedDuringDrag && formulaDockDragState.fromToggle) {
+    suppressNextFormulaDockToggle = true
+  }
+  formulaDockDragging.value = false
+  formulaDockDragState = null
+  formulaDockMovedDuringDrag = false
+  window.removeEventListener('pointermove', moveFormulaDock)
+  window.removeEventListener('pointerup', stopFormulaDockDrag)
+  saveFormulaDockPrefs()
+}
+
+function startChatResize(event: PointerEvent) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  chatResizeState = {
+    startX: event.clientX,
+    startWidth: chatPaneWidth.value,
+  }
+  window.addEventListener('pointermove', moveChatResize)
+  window.addEventListener('pointerup', stopChatResize)
+}
+
+function moveChatResize(event: PointerEvent) {
+  if (!chatResizeState) return
+  chatPaneWidth.value = clamp(chatResizeState.startWidth + chatResizeState.startX - event.clientX, 320, 540)
+  syncFormulaDockPosition()
+}
+
+function stopChatResize() {
+  if (!chatResizeState) return
+  chatResizeState = null
+  window.removeEventListener('pointermove', moveChatResize)
+  window.removeEventListener('pointerup', stopChatResize)
+  saveChatPaneWidth()
+  saveFormulaDockPrefs()
+}
+
+function saveCurrentTabScroll() {
+  if (!readerPaneRef.value) return
+  tabScrollTop.value[activeTab.value] = readerPaneRef.value.scrollTop
+}
+
+async function switchTab(tab: 'paper' | 'formulas' | 'teaching') {
+  if (tab === activeTab.value) return
+
+  saveCurrentTabScroll()
+  activeTab.value = tab
+
+  await nextTick()
+
+  if (readerPaneRef.value) {
+    readerPaneRef.value.scrollTop = tabScrollTop.value[tab] || 0
+  }
+
+  await nextFrame()
+
+  if (readerPaneRef.value) {
+    readerPaneRef.value.scrollTop = tabScrollTop.value[tab] || 0
+  }
+
+  await nextFrame()
+
+  if (readerPaneRef.value) {
+    readerPaneRef.value.scrollTop = tabScrollTop.value[tab] || 0
+  }
+}
+
 function scrollToFormula(id: string) {
   activeFormulaAnchor.value = id
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  const pane = readerPaneRef.value
+  const target = document.getElementById(id)
+  if (!pane || !target) return
+
+  const paneRect = pane.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+
+  pane.scrollTo({
+    top: pane.scrollTop + targetRect.top - paneRect.top - 16,
+    behavior: 'smooth',
+  })
 }
 
 function setupFormulaObserver() {
@@ -364,6 +608,9 @@ function setupFormulaObserver() {
     return
   }
   void nextTick(() => {
+    const root = readerPaneRef.value
+    if (!root) return
+
     const nodes = formulaNavItems.value
       .map((item: { id: string }) => document.getElementById(item.id))
       .filter((node: HTMLElement | null): node is HTMLElement => Boolean(node))
@@ -376,9 +623,30 @@ function setupFormulaObserver() {
       if (visible?.target.id) {
         activeFormulaAnchor.value = visible.target.id
       }
-    }, { root: readerPaneRef.value, rootMargin: '-35% 0px -55% 0px', threshold: 0.01 })
+    }, { root, rootMargin: '-35% 0px -55% 0px', threshold: 0.01 })
     nodes.forEach((node: HTMLElement) => formulaObserver?.observe(node))
   })
+}
+
+function syncFormulaRailDefaultCollapse() {
+  if (formulaDockCustomized.value) {
+    syncFormulaDockPosition()
+    return
+  }
+
+  if (activeTab.value !== 'formulas') {
+    formulaRailCollapsed.value = false
+    syncFormulaDockPosition(true)
+    return
+  }
+
+  formulaRailCollapsed.value = store.isAskPanelOpen && canShowCards.value
+  syncFormulaDockPosition(true)
+}
+
+function handleWorkspaceResize() {
+  syncFormulaRailDefaultCollapse()
+  syncFormulaDockPosition()
 }
 
 function activateFirstAvailableTab() {
@@ -443,54 +711,72 @@ async function loadWorkspace() {
   }
 }
 
+async function reparseCurrentPaper() {
+  if (isReparsing.value) return
+  isReparsing.value = true
+  error.value = ''
+  try {
+    const res = await fetch(`/api/v1/jobs/${jobId}/reparse`, { method: 'POST' })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data.job_id) {
+      error.value = data.detail?.message || data.detail || '重新解析任务创建失败。'
+      return
+    }
+    window.location.assign(`/learn/${data.job_id}`)
+  } catch {
+    error.value = '网络请求失败，暂时不能重新解析这篇论文。'
+  } finally {
+    isReparsing.value = false
+  }
+}
+
 onMounted(() => {
   store.currentJobId = jobId
+  topbarTargetReady.value = Boolean(document.getElementById('workbench-topbar-center'))
+  loadWorkspaceLayoutPrefs()
+  syncFormulaDockPosition(!formulaDockCustomized.value)
+  window.addEventListener('resize', handleWorkspaceResize)
   void loadWorkspace()
 })
 
 watch([activeTab, formulaCardsList], () => setupFormulaObserver(), { flush: 'post' })
+watch([activeTab, () => store.isAskPanelOpen, formulaCardsList], () => syncFormulaRailDefaultCollapse(), { flush: 'post', immediate: true })
 watch(formulaEntries, () => syncFormulaOrder(), { immediate: true })
 
 onBeforeUnmount(() => {
   formulaObserver?.disconnect()
+  window.removeEventListener('resize', handleWorkspaceResize)
+  window.removeEventListener('pointermove', moveFormulaDock)
+  window.removeEventListener('pointerup', stopFormulaDockDrag)
+  window.removeEventListener('pointermove', moveChatResize)
+  window.removeEventListener('pointerup', stopChatResize)
 })
 </script>
 
 <template>
+  <Teleport to="#workbench-topbar-center" :disabled="!topbarTargetReady">
+    <nav class="learning-topbar-tabs" data-testid="learning-topbar-tabs" aria-label="深读页面切换">
+      <button
+        v-for="tab in tabs"
+        :key="tab.key"
+        :disabled="tab.disabled"
+        :class="{ active: activeTab === tab.key }"
+        @click="switchTab(tab.key)"
+      >
+        <span>{{ tab.label }}</span>
+        <small>{{ tab.count }}</small>
+      </button>
+    </nav>
+  </Teleport>
+
   <div
     class="workspace-shell"
     :class="{
       'with-chat': store.isAskPanelOpen && canShowCards,
-      'formula-mode': activeTab === 'formulas',
+      'formula-mode': activeTab === 'formulas' && formulaCardsList.length > 0,
     }"
+    :style="workspaceShellStyle"
   >
-    <aside class="workspace-nav">
-      <div class="nav-title">
-        <strong>深读工作台</strong>
-        <span>{{ jobId }}</span>
-      </div>
-      <nav>
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          :disabled="tab.disabled"
-          :class="{ active: activeTab === tab.key }"
-          @click="switchTab(tab.key)"
-        >
-          <span>{{ tab.label }}</span>
-          <small>{{ tab.count }}</small>
-        </button>
-      </nav>
-      <button
-        v-if="canShowCards && !store.isAskPanelOpen"
-        type="button"
-        class="secondary-btn chat-open"
-        @click="store.isAskPanelOpen = true"
-      >
-        打开 M4
-      </button>
-    </aside>
-
     <main ref="readerPaneRef" class="reader-pane">
       <div v-if="isLoading" class="loading-state">
         正在加载论文工作台...
@@ -508,8 +794,11 @@ onBeforeUnmount(() => {
             <h1>{{ workspaceTitle }}</h1>
             <p>{{ workspaceSubtitle }}</p>
           </div>
-          <div v-if="canShowCards && !store.isAskPanelOpen" class="reader-actions">
-            <button type="button" class="primary-btn" @click="store.isAskPanelOpen = true">
+          <div v-if="canShowCards" class="reader-actions">
+            <button type="button" class="secondary-btn" :disabled="isReparsing" @click="reparseCurrentPaper">
+              {{ isReparsing ? '重新解析中' : '重新解析' }}
+            </button>
+            <button v-if="!store.isAskPanelOpen" type="button" class="primary-btn" @click="store.isAskPanelOpen = true">
               打开 M4
             </button>
           </div>
@@ -552,42 +841,45 @@ onBeforeUnmount(() => {
           <template v-else-if="activeTab === 'formulas'">
             <template v-if="formulaCardsList.length > 0">
               <div class="formula-workspace">
-                <section class="formula-board-toolbar surface" aria-label="公式阅读器">
-                  <div>
-                    <strong>公式阅读器</strong>
-                    <span>按正文顺序阅读；当前公式会在右侧停靠，滚动时公式标题会留在顶部。</span>
+                <section class="formula-reader">
+                  <section class="formula-board-toolbar surface" aria-label="公式阅读器">
+                    <div>
+                      <strong>公式阅读器</strong>
+                      <span>按正文顺序阅读；当前公式会在右侧停靠，滚动时公式标题会留在顶部。</span>
+                    </div>
+                    <button type="button" class="secondary-btn" @click="resetFormulaLayout">重置</button>
+                  </section>
+
+                  <div class="formula-list" data-testid="formula-board">
+                    <article
+                      v-for="entry in orderedFormulaEntries"
+                      :id="entry.id"
+                      :key="entry.id"
+                      class="formula-board-card"
+                      :class="{
+                        collapsed: collapsedFormulas[entry.id],
+                        active: activeFormulaAnchor === entry.id,
+                      }"
+                      data-testid="formula-board-card"
+                    >
+                      <header class="formula-card-bar">
+                        <div class="formula-card-number">{{ entry.index }}</div>
+                        <div>
+                          <span>公式 {{ entry.index }}</span>
+                          <strong>{{ entry.title }}</strong>
+                        </div>
+                        <div class="formula-card-actions">
+                          <button type="button" @click="openFormulaFocus(entry.card, entry.index)">单独查看</button>
+                          <button type="button" @click="toggleFormulaCollapsed(entry.id)">
+                            {{ collapsedFormulas[entry.id] ? '展开' : '折叠' }}
+                          </button>
+                        </div>
+                      </header>
+                      <FormulaCard v-if="!collapsedFormulas[entry.id]" :card="entry.card" />
+                    </article>
                   </div>
-                  <button type="button" class="secondary-btn" @click="resetFormulaLayout">重置</button>
                 </section>
 
-                <div class="formula-list" data-testid="formula-board">
-                  <article
-                    v-for="entry in orderedFormulaEntries"
-                    :id="entry.id"
-                    :key="entry.id"
-                    class="formula-board-card"
-                    :class="{
-                      collapsed: collapsedFormulas[entry.id],
-                      active: activeFormulaAnchor === entry.id,
-                    }"
-                    data-testid="formula-board-card"
-                  >
-                    <header class="formula-card-bar">
-                      <div class="formula-card-number">{{ entry.index }}</div>
-                      <div>
-                        <span>公式 {{ entry.index }}</span>
-                        <strong>{{ entry.title }}</strong>
-                      </div>
-                      <div class="formula-card-actions">
-                        <button type="button" @click="openFormulaFocus(entry.card, entry.index)">单独查看</button>
-                        <button type="button" @click="toggleFormulaCollapsed(entry.id)">
-                          {{ collapsedFormulas[entry.id] ? '展开' : '折叠' }}
-                        </button>
-                      </div>
-                    </header>
-                    <FormulaCard v-if="!collapsedFormulas[entry.id]" :card="entry.card" />
-                  </article>
-                </div>
               </div>
             </template>
             <div v-else class="empty-card" data-testid="formula-degraded-message">
@@ -624,57 +916,67 @@ onBeforeUnmount(() => {
 
     <aside
       v-if="activeTab === 'formulas' && formulaCardsList.length > 0"
-      class="formula-rail surface"
-      :class="{ collapsed: formulaRailCollapsed }"
+      class="formula-rail formula-dock surface"
+      :class="{ collapsed: formulaRailCollapsed, dragging: formulaDockDragging }"
+      :style="formulaDockStyle"
       aria-label="当前公式与目录"
+      @pointerdown="startFormulaDockDrag"
     >
-      <button type="button" class="rail-toggle" @click="formulaRailCollapsed = !formulaRailCollapsed">
-        {{ formulaRailCollapsed ? `公式 ${activeFormulaEntry?.index || '…'}` : '收起' }}
-      </button>
+      <div class="formula-dock-handle">
+        <button type="button" class="rail-toggle" @click="toggleFormulaDockCollapsed">
+          {{ formulaRailCollapsed ? `公式 ${activeFormulaEntry?.index || '...'}` : '收起' }}
+        </button>
+        <span v-if="!formulaRailCollapsed">拖动移动</span>
+      </div>
       <template v-if="!formulaRailCollapsed">
-      <section v-if="activeFormulaEntry" class="active-formula-card">
-        <span>当前公式</span>
-        <strong>{{ activeFormulaEntry.title }}</strong>
-        <small>公式 {{ activeFormulaEntry.index }}</small>
-        <div class="active-formula-actions">
-          <button type="button" @click="openFormulaFocus(activeFormulaEntry.card, activeFormulaEntry.index)">点开看</button>
-          <button type="button" @click="scrollToFormula(activeFormulaEntry.id)">回到正文</button>
-        </div>
-      </section>
+        <section v-if="activeFormulaEntry" class="active-formula-card">
+          <span>当前公式</span>
+          <strong>{{ activeFormulaEntry.title }}</strong>
+          <small>公式 {{ activeFormulaEntry.index }}</small>
+          <div class="active-formula-actions">
+            <button type="button" @click="openFormulaFocus(activeFormulaEntry.card, activeFormulaEntry.index)">点开看</button>
+            <button type="button" @click="scrollToFormula(activeFormulaEntry.id)">回到正文</button>
+          </div>
+        </section>
 
-      <nav class="formula-index" data-testid="formula-index" aria-label="公式目录">
-        <header>
-          <div>
-            <strong>公式目录</strong>
-            <small>{{ formulaCardsList.length }} 张卡片</small>
+        <nav class="formula-index" data-testid="formula-index" aria-label="公式目录">
+          <header>
+            <div>
+              <strong>公式目录</strong>
+              <small>{{ formulaCardsList.length }} 张卡片</small>
+            </div>
+            <div class="formula-index-actions">
+              <button type="button" @click="setAllFormulaCollapsed(true)">折叠</button>
+              <button type="button" @click="setAllFormulaCollapsed(false)">展开</button>
+            </div>
+          </header>
+          <div class="formula-index-list">
+            <button
+              v-for="item in formulaNavItems"
+              :key="item.id"
+              type="button"
+              :class="{ active: activeFormulaAnchor === item.id }"
+              :title="item.title"
+              @click="scrollToFormula(item.id)"
+            >
+              <b>{{ item.index }}</b>
+              <span>{{ item.title }}</span>
+            </button>
           </div>
-          <div class="formula-index-actions">
-            <button type="button" @click="setAllFormulaCollapsed(true)">折叠</button>
-            <button type="button" @click="setAllFormulaCollapsed(false)">展开</button>
-          </div>
-        </header>
-        <div class="formula-index-list">
-          <button
-            v-for="item in formulaNavItems"
-            :key="item.id"
-            type="button"
-            :class="{ active: activeFormulaAnchor === item.id }"
-            :title="item.title"
-            @click="scrollToFormula(item.id)"
-          >
-            <b>{{ item.index }}</b>
-            <span>{{ item.title }}</span>
-          </button>
-        </div>
-      </nav>
+        </nav>
       </template>
     </aside>
 
-    <Transition name="slide-right">
-      <aside v-if="store.isAskPanelOpen && canShowCards" class="chat-pane">
-        <AskPanel />
-      </aside>
-    </Transition>
+    <aside v-if="store.isAskPanelOpen && canShowCards" class="chat-pane">
+      <div
+        class="chat-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整 M4 宽度"
+        @pointerdown="startChatResize"
+      />
+      <AskPanel />
+    </aside>
 
     <button
       v-if="canShowCards && !store.isAskPanelOpen"
@@ -710,121 +1012,86 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.workspace-shell {
-  display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  height: 100dvh;
-  overflow: hidden;
-  background: var(--bg-primary);
-}
-
-.workspace-shell.formula-mode {
-  grid-template-columns: 170px minmax(0, 1fr) 280px;
-}
-
-.workspace-shell.with-chat {
-  grid-template-columns: 170px minmax(0, 1fr) 380px;
-}
-
-.workspace-shell.formula-mode.with-chat {
-  grid-template-columns: 160px minmax(0, 1fr) 260px 380px;
-}
-
-/* Each panel scrolls independently */
-.workspace-nav,
-.reader-pane,
-.formula-rail,
-.chat-pane {
-  height: 100dvh;
-  overflow-y: auto;
-}
-
-.chat-pane {
-  overflow: hidden;
+.learning-topbar-tabs {
   display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border-subtle);
-  background: var(--bg-card);
-}
-
-.workspace-nav {
-  position: sticky;
-  top: 0;
-  height: 100%;
-  border-right: 1px solid var(--border-subtle);
-  padding: 12px 10px;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
   background: var(--bg-secondary);
 }
 
-.nav-title {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 18px;
-  padding: 0 6px;
-}
-
-.nav-title strong {
-  color: var(--text-primary);
-  font-size: 14px;
-  font-weight: 720;
-}
-
-.nav-title span {
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workspace-nav nav {
-  display: grid;
-  gap: 3px;
-}
-
-.workspace-nav nav button {
-  display: flex;
-  min-height: 38px;
+.learning-topbar-tabs button {
+  display: inline-flex;
+  min-height: 30px;
+  min-width: 0;
+  flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 0 10px;
   color: var(--text-secondary);
   font-size: 13px;
   font-weight: 650;
 }
 
-.workspace-nav nav button.active,
-.workspace-nav nav button:hover:not(:disabled) {
+.learning-topbar-tabs button.active,
+.learning-topbar-tabs button:hover:not(:disabled) {
   background: var(--bg-card);
   color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
 }
 
-.workspace-nav nav button:disabled {
+.learning-topbar-tabs button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
 }
 
-.workspace-nav nav small {
+.learning-topbar-tabs small {
   color: inherit;
   font-size: 12px;
 }
 
-.chat-open {
-  width: 100%;
-  margin-top: 18px;
+.workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "reader";
+  height: calc(100dvh - 49px);
+  max-height: calc(100dvh - 49px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.reader-pane,
+.chat-pane {
+  min-height: 0;
 }
 
 .reader-pane {
+  grid-area: reader;
   height: 100%;
   min-width: 0;
   padding: 34px clamp(18px, 4vw, 44px) 56px;
   overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .workspace-shell.formula-mode .reader-pane {
   padding-inline: clamp(16px, 2.2vw, 28px);
+}
+
+@media (min-width: 1121px) {
+  .workspace-shell.with-chat {
+    grid-template-columns: minmax(0, 1fr) var(--chat-pane-width, 380px);
+    grid-template-areas: "reader chat";
+  }
 }
 
 .reader-header {
@@ -866,6 +1133,7 @@ onBeforeUnmount(() => {
 
 .reader-actions {
   display: flex;
+  gap: 8px;
   justify-content: flex-end;
 }
 
@@ -976,70 +1244,107 @@ onBeforeUnmount(() => {
 
 .card-stack {
   display: grid;
-  max-width: 860px;
+  max-width: min(980px, 100%);
   margin: 0 auto;
   gap: 18px;
 }
 
 .card-stack.formula-stack {
-  max-width: min(1180px, 100%);
+  max-width: min(1120px, 100%);
 }
 
 .formula-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1040px);
+  align-items: start;
+  justify-content: center;
+}
+
+.formula-reader {
   display: grid;
   min-width: 0;
   gap: 14px;
 }
 
 .formula-rail {
+  position: fixed;
+  z-index: 260;
   display: grid;
-  grid-template-rows: auto 1fr;
+  width: 300px;
+  max-height: min(72vh, calc(100dvh - 82px));
+  align-content: start;
   min-width: 0;
   gap: 0;
-  padding: 0;
-  border-left: 1px solid var(--border-subtle);
+  overflow-y: auto;
   background: var(--bg-card);
+  overscroll-behavior: contain;
+  padding: 0;
+  box-shadow: var(--shadow-lg);
+  user-select: none;
+  touch-action: none;
 }
 
 .formula-rail.collapsed {
-  width: 72px;
-  min-width: 72px;
-  height: 48px;
-  min-height: 48px;
+  width: 96px;
+  height: 44px;
+  align-content: stretch;
   overflow: hidden;
-  border-radius: 12px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 999px;
 }
 
-.formula-rail.collapsed .rail-toggle {
-  position: static;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  font-size: 13px;
-  font-weight: 720;
-  border-radius: 12px;
-  cursor: pointer;
+.formula-rail.dragging {
+  cursor: grabbing;
+}
+
+.formula-dock-handle {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 8px;
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  backdrop-filter: blur(12px);
+  cursor: grab;
+}
+
+.formula-rail.collapsed .formula-dock-handle {
+  min-height: 44px;
+  border-bottom: 0;
+  padding: 0;
+  cursor: grab;
+}
+
+.formula-dock-handle span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .rail-toggle {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
+  min-width: 62px;
+  min-height: 30px;
   border: 1px solid var(--border-subtle);
-  border-radius: 6px;
-  padding: 3px 10px;
+  border-radius: 8px;
+  padding: 3px 11px;
   background: var(--bg-card);
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 650;
   cursor: pointer;
+}
+
+.formula-rail.collapsed .rail-toggle {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 .rail-toggle:hover {
@@ -1118,7 +1423,7 @@ onBeforeUnmount(() => {
   gap: 3px;
   max-height: none;
   overflow-x: hidden;
-  overflow-y: auto;
+  overflow-y: visible;
   padding: 0 2px 4px 0;
   overscroll-behavior: contain;
   scroll-behavior: smooth;
@@ -1215,47 +1520,6 @@ onBeforeUnmount(() => {
   padding: 14px;
   border-bottom: 1px solid var(--border-subtle);
   background: color-mix(in srgb, var(--bg-card) 96%, var(--bg-secondary));
-}
-
-@media (min-width: 1121px) {
-  .formula-rail {
-    position: fixed;
-    top: 88px;
-    right: 28px;
-    z-index: 70;
-    width: 300px;
-    max-height: calc(100vh - 112px);
-    overflow-y: auto;
-    box-shadow: var(--shadow-md);
-  }
-}
-
-/* Mid-size (1121px-1499px): formula-rail becomes floating pill when chat open */
-@media (min-width: 1121px) and (max-width: 1499px) {
-  .workspace-shell.formula-mode.with-chat {
-    grid-template-columns: 160px minmax(0, 1fr) 380px;
-  }
-
-  .workspace-shell.formula-mode.with-chat .formula-rail {
-    position: fixed;
-    right: 400px;
-    bottom: 20px;
-    width: 86px;
-    height: 44px;
-    z-index: 80;
-    overflow: hidden;
-    border-radius: 999px;
-    border: 1px solid var(--border-subtle);
-  }
-
-  .workspace-shell.formula-mode.with-chat .formula-rail:not(.collapsed) {
-    width: 280px;
-    height: auto;
-    max-height: 70vh;
-    bottom: 76px;
-    overflow-y: auto;
-    border-radius: 12px;
-  }
 }
 
 .active-formula-card > span {
@@ -1505,15 +1769,39 @@ onBeforeUnmount(() => {
 }
 
 .chat-pane {
-  position: sticky;
-  top: 0;
-  height: 100dvh;
-  z-index: 30;
+  position: relative;
+  grid-area: chat;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
   border-left: 1px solid var(--border-subtle);
   background: var(--bg-card);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+}
+
+.chat-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  z-index: 4;
+  width: 8px;
+  cursor: col-resize;
+}
+
+.chat-resize-handle::after {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 2px;
+  height: 42px;
+  border-radius: 999px;
+  background: transparent;
+  content: '';
+  transform: translateY(-50%);
+}
+
+.chat-resize-handle:hover::after {
+  background: var(--border-subtle);
 }
 
 .chat-fab {
@@ -1539,19 +1827,14 @@ onBeforeUnmount(() => {
   .workspace-shell.formula-mode,
   .workspace-shell.formula-mode.with-chat {
     grid-template-columns: 1fr;
-  }
-
-  .workspace-nav {
-    position: static;
-    height: auto;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-subtle);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "reader";
   }
 
   .reader-pane {
-    height: auto;
-    min-height: 100%;
-    overflow-y: visible;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .reader-header {
@@ -1561,10 +1844,6 @@ onBeforeUnmount(() => {
 
   .reader-actions {
     justify-content: flex-start;
-  }
-
-  .workspace-nav nav {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .chat-pane {
@@ -1582,24 +1861,7 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
-  .formula-rail {
-    position: static;
-    order: -1;
-    max-height: none;
-    overflow: visible;
-  }
-
-  .formula-index-list {
-    display: flex;
-    max-height: none;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 6px;
-  }
-
   .formula-index button {
-    width: min(72vw, 220px);
-    flex: 0 0 auto;
     min-height: 34px;
   }
 
@@ -1611,10 +1873,6 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 720px) {
-  .workspace-nav nav {
-    grid-template-columns: 1fr;
-  }
-
   .reader-pane {
     padding-inline: 14px;
   }

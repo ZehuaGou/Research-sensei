@@ -45,3 +45,14 @@ def formula_card_batch_size(default: int = 10) -> int:
     except ValueError:
         return default
     return value if value > 0 else default
+
+
+def formula_card_concurrency(default: int = 3) -> int:
+    raw = os.getenv("RESEARCHSENSEI_FORMULA_CARD_CONCURRENCY", "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return value if value > 0 else default

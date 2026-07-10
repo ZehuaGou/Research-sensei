@@ -100,10 +100,10 @@ def run_m2_full_pipeline(
         claim_evidence,
         passage_index,
         None,
-        max_total_tokens=max(4000, formula_claim_count * 900),
+        max_total_tokens=max(5000, formula_claim_count * 1800),
         max_items_per_type=0,
         max_formula_items=max(formula_claim_count, 0),
-        max_passage_chars=700,
+        max_passage_chars=1600,
     )
     evidence_pack_summary = _evidence_pack_summary(evidence_pack, claim_evidence)
     survey_artifacts = build_survey_artifacts(document, passage_index, claim_evidence)

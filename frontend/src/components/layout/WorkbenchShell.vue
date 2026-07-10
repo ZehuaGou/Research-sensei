@@ -318,6 +318,7 @@ function formatCount(run: SearchRun) {
           <strong>{{ routeTitle }}</strong>
           <span class="branch-pill">main</span>
         </div>
+        <div id="workbench-topbar-center" class="topbar-center" />
         <div class="topbar-right">
           <button type="button" class="topbar-btn open-location" @click="router.push('/papers/library')">论文库</button>
           <button type="button" class="topbar-btn icon-only" aria-label="切换主题" @click="theme.toggle()">
@@ -624,10 +625,10 @@ function formatCount(run: SearchRun) {
 }
 
 .workbench-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   min-width: 0;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border-subtle);
   padding: 0 18px;
@@ -640,6 +641,12 @@ function formatCount(run: SearchRun) {
   min-width: 0;
   align-items: center;
   gap: 8px;
+}
+
+.topbar-center {
+  display: flex;
+  min-width: 0;
+  justify-content: center;
 }
 
 .topbar-left strong {

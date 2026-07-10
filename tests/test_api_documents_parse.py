@@ -71,6 +71,43 @@ def test_parse_local_path_reuses_existing_job_by_file_hash(tmp_path: Path) -> No
     assert [job["job_id"] for job in recent].count(first_data["job_id"]) == 1
 
 
+def test_parse_local_path_force_creates_new_job(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    source = workspace / "paper.md"
+    source.write_text("# Paper\n## Abstract\nA local force parse test.", encoding="utf-8")
+    client = TestClient(create_app(workspace_root=workspace))
+
+    first = client.post("/api/v1/documents/parse", data={"local_path": str(source)})
+    forced = client.post("/api/v1/documents/parse", data={"local_path": str(source), "force": "true"})
+
+    assert first.status_code == 200
+    assert forced.status_code == 200
+    forced_data = forced.json()
+    assert forced_data.get("cache_hit") is not True
+    assert forced_data["job_id"] != first.json()["job_id"]
+
+
+def test_reparse_job_creates_new_job_from_existing_source(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True)
+    source = workspace / "paper.md"
+    source.write_text("# Paper\n## Abstract\nA reparse test.", encoding="utf-8")
+    client = TestClient(create_app(workspace_root=workspace))
+
+    first = client.post("/api/v1/documents/parse", data={"local_path": str(source)})
+    assert first.status_code == 200
+    first_data = first.json()
+
+    reparsed = client.post(f"/api/v1/jobs/{first_data['job_id']}/reparse")
+
+    assert reparsed.status_code == 200
+    reparsed_data = reparsed.json()
+    assert reparsed_data["status"] == "JOB_CREATED"
+    assert reparsed_data["source_job_id"] == first_data["job_id"]
+    assert reparsed_data["job_id"] != first_data["job_id"]
+
+
 def test_parse_upload_markdown_generates_phase6_artifacts(tmp_path: Path) -> None:
     client = TestClient(create_app(workspace_root=tmp_path / "workspace"))
 

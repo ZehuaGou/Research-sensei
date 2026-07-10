@@ -8,6 +8,7 @@ from researchsensei.schemas.evidence import (
     ClaimEvidenceBundle,
     EvidencePack,
     EvidencePackItem,
+    Passage,
     PassageIndex,
 )
 
@@ -39,6 +40,7 @@ def build_evidence_pack(
 
     # Build passage lookup
     passage_map = {p.passage_id: p for p in passage_index.passages}
+    passage_order = {p.passage_id: index for index, p in enumerate(passage_index.passages)}
 
     # Filter claims
     filtered = [
@@ -98,6 +100,14 @@ def build_evidence_pack(
                 passage = passage_map.get(claim.passage_id)
                 if passage:
                     passage_text = passage.text
+
+            if claim.claim_type == "FORMULA_CONTEXT" and passage is not None:
+                passage_text = _formula_contextual_passage_text(
+                    claim=claim,
+                    passage=passage,
+                    passages=passage_index.passages,
+                    passage_order=passage_order,
+                )
 
             if not passage_text:
                 warnings.append(WarningItem(
@@ -221,6 +231,80 @@ def _formula_core_score(claim) -> float:
     if any("RAW" in flag or "UNKNOWN" in flag for flag in risk_flags):
         score -= 3.0
     return score
+
+
+def _formula_contextual_passage_text(
+    *,
+    claim,
+    passage: Passage,
+    passages: list[Passage],
+    passage_order: dict[str, int],
+) -> str:
+    """Give formula-card LLM calls the local prose needed to explain a formula.
+
+    A standalone equation is often not enough: the symbol definitions and method
+    role are usually in the paragraphs immediately before or after it.
+    """
+    formula_text = (passage.text or claim.source_sentence or claim.quote_or_summary or "").strip()
+    index = passage_order.get(passage.passage_id)
+    if index is None:
+        return formula_text
+
+    before = _neighbor_context(passages, index, -1, section=passage.section)
+    after = _neighbor_context(passages, index, 1, section=passage.section)
+    if not before and not after:
+        return formula_text
+
+    formula_id = str(getattr(claim, "formula_id", "") or "").strip() or "unknown"
+    origin = str(getattr(claim, "formula_origin", "") or "").strip() or "unknown"
+    return "\n".join(
+        [
+            f"Formula {formula_id}. Origin: {origin}.",
+            f"Formula: {formula_text}",
+            f"Context before: {before or 'unknown'}",
+            f"Context after: {after or 'unknown'}",
+        ]
+    ).strip()
+
+
+def _neighbor_context(
+    passages: list[Passage],
+    start_index: int,
+    direction: int,
+    *,
+    section: str,
+    max_chars: int = 900,
+) -> str:
+    rows: list[str] = []
+    section_key = (section or "").strip().lower()
+    index = start_index + direction
+    while 0 <= index < len(passages):
+        passage = passages[index]
+        if section_key and (passage.section or "").strip().lower() != section_key:
+            break
+        if not _is_formula_passage(passage):
+            text = " ".join((passage.text or "").split())
+            if text:
+                rows.append(text)
+                if sum(len(row) for row in rows) >= max_chars:
+                    break
+        index += direction
+    if direction < 0:
+        rows.reverse()
+    return _compact_context(" ".join(rows), max_chars=max_chars)
+
+
+def _is_formula_passage(passage: Passage) -> bool:
+    if passage.formula_ids:
+        return True
+    return "formula" in {kind.lower() for kind in passage.source_block_types}
+
+
+def _compact_context(text: str, *, max_chars: int) -> str:
+    compact = " ".join((text or "").split())
+    if len(compact) <= max_chars:
+        return compact
+    return compact[: max_chars - 3].rstrip() + "..."
 
 
 def _looks_like_formula_where_clause(text: str) -> bool:

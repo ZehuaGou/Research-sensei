@@ -71,6 +71,82 @@ def _method_passage(idx: int, text: str) -> Passage:
     )
 
 
+def test_formula_evidence_pack_includes_neighboring_formula_context() -> None:
+    formula_text = r"h_q(f) = \frac{1}{q^2}\begin{bmatrix}1&1\\1&1\end{bmatrix}"
+    claim_bundle = ClaimEvidenceBundle(
+        paper_id="paper",
+        claims=[
+            ClaimEvidenceRecord(
+                claim_id="paper:claim:c001",
+                claim_text=formula_text,
+                evidence_ref="paper:eq001",
+                block_id="eq001",
+                passage_id="p002",
+                section="sr",
+                claim_type="FORMULA_CONTEXT",
+                semantic_support=EvidenceType.SUPPORTED_BY_FORMULA.value,
+                source_sentence=formula_text,
+                quote_or_summary=formula_text,
+                confidence=0.7,
+                formula_origin="source_latex",
+                formula_id="source_latex_formula_002",
+                formula_ocr_status="not_required",
+            )
+        ],
+    )
+    passage_index = PassageIndex(
+        paper_id="paper",
+        passages=[
+            Passage(
+                passage_id="p001",
+                paper_id="paper",
+                block_ids=["b001"],
+                section="sr",
+                text="AL(f) is the average spectrum of L(f), approximated by convoluting L(f) with h_q(f).",
+                source_block_types=["paragraph"],
+                evidence_refs=["paper:b001"],
+            ),
+            Passage(
+                passage_id="p002",
+                paper_id="paper",
+                block_ids=["eq001"],
+                section="sr",
+                text=formula_text,
+                source_block_types=["formula"],
+                evidence_refs=["paper:eq001"],
+                formula_ids=["source_latex_formula_002"],
+                formula_origins=["source_latex"],
+            ),
+            Passage(
+                passage_id="p003",
+                paper_id="paper",
+                block_ids=["b002"],
+                section="sr",
+                text="R(f) subtracts the averaged log spectrum AL(f), making the innovation part more significant.",
+                source_block_types=["paragraph"],
+                evidence_refs=["paper:b002"],
+            ),
+        ],
+    )
+
+    pack = build_evidence_pack(
+        claim_bundle,
+        passage_index,
+        None,
+        max_items_per_type=0,
+        max_formula_items=1,
+        max_passage_chars=1200,
+    )
+
+    item = pack.items[0]
+    assert item.passage_text.startswith("Formula source_latex_formula_002. Origin: source_latex.")
+    assert "Formula:" in item.passage_text
+    assert "Context before:" in item.passage_text
+    assert "average spectrum of L(f)" in item.passage_text
+    assert "Context after:" in item.passage_text
+    assert "innovation part" in item.passage_text
+
+
 def test_evidence_pack_selects_core_formula_contexts_not_first_seen() -> None:
     texts = [
         "Shape definition h_i in R^d for EdgeConv input.",
