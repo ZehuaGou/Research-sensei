@@ -1,5 +1,12 @@
 # Copy this file to config/local.toml for machine-local provider overrides.
 # Keep secrets in .env, not in TOML and never in git.
+# Runtime precedence is:
+#   explicit create_app/constructor value
+#   > environment variable
+#   > config/local.toml
+#   > this example file
+#   > code default
+# create_app loads the merged configuration once and injects it into services.
 #
 # Typical .env for ccswitch live runs:
 # RESEARCHSENSEI_ENABLE_API_LLM=1
@@ -62,7 +69,8 @@ timeout_seconds = 60
 workspace_dir = "workspace"
 default_learning_mode = "reproducible_2h"
 max_upload_mb = 80
-parser_backend = "docling"
+# The maintained built-in parser path. PDF extraction uses PyMuPDF.
+parser_backend = "pymupdf"
 
 [server]
 host = "127.0.0.1"
@@ -70,9 +78,12 @@ port = 8765
 reload = false
 
 [search]
-execution = "uvx"
+# Every field below is consumed by PaperSearchMcpAdapter through the canonical
+# SearchConfig. Unknown sources, empty commands, negative timeouts, and unsafe
+# result limits are rejected during startup rather than silently ignored.
+execution = "auto"
 command = "paper-search"
-sources = ["arxiv", "openalex", "semantic_scholar", "crossref", "dblp", "unpaywall"]
+sources = ["openalex", "semantic", "crossref", "dblp", "arxiv", "core"]
 max_results = 80
 timeout_seconds = 90
 min_citation_count = 0

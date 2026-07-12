@@ -6,6 +6,7 @@ import time
 from typing import Protocol
 
 from researchsensei.acquisition import make_default_search_adapter
+from researchsensei.core.config import DEFAULT_SEARCH_MAX_RESULTS
 from researchsensei.schemas import (
     CandidatePaper,
     SeedExpansionBundle,
@@ -49,7 +50,7 @@ class SeedExpansionService:
         selection_service: SelectionService | None = None,
         verifier: CandidateVerifier | None = None,
         sources: list[str] | None = None,
-        max_results_per_source: int = 5,
+        max_results_per_source: int = DEFAULT_SEARCH_MAX_RESULTS,
         max_group_items: int = 6,
         max_verify_candidates: int = 12,
     ) -> None:

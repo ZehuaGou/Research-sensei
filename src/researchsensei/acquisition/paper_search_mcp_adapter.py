@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -11,9 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from researchsensei.core.config import DEFAULT_PAPER_SEARCH_SOURCES, DEFAULT_SEARCH_TIMEOUT_SECONDS
 from researchsensei.schemas import CandidatePaper
-
-DEFAULT_PAPER_SEARCH_SOURCES = "openalex,semantic,crossref,dblp,arxiv,core"
 
 
 class PaperSearchMcpAdapter:
@@ -24,11 +22,11 @@ class PaperSearchMcpAdapter:
         *,
         sources: str | Sequence[str] | None = None,
         command: Sequence[str] | None = None,
-        timeout_seconds: float = 90.0,
+        timeout_seconds: float = float(DEFAULT_SEARCH_TIMEOUT_SECONDS),
         runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
         cwd: str | Path | None = None,
     ) -> None:
-        self.sources = _normalize_sources(sources or os.getenv("RESEARCHSENSEI_PAPER_SEARCH_SOURCES", "") or DEFAULT_PAPER_SEARCH_SOURCES)
+        self.sources = _normalize_sources(sources or DEFAULT_PAPER_SEARCH_SOURCES)
         self.command = list(command) if command is not None else _default_command()
         self.timeout_seconds = timeout_seconds
         self.runner = runner or subprocess.run
@@ -157,9 +155,6 @@ def paper_search_mcp_available() -> bool:
 
 
 def _default_command() -> list[str]:
-    configured = os.getenv("RESEARCHSENSEI_PAPER_SEARCH_COMMAND", "").strip()
-    if configured:
-        return _split_command(configured)
     if _python_can_import_paper_search(sys.executable):
         return [sys.executable, "-m", "paper_search_mcp.cli"]
     venv_python = _project_venv_python()
@@ -193,10 +188,6 @@ def _python_can_import_paper_search(python_executable: str) -> bool:
     return completed.returncode == 0
 
 
-def _split_command(command: str) -> list[str]:
-    return [part for part in re.findall(r'"([^"]+)"|(\S+)', command) for part in part if part]
-
-
 def _normalize_sources(value: str | Sequence[str]) -> list[str]:
     if isinstance(value, str):
         parts = value.split(",")
@@ -207,7 +198,7 @@ def _normalize_sources(value: str | Sequence[str]) -> list[str]:
         source = str(part or "").strip().lower()
         if source and source not in result:
             result.append(source)
-    return result or DEFAULT_PAPER_SEARCH_SOURCES.split(",")
+    return result or list(DEFAULT_PAPER_SEARCH_SOURCES)
 
 
 def _split_semicolon_field(value: object) -> list[str]:
