@@ -101,5 +101,5 @@ def test_seed_expansion_api_rejects_non_object_seed(tmp_path: Path) -> None:
 
     response = client.post("/api/v1/directions/seed_expansion", json={"seed": "not-an-object"})
 
-    assert response.status_code == 400
-    assert response.json()["detail"]["status"] == "BLOCKED"
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"

@@ -154,7 +154,7 @@ def test_parse_upload_rejects_unsupported_file_type(tmp_path: Path) -> None:
     )
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Unsupported file type: .exe"
+    assert response.json()["error"]["code"] == "UNSUPPORTED_FILE_TYPE"
 
 
 def test_parse_doi_resolves_legal_oa_pdf_and_creates_job(tmp_path: Path, monkeypatch) -> None:
@@ -296,7 +296,10 @@ def test_delete_job_removes_it_from_recent_jobs(tmp_path: Path) -> None:
     deleted = client.delete(f"/api/v1/jobs/{job_id}")
 
     assert deleted.status_code == 200
-    assert deleted.json() == {"status": "DELETED", "job_id": job_id}
+    assert deleted.json()["status"] == "DELETED"
+    assert deleted.json()["job_id"] == job_id
+    assert deleted.json()["artifacts_removed"] is True
+    assert deleted.json()["cleanup_warning"] == ""
     assert client.get(f"/api/v1/jobs/{job_id}").status_code == 404
     recent = client.get("/api/v1/jobs").json()["jobs"]
     assert all(job["job_id"] != job_id for job in recent)
