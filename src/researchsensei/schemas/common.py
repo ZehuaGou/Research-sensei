@@ -22,7 +22,7 @@ class ErrorItem(SenseiModel):
 
 class GeneratedMetadata(SenseiModel):
     generated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    generator_version: str = "v0.5.0"
+    generator_version: str = "v0.6.0"
 
 
 class StatusEnvelope(SenseiModel):

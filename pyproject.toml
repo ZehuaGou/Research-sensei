@@ -1,43 +1,76 @@
 [project]
 name = "research-sensei"
-version = "0.5.0"
+version = "0.6.0"
 description = "AI-powered research paper reading assistant with LLM integration."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
-  "fastapi>=0.110",
-  "httpx>=0.27",
-  "httpx-sse>=0.4",
-  "jinja2>=3.1",
-  "pymupdf>=1.24",
-  "python-multipart>=0.0.20",
-  "python-dotenv>=1.0",
-  "pydantic>=2.0",
-  "uvicorn>=0.27",
-  "aiosqlite>=0.19",
-  "arxiv>=2.1",
-  "pyalex>=0.15",
-  "semanticscholar>=0.8",
-  "habanero>=1.2",
-  "beautifulsoup4>=4.12",
-  "requests>=2.31",
-  "paper-search-mcp>=0.1.4",
-  "flashrank>=0.2.10",
+  "fastapi>=0.110,<1",
+  "httpx>=0.28.1,<1",
+  "httpx-sse>=0.4,<1",
+  "jinja2>=3.1,<4",
+  "pymupdf>=1.24,<2",
+  "python-multipart>=0.0.20,<1",
+  "python-dotenv>=1.0,<2",
+  "pydantic>=2.0,<3",
+  "uvicorn>=0.27,<1",
+  "aiosqlite>=0.19,<1",
+  "arxiv>=2.1,<5",
+  "pyalex>=0.15,<1",
+  "semanticscholar>=0.8,<1",
+  "habanero>=1.2,<3",
+  "beautifulsoup4>=4.12,<5",
+  "requests>=2.31,<3",
+  "paper-search-mcp>=0.1.4,<1",
+  "flashrank>=0.2.10,<1",
+  "tomli>=2,<3; python_version < '3.11'",
 ]
 
 [project.optional-dependencies]
 dev = [
-  "pytest>=8.0",
-  "pytest-asyncio>=0.23",
+  "pytest>=8.0,<10",
+  "pytest-asyncio>=0.23,<2",
+  "mypy>=1.16,<2",
+  "ruff>=0.12,<1",
+  "types-requests>=2.31,<3",
 ]
 external = [
-  "docling>=2.0",
-  "marker>=1.0",
-  "instructor>=1.0",
-  "networkx>=3.0",
-  "py-fsrs>=2.0",
-  "sympy>=1.12",
+  "docling>=2.0,<3",
+  "marker>=1.0,<2",
+  "instructor>=1.0,<2",
+  "networkx>=3.0,<4",
+  "py-fsrs>=2.0,<3",
+  "sympy>=1.12,<2",
 ]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.mypy]
+python_version = "3.10"
+files = [
+  "src/researchsensei/core/config.py",
+  "src/researchsensei/core/sqlite.py",
+  "src/researchsensei/relevance.py",
+  "src/researchsensei/web/request_models.py",
+  "src/researchsensei/web/services/upload_service.py",
+  "src/researchsensei/web/services/task_service.py",
+]
+follow_imports = "skip"
+ignore_missing_imports = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_configs = true
+warn_unused_ignores = true
+show_error_codes = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "tests_live"]

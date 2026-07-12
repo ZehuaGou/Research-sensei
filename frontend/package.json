@@ -2,13 +2,21 @@
   "name": "frontend",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": "22.13.x",
+    "npm": "11.x"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
+    "typecheck": "vue-tsc -b",
     "preview": "vite preview",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --exclude e2e/**",
+    "test:watch": "vitest --exclude e2e/**",
+    "test:e2e": "playwright test --grep-invert @live",
+    "test:e2e:live": "playwright test --grep @live"
   },
   "dependencies": {
     "@vueuse/core": "^14.3.0",
@@ -22,6 +30,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "@types/node": "^24.12.3",
     "@vitejs/plugin-vue": "^6.0.6",
+    "@playwright/test": "1.56.1",
     "@vue/test-utils": "^2.4.10",
     "@vue/tsconfig": "^0.9.1",
     "jsdom": "^29.1.1",

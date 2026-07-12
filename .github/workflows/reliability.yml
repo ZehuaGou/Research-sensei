@@ -1,0 +1,134 @@
+name: Reliability baseline
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+
+concurrency:
+  group: reliability-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  RESEARCHSENSEI_ENABLE_API_LLM: "0"
+  RUN_LIVE_TESTS: "0"
+  RUN_LLM_TESTS: "0"
+
+jobs:
+  backend:
+    name: Backend (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - python-version: "3.10"
+            constraints: constraints/py310.txt
+          - python-version: "3.13"
+            constraints: constraints/py313.txt
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            constraints/compatibility.txt
+            constraints/py310.txt
+            constraints/py313.txt
+
+      - name: Install locked runtime and development dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c "${{ matrix.constraints }}" -e ".[dev]"
+
+      - name: Run backend suite
+        run: python -m pytest -q
+
+      - name: Run main-chain matrix
+        run: python -m pytest tests/test_main_chain_matrix.py -v
+
+      - name: Run encoding and mojibake gate
+        run: python -m pytest tests/test_encoding_hygiene.py -v
+
+      - name: Lint reliability boundary
+        if: matrix.python-version == '3.13'
+        run: >-
+          python -m ruff check
+          src/researchsensei/core
+          src/researchsensei/web
+          src/researchsensei/relevance.py
+          tests/test_api_contract_v06.py
+          tests/test_config_contract_v06.py
+          tests/test_upload_service.py
+          tests/test_background_tasks.py
+          tests/test_job_service.py
+          tests/test_m1_relevance_benchmark.py
+          tests/test_m4_memory.py
+
+      - name: Type-check reliability boundary
+        if: matrix.python-version == '3.13'
+        run: python -m mypy
+
+      - name: Verify patch whitespace
+        run: git diff --check HEAD
+
+  frontend:
+    name: Frontend unit, types, build, audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - name: Run Vitest
+        run: npm test
+      - name: Run Vue TypeScript check
+        run: npm run typecheck
+      - name: Build production assets
+        run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --registry=https://registry.npmjs.org
+
+  browser-e2e:
+    name: Browser E2E (fixed fixtures)
+    needs: frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.1
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run fixture-backed E2E suite
+        run: npm run test:e2e

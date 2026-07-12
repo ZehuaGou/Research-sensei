@@ -1,0 +1,3 @@
+# onnxruntime 1.24+ no longer publishes CPython 3.10 wheels. FlashRank does
+# not declare that transitive compatibility ceiling itself.
+onnxruntime<1.24; python_version < "3.11"
