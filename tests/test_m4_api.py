@@ -7,7 +7,6 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ModelProviderConfig
 from researchsensei.llm.client import LLMClient
-from researchsensei.llm.types import ChatResponse
 from researchsensei.web.app import create_app
 
 
@@ -16,20 +15,38 @@ class ScriptedM4LLM:
         self,
         *,
         evidence_refs: list[str] | None = None,
-        answer: str = "这篇论文用注意力结构把分散的证据片段连接起来，核心作用是让检索时不只看单个片段，而是聚合相关上下文。证据边界是当前卡片只支持方法机制，不能推出额外实验结论。",
+        answer: str = "这篇论文用注意力结构把分散的证据片段连接起来，让检索可以聚合相关上下文。",
+        supporting_quote: str = "The attention architecture links sparse evidence passages to solve the retrieval problem.",
+        claims: list[dict[str, object]] | None = None,
+        uncertainty: str = "",
     ) -> None:
         self.calls = 0
         self.evidence_refs = evidence_refs or ["paper:b001"]
         self.answer = answer
+        self.supporting_quote = supporting_quote
+        self.claims = claims
+        self.uncertainty = uncertainty
         self.messages = []
 
     async def chat(self, messages, *, config=None):
-        self.calls += 1
-        self.messages.append(messages)
-        return ChatResponse(content=self.answer)
+        raise AssertionError("M4 ask must use structured chat_json")
 
     async def chat_json(self, messages, *, config=None):
-        raise AssertionError("M4 ask should use freeform chat, not chat_json")
+        self.calls += 1
+        self.messages.append(messages)
+        claims = self.claims or [
+            {
+                "text": self.answer,
+                "claim_type": "paper_claim",
+                "evidence_refs": self.evidence_refs,
+                "supporting_quotes": [
+                    {"evidence_ref": ref, "quote": self.supporting_quote}
+                    for ref in self.evidence_refs
+                ],
+                "uncertainty": "",
+            }
+        ]
+        return {"claims": claims, "uncertainty": self.uncertainty, "follow_up_suggestions": []}
 
 
 class FailingM4LLM:
@@ -37,6 +54,9 @@ class FailingM4LLM:
         self.calls = 0
 
     async def chat(self, messages, *, config=None):
+        raise AssertionError("M4 ask must use structured chat_json")
+
+    async def chat_json(self, messages, *, config=None):
         self.calls += 1
         raise RuntimeError("simulated llm outage")
 
@@ -78,9 +98,8 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     )
     assert full_formula_response.status_code == 200
     full_formula = full_formula_response.json()
-    assert "打分器" in full_formula["meaning"]
-    assert "目标是" in full_formula["meaning"]
-    assert "最重要的对象" in full_formula["meaning"]
+    assert "公式卡片记录的目标" in full_formula["meaning"]
+    assert "公式卡片明确记录的对象" in full_formula["meaning"]
     assert "证据片段的向量表示" in full_formula["meaning"]
     assert "注意力分数" in full_formula["meaning"]
     assert full_formula["symbol"] == ""
@@ -136,7 +155,7 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     memory_response = client.get(f"/api/v1/jobs/{job_id}/memory")
     assert memory_response.status_code == 200
     memory = memory_response.json()
-    assert memory["schema_version"] == "m4_memory"
+    assert memory["schema_version"] == "m4_memory.v2"
     assert memory["job_id"] == job_id
     assert len(memory["records"]) >= 5
     assert {record["memory_type"] for record in memory["records"]} >= {
@@ -305,11 +324,88 @@ def test_m4_ask_uses_llm_when_client_is_configured(tmp_path: Path) -> None:
     assert response.status_code == 200
     data = response.json()
     assert "注意力结构" in data["answer"]
-    assert "证据边界" in data["answer"]
     assert data["evidence_refs"] == ["paper:b001"]
+    assert data["claims"] == [
+        {
+            "text": "这篇论文用注意力结构把分散的证据片段连接起来，让检索可以聚合相关上下文。",
+            "evidence_refs": ["paper:b001"],
+            "claim_type": "paper_claim",
+            "support_status": "SUPPORTED",
+            "uncertainty": "",
+        }
+    ]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": True}
     assert data["warnings"] == []
     assert llm.calls == 1
+
+
+def test_m4_rejects_legal_ref_when_evidence_does_not_support_claim(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "unsupported_claim")
+    llm = ScriptedM4LLM(
+        answer="论文在 NASA 数据集上把 F1 提升了 12.5%。",
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "实验结果如何？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == []
+    assert data["claims"] == []
+    assert "NASA" not in data["answer"]
+    assert "12.5" not in data["answer"]
+    assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
+
+
+def test_m4_keeps_supported_claims_and_drops_unsupported_claims(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "partial_claims")
+    quote = "The attention architecture links sparse evidence passages to solve the retrieval problem."
+    llm = ScriptedM4LLM(
+        claims=[
+            {
+                "text": "论文用注意力结构连接分散的证据片段，以回应检索问题。",
+                "claim_type": "paper_claim",
+                "evidence_refs": ["paper:b001"],
+                "supporting_quotes": [{"evidence_ref": "paper:b001", "quote": quote}],
+                "uncertainty": "",
+            },
+            {
+                "text": "论文还在 NASA 数据集上把 F1 提升了 12.5%。",
+                "claim_type": "paper_claim",
+                "evidence_refs": ["paper:b001"],
+                "supporting_quotes": [{"evidence_ref": "paper:b001", "quote": quote}],
+                "uncertainty": "",
+            },
+        ]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "这篇论文的方法是什么？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert len(data["claims"]) == 1
+    assert data["claims"][0]["support_status"] == "SUPPORTED"
+    assert "注意力结构" in data["answer"]
+    assert "NASA" not in data["answer"]
+    assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
 
 
 def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -> None:
@@ -553,7 +649,7 @@ def test_m4_ask_handles_general_chat_without_paper_fallback(tmp_path: Path) -> N
 
 def test_m4_ask_rejects_off_topic_tasks_without_memory_pollution(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
-    llm = ScriptedM4LLM(answer="不应该被非论文任务调用")
+    llm = ScriptedM4LLM()
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
@@ -631,7 +727,7 @@ def test_m4_ask_reports_llm_request_failure_without_local_fallback(tmp_path: Pat
     assert data["status"] == "DEGRADED"
     assert "没有拿到可用的大模型解释" in data["answer"]
     assert "没有改用本地卡片兜底" in data["answer"]
-    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["evidence_refs"] == []
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert data["warnings"][0]["code"] == "M4_LLM_REQUEST_FAILED"
     assert llm.calls == 1
@@ -663,9 +759,9 @@ def test_m4_ask_rejects_english_heavy_llm_answer(tmp_path: Path) -> None:
     data = response.json()
     assert data["status"] == "DEGRADED"
     assert "没有拿到可用的大模型解释" in data["answer"]
-    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["evidence_refs"] == []
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
+    assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
     assert llm.calls == 1
 
 
@@ -691,8 +787,78 @@ def test_m4_example_question_rejects_abstract_llm_answer(tmp_path: Path) -> None
     assert data["status"] == "DEGRADED"
     assert "没有拿到可用的大模型解释" in data["answer"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
+    assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
     assert llm.calls == 1
+
+
+def test_m4_example_fallback_does_not_invent_spectral_residual_from_broad_keywords(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "generic_anomaly")
+    _write_json(
+        artifact_dir / "paper_card.json",
+        {
+            "paper_id": "paper",
+            "title": "Generic Time-series Detector",
+            "one_sentence_summary": "A paper about time series anomaly detection.",
+            "evidence_refs": ["paper:b001"],
+            "problem": {"text": "The task is time series anomaly detection.", "evidence_ref": "paper:b001"},
+            "core_idea": {"text": "Learn a detector from time-series observations.", "evidence_ref": "paper:b001"},
+            "method_overview": {"text": "The detector assigns an anomaly score.", "evidence_ref": "paper:b001"},
+            "experiment_summary": {"text": "UNKNOWN", "evidence_ref": "paper:b001"},
+        },
+    )
+    _write_json(
+        artifact_dir / "claim_evidence.json",
+        {
+            "paper_id": "paper",
+            "claims": [
+                {
+                    "claim_id": "c1",
+                    "evidence_ref": "paper:b001",
+                    "passage_id": "p1",
+                    "claim_type": "METHOD",
+                    "claim_text": "The detector assigns an anomaly score to time-series observations.",
+                    "quote_or_summary": "The detector assigns an anomaly score to time-series observations.",
+                    "source_sentence": "The detector assigns an anomaly score to time-series observations.",
+                    "section": "method",
+                }
+            ],
+        },
+    )
+    _write_json(
+        artifact_dir / "passage_index.json",
+        {
+            "paper_id": "paper",
+            "passages": [
+                {
+                    "passage_id": "p1",
+                    "text": "The detector assigns an anomaly score to time-series observations.",
+                    "section": "method",
+                    "evidence_refs": ["paper:b001"],
+                }
+            ],
+        },
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "请给这个 time series anomaly detection 方法举例。"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["warnings"][0]["code"] == "M4_EXAMPLE_EVIDENCE_INSUFFICIENT"
+    assert "傅里叶" not in data["answer"]
+    assert "谱残差" not in data["answer"]
+    assert "阈值 τ" not in data["answer"]
+    assert "公式卡片和证据" in data["answer"]
 
 
 def test_m4_example_question_includes_formula_context_and_rejects_external_threshold_rule(tmp_path: Path) -> None:
@@ -745,11 +911,11 @@ def test_m4_example_question_includes_formula_context_and_rejects_external_thres
     data = response.json()
     assert data["status"] == "DEGRADED"
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_LOW_QUALITY"
+    assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
     prompt_text = llm.messages[0][1].content
     assert "paper:eq003" in prompt_text
     assert "\\overline{S(x_i)}" in prompt_text
-    assert "不要把论文的阈值判断改写成 μ+3σ" in prompt_text
+    assert "公式、阈值、数值、数据集、指标和实验结果" in prompt_text
 
 
 def test_m4_ask_strips_internal_refs_from_user_facing_answer(tmp_path: Path) -> None:

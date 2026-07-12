@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import json
-import re
-import uuid
 import asyncio
+import json
+import os
+import re
+import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Literal
 
 from researchsensei.llm.client import LLMClient, LLMClientError
 from researchsensei.llm.types import ChatMessage, LLMConfig
@@ -15,6 +17,7 @@ from researchsensei.schemas.m4 import (
     AdvisorEvaluation,
     AdvisorQuestion,
     FormulaSymbolExplanation,
+    GroundedClaim,
     InteractiveAnswer,
     M4MemoryBundle,
     M4MemoryRecord,
@@ -23,6 +26,13 @@ from researchsensei.schemas.m4 import (
 
 
 M4_MEMORY_FILENAME = "m4_memory.json"
+M4_MEMORY_SCHEMA_VERSION = "m4_memory.v2"
+M4_MEMORY_MAX_RECORDS = 200
+M4_MEMORY_MAX_BYTES = 1_048_576
+M4_MEMORY_MAX_WARNINGS = 16
+
+_MEMORY_LOCKS: dict[str, threading.RLock] = {}
+_MEMORY_LOCKS_GUARD = threading.Lock()
 
 
 class M4InteractionService:
@@ -40,6 +50,7 @@ class M4InteractionService:
         self.run_dir = Path(run_dir)
         self.artifacts = artifacts
         self.llm_client = llm_client
+        self._memory_lock = _memory_lock_for(self.memory_path)
 
     @property
     def memory_path(self) -> Path:
@@ -58,7 +69,8 @@ class M4InteractionService:
         evidence = self._best_evidence(selected_text)
         warnings: list[WarningItem] = []
         status = "SUCCESS"
-        confidence = evidence["score"]
+        raw_confidence = evidence.get("score")
+        confidence = float(raw_confidence) if isinstance(raw_confidence, (int, float)) else 0.0
         if not evidence.get("evidence_ref"):
             status = "DEGRADED"
             warnings.append(_warning("NO_TRACEABLE_EVIDENCE", "这段选中文本没有匹配到可追踪的 evidence_ref。"))
@@ -197,8 +209,10 @@ class M4InteractionService:
         is_formula_question = _is_formula_question(question, selected_text)
         ignore_selection = _should_ignore_selection(question, selected_text)
         memory_hit = self._memory_hit(question=question, selected_text=selected_text)
+        memory_claims = self._claims_from_memory(memory_hit) if memory_hit is not None else []
         if (
             memory_hit is not None
+            and memory_claims
             and self.llm_client is None
             and not is_formula_question
             and not _looks_like_english_answer(memory_hit.answer)
@@ -211,7 +225,8 @@ class M4InteractionService:
             return InteractiveAnswer(
                 status="SUCCESS",
                 answer=_strip_internal_refs_from_answer(_normalize_answer_text(memory_hit.answer, max_chars=1800)),
-                evidence_refs=memory_hit.evidence_refs,
+                evidence_refs=_unique([ref for claim in memory_claims for ref in claim.evidence_refs]),
+                claims=memory_claims,
                 memory_refs=[memory_hit.memory_id],
                 uncertainty="这次回答来自 M4 记忆，并沿用当时记录的证据引用。",
                 follow_up_suggestions=_follow_ups(),
@@ -230,47 +245,84 @@ class M4InteractionService:
         else:
             answer, evidence_refs, confidence, warnings = self._answer_from_artifacts(question)
 
+        grounded_claims = (
+            [
+                GroundedClaim(
+                    text=answer,
+                    evidence_refs=_unique(evidence_refs),
+                    support_status="ARTIFACT_DERIVED",
+                )
+            ]
+            if answer and evidence_refs
+            else []
+        )
+        grounding_degraded = any(
+            warning.code in {"LIMITATION_EVIDENCE_MISSING", "M4_EXAMPLE_EVIDENCE_INSUFFICIENT"}
+            for warning in warnings
+        )
+        llm_uncertainty = ""
+
         llm_evidence_refs = self._expanded_question_evidence_refs(
             question=question,
             selected_text=selected_text,
             seed_refs=evidence_refs,
         )
         used_context = {"memory": False, "artifacts": True, "llm": False}
-        llm_result = self._answer_with_freeform_llm(
+        llm_result = self._answer_with_grounded_llm(
             question=question,
             selected_text=selected_text,
-            fallback_answer=answer,
             allowed_evidence_refs=llm_evidence_refs or evidence_refs,
             conversation_history=conversation_history,
         )
         if llm_result.get("ok"):
-            answer = llm_result["answer"]
-            evidence_refs = llm_result["evidence_refs"]
+            answer = _clean(llm_result.get("answer"))
+            evidence_refs = _string_list(llm_result.get("evidence_refs"))
+            raw_grounded_claims = llm_result.get("claims", [])
+            grounded_claims = (
+                [claim for claim in raw_grounded_claims if isinstance(claim, GroundedClaim)]
+                if isinstance(raw_grounded_claims, list)
+                else []
+            )
+            grounding_degraded = bool(llm_result.get("degraded"))
+            llm_uncertainty = _clean(llm_result.get("uncertainty"))
+            raw_warnings = llm_result.get("warnings", [])
+            if isinstance(raw_warnings, list):
+                warnings.extend(warning for warning in raw_warnings if isinstance(warning, WarningItem))
             used_context = {"memory": False, "artifacts": True, "llm": True}
-            confidence = max(confidence, float(llm_result.get("confidence", 0.0)))
+            raw_llm_confidence = llm_result.get("confidence")
+            llm_confidence = (
+                float(raw_llm_confidence) if isinstance(raw_llm_confidence, (int, float)) else 0.0
+            )
+            confidence = max(confidence, llm_confidence)
         elif self.llm_client is not None:
             code = str(llm_result.get("code") or "M4_LLM_FAILED")
             message = str(llm_result.get("message") or "LLM did not return a usable answer.")
             return InteractiveAnswer(
                 status="DEGRADED",
                 answer=_llm_failure_answer(code=code, message=message),
-                evidence_refs=llm_evidence_refs or evidence_refs,
+                evidence_refs=[],
+                claims=[],
                 uncertainty="M4 已经拿到论文上下文，但 LLM 没有返回可用解释；本次没有改用本地兜底答案。",
                 follow_up_suggestions=_follow_ups(),
                 used_context={"memory": False, "artifacts": bool(llm_evidence_refs or evidence_refs), "llm": False},
                 warnings=[*warnings, _warning(code, message)],
             )
 
-        status = "SUCCESS" if evidence_refs else "DEGRADED"
+        status = "SUCCESS" if evidence_refs and not grounding_degraded else "DEGRADED"
+        if llm_uncertainty:
+            uncertainty = llm_uncertainty
+        elif evidence_refs and not grounding_degraded:
+            uncertainty = "回答基于当前 M2 证据卡片。"
+        elif evidence_refs:
+            uncertainty = "部分结论无法通过逐条证据校验，未通过的内容已删除。"
+        else:
+            uncertainty = "没有可追踪的 evidence_ref，所以只给出受限回答。"
         result = InteractiveAnswer(
             status=status,
             answer=answer,
             evidence_refs=evidence_refs,
-            uncertainty=(
-                "回答基于当前 M2 证据卡片。"
-                if evidence_refs
-                else "没有可追踪的 evidence_ref，所以只给出受限回答。"
-            ),
+            claims=grounded_claims,
+            uncertainty=uncertainty,
             follow_up_suggestions=_follow_ups(),
             used_context=used_context,
             warnings=warnings,
@@ -283,7 +335,11 @@ class M4InteractionService:
             evidence_refs=result.evidence_refs,
             confidence=confidence,
             source_artifact="paper_card",
-            metadata={"selected_text": selected_text, "status": result.status},
+            metadata={
+                "selected_text": selected_text,
+                "status": result.status,
+                "grounded_claims": [claim.model_dump(mode="json") for claim in result.claims],
+            },
         )
         return result
 
@@ -411,9 +467,11 @@ class M4InteractionService:
         return self._read_memory()
 
     def clear_memory(self) -> M4MemoryBundle:
-        bundle = M4MemoryBundle(job_id=self.job_id)
-        self._write_memory(bundle)
-        return bundle
+        with self._memory_lock:
+            current = self._read_memory_unlocked()
+            bundle = M4MemoryBundle(job_id=self.job_id, warnings=current.warnings)
+            self._write_memory_unlocked(bundle)
+            return bundle
 
     def _expanded_question_evidence_refs(
         self,
@@ -444,12 +502,11 @@ class M4InteractionService:
             refs.extend(self._paper_card_refs())
         return _unique(refs)[:limit]
 
-    def _answer_with_freeform_llm(
+    def _answer_with_grounded_llm(
         self,
         *,
         question: str,
         selected_text: str,
-        fallback_answer: str,
         allowed_evidence_refs: list[str],
         conversation_history: list[dict[str, str]],
     ) -> dict[str, object]:
@@ -459,139 +516,57 @@ class M4InteractionService:
             return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的论文证据引用。")
 
         allowed = set(allowed_evidence_refs)
+        evidence_rows = self._llm_context(allowed)
+        if not evidence_rows:
+            return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的可验证论文证据。")
+        evidence_by_ref = _evidence_text_by_ref(evidence_rows)
         context = {
-            "paper": self._paper_overview_context(),
-            "retrieved_evidence": self._llm_context(allowed),
+            "retrieved_evidence": evidence_rows,
             "recent_memory": self._memory_context(),
             "conversation_history": conversation_history[-10:],
             "allowed_evidence_refs": allowed_evidence_refs,
         }
-        if not context["paper"] and not context["retrieved_evidence"]:
-            return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的论文上下文。")
-
-        user_prompt = (
-            "你正在回答当前论文的深读问题。下面是论文上下文、检索到的证据、最近对话和用户问题。\n"
-            "请直接用简体中文自然回答，不要输出 JSON，不要复述内部 evidence_ref，不要把 LaTeX 源码整段抄给用户。\n"
-            "如果问题要求例子，就给一个具体输入、步骤和输出的例子；如果问题问解决了什么问题，就先说清楚具体任务和困难。\n"
-            "如果回答涉及公式、阈值或数值例子，必须优先使用 context 里的 formula_cards 或 claim_evidence 公式，不要把论文公式替换成外部通用规则。\n"
-            "尤其不要把论文的阈值判断改写成 μ+3σ、均值加标准差或其他上下文没有出现的启发式阈值。\n"
-            "如果上下文不足以回答某个细节，请明确说缺少哪类证据，不要编。\n\n"
-            f"用户问题：{_compact_user_text(question, max_chars=900)}\n"
-            f"用户选中文本：{_compact_user_text(selected_text, max_chars=900) or '无'}\n"
-            f"后端本地检索草稿（只作为线索，可纠正，不要照抄）：{_normalize_answer_text(fallback_answer, max_chars=900)}\n\n"
-            "论文上下文：\n"
-            f"{json.dumps(context, ensure_ascii=False, indent=2)}"
-        )
-        messages = [
-            ChatMessage(
-                role="system",
-                content=(
-                    "你是 ResearchSensei 的 M4 论文助教。你的任务是基于当前论文上下文回答用户的深读问题。"
-                    "回答要像真实助教：先直接回答，再解释机制、变量、证据边界和例子。"
-                    "不要机械套模板，不要输出 JSON，不要暴露 evidence_ref、memory_ref、job id 等内部编号。"
-                    "公式问题要解释符号含义和作用，不要只翻译 LaTeX。"
-                    "举例时可以使用玩具数字，但计算规则必须来自论文上下文；不要引入 μ+3σ、均值加标准差等上下文没有的外部规则。"
-                ),
-            ),
-            ChatMessage(role="user", content=user_prompt),
-        ]
-        try:
-            response = _run_async_llm(
-                self.llm_client.chat(
-                    messages,
-                    config=LLMConfig(
-                        temperature=0.25,
-                        max_tokens=5000,
-                        json_mode=False,
-                        timeout=150,
-                        max_retries=1,
-                        retry_delay=1.0,
-                        disable_thinking=True,
-                    ),
-                )
-            )
-        except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
-            return _llm_error_result("M4_LLM_REQUEST_FAILED", _compact_user_text(str(exc), max_chars=800))
-
-        answer = _soften_mechanical_answer(
-            _strip_internal_refs_from_answer(_normalize_answer_text(response.content, max_chars=2600))
-        )
-        if not answer:
-            return _llm_error_result("M4_LLM_EMPTY", "LLM 返回了空内容。")
-        if _looks_like_english_answer(answer):
-            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回了英文占比过高的回答。")
-        if _looks_like_thin_llm_answer(answer):
-            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回的回答过于空泛。")
-        if _should_reject_llm_answer_for_question(question, answer, context=context):
-            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 回答没有满足当前问题的证据约束或具体性要求。")
-        return {
-            "ok": True,
-            "answer": answer,
-            "evidence_refs": _unique(allowed_evidence_refs)[:8],
-            "confidence": 0.88,
-        }
-
-    def _answer_with_llm(
-        self,
-        *,
-        question: str,
-        selected_text: str,
-        fallback_answer: str,
-        allowed_evidence_refs: list[str],
-    ) -> dict[str, object] | None:
-        if self.llm_client is None or not allowed_evidence_refs:
-            return None
-        allowed = set(allowed_evidence_refs)
-        context = self._llm_context(allowed)
-        if not context:
-            return None
         prompt = {
-            "job_id": self.job_id,
-            "question": _compact_user_text(question, max_chars=700),
-            "selected_text": _compact_user_text(selected_text, max_chars=700),
-            "allowed_evidence_refs": allowed_evidence_refs,
-            "fallback_answer": _normalize_answer_text(fallback_answer, max_chars=1200),
+            "question": _compact_user_text(question, max_chars=900),
+            "selected_text": _compact_user_text(selected_text, max_chars=900),
             "context": context,
             "output_rules": [
-                "answer 必须是简体中文自然语言，即使 question、selected_text 或 context 是英文。",
-                "不要逐字复述 selected_text；尤其不要整段复制 LaTeX、KaTeX 或公式源码。",
-                "公式只保留必要符号，优先解释变量含义、机制和论文里的作用。",
-                "理论类和公式类问题必须按“直觉-对象-逻辑链-证据边界”讲：先用一句话说明它在解决什么困惑，再解释每个对象是什么，最后说明为什么这一步有用。",
-                "回答要像真实助教：先直接回答问题，不要用“可以这样理解”“这段内容说明了”这类空泛开场。",
-                "如果 question 在问“为什么/怎么/能不能”，answer 必须给出因果链：论文要解决的障碍是什么、方法做了哪一步、这一步为什么能回应障碍。",
-                "如果 question 要求“举例子/详细说明/example”，answer 必须给一个明确玩具例子，包含具体输入、步骤和输出；不要只复述论文流程。",
-                "如果 question 问“解决了什么问题”，先用一句话说清楚具体任务和困难，再讲方法怎样解决，避免只说抽象贡献。",
-                "每个段落至少落到一个具体对象，例如变量、模块、训练项、数据集、指标、约束或论文中的方法步骤。",
-                "解释公式时，如果 context 里有参数/符号或关键项，必须单独讲清楚它们各自的作用。",
-                "不要固定使用“重点：”“问题：”“核心机制：”“对应证据：”这类标题式模板；更像助教自然讲解，可以用短自然段和顺口的承接句。",
-                "论文级方法、贡献、证据问题开头先直接给一句自然回答，然后再顺着讲背景、机制、原因和证据。",
-                "对应证据只写论文中的依据内容，不要写 evidence_ref、memory_ref、job id、b038、eq009、m4_xxx 等内部编号。",
-                "优先使用 paper_card 和 claim_evidence 细节。",
-                "不要只给一句概括；除非 context 不足，至少说明两个具体机制、数据集、指标或变量。",
-                "最多 4 个短段落，每段不超过 160 个中文字符。",
+                "只输出符合 required_json_schema 的 JSON。",
+                "每个可向用户展示的结论必须单独放进 claims，不能把整篇回答只绑定到一个引用集合。",
+                "每个 claim 的 evidence_refs 只能从 allowed_evidence_refs 选择，并逐个提供 supporting_quotes。",
+                "supporting_quotes 必须从对应 evidence_ref 的 text 原样摘录，不得改写或翻译。",
+                "claim.text 必须是简体中文自然语言，不能暴露 evidence_ref、memory_ref、job id 等内部编号。",
+                "公式、阈值、数值、数据集、指标和实验结果只有在 supporting quote 明确出现时才允许写入。",
+                "玩具数字只能放在 toy_example claim 中，且计算规则必须在引用证据里明确出现。",
+                "证据不足的细节不要猜；写进顶层 uncertainty，而不是伪造 claim。",
             ],
             "required_json_schema": {
-                "answer": "简体中文回答，只能使用 context 中的信息，不能整段复制公式源码",
-                "evidence_refs": ["从 allowed_evidence_refs 中原样复制一个或多个引用"],
-                "uncertainty": "中文说明：证据是否充分",
-                "follow_up_suggestions": ["中文后续追问建议"],
+                "claims": [
+                    {
+                        "text": "一个独立、可核验的简体中文结论",
+                        "claim_type": "paper_claim | explanation | toy_example",
+                        "evidence_refs": ["一个或多个允许的引用"],
+                        "supporting_quotes": [
+                            {
+                                "evidence_ref": "与该 quote 对应的允许引用",
+                                "quote": "从该引用 text 原样复制的最小充分片段",
+                            }
+                        ],
+                        "uncertainty": "该结论自身的不确定性；充分时为空字符串",
+                    }
+                ],
+                "uncertainty": "对证据缺口的简体中文说明",
+                "follow_up_suggestions": ["基于现有论文证据可以继续追问的问题"],
             },
         }
         messages = [
             ChatMessage(
                 role="system",
                 content=(
-                    "你是 ResearchSensei 的 M4 论文助教。必须用简体中文回答，只能使用提供的 context。"
-                    "即使用户问题、选中文本或证据是英文，也要翻译成中文解释。"
-                    "不要整段复制 LaTeX/KaTeX/公式源码；要把公式转成中文含义和作用。"
-                    "理论和公式必须讲懂：先给直觉，再讲对象，再讲逻辑链，不要只堆术语或翻译英文。"
-                    "回答要像真实助教，先直接解释用户问的点，再展开变量、机制、证据中的具体细节。"
-                    "不要机械使用“重点/问题/核心机制/对应证据”标题，除非用户明确要求列表。"
-                    "如果用户问的是自己的疑问，要围绕这个疑问组织因果解释，不要退回成通用论文摘要。"
-                    "论文级问题必须给正文细节，不要只回答标题、作者或一句摘要。"
-                    "answer 字段面向用户，不能出现 evidence_ref、memory_ref、job id、b038、eq009、m4_xxx 等内部编号。"
-                    "只返回 JSON，不要输出 Markdown。evidence_refs 必须从 allowed_evidence_refs 中原样复制。"
-                    "如果 context 不足，就使用 fallback_answer，并保留相同的 evidence_refs。"
+                    "你是 ResearchSensei 的 M4 论文助教。你只能根据提供的逐条证据生成 claim。"
+                    "每条 claim 都必须逐引用绑定原文 quote；合法引用不等于内容获得支持。"
+                    "不要引入证据里没有的算法、公式、阈值、数值、数据集、指标或实验结果。"
+                    "只能返回 JSON，不要输出 Markdown。"
                 ),
             ),
             ChatMessage(role="user", content=json.dumps(prompt, ensure_ascii=False)),
@@ -601,36 +576,73 @@ class M4InteractionService:
                 self.llm_client.chat_json(
                     messages,
                     config=LLMConfig(
-                        temperature=0.2,
-                        max_tokens=2400,
+                        temperature=0.15,
+                        max_tokens=3200,
                         json_mode=True,
-                        timeout=90,
+                        timeout=120,
                         max_retries=1,
                         retry_delay=1.0,
                         disable_thinking=True,
                     ),
                 )
             )
-        except (LLMClientError, RuntimeError, ValueError, TypeError):
-            return None
+        except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
+            return _llm_error_result("M4_LLM_REQUEST_FAILED", _compact_user_text(str(exc), max_chars=800))
         if not isinstance(data, dict):
-            return None
-        answer = _soften_mechanical_answer(
-            _strip_internal_refs_from_answer(_normalize_answer_text(data.get("answer"), max_chars=1800))
-        )
-        refs = _string_list(data.get("evidence_refs"))
-        if not answer or not refs:
-            return None
+            return _llm_error_result("M4_LLM_INVALID_STRUCTURE", "LLM 没有返回 claim 结构。")
+
+        raw_claims = data.get("claims", [])
+        if not isinstance(raw_claims, list) or not raw_claims:
+            return _llm_error_result("M4_LLM_INVALID_STRUCTURE", "LLM 返回的 claims 为空或格式错误。")
+        claims: list[GroundedClaim] = []
+        rejected_reasons: list[str] = []
+        for raw_claim in raw_claims[:12]:
+            claim, reason = _validate_grounded_claim(
+                raw_claim,
+                allowed=allowed,
+                evidence_by_ref=evidence_by_ref,
+            )
+            if claim is None:
+                rejected_reasons.append(reason)
+                continue
+            claims.append(claim)
+        if not claims:
+            return _llm_error_result(
+                "M4_CLAIM_UNSUPPORTED",
+                "LLM 给出了合法引用，但没有任何结论通过内容级证据校验。",
+            )
+
+        answer = _soften_mechanical_answer("\n\n".join(claim.text for claim in claims))
+        if not answer:
+            return _llm_error_result("M4_LLM_EMPTY", "通过证据校验的结论为空。")
         if _looks_like_english_answer(answer):
-            return None
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回了英文占比过高的回答。")
         if _looks_like_thin_llm_answer(answer):
-            return None
-        if any(ref not in allowed for ref in refs):
-            return None
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回的回答过于空泛。")
+        if _should_reject_llm_answer_for_question(question, answer, context=context):
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 回答没有满足当前问题的证据约束或具体性要求。")
+
+        warnings: list[WarningItem] = []
+        if rejected_reasons:
+            warnings.append(
+                WarningItem(
+                    code="M4_CLAIM_UNSUPPORTED",
+                    message="部分 LLM 结论未通过内容级证据校验，已从回答中删除。",
+                    detail="; ".join(_unique(rejected_reasons)[:6]),
+                )
+            )
+        uncertainty = _compact_user_text(data.get("uncertainty"), max_chars=500)
+        if rejected_reasons and not uncertainty:
+            uncertainty = "部分结论缺少能直接支持其内容的论文证据，已删除。"
         return {
+            "ok": True,
             "answer": answer,
-            "evidence_refs": _unique(refs),
-            "confidence": 0.88,
+            "claims": claims,
+            "evidence_refs": _unique([ref for claim in claims for ref in claim.evidence_refs]),
+            "confidence": 0.7 if rejected_reasons else 0.88,
+            "degraded": bool(rejected_reasons),
+            "uncertainty": uncertainty,
+            "warnings": warnings,
         }
 
     def _answer_from_artifacts(self, question: str) -> tuple[str, list[str], float, list[WarningItem]]:
@@ -645,7 +657,17 @@ class M4InteractionService:
             answer = _example_driven_paper_answer(paper_card, question=question, evidence_rows=ranked_evidence)
             refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
             if answer and refs:
-                return answer, refs[:4], 0.82, []
+                return (
+                    answer,
+                    refs[:4],
+                    0.55,
+                    [
+                        _warning(
+                            "M4_EXAMPLE_EVIDENCE_INSUFFICIENT",
+                            "当前证据不足以构造可复算的数值例子；回答已限制为论文卡片中的任务和方法。",
+                        )
+                    ],
+                )
         if _is_problem_solution_question(question):
             answer = _problem_solution_answer(paper_card, question=question, evidence_rows=ranked_evidence)
             refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
@@ -809,8 +831,15 @@ class M4InteractionService:
                 continue
             text = _clean(candidate.get("claim_text")) or _clean(candidate.get("quote_or_summary")) or _clean(candidate.get("text"))
             if text:
-                rows.append({"source": "claim_evidence", "evidence_ref": ref, "text": _compact_user_text(text, max_chars=900)})
-        for formula in _as_dict(self.artifacts.get("formula_cards")).get("formula_cards", []):
+                rows.append({
+                    "source": _clean(candidate.get("artifact_source")) or "claim_evidence",
+                    "evidence_ref": ref,
+                    "text": _compact_user_text(text, max_chars=900),
+                })
+        formulas = _as_dict(self.artifacts.get("formula_cards")).get("formula_cards", [])
+        if not isinstance(formulas, list):
+            formulas = []
+        for formula in formulas:
             if not isinstance(formula, dict):
                 continue
             ref = _clean(formula.get("evidence_ref"))
@@ -904,6 +933,7 @@ class M4InteractionService:
                 passage_by_id[passage_id] = passage
             for ref in _string_list(passage.get("evidence_refs")):
                 candidates.append({
+                    "artifact_source": "passage_index",
                     "evidence_ref": ref,
                     "passage_id": passage_id,
                     "text": _clean(passage.get("text")) or _clean(passage.get("normalized_text")),
@@ -913,6 +943,7 @@ class M4InteractionService:
             passage_id = _clean(claim.get("passage_id"))
             passage = passage_by_id.get(passage_id, {})
             candidates.append({
+                "artifact_source": "claim_evidence",
                 "evidence_ref": _clean(claim.get("evidence_ref")),
                 "passage_id": passage_id,
                 "claim_type": _clean(claim.get("claim_type")),
@@ -922,14 +953,15 @@ class M4InteractionService:
                 "section": _clean(claim.get("section")) or _clean(passage.get("section")),
                 "text": _clean(passage.get("text")) or _clean(passage.get("normalized_text")),
             })
-        for field, claim in _paper_claims(_as_dict(self.artifacts.get("paper_card"))):
-            ref = _claim_ref(claim)
+        for field, paper_claim in _paper_claims(_as_dict(self.artifacts.get("paper_card"))):
+            ref = _claim_ref(paper_claim)
             if ref:
                 candidates.append({
+                    "artifact_source": "paper_card",
                     "evidence_ref": ref,
-                    "claim_text": _claim_text(claim),
+                    "claim_text": _claim_text(paper_claim),
                     "section": field,
-                    "text": _claim_text(claim),
+                    "text": _claim_text(paper_claim),
                 })
         return [candidate for candidate in candidates if candidate.get("evidence_ref") or candidate.get("text")]
 
@@ -1004,8 +1036,63 @@ class M4InteractionService:
             if record.memory_type != "interactive_answer":
                 continue
             if _normalize(record.question) == key and _normalize(str(record.metadata.get("selected_text") or "")) == selected_key:
+                if not self._claims_from_memory(record):
+                    continue
                 return record
         return None
+
+    def _claims_from_memory(self, record: M4MemoryRecord | None) -> list[GroundedClaim]:
+        if record is None:
+            return []
+        raw_claims = record.metadata.get("grounded_claims", [])
+        if not isinstance(raw_claims, list):
+            return []
+        known_refs = self._known_evidence_refs()
+        evidence_by_ref = _evidence_text_by_ref(self._llm_context(known_refs))
+        claims: list[GroundedClaim] = []
+        for raw_claim in raw_claims:
+            try:
+                claim = GroundedClaim.model_validate(raw_claim)
+            except (TypeError, ValueError):
+                continue
+            refs = _unique(claim.evidence_refs)
+            if (
+                not claim.text
+                or not refs
+                or any(ref not in known_refs or ref not in evidence_by_ref for ref in refs)
+            ):
+                continue
+            evidence_text = " ".join(
+                text
+                for ref in refs
+                for text in evidence_by_ref.get(ref, [])
+            )
+            supported, _reason = _claim_content_supported(
+                claim.text,
+                evidence_text=evidence_text,
+                claim_type=claim.claim_type,
+            )
+            if not supported:
+                continue
+            claims.append(
+                claim.model_copy(
+                    update={
+                        "evidence_refs": refs,
+                        "support_status": "MEMORY_REPLAY",
+                    }
+                )
+            )
+        return claims
+
+    def _known_evidence_refs(self) -> set[str]:
+        refs = set(self._paper_card_refs())
+        refs.update(self._formula_card_refs(limit=100))
+        refs.update(
+            _clean(candidate.get("evidence_ref"))
+            for candidate in self._evidence_candidates()
+            if _clean(candidate.get("evidence_ref"))
+        )
+        return refs
 
     def _append_memory(
         self,
@@ -1019,44 +1106,243 @@ class M4InteractionService:
         source_artifact: str,
         metadata: dict[str, object] | None = None,
     ) -> M4MemoryRecord:
-        bundle = self._read_memory()
-        now = datetime.now(timezone.utc).isoformat()
-        record = M4MemoryRecord(
-            memory_id=f"m4_{uuid.uuid4().hex[:10]}",
-            job_id=self.job_id,
-            memory_type=memory_type,
-            text=_compact_user_text(text, max_chars=4000),
-            question=_compact_user_text(question, max_chars=1000),
-            answer=_normalize_answer_text(answer, max_chars=4000),
-            source_artifact=source_artifact,
-            evidence_refs=_unique(evidence_refs),
-            confidence=round(max(0.0, min(1.0, confidence)), 2),
-            created_at=now,
-            updated_at=now,
-            metadata=metadata or {},
-        )
-        bundle.records.append(record)
-        self._write_memory(bundle)
-        return record
+        with self._memory_lock:
+            bundle = self._read_memory_unlocked()
+            if any(warning.code == "M4_MEMORY_CORRUPTION_UNPRESERVED" for warning in bundle.warnings):
+                raise OSError("Refusing to overwrite an unpreserved corrupt M4 memory file.")
+            now = datetime.now(timezone.utc).isoformat()
+            record = M4MemoryRecord(
+                memory_id=f"m4_{uuid.uuid4().hex[:10]}",
+                job_id=self.job_id,
+                memory_type=memory_type,
+                text=_compact_user_text(text, max_chars=4000),
+                question=_compact_user_text(question, max_chars=1000),
+                answer=_normalize_answer_text(answer, max_chars=4000),
+                source_artifact=source_artifact,
+                evidence_refs=_unique(evidence_refs),
+                confidence=round(max(0.0, min(1.0, confidence)), 2),
+                created_at=now,
+                updated_at=now,
+                metadata=metadata or {},
+            )
+            bundle.records.append(record)
+            self._write_memory_unlocked(bundle)
+            return record
 
     def _read_memory(self) -> M4MemoryBundle:
+        with self._memory_lock:
+            return self._read_memory_unlocked()
+
+    def _read_memory_unlocked(self) -> M4MemoryBundle:
         if not self.memory_path.exists():
             return M4MemoryBundle(job_id=self.job_id)
         try:
+            if self.memory_path.stat().st_size > M4_MEMORY_MAX_BYTES:
+                return self._preserve_corrupt_memory_unlocked(
+                    code="M4_MEMORY_FILE_TOO_LARGE",
+                    message="M4 记忆文件超过大小上限，已保留原文件并从空记忆继续。",
+                )
             data = json.loads(self.memory_path.read_text(encoding="utf-8"))
-            return M4MemoryBundle.model_validate(data)
-        except Exception:
-            return M4MemoryBundle(
-                job_id=self.job_id,
-                records=[],
+            bundle = _migrate_memory_payload(data, expected_job_id=self.job_id)
+            return _sanitize_memory_bundle(bundle)
+        except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            return self._preserve_corrupt_memory_unlocked(
+                code="M4_MEMORY_CORRUPTED",
+                message="M4 记忆文件损坏或不兼容，已保留原文件并从空记忆继续。",
+                detail=type(exc).__name__,
             )
 
     def _write_memory(self, bundle: M4MemoryBundle) -> None:
+        with self._memory_lock:
+            self._write_memory_unlocked(bundle)
+
+    def _write_memory_unlocked(self, bundle: M4MemoryBundle) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self.memory_path.write_text(
-            json.dumps(bundle.model_dump(mode="json"), ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        bounded = _sanitize_memory_bundle(bundle)
+        payload = _serialize_memory_bundle(bounded)
+        temp_path = self.memory_path.with_name(f".{self.memory_path.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            with temp_path.open("xb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp_path, self.memory_path)
+        finally:
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    def _preserve_corrupt_memory_unlocked(
+        self,
+        *,
+        code: str,
+        message: str,
+        detail: str = "",
+    ) -> M4MemoryBundle:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+        preserved = self.memory_path.with_name(
+            f"{self.memory_path.stem}.corrupt-{timestamp}-{uuid.uuid4().hex[:8]}{self.memory_path.suffix}"
         )
+        try:
+            os.replace(self.memory_path, preserved)
+        except OSError as exc:
+            return M4MemoryBundle(
+                job_id=self.job_id,
+                warnings=[
+                    WarningItem(
+                        code="M4_MEMORY_CORRUPTION_UNPRESERVED",
+                        message="M4 记忆文件损坏，且无法安全保留原文件；已拒绝覆盖。",
+                        detail=type(exc).__name__,
+                    )
+                ],
+            )
+        return M4MemoryBundle(
+            job_id=self.job_id,
+            warnings=[
+                WarningItem(
+                    code=code,
+                    message=message,
+                    detail=f"{detail}; preserved_as={preserved.name}".strip("; "),
+                )
+            ],
+        )
+
+
+def _memory_lock_for(path: Path) -> threading.RLock:
+    key = os.path.normcase(str(path.absolute()))
+    with _MEMORY_LOCKS_GUARD:
+        lock = _MEMORY_LOCKS.get(key)
+        if lock is None:
+            lock = threading.RLock()
+            _MEMORY_LOCKS[key] = lock
+        return lock
+
+
+def _migrate_memory_payload(data: object, *, expected_job_id: str) -> M4MemoryBundle:
+    if not isinstance(data, dict):
+        raise ValueError("M4 memory root must be an object.")
+    version = _clean(data.get("schema_version")) or "m4_memory"
+    job_id = _clean(data.get("job_id"))
+    if job_id != expected_job_id:
+        raise ValueError("M4 memory job_id does not match the current job.")
+    if version == M4_MEMORY_SCHEMA_VERSION:
+        return M4MemoryBundle.model_validate(data)
+    if version not in {"m4_memory", "m4_memory.v1", "1"}:
+        raise ValueError(f"Unsupported M4 memory schema: {version}")
+    records = data.get("records", [])
+    if not isinstance(records, list):
+        raise ValueError("Legacy M4 memory records must be a list.")
+    bundle = M4MemoryBundle(
+        job_id=expected_job_id,
+        records=[M4MemoryRecord.model_validate(record) for record in records],
+        migrated_from=version,
+        warnings=[
+            _warning(
+                "M4_MEMORY_SCHEMA_MIGRATED",
+                f"M4 记忆已从 {version} 迁移到 {M4_MEMORY_SCHEMA_VERSION}。",
+            )
+        ],
+    )
+    return bundle
+
+
+def _sanitize_memory_bundle(bundle: M4MemoryBundle) -> M4MemoryBundle:
+    if bundle.schema_version != M4_MEMORY_SCHEMA_VERSION:
+        raise ValueError("M4 memory must use the current schema before writing.")
+    records: list[M4MemoryRecord] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    removed = 0
+    for original in reversed(bundle.records):
+        record = original.model_copy(
+            update={
+                "text": _compact_user_text(original.text, max_chars=4000),
+                "question": _compact_user_text(original.question, max_chars=1000),
+                "answer": _normalize_answer_text(original.answer, max_chars=4000),
+                "evidence_refs": _unique(original.evidence_refs)[:16],
+            },
+            deep=True,
+        )
+        meaningful = bool(record.text or record.question or record.answer)
+        low_quality = bool(record.answer) and (
+            _is_low_quality_memory_answer(record) or _looks_like_mojibake_answer(record.answer)
+        )
+        key = (
+            record.memory_type,
+            _quote_key(record.question),
+            _quote_key(record.answer),
+            _quote_key(str(record.metadata.get("selected_text") or record.text)),
+        )
+        if not meaningful or low_quality or key in seen:
+            removed += 1
+            continue
+        records.append(record)
+        seen.add(key)
+    records.reverse()
+
+    warnings = _unique_warnings(bundle.warnings)
+    if removed:
+        warnings.append(_warning("M4_MEMORY_RECORDS_CLEANED", f"已清理 {removed} 条空白、低质量或重复 M4 记忆。"))
+    if len(records) > M4_MEMORY_MAX_RECORDS:
+        dropped = len(records) - M4_MEMORY_MAX_RECORDS
+        records = records[-M4_MEMORY_MAX_RECORDS:]
+        warnings.append(_warning("M4_MEMORY_RECORD_LIMIT", f"M4 记忆超过条数上限，已移除最早的 {dropped} 条。"))
+    sanitized = M4MemoryBundle(
+        job_id=bundle.job_id,
+        records=records,
+        migrated_from=bundle.migrated_from,
+        warnings=_unique_warnings(warnings)[-M4_MEMORY_MAX_WARNINGS:],
+    )
+    size_dropped = 0
+    while sanitized.records and len(_memory_json_bytes(sanitized)) > M4_MEMORY_MAX_BYTES:
+        sanitized.records.pop(0)
+        size_dropped += 1
+    if size_dropped:
+        sanitized.warnings.append(
+            _warning(
+                "M4_MEMORY_SIZE_LIMIT",
+                f"M4 记忆超过文件大小上限，已移除最早的 {size_dropped} 条。",
+            )
+        )
+        sanitized.warnings = _unique_warnings(sanitized.warnings)[-M4_MEMORY_MAX_WARNINGS:]
+        while sanitized.records and len(_memory_json_bytes(sanitized)) > M4_MEMORY_MAX_BYTES:
+            sanitized.records.pop(0)
+            size_dropped += 1
+        for index, warning in enumerate(sanitized.warnings):
+            if warning.code == "M4_MEMORY_SIZE_LIMIT":
+                sanitized.warnings[index] = _warning(
+                    "M4_MEMORY_SIZE_LIMIT",
+                    f"M4 记忆超过文件大小上限，已移除最早的 {size_dropped} 条。",
+                )
+                break
+    while len(sanitized.warnings) > 1 and len(_memory_json_bytes(sanitized)) > M4_MEMORY_MAX_BYTES:
+        sanitized.warnings.pop(0)
+    if len(_memory_json_bytes(sanitized)) > M4_MEMORY_MAX_BYTES:
+        raise ValueError("M4 memory metadata exceeds the configured file size limit.")
+    return sanitized
+
+
+def _unique_warnings(warnings: list[WarningItem]) -> list[WarningItem]:
+    result: list[WarningItem] = []
+    seen: set[tuple[str, str, str]] = set()
+    for warning in warnings:
+        key = (warning.code, warning.message, warning.detail)
+        if key in seen:
+            continue
+        result.append(warning)
+        seen.add(key)
+    return result
+
+
+def _memory_json_bytes(bundle: M4MemoryBundle) -> bytes:
+    return json.dumps(bundle.model_dump(mode="json"), ensure_ascii=False, indent=2).encode("utf-8")
+
+
+def _serialize_memory_bundle(bundle: M4MemoryBundle) -> bytes:
+    payload = _memory_json_bytes(bundle)
+    if len(payload) > M4_MEMORY_MAX_BYTES:
+        raise ValueError("M4 memory payload exceeds the configured file size limit.")
+    return payload
 
 
 def _paper_claims(paper_card: dict[str, object]) -> list[tuple[str, object]]:
@@ -1082,6 +1368,221 @@ def _conversation_history(value: object) -> list[dict[str, str]]:
 
 def _llm_error_result(code: str, message: str) -> dict[str, object]:
     return {"ok": False, "code": code, "message": message}
+
+
+def _evidence_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
+    grouped: dict[str, list[tuple[str, str]]] = {}
+    for row in rows:
+        ref = _clean(row.get("evidence_ref"))
+        text = _clean(row.get("text"))
+        if ref and text:
+            grouped.setdefault(ref, []).append((_clean(row.get("source")), text))
+    result: dict[str, list[str]] = {}
+    for ref, candidates in grouped.items():
+        primary = [
+            text
+            for source, text in candidates
+            if not source.startswith("paper_card") and source != "paper_card"
+        ]
+        result[ref] = _unique(primary or [text for _source, text in candidates])
+    return result
+
+
+def _validate_grounded_claim(
+    value: object,
+    *,
+    allowed: set[str],
+    evidence_by_ref: dict[str, list[str]],
+) -> tuple[GroundedClaim | None, str]:
+    if not isinstance(value, dict):
+        return None, "claim_not_object"
+    text = _soften_mechanical_answer(
+        _strip_internal_refs_from_answer(_normalize_answer_text(value.get("text"), max_chars=1200))
+    )
+    if not text:
+        return None, "claim_text_missing"
+    claim_type = _clean(value.get("claim_type")) or "paper_claim"
+    if claim_type not in {"paper_claim", "explanation", "toy_example"}:
+        return None, "claim_type_invalid"
+    refs = _unique(_string_list(value.get("evidence_refs")))
+    if not refs:
+        return None, "claim_refs_missing"
+    if any(ref not in allowed for ref in refs):
+        return None, "claim_ref_not_allowed"
+    if any(ref not in evidence_by_ref for ref in refs):
+        return None, "claim_ref_has_no_evidence_text"
+
+    raw_quotes = value.get("supporting_quotes", [])
+    if not isinstance(raw_quotes, list):
+        return None, "supporting_quotes_invalid"
+    quoted_refs: set[str] = set()
+    for raw_quote in raw_quotes:
+        if not isinstance(raw_quote, dict):
+            continue
+        ref = _clean(raw_quote.get("evidence_ref"))
+        quote = _clean(raw_quote.get("quote"))
+        if ref not in refs or not quote:
+            continue
+        if _quote_matches_evidence(quote, evidence_by_ref.get(ref, [])):
+            quoted_refs.add(ref)
+    if quoted_refs != set(refs):
+        return None, "supporting_quote_not_verbatim"
+
+    evidence_text = " ".join(text for ref in refs for text in evidence_by_ref[ref])
+    supported, reason = _claim_content_supported(text, evidence_text=evidence_text, claim_type=claim_type)
+    if not supported:
+        return None, reason
+    return (
+        GroundedClaim(
+            text=text,
+            evidence_refs=refs,
+            claim_type=claim_type,
+            support_status="SUPPORTED",
+            uncertainty=_compact_user_text(value.get("uncertainty"), max_chars=300),
+        ),
+        "",
+    )
+
+
+def _quote_matches_evidence(quote: str, evidence_texts: list[str]) -> bool:
+    compact_quote = _quote_key(quote)
+    if len(compact_quote) < 12:
+        return False
+    return any(compact_quote in _quote_key(evidence) for evidence in evidence_texts)
+
+
+def _quote_key(value: str) -> str:
+    return re.sub(r"\s+", " ", _clean(value)).strip().casefold()
+
+
+_GROUNDING_CONCEPTS: dict[str, tuple[str, ...]] = {
+    "attention": ("attention", "注意力"),
+    "evidence": ("evidence", "passage", "证据", "片段"),
+    "retrieval": ("retrieval", "retrieve", "检索"),
+    "sparse": ("sparse", "稀疏", "分散"),
+    "connection": ("connect", "link", "aggregate", "连接", "聚合", "关联"),
+    "architecture": ("architecture", "结构", "架构"),
+    "weight": ("weight", "score", "权重", "分数", "打分"),
+    "time_series": ("time series", "timeseries", "时间序列", "时序"),
+    "anomaly": ("anomaly", "outlier", "异常"),
+    "forecasting": ("forecast", "forecasting", "预测"),
+    "imputation": ("imputation", "impute", "插补", "填补"),
+    "graph": ("graph", "图结构", "图神经"),
+    "gnn": ("gnn", "graph neural network", "图神经网络"),
+    "diffusion": ("diffusion", "扩散模型"),
+    "fourier": ("fourier", "fft", "傅里叶"),
+    "spectral_residual": ("spectral residual", "谱残差"),
+    "threshold": ("threshold", "阈值", "门限"),
+    "convolution": ("convolution", "convolutional", "cnn", "卷积"),
+    "transformer": ("transformer", "变换器"),
+    "recurrent": ("lstm", "gru", "rnn", "recurrent", "循环神经"),
+    "dataset": ("dataset", "data set", "数据集"),
+    "benchmark": ("benchmark", "基准"),
+    "metric": ("metric", "f1", "auroc", "auc", "precision", "recall", "rmse", "mae", "mse", "指标", "准确率", "精确率", "召回率"),
+    "comparison": ("outperform", "state-of-the-art", "sota", "优于", "超过基线", "提升", "最好", "最佳"),
+}
+
+_STRICT_GROUNDING_CONCEPTS = {
+    "time_series",
+    "anomaly",
+    "forecasting",
+    "imputation",
+    "graph",
+    "gnn",
+    "diffusion",
+    "fourier",
+    "spectral_residual",
+    "threshold",
+    "convolution",
+    "transformer",
+    "recurrent",
+    "dataset",
+    "benchmark",
+    "metric",
+    "comparison",
+}
+
+
+def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) -> tuple[bool, str]:
+    claim_key = _grounding_key(text)
+    evidence_key = _grounding_key(evidence_text)
+    claim_concepts = _grounding_concepts(claim_key)
+    evidence_concepts = _grounding_concepts(evidence_key)
+    missing_strict = (claim_concepts & _STRICT_GROUNDING_CONCEPTS) - evidence_concepts
+    if missing_strict:
+        return False, f"unsupported_specific_concept:{sorted(missing_strict)[0]}"
+
+    if claim_type != "toy_example":
+        claim_numbers = set(_grounded_numbers(text))
+        evidence_numbers = set(_grounded_numbers(evidence_text))
+        if claim_numbers - evidence_numbers:
+            return False, "unsupported_number"
+    dataset_names = _named_datasets_or_metrics(text)
+    if any(_grounding_key(name) not in evidence_key for name in dataset_names):
+        return False, "unsupported_dataset_or_metric"
+    if _has_math_or_threshold_rule(text) and not _has_math_or_threshold_rule(evidence_text):
+        return False, "unsupported_formula_or_threshold"
+
+    matched_concepts = claim_concepts & evidence_concepts
+    if claim_concepts:
+        required = min(2, len(claim_concepts))
+        if len(matched_concepts) < required:
+            return False, "insufficient_concept_support"
+        return True, ""
+
+    claim_terms = _grounding_terms(text)
+    evidence_terms = _grounding_terms(evidence_text)
+    overlap = claim_terms & evidence_terms
+    if len(overlap) >= 2 and len(overlap) / max(len(claim_terms), 1) >= 0.3:
+        return True, ""
+    return False, "insufficient_lexical_support"
+
+
+def _grounding_key(value: str) -> str:
+    return re.sub(r"\s+", " ", _clean(value).casefold()).strip()
+
+
+def _grounding_concepts(value: str) -> set[str]:
+    return {
+        concept
+        for concept, markers in _GROUNDING_CONCEPTS.items()
+        if any(marker.casefold() in value for marker in markers)
+    }
+
+
+def _grounded_numbers(value: str) -> list[str]:
+    return re.findall(r"(?<![\w.])\d+(?:\.\d+)?%?(?![\w.])", value)
+
+
+def _named_datasets_or_metrics(value: str) -> set[str]:
+    names = set(
+        re.findall(
+            r"(?i)\b(?:NASA|SMD|MSL|SMAP|SWaT|WADI|PSM|NAB|UCR|Yahoo|F1|AUROC|AUC|RMSE|MAE|MSE)\b",
+            value,
+        )
+    )
+    names.update(
+        match.group(1)
+        for match in re.finditer(r"\b([A-Za-z][A-Za-z0-9_-]{2,})\s+(?:dataset|benchmark|metric)\b", value)
+    )
+    return names
+
+
+def _has_math_or_threshold_rule(value: str) -> bool:
+    normalized = _normalize_math_text(value)
+    return bool(
+        any(marker in normalized for marker in ["阈值", "threshold", "谱残差", "spectralresidual", "傅里叶", "fourier"])
+        or re.search(r"(?:[=<>≤≥]|\\(?:frac|sum|sigma|mu)|[μστ])", value)
+    )
+
+
+def _grounding_terms(value: str) -> set[str]:
+    lowered = _grounding_key(value)
+    terms = {token for token in re.findall(r"[a-z][a-z0-9_-]{2,}", lowered) if token not in {"the", "and", "with", "this", "that", "from", "into"}}
+    cjk_runs = re.findall(r"[\u4e00-\u9fff]{2,}", lowered)
+    for run in cjk_runs:
+        terms.update(run[index : index + 2] for index in range(len(run) - 1))
+    return terms
 
 
 def _llm_failure_answer(*, code: str, message: str) -> str:
@@ -1342,30 +1843,18 @@ def _example_driven_paper_answer(
     question: str,
     evidence_rows: list[dict[str, object]] | None = None,
 ) -> str:
-    text = " ".join(
-        _clean(value)
-        for value in [
-            _claim_text(paper_card.get("problem")),
-            _claim_text(paper_card.get("core_idea")),
-            _claim_text(paper_card.get("method_overview")),
-            _claim_text(paper_card.get("experiment_summary")),
-            _clean(paper_card.get("one_sentence_summary")),
-        ]
-    ).lower()
-    if any(marker in text for marker in ["time series", "anomaly", "spectral", "fourier", "fft", "时间序列", "异常", "傅里叶", "谱残差"]):
-        parts = [
-            "举个小例子：假设服务器某个指标连续是 [10, 11, 10, 60, 11]。肉眼看 60 很突兀，但算法不能靠肉眼，它要把每个时间点自动标成正常或异常。",
-            "这篇论文的做法可以理解为：先把序列做傅里叶变换，得到幅度谱和相位谱；再用平均滤波器估计“普通背景谱”；把原始对数幅度减去背景谱，得到谱残差；最后逆变换回时间轴，60 附近会得到更高的显著性分数。",
-            "最后用论文自己的阈值公式判断：把某点显著性减去它的局部平均显著性，再除以局部平均显著性；如果这个相对偏离超过阈值 τ，就输出 1 表示异常，否则输出 0。这个例子是教学用的玩具数字，不是论文实验数据。",
-        ]
-    else:
-        problem = _teach_phrase(_claim_text(paper_card.get("problem"))) or "论文要处理的任务"
-        method = _teach_phrase(_claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))) or "论文提出的方法"
-        parts = [
-            f"举个简化例子：先把任务想成一个具体场景，里面的困难是“{problem}”。",
-            f"论文方法做的事是“{method}”。也就是说，它不是直接给结论，而是把原问题拆成一个可执行的中间步骤，再用这个步骤产生判断。",
-            "如果要自己复述，可以按三句讲：输入是什么、方法先算什么中间量、这个中间量怎样帮助输出最终判断。这个例子用于理解机制，不等同于论文原始实验。",
-        ]
+    problem = _teach_phrase(_claim_text(paper_card.get("problem")))
+    method = _teach_phrase(
+        _claim_text(paper_card.get("method_overview")) or _claim_text(paper_card.get("core_idea"))
+    )
+    parts: list[str] = []
+    if problem:
+        parts.append(f"可以把论文卡片里的困难放进一个简化场景：{problem}")
+    if method:
+        parts.append(f"在这个场景中，只能沿用论文卡片明确写出的处理步骤：{method}")
+    parts.append(
+        "这里不自行添加具体数值、阈值或额外算法步骤。若要做数值玩具例子，必须先逐项核对对应公式卡片和证据。"
+    )
     focused = _focused_evidence_lines(evidence_rows)
     if focused:
         parts.append("对应到正文证据，能看到：" + "；".join(focused[:2]))
@@ -1407,7 +1896,7 @@ def _formula_context_text(formula: dict[str, object]) -> str:
 
 
 def _formula_full_explanation(formula: dict[str, object]) -> str:
-    purpose = _teach_phrase(_clean(formula.get("purpose")) or _clean(formula.get("plain_summary"))) or "这条公式用于说明论文方法中的一个计算步骤。"
+    purpose = _teach_phrase(_clean(formula.get("purpose")) or _clean(formula.get("plain_summary")))
     symbols = _formula_symbol_summary(formula)
     terms = _formula_term_summary(formula)
     intuition = _teach_phrase(_clean(formula.get("intuition")) or _clean(formula.get("plain_summary")))
@@ -1415,12 +1904,9 @@ def _formula_full_explanation(formula: dict[str, object]) -> str:
     removed = _teach_phrase(_clean(formula.get("what_if_removed")) or _clean(formula.get("remove_effect")))
     sensitivity = _teach_phrase(_clean(formula.get("weight_sensitivity")) or _clean(formula.get("weight_change_effect")))
 
-    parts = [
-        f"可以先把这条公式看成一个“打分器”：它把论文里的理论对象变成可计算的分数或权重，方便模型判断哪部分更重要。",
-        f"放到这篇论文里，它的目标是{purpose}",
-    ]
+    parts = [f"这条公式卡片记录的目标是：{purpose}"] if purpose else []
     if symbols:
-        parts.append(f"这里最重要的对象是：{symbols}")
+        parts.append(f"公式卡片明确记录的对象是：{symbols}")
     if terms:
         parts.append(f"如果拆开关键项，可以这样看：{terms}")
     if intuition and intuition != purpose:
@@ -1431,7 +1917,7 @@ def _formula_full_explanation(formula: dict[str, object]) -> str:
         parts.append(f"拿掉影响：{removed}")
     if sensitivity:
         parts.append(f"权重变化：{sensitivity}")
-    return "\n\n".join(parts)
+    return "\n\n".join(parts) or "当前公式卡片没有足够的可展示解释。"
 
 
 def _formula_symbol_summary(formula: dict[str, object]) -> str:
