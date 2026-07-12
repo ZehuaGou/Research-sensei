@@ -14,7 +14,7 @@ from researchsensei.formula_card_baseline import build_formula_cards as build_fo
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
-from researchsensei.jobs import JobStore
+from researchsensei.jobs import DuplicateSourceJobError, JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
 from researchsensei.paper_card import (
@@ -104,7 +104,10 @@ class SinglePaperIngestionRunner:
             source_identity=source_identity,
             current_step="ingestion_started",
         )
-        self.jobs.create(job)
+        try:
+            self.jobs.create(job)
+        except DuplicateSourceJobError as error:
+            return error.job
 
         try:
             # Common preprocessing

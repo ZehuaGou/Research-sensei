@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
+
+import pytest
 
 from researchsensei.library import PaperLibraryStore
 from researchsensei.schemas import CandidatePaper, PaperSourceStatus, PaperSourceType, ResolvedPaperSource, VenueRank
@@ -117,3 +120,31 @@ def test_paper_library_delete_marks_record_and_removes_file(tmp_path: Path) -> N
     assert db.find_match(paper) is None
     deleted = db.list_papers(include_deleted=True)
     assert deleted[0]["deleted_at"]
+
+
+def test_paper_library_refuses_to_delete_outside_managed_root(tmp_path: Path) -> None:
+    managed = tmp_path / "workspace"
+    managed.mkdir()
+    outside = tmp_path / "outside.pdf"
+    outside.write_bytes(PDF_BYTES)
+    db = PaperLibraryStore(managed / "sensei.sqlite3", managed_roots=[managed])
+    paper = _candidate()
+    record = db.upsert_download(paper, _resolved(paper, outside))
+
+    assert record is not None
+    with pytest.raises(ValueError, match="outside managed workspace"):
+        db.delete_paper(record.paper_id)
+
+    assert outside.exists()
+    assert db.find_match(paper) is not None
+
+
+def test_paper_library_records_schema_version_and_wal(tmp_path: Path) -> None:
+    db_path = tmp_path / "sensei.sqlite3"
+    PaperLibraryStore(db_path)
+
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("pragma journal_mode").fetchone()[0] == "wal"
+        assert conn.execute(
+            "select version from schema_meta where component='paper_library'"
+        ).fetchone()[0] == 1

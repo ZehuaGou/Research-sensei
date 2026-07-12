@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from researchsensei.core.sqlite import connect_sqlite
 from researchsensei.schemas import CandidatePaper, ResolvedPaperSource
 from researchsensei.schemas.enums import VenueRank
 
@@ -62,9 +63,11 @@ class PaperLibraryRecord:
 class PaperLibraryStore:
     """SQLite-backed local paper library for M1 search/download reuse."""
 
-    def __init__(self, db_path: str | Path) -> None:
+    def __init__(self, db_path: str | Path, *, managed_roots: list[str | Path] | None = None) -> None:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        roots = managed_roots if managed_roots is not None else [self.db_path.parent]
+        self.managed_roots = [Path(root).resolve() for root in roots]
         self._init()
 
     def find_match(self, candidate: CandidatePaper) -> PaperLibraryRecord | None:
@@ -142,6 +145,7 @@ class PaperLibraryStore:
         source_url = item.source_url or candidate.source_url or pdf_url or landing_url
 
         with self._connect() as conn:
+            conn.execute("begin immediate")
             existing = conn.execute("select first_seen_at from papers where paper_id = ?", (paper_id,)).fetchone()
             first_seen_at = existing["first_seen_at"] if existing is not None else now
             conn.execute(
@@ -254,6 +258,7 @@ class PaperLibraryStore:
             )
 
         with self._connect() as conn:
+            conn.execute("begin immediate")
             conn.execute(
                 """
                 insert into search_runs(run_id, query, topic_folder, created_at, candidate_count, downloaded_count, reused_count)
@@ -356,15 +361,21 @@ class PaperLibraryStore:
             row = conn.execute("select local_path from papers where paper_id = ? and deleted_at = ''", (paper_id,)).fetchone()
             if row is None:
                 return False
+            path = Path(row["local_path"] or "")
+            if remove_file and path.exists() and path.is_file() and not self._is_managed_path(path):
+                raise ValueError(f"Refusing to delete paper outside managed workspace roots: {path}")
             conn.execute("update papers set deleted_at = ?, last_seen_at = ? where paper_id = ?", (now, now, paper_id))
         if remove_file:
-            path = Path(row["local_path"] or "")
             if path.exists() and path.is_file():
-                try:
-                    path.unlink()
-                except OSError:
-                    pass
+                path.unlink()
         return True
+
+    def _is_managed_path(self, path: Path) -> bool:
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError:
+            return False
+        return any(resolved == root or root in resolved.parents for root in self.managed_roots)
 
     def import_manifests(self, search_root: str | Path) -> int:
         root = Path(search_root)
@@ -475,12 +486,24 @@ class PaperLibraryStore:
         )
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("pragma busy_timeout=5000")
+        conn.execute("pragma foreign_keys=on")
         return conn
 
     def _init(self) -> None:
         with self._connect() as conn:
+            conn.execute("pragma journal_mode=wal")
+            conn.execute(
+                """
+                create table if not exists schema_meta(
+                    component text primary key,
+                    version integer not null,
+                    updated_at text not null
+                )
+                """
+            )
             conn.execute(
                 """
                 create table if not exists papers(
@@ -556,6 +579,13 @@ class PaperLibraryStore:
                 """
             )
             self._migrate_search_run_papers(conn)
+            conn.execute(
+                """
+                insert into schema_meta(component, version, updated_at) values('paper_library', 1, ?)
+                on conflict(component) do update set version=excluded.version, updated_at=excluded.updated_at
+                """,
+                (_now(),),
+            )
 
     @staticmethod
     def _migrate_search_run_papers(conn: sqlite3.Connection) -> None:

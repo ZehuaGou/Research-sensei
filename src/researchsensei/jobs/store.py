@@ -5,10 +5,21 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
+from researchsensei.core.sqlite import connect_sqlite
 from researchsensei.schemas import JobRecord, JobStatus, WarningItem, WorkspaceArtifact
 
 
 class JobNotFoundError(KeyError):
+    pass
+
+
+class DuplicateSourceJobError(RuntimeError):
+    def __init__(self, job: JobRecord) -> None:
+        super().__init__(f"An active job already exists for source identity: {job.source_identity}")
+        self.job = job
+
+
+class DatabaseMigrationError(RuntimeError):
     pass
 
 
@@ -20,6 +31,23 @@ class JobStore:
 
     def create(self, job: JobRecord) -> JobRecord:
         with self._connect() as conn:
+            conn.execute("begin immediate")
+            if job.source_identity:
+                row = conn.execute(
+                    """
+                    select * from jobs
+                    where source_identity = ? and status in (?, ?, ?)
+                    order by created_at desc limit 1
+                    """,
+                    (
+                        job.source_identity,
+                        JobStatus.PENDING.value,
+                        JobStatus.RUNNING.value,
+                        JobStatus.SUCCEEDED.value,
+                    ),
+                ).fetchone()
+                if row is not None:
+                    raise DuplicateSourceJobError(self._from_row(row))
             values = _to_column_values(job)
             columns = [column for column in values if column in _table_columns(conn)]
             placeholders = ",".join("?" for _ in columns)
@@ -44,13 +72,22 @@ class JobStore:
             raise JobNotFoundError(f"Job not found: {job_id}")
 
     def find_by_source_identity(self, source_identity: str) -> JobRecord | None:
-        """Return the most recent SUCCEEDED job for a source identity, or None."""
+        """Return the most recent active or successful job for an identity."""
         if not source_identity:
             return None
         with self._connect() as conn:
             row = conn.execute(
-                "select * from jobs where source_identity = ? and status = ? order by created_at desc limit 1",
-                (source_identity, JobStatus.SUCCEEDED.value),
+                """
+                select * from jobs
+                where source_identity = ? and status in (?, ?, ?)
+                order by created_at desc limit 1
+                """,
+                (
+                    source_identity,
+                    JobStatus.PENDING.value,
+                    JobStatus.RUNNING.value,
+                    JobStatus.SUCCEEDED.value,
+                ),
             ).fetchone()
         if row is None:
             return None
@@ -58,8 +95,15 @@ class JobStore:
 
     def list_recent(self, limit: int = 20) -> list[JobRecord]:
         with self._connect() as conn:
-            rows = conn.execute("select * from jobs order by created_at desc limit ?", (limit,)).fetchall()
+            rows = conn.execute(
+                "select * from jobs order by created_at desc limit ?",
+                (max(1, min(int(limit), 200)),),
+            ).fetchall()
         return [self._from_row(row) for row in rows]
+
+    def list_ids(self) -> set[str]:
+        with self._connect() as conn:
+            return {str(row["job_id"]) for row in conn.execute("select job_id from jobs").fetchall()}
 
     def update(
         self,
@@ -71,23 +115,28 @@ class JobStore:
         warnings: list[WarningItem] | None = None,
         artifacts: list[WorkspaceArtifact] | None = None,
     ) -> JobRecord:
-        job = self.get(job_id)
-        updated = job.model_copy(
-            update={
-                "status": status or job.status,
-                "current_step": current_step if current_step is not None else job.current_step,
-                "error": error if error is not None else job.error,
-                "warnings": warnings if warnings is not None else job.warnings,
-                "artifacts": artifacts if artifacts is not None else job.artifacts,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
         with self._connect() as conn:
-            conn.execute(
+            conn.execute("begin immediate")
+            row = conn.execute("select * from jobs where job_id = ?", (job_id,)).fetchone()
+            if row is None:
+                raise JobNotFoundError(f"Job not found: {job_id}")
+            job = self._from_row(row)
+            version = int(row["version"] if "version" in row.keys() else 0)
+            updated = job.model_copy(
+                update={
+                    "status": status or job.status,
+                    "current_step": current_step if current_step is not None else job.current_step,
+                    "error": error if error is not None else job.error,
+                    "warnings": warnings if warnings is not None else job.warnings,
+                    "artifacts": artifacts if artifacts is not None else job.artifacts,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+            )
+            cursor = conn.execute(
                 """
                 update jobs
-                set status=?, source_path=?, run_dir=?, current_step=?, error=?, warnings=?, artifacts=?, created_at=?, updated_at=?
-                where job_id=?
+                set status=?, source_path=?, run_dir=?, current_step=?, error=?, warnings=?, artifacts=?, created_at=?, updated_at=?, version=version+1
+                where job_id=? and version=?
                 """,
                 (
                     updated.status.value,
@@ -100,18 +149,34 @@ class JobStore:
                     updated.created_at,
                     updated.updated_at,
                     updated.job_id,
+                    version,
                 ),
             )
+            if cursor.rowcount != 1:
+                raise RuntimeError(f"Concurrent update conflict for job: {job_id}")
         return updated
 
     def _connect(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path)
+        conn = connect_sqlite(self.db_path, timeout=5.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("pragma busy_timeout=5000")
+        conn.execute("pragma foreign_keys=on")
         return conn
 
     def _init(self) -> None:
-        with self._connect() as conn:
-            conn.execute(
+        try:
+            with self._connect() as conn:
+                conn.execute("pragma journal_mode=wal")
+                conn.execute(
+                    """
+                    create table if not exists schema_meta(
+                        component text primary key,
+                        version integer not null,
+                        updated_at text not null
+                    )
+                    """
+                )
+                conn.execute(
                 """
                 create table if not exists jobs(
                     job_id text primary key,
@@ -126,8 +191,19 @@ class JobStore:
                     updated_at text not null
                 )
                 """
-            )
-            self._migrate(conn)
+                )
+                self._migrate(conn)
+                conn.execute(
+                    """
+                    insert into schema_meta(component, version, updated_at) values('jobs', 2, ?)
+                    on conflict(component) do update set version=excluded.version, updated_at=excluded.updated_at
+                    """,
+                    (datetime.now(timezone.utc).isoformat(),),
+                )
+        except sqlite3.Error as error:
+            raise DatabaseMigrationError(
+                f"Job database migration failed for {self.db_path}. Restore the latest backup before retrying: {error}"
+            ) from error
 
     def _migrate(self, conn: sqlite3.Connection) -> None:
         columns = {row["name"] for row in conn.execute("pragma table_info(jobs)").fetchall()}
@@ -141,6 +217,7 @@ class JobStore:
             "created_at": "text not null default ''",
             "updated_at": "text not null default ''",
             "source_identity": "text not null default ''",
+            "version": "integer not null default 0",
         }
         for column, definition in required_columns.items():
             if column not in columns:
@@ -149,6 +226,13 @@ class JobStore:
         existing_indexes = {row["name"] for row in conn.execute("pragma index_list(jobs)").fetchall()}
         if "idx_jobs_source_identity" not in existing_indexes:
             conn.execute("create index idx_jobs_source_identity on jobs(source_identity)")
+
+    def backup(self, target: str | Path | None = None) -> Path:
+        destination = Path(target) if target is not None else self.db_path.with_suffix(self.db_path.suffix + ".bak")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with self._connect() as source, connect_sqlite(destination) as backup_conn:
+            source.backup(backup_conn)
+        return destination
 
     def _to_row(self, job: JobRecord) -> tuple[str, ...]:
         return (
