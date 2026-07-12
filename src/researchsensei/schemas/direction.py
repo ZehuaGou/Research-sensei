@@ -97,7 +97,11 @@ class CandidatePaper(SenseiModel):
     llm_relevance_label: str = ""  # HIGH, MEDIUM, LOW, IRRELEVANT
     matched_concepts: list[str] = Field(default_factory=list)
     missing_concepts: list[str] = Field(default_factory=list)
+    forbidden_intent_matches: list[str] = Field(default_factory=list)
+    concept_coverage: float = 0.0
     relevance_reason: str = ""
+    relevance_gate_evaluated: bool = False
+    relevance_gate_passed: bool = False
     should_download: bool = False
     should_a_read: bool = False
     # Source-aware M1 fields
@@ -227,11 +231,32 @@ class ReadingPlan(SenseiModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class M1LayerStatus(SenseiModel):
+    """One explicit reliability dimension for a direction-search result.
+
+    ``status`` is intentionally dimension-local. Consumers must not infer
+    source or understanding success from ``pipeline_status.status``.
+    """
+
+    status: str = "UNKNOWN"
+    code: str = ""
+    message: str = ""
+    completed: bool = False
+    candidate_count: int = 0
+    passed_candidate_count: int = 0
+    threshold: float | None = None
+    details: dict[str, object] = Field(default_factory=dict)
+
+
 class DirectionBundle(SenseiModel):
     """Complete direction analysis bundle."""
 
     status: str = "UNKNOWN"
     direction_workspace_status: str = "UNKNOWN"
+    pipeline_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
+    relevance_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
+    source_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
+    understanding_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
     query: str = ""
     message: str = ""
     overview: str = ""

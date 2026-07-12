@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field
 
@@ -42,10 +42,21 @@ class FormulaSymbolExplanation(SenseiModel):
     warnings: list[WarningItem] = Field(default_factory=list)
 
 
+class GroundedClaim(SenseiModel):
+    """A user-facing M4 claim whose evidence binding was checked by the backend."""
+
+    text: str
+    evidence_refs: list[str] = Field(default_factory=list)
+    claim_type: Literal["paper_claim", "explanation", "toy_example"] = "paper_claim"
+    support_status: Literal["SUPPORTED", "ARTIFACT_DERIVED", "MEMORY_REPLAY"] = "SUPPORTED"
+    uncertainty: str = ""
+
+
 class InteractiveAnswer(SenseiModel):
     status: str = "SUCCESS"
     answer: str = ""
     evidence_refs: list[str] = Field(default_factory=list)
+    claims: list[GroundedClaim] = Field(default_factory=list)
     memory_refs: list[str] = Field(default_factory=list)
     uncertainty: str = ""
     follow_up_suggestions: list[str] = Field(default_factory=list)
@@ -97,9 +108,11 @@ class M4MemoryRecord(SenseiModel):
 
 
 class M4MemoryBundle(SenseiModel):
-    schema_version: str = "m4_memory"
+    schema_version: Literal["m4_memory.v2"] = "m4_memory.v2"
     job_id: str
     records: list[M4MemoryRecord] = Field(default_factory=list)
+    migrated_from: str = ""
+    warnings: list[WarningItem] = Field(default_factory=list)
 
 
 class MemoryRetrievalResult(SenseiModel):

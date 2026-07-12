@@ -20,6 +20,7 @@ from researchsensei.schemas import (
     VenueRank,
     VerificationStatus,
 )
+from researchsensei.relevance import MIN_DEEP_READ_RELEVANCE_SCORE
 
 SOURCE_RELIABILITY = {
     "paper_search_mcp": 0.9,
@@ -109,13 +110,21 @@ class SelectionService:
         unverified_count = 0
         for item in items:
             total = item.scoring_breakdown.weighted_total
-            # Use LLM relevance if available, otherwise fall back to rule-based
-            relevance = item.paper.llm_relevance_score if item.paper.llm_relevance_score > 0 else item.scoring_breakdown.relevance_score
+            # An LLM score can tighten an already-passing decision, but it must
+            # never rescue a deterministic task/concept mismatch.
+            relevance = item.scoring_breakdown.relevance_score
             is_irrelevant_llm = item.paper.llm_relevance_label == "IRRELEVANT"
+            deterministic_rejected = (
+                item.paper.relevance_gate_evaluated
+                and not item.paper.relevance_gate_passed
+            )
 
-            if relevance < 0.2 or total < 0.25 or item.role == "IRRELEVANT" or is_irrelevant_llm:
+            if deterministic_rejected or relevance < 0.2 or total < 0.25 or item.role == "IRRELEVANT" or is_irrelevant_llm:
                 item.priority = "D_IGNORE"
-                item.selection_reason = _append_reason(item.selection_reason, "Filtered: weak relevance or low metadata confidence.")
+                item.selection_reason = _append_reason(
+                    item.selection_reason,
+                    "Filtered: deterministic relevance gate failed or metadata confidence was too low.",
+                )
                 continue
             if item.paper.verification_status != VerificationStatus.VERIFIED:
                 unverified_count += 1
@@ -159,7 +168,7 @@ class SelectionService:
         pdf_available_score = self._source_readiness_score(paper)
         metadata_completeness = self._metadata_completeness(paper)
         method_rep = 0.85 if role not in {"SURVEY", "IRRELEVANT"} else 0.35
-        intent_penalty = _intent_mismatch_penalty(query_plan, paper)
+        intent_penalty = 0.0 if paper.relevance_gate_evaluated else _intent_mismatch_penalty(query_plan, paper)
         penalty = (-0.5 if relevance < 0.35 else 0.0) - intent_penalty
 
         total = max(
@@ -194,9 +203,20 @@ class SelectionService:
             penalty_noise=round(penalty, 3),
             weighted_total=round(total, 3),
         )
+        minimum_relevance = (
+            MIN_DEEP_READ_RELEVANCE_SCORE
+            if paper.relevance_gate_evaluated
+            else 0.45
+        )
+        relevance_gate_ok = (
+            paper.relevance_gate_passed
+            if paper.relevance_gate_evaluated
+            else True
+        )
         can_enter_m2 = bool(
             paper.can_enter_m2
-            and breakdown.relevance_score >= 0.45
+            and relevance_gate_ok
+            and breakdown.relevance_score >= minimum_relevance
             and _confidence_at_least(paper.source_confidence, "medium")
             and _confidence_at_least(paper.metadata_confidence, "medium")
         )
@@ -211,6 +231,8 @@ class SelectionService:
         )
 
     def _relevance_score(self, query_plan: QueryPlan, paper: CandidatePaper) -> float:
+        if paper.relevance_gate_evaluated:
+            return paper.rule_relevance_score
         query_terms = query_plan.core_terms or [query_plan.english_query, query_plan.direction_en]
         related_terms = query_plan.related_terms + query_plan.query_variants
         text = f"{paper.title} {paper.abstract} {paper.tldr}".lower()
@@ -343,7 +365,17 @@ class SelectionService:
 
         # Selection checks
         verified = paper.verification_status == VerificationStatus.VERIFIED
-        relevant = sr.relevance_score >= 0.45
+        minimum_relevance = (
+            MIN_DEEP_READ_RELEVANCE_SCORE
+            if paper.relevance_gate_evaluated
+            else 0.45
+        )
+        relevant = sr.relevance_score >= minimum_relevance
+        deterministic_gate_ok = (
+            paper.relevance_gate_passed
+            if paper.relevance_gate_evaluated
+            else True
+        )
         llm_relevant = paper.llm_relevance_score <= 0 or paper.llm_relevance_score >= 0.65
         llm_label_ok = not paper.llm_relevance_label or paper.llm_relevance_label in ("HIGH", "MEDIUM")
         should_read = paper.should_a_read is True or paper.download_selected is True
@@ -362,6 +394,7 @@ class SelectionService:
             # Selection gate
             verified,
             relevant,
+            deterministic_gate_ok,
             llm_relevant,
             llm_label_ok,
             should_read,

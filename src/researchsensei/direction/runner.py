@@ -13,17 +13,18 @@ from researchsensei.acquisition import (
     SemanticScholarAdapter,
     make_default_search_adapter,
 )
+from researchsensei.core.config import DEFAULT_SEARCH_MAX_RESULTS
 from researchsensei.canonical import MaterialNormalizer
 from researchsensei.query import QueryPlanner
 from researchsensei.query.planner import detect_venue_openalex_source_ids
 from researchsensei.ranking import PaperRanker, select_downloads
+from researchsensei.relevance import DeterministicRelevanceEvaluator
 from researchsensei.schemas import (
     CandidatePaper,
     CanonicalizationResult,
     DirectionBundle,
     PaperSourceStatus,
     QueryPlan,
-    ReadingPlan,
     SourceResolutionResult,
     SourcePriority,
     VerificationStatus,
@@ -58,9 +59,10 @@ class DirectionRunner:
         material_normalizer: MaterialNormalizer | None = None,
         paper_ranker: PaperRanker | None = None,
         sources: list[str] | None = None,
-        max_results_per_source: int = 20,
+        max_results_per_source: int = DEFAULT_SEARCH_MAX_RESULTS,
         max_download_candidates: int = 10,
         max_canonicalize_candidates: int | None = None,
+        relevance_evaluator: DeterministicRelevanceEvaluator | None = None,
     ) -> None:
         self.workspace = workspace
         self.query_planner = query_planner or QueryPlanner()
@@ -78,6 +80,7 @@ class DirectionRunner:
         self.max_results_per_source = max_results_per_source
         self.max_download_candidates = max_download_candidates
         self.max_canonicalize_candidates = max_canonicalize_candidates
+        self.relevance_evaluator = relevance_evaluator or DeterministicRelevanceEvaluator()
 
     async def run(self, user_query: str, direction_id: str | None = None) -> DirectionBundle:
         actual_id = direction_id or _slugify(user_query)
@@ -116,10 +119,12 @@ class DirectionRunner:
             query=query,
             candidates=fulltext_enriched,
         ).items
-        ranked_candidates = self.paper_ranker.rank(query, normalized_for_download)
+        externally_ranked = self.paper_ranker.rank(query, normalized_for_download)
+        ranked_candidates = self.relevance_evaluator.evaluate_and_rank(query_plan, externally_ranked)
         screened_candidates = select_downloads(
             ranked_candidates,
             max_download_candidates=self.max_download_candidates,
+            require_relevance_gate=True,
         )
         download_candidates = [candidate for candidate in screened_candidates if candidate.download_selected]
 
@@ -169,6 +174,42 @@ class DirectionRunner:
         # Step 9: Build reading plan from resolved candidates
         reading_plan = self.selection_service.build_reading_plan(query_plan, resolved_candidates)
 
+        download_attempt_count = len(source_resolution.items)
+        downloaded_count = sum(
+            1
+            for item in source_resolution.items
+            if item.has_valid_deep_reading_source and item.download_status == "downloaded"
+        )
+        from researchsensei.direction.exploration import (
+            _pipeline_layer_status,
+            _relevance_layer_status,
+            _source_layer_status,
+            _understanding_layer_status,
+        )
+
+        pipeline_status = _pipeline_layer_status(
+            source_metrics=source_metrics,
+            candidate_count=len(candidates),
+            warning_count=len(acquisition_warnings),
+            download_attempt_count=download_attempt_count,
+            downloaded_count=downloaded_count,
+        )
+        relevance_status = _relevance_layer_status(resolved_candidates)
+        source_status = _source_layer_status(resolved_candidates)
+        understanding_status = _understanding_layer_status(resolved_candidates)
+        if not candidates:
+            overall_status = "EMPTY_RESULT" if any(metric.get("success") for metric in source_metrics) else "BLOCKED"
+            message = "No paper source returned a candidate for this direction."
+        elif relevance_status.status != "SUCCESS":
+            overall_status = "DEGRADED"
+            message = "Search completed, but no candidate passed deterministic relevance checks."
+        elif pipeline_status.status == "DEGRADED":
+            overall_status = "DEGRADED"
+            message = "Direction search returned relevant candidates with partial source/download degradation."
+        else:
+            overall_status = "SUCCESS"
+            message = "Direction search returned relevance-cleared candidates; inspect source and understanding status separately."
+
         # Compute verification summary
         verification_summary = {
             "verified_candidate_count": sum(1 for c in resolved_candidates if c.verification_status == VerificationStatus.VERIFIED),
@@ -207,6 +248,14 @@ class DirectionRunner:
         self.workspace.write_json(run_dir / "canonicalization_summary.json", canon_summary)
 
         return DirectionBundle(
+            status=overall_status,
+            direction_workspace_status=overall_status,
+            pipeline_status=pipeline_status,
+            relevance_status=relevance_status,
+            source_status=source_status,
+            understanding_status=understanding_status,
+            query=user_query,
+            message=message,
             query_plan=query_plan,
             candidate_pool=raw_pool,
             source_resolution=source_resolution,
@@ -217,12 +266,19 @@ class DirectionRunner:
                 + acquisition_warnings
                 + [warning.code for warning in source_resolution.warnings]
                 + reading_plan.warnings
+                + (
+                    ["NO_CANDIDATE_PASSED_RELEVANCE_GATE"]
+                    if relevance_status.status != "SUCCESS" and candidates
+                    else []
+                )
             ),
             verification_summary=verification_summary,
             relevance_summary={
                 "candidate_count": len(resolved_candidates),
                 "venue_ranked_count": sum(1 for c in resolved_candidates if c.venue_rank.value != "unranked"),
                 "download_selected_count": len(download_candidates),
+                "relevance_evaluated_count": sum(1 for c in resolved_candidates if c.relevance_gate_evaluated),
+                "relevance_passed_count": sum(1 for c in resolved_candidates if c.relevance_gate_passed),
             },
         )
 

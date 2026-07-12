@@ -14,13 +14,20 @@ from researchsensei.acquisition import (
     SemanticScholarAdapter,
     make_default_search_adapter,
 )
+from researchsensei.core.config import DEFAULT_SEARCH_MAX_RESULTS
 from researchsensei.library import PaperLibraryStore
 from researchsensei.ranking import PaperRanker, select_downloads
+from researchsensei.relevance import (
+    MIN_DEEP_READ_RELEVANCE_SCORE,
+    MIN_RELEVANCE_SCORE,
+    DeterministicRelevanceEvaluator,
+)
 from researchsensei.schemas import (
     CanonicalQualityStatus,
     CandidatePaper,
     CandidatePool,
     DirectionBundle,
+    M1LayerStatus,
     PaperSourceStatus,
     QueryPlan,
     ReadingPlan,
@@ -58,7 +65,7 @@ class DirectionExplorationService:
         source_resolver: PaperSourceResolver | None = None,
         fulltext_resolver: FullTextResolver | None = None,
         sources: list[str] | None = None,
-        max_results_per_source: int = 8,
+        max_results_per_source: int = DEFAULT_SEARCH_MAX_RESULTS,
         max_verify_candidates: int = 12,
         max_download_candidates: int = 10,
         max_search_queries: int = 12,
@@ -67,6 +74,7 @@ class DirectionExplorationService:
         fallback_adapters: dict[str, SearchAdapter] | None = None,
         paper_ranker: PaperRanker | None = None,
         query_planner: QueryPlannerAdapter | None = None,
+        relevance_evaluator: DeterministicRelevanceEvaluator | None = None,
     ) -> None:
         if adapters is None:
             default_adapters: dict[str, SearchAdapter] = {
@@ -94,6 +102,7 @@ class DirectionExplorationService:
         self.paper_library = paper_library
         self.paper_ranker = paper_ranker or PaperRanker()
         self.query_planner = query_planner
+        self.relevance_evaluator = relevance_evaluator or DeterministicRelevanceEvaluator()
 
     def explore(self, user_query: str) -> DirectionBundle:
         query = " ".join(user_query.split())
@@ -122,11 +131,13 @@ class DirectionExplorationService:
         verified = self._verify(deduplicated)
         fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(verified, download_top_n=0)
         source_metrics = [*source_metrics, *fulltext_metrics]
-        ranked_candidates = self.paper_ranker.rank(search_query, fulltext_enriched)
+        externally_ranked = self.paper_ranker.rank(search_query, fulltext_enriched)
+        ranked_candidates = self.relevance_evaluator.evaluate_and_rank(query_plan, externally_ranked)
         download_queue = select_downloads(
             ranked_candidates,
             max_download_candidates=self.max_download_candidates,
             paper_library=self.paper_library,
+            require_relevance_gate=True,
         )
         download_candidates = [candidate for candidate in download_queue if candidate.download_selected]
         download_dir = _direction_download_dir(self.source_download_dir, query_plan)
@@ -169,17 +180,42 @@ class DirectionExplorationService:
             download_attempt_count=download_attempt_count,
             download_failed_count=max(download_attempt_count - downloaded_count, 0),
         )
+        relevance_passed_count = sum(1 for candidate in resolved if candidate.relevance_gate_passed)
+        if candidates and relevance_passed_count == 0:
+            status = "DEGRADED"
+            message = (
+                "Direction discovery completed, but no candidate passed the deterministic "
+                "task/concept relevance gate. No paper was selected for deep reading."
+            )
+        pipeline_status = _pipeline_layer_status(
+            source_metrics=source_metrics,
+            candidate_count=len(candidates),
+            warning_count=len(warnings),
+            download_attempt_count=download_attempt_count,
+            downloaded_count=downloaded_count,
+        )
+        relevance_status = _relevance_layer_status(resolved)
+        source_status = _source_layer_status(resolved)
+        understanding_status = _understanding_layer_status(resolved)
         overview = _overview(query_plan, len(reading_plan.items), status)
         key_sub_directions = _key_sub_directions(query_plan, reading_plan)
         method_families = _method_families(query_plan, reading_plan)
         deep_read_candidates = [
             card for card in card_candidates
-            if card.get("priority") in {"A_READ", "A_READ_FOR_M2"} and card.get("can_enter_m2") is True
+            if (
+                card.get("priority") in {"A_READ", "A_READ_FOR_M2"}
+                and card.get("can_enter_m2") is True
+                and card.get("deep_read_relevance_passed") is True
+            )
         ]
 
         return DirectionBundle(
             status=status,
             direction_workspace_status=status,
+            pipeline_status=pipeline_status,
+            relevance_status=relevance_status,
+            source_status=source_status,
+            understanding_status=understanding_status,
             query=query,
             message=message,
             overview=overview,
@@ -200,6 +236,7 @@ class DirectionExplorationService:
                 + download_quality_warnings
                 + [warning.code for warning in source_resolution.warnings]
                 + reading_plan.warnings
+                + (["NO_CANDIDATE_PASSED_RELEVANCE_GATE"] if relevance_passed_count == 0 else [])
             ),
             verification_summary=_verification_summary(resolved),
             relevance_summary=_relevance_summary(reading_plan),
@@ -498,6 +535,31 @@ class DirectionExplorationService:
         return DirectionBundle(
             status=status,
             direction_workspace_status=status,
+            pipeline_status=M1LayerStatus(
+                status="BLOCKED",
+                code="EMPTY_QUERY" if "EMPTY_QUERY" in warnings else "PIPELINE_BLOCKED",
+                message=message,
+                completed=False,
+            ),
+            relevance_status=M1LayerStatus(
+                status="BLOCKED",
+                code="NO_QUERY" if "EMPTY_QUERY" in warnings else "NO_CANDIDATES",
+                message="Relevance cannot be evaluated without a query and candidates.",
+                completed=False,
+                threshold=MIN_RELEVANCE_SCORE,
+            ),
+            source_status=M1LayerStatus(
+                status="BLOCKED",
+                code="NO_RELEVANT_CANDIDATE",
+                message="Source selection is blocked until a candidate passes relevance.",
+                completed=False,
+            ),
+            understanding_status=M1LayerStatus(
+                status="BLOCKED",
+                code="M2_NOT_REACHED",
+                message="M2 understanding was not reached.",
+                completed=False,
+            ),
             query=query,
             message=message,
             query_plan=query_plan,
@@ -640,7 +702,6 @@ def build_heuristic_query_plan(user_query: str) -> QueryPlan:
 
 
 def _translate_direction(query: str) -> str:
-    lower = query.lower()
     replacements = {
         "时间序列": "time series",
         "时序": "time series",
@@ -667,6 +728,13 @@ def _translate_direction(query: str) -> str:
         "聚类": "clustering",
         "插补": "imputation",
         "缺失值填补": "imputation",
+        "缺失值补全": "imputation",
+        "扩散模型": "diffusion model",
+        "大语言模型": "large language model",
+        "智能运维": "AIOps",
+        "文献综述": "survey",
+        "研究综述": "survey",
+        "综述": "survey",
         "图神经网络": "graph neural network",
         "图网络": "graph neural network",
         "图": "graph",
@@ -702,6 +770,12 @@ def _core_terms(direction: str) -> list[str]:
         "fault localization",
         "fault diagnosis",
         "imputation",
+        "diffusion model",
+        "diffusion",
+        "large language model",
+        "llm",
+        "aiops",
+        "survey",
         "graph neural network",
         "graph",
         "forecasting",
@@ -990,8 +1064,6 @@ def _semantic_variants(query: str) -> list[str]:
     variants: list[str] = []
     has_graph = "graph" in query or "gnn" in query
     has_time = "time series" in query or "temporal" in query
-    has_neural = "neural" in query or "gnn" in query
-
     # Graph + time series compound queries
     if has_graph and has_time:
         variants.extend([
@@ -1061,6 +1133,176 @@ def _semantic_variants(query: str) -> list[str]:
     return variants
 
 
+def _pipeline_layer_status(
+    *,
+    source_metrics: list[dict[str, object]],
+    candidate_count: int,
+    warning_count: int,
+    download_attempt_count: int,
+    downloaded_count: int,
+) -> M1LayerStatus:
+    attempted = [metric for metric in source_metrics if metric.get("attempted")]
+    failed = [metric for metric in attempted if not metric.get("success")]
+    details = {
+        "scope": "M1_DIRECTION_EXPLORATION",
+        "search_completed": bool(attempted),
+        "verification_completed": candidate_count > 0,
+        "ranking_completed": candidate_count > 0,
+        "source_resolution_completed": download_attempt_count > 0,
+        "download_attempt_count": download_attempt_count,
+        "downloaded_count": downloaded_count,
+        "m2_completed": False,
+        "cards_completed": False,
+    }
+    if candidate_count == 0:
+        return M1LayerStatus(
+            status="BLOCKED" if failed and not any(metric.get("success") for metric in attempted) else "EMPTY_RESULT",
+            code="SEARCH_SOURCES_BLOCKED" if failed and not any(metric.get("success") for metric in attempted) else "NO_SEARCH_RESULTS",
+            message="M1 search produced no candidates; downstream stages were not run.",
+            completed=bool(attempted),
+            candidate_count=0,
+            details=details,
+        )
+    if failed or warning_count or (download_attempt_count > 0 and downloaded_count < download_attempt_count):
+        return M1LayerStatus(
+            status="DEGRADED",
+            code="M1_PIPELINE_PARTIAL",
+            message="M1 search and ranking completed, but one or more source/download operations degraded.",
+            completed=True,
+            candidate_count=candidate_count,
+            details=details,
+        )
+    return M1LayerStatus(
+        status="SUCCESS",
+        code="M1_PIPELINE_COMPLETE",
+        message="M1 search, verification, and ranking completed for this endpoint; M2/cards were not run.",
+        completed=True,
+        candidate_count=candidate_count,
+        details=details,
+    )
+
+
+def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+    evaluated = [candidate for candidate in candidates if candidate.relevance_gate_evaluated]
+    passed = [candidate for candidate in evaluated if candidate.relevance_gate_passed]
+    details = {
+        "minimum_score": MIN_RELEVANCE_SCORE,
+        "deep_read_minimum_score": MIN_DEEP_READ_RELEVANCE_SCORE,
+        "top_candidate_id": passed[0].paper_id if passed else "",
+        "top_candidate_score": passed[0].rule_relevance_score if passed else 0.0,
+        "deterministic_gate": True,
+        "llm_is_supplemental": True,
+    }
+    if not candidates:
+        return M1LayerStatus(
+            status="BLOCKED",
+            code="NO_CANDIDATES",
+            message="No candidate was available for relevance evaluation.",
+            completed=False,
+            threshold=MIN_RELEVANCE_SCORE,
+            details=details,
+        )
+    if not passed:
+        return M1LayerStatus(
+            status="BLOCKED",
+            code="NO_CANDIDATE_PASSED_RELEVANCE_GATE",
+            message="Candidates were found, but none covered all required task/method concepts without an intent mismatch.",
+            completed=True,
+            candidate_count=len(evaluated),
+            passed_candidate_count=0,
+            threshold=MIN_RELEVANCE_SCORE,
+            details=details,
+        )
+    return M1LayerStatus(
+        status="SUCCESS",
+        code="RELEVANCE_GATE_PASSED",
+        message=f"{len(passed)}/{len(evaluated)} candidates passed deterministic relevance checks.",
+        completed=True,
+        candidate_count=len(evaluated),
+        passed_candidate_count=len(passed),
+        threshold=MIN_RELEVANCE_SCORE,
+        details=details,
+    )
+
+
+def _source_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+    relevant = [candidate for candidate in candidates if candidate.relevance_gate_passed]
+    source_ready = [candidate for candidate in relevant if candidate.has_valid_deep_reading_source]
+    details = {
+        "legal_verified_source_required": True,
+        "source_ready_candidate_ids": [candidate.paper_id for candidate in source_ready],
+        "metadata_only_count": sum(1 for candidate in relevant if candidate.metadata_only),
+    }
+    if not relevant:
+        return M1LayerStatus(
+            status="BLOCKED",
+            code="NO_RELEVANT_CANDIDATE",
+            message="Source acceptance is blocked because no candidate passed relevance.",
+            completed=False,
+            details=details,
+        )
+    if not source_ready:
+        return M1LayerStatus(
+            status="DEGRADED",
+            code="NO_VERIFIED_FULLTEXT_FOR_RELEVANT_CANDIDATE",
+            message="Relevant candidates exist, but none has a verified legal full-text source for M2.",
+            completed=True,
+            candidate_count=len(relevant),
+            passed_candidate_count=0,
+            details=details,
+        )
+    return M1LayerStatus(
+        status="SUCCESS",
+        code="VERIFIED_FULLTEXT_AVAILABLE",
+        message=f"{len(source_ready)}/{len(relevant)} relevant candidates have a verified full-text source.",
+        completed=True,
+        candidate_count=len(relevant),
+        passed_candidate_count=len(source_ready),
+        details=details,
+    )
+
+
+def _understanding_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+    relevant = [candidate for candidate in candidates if candidate.relevance_gate_passed]
+    source_ready = [candidate for candidate in relevant if candidate.has_valid_deep_reading_source]
+    m2_ready = [
+        candidate
+        for candidate in source_ready
+        if candidate.m2_ready and candidate.can_enter_m2
+    ]
+    details = {
+        "m2_was_run": False,
+        "cards_were_generated": False,
+        "m2_ready_candidate_ids": [candidate.paper_id for candidate in m2_ready],
+    }
+    if not relevant:
+        return M1LayerStatus(
+            status="BLOCKED",
+            code="RELEVANCE_GATE_BLOCKED_UNDERSTANDING",
+            message="M2 understanding cannot start without a relevant candidate.",
+            completed=False,
+            details=details,
+        )
+    if not source_ready:
+        return M1LayerStatus(
+            status="BLOCKED",
+            code="SOURCE_GATE_BLOCKED_UNDERSTANDING",
+            message="M2 understanding cannot start without verified full text.",
+            completed=False,
+            candidate_count=len(relevant),
+            details=details,
+        )
+    return M1LayerStatus(
+        status="NOT_RUN",
+        code="READY_FOR_M2" if m2_ready else "M2_PREPARATION_NOT_RUN",
+        message="This direction endpoint does not run M2 or generate user-facing cards.",
+        completed=False,
+        candidate_count=len(source_ready),
+        passed_candidate_count=len(m2_ready),
+        details=details,
+    )
+
+
 def _overview(query_plan: QueryPlan, count: int, status: str) -> str:
     topic = query_plan.direction_en or query_plan.user_query
     return (
@@ -1103,7 +1345,12 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
     cards: list[dict[str, object]] = []
     ordered_items = sorted(
         reading_plan.items,
-        key=lambda item: _search_rank(item.paper, fallback=reading_plan.items.index(item) + 1),
+        key=lambda item: (
+            1 if item.paper.relevance_gate_evaluated and not item.paper.relevance_gate_passed else 0,
+            -item.paper.rule_relevance_score if item.paper.relevance_gate_evaluated else 0.0,
+            item.paper.rerank_rank
+            or _search_rank(item.paper, fallback=reading_plan.items.index(item) + 1),
+        ),
     )
     for index, item in enumerate(ordered_items, start=1):
         paper = item.paper.model_copy(
@@ -1157,6 +1404,18 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "can_deep_read": paper.can_deep_read,
             "needs_user_upload": paper.needs_user_upload,
             "relevance_score": item.scoring_breakdown.relevance_score,
+            "rule_relevance_score": paper.rule_relevance_score,
+            "relevance_gate_evaluated": paper.relevance_gate_evaluated,
+            "relevance_gate_passed": paper.relevance_gate_passed,
+            "deep_read_relevance_passed": bool(
+                paper.relevance_gate_passed
+                and paper.rule_relevance_score >= MIN_DEEP_READ_RELEVANCE_SCORE
+            ),
+            "concept_coverage": paper.concept_coverage,
+            "matched_concepts": paper.matched_concepts,
+            "missing_concepts": paper.missing_concepts,
+            "forbidden_intent_matches": paper.forbidden_intent_matches,
+            "relevance_reason": paper.relevance_reason,
             "weighted_score": item.scoring_breakdown.weighted_total,
             "verification_status": paper.verification_status.value,
             "verification_reason": paper.verification_reason,
@@ -1213,6 +1472,13 @@ def _relevance_summary(reading_plan: ReadingPlan) -> dict[str, int]:
         "candidate_count": len(reading_plan.items),
         "download_selected_count": sum(1 for item in reading_plan.items if item.paper.download_selected),
         "venue_ranked_count": sum(1 for item in reading_plan.items if item.paper.venue_rank.value != "unranked"),
+        "relevance_evaluated_count": sum(1 for item in reading_plan.items if item.paper.relevance_gate_evaluated),
+        "relevance_passed_count": sum(1 for item in reading_plan.items if item.paper.relevance_gate_passed),
+        "relevance_blocked_count": sum(
+            1
+            for item in reading_plan.items
+            if item.paper.relevance_gate_evaluated and not item.paper.relevance_gate_passed
+        ),
     }
     for item in reading_plan.items:
         summary[item.priority] = summary.get(item.priority, 0) + 1

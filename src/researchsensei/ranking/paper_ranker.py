@@ -23,7 +23,13 @@ class PaperRanker:
         ranker: Any | None = None,
         ranker_factory: Callable[..., Any] | None = None,
     ) -> None:
-        self.enabled = _env_enabled() if enabled is None else enabled
+        # An explicitly injected ranker is a test/runtime dependency choice and
+        # must not be silently disabled by a process-level environment value.
+        self.enabled = (
+            (ranker is not None or ranker_factory is not None or _env_enabled())
+            if enabled is None
+            else enabled
+        )
         self.model_name = model_name or os.getenv("RESEARCHSENSEI_RERANKER_MODEL", "").strip() or DEFAULT_RERANKER_MODEL
         self.max_length = max_length or int(os.getenv("RESEARCHSENSEI_RERANKER_MAX_LENGTH", "384"))
         self._ranker = ranker
@@ -89,8 +95,6 @@ class PaperRanker:
 
     @staticmethod
     def _request(query: str, candidates: Sequence[CandidatePaper]) -> Any:
-        from flashrank import RerankRequest
-
         passages = [
             {
                 "id": index,
@@ -99,6 +103,12 @@ class PaperRanker:
             }
             for index, candidate in enumerate(candidates)
         ]
+        try:
+            from flashrank import RerankRequest
+        except ModuleNotFoundError:
+            # Injected test/custom rankers can accept this dependency-free
+            # request shape. The default loader still requires flashrank.
+            return {"query": query, "passages": passages}
         return RerankRequest(query=query, passages=passages)
 
 
@@ -107,11 +117,22 @@ def select_downloads(
     *,
     max_download_candidates: int,
     paper_library: PaperLibraryStore | None = None,
+    require_relevance_gate: bool = False,
 ) -> list[CandidatePaper]:
     limit = max(max_download_candidates, 0)
     selected: list[CandidatePaper] = []
+    selected_count = 0
     for index, candidate in enumerate(candidates, start=1):
-        is_selected = index <= limit
+        relevance_eligible = bool(
+            not require_relevance_gate
+            or (
+                candidate.relevance_gate_evaluated
+                and candidate.relevance_gate_passed
+            )
+        )
+        is_selected = relevance_eligible and selected_count < limit
+        if is_selected:
+            selected_count += 1
         cached = paper_library.find_match(candidate) if paper_library is not None else None
         download_rank = int(candidate.rerank_rank or candidate.search_rank or index)
         raw_metadata = {
@@ -127,7 +148,13 @@ def select_downloads(
             }
         venue = candidate.venue_canonical_name or candidate.venue or "unknown venue"
         venue_rank = candidate.venue_rank.value
-        if is_selected:
+        if not relevance_eligible:
+            decision = "SKIPPED_RELEVANCE_GATE"
+            reason = (
+                "Not attempted because the deterministic relevance gate did not "
+                f"pass: {candidate.relevance_reason or 'missing relevance assessment'}."
+            )
+        elif is_selected:
             decision = "SELECTED_BY_RERANKER"
             reuse_note = " local library hit; reuse before network download." if cached is not None else ""
             reason = (
@@ -136,7 +163,7 @@ def select_downloads(
             )
         else:
             decision = "SKIPPED_OVER_DOWNLOAD_LIMIT"
-            reason = f"Not attempted because it is beyond the top {limit} reranked download candidates."
+            reason = f"Not attempted because it is beyond the top {limit} relevance-cleared reranked download candidates."
         selected.append(
             candidate.model_copy(
                 update={

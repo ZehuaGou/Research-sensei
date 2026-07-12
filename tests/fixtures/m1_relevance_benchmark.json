@@ -1,0 +1,236 @@
+{
+  "schema_version": "m1_relevance_benchmark.v1",
+  "minimum_case_pass_rate": 1.0,
+  "cases": [
+    {
+      "id": "ts_anomaly_en",
+      "query": "time series anomaly detection",
+      "required_concepts": ["time_series", "anomaly_detection"],
+      "optional_concepts": ["multivariate", "root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Transformer Time Series Anomaly Detection", "abstract": "We detect anomalies in temporal sensor sequences."}],
+      "unacceptable_candidates": [{"title": "Image Anomaly Classification", "abstract": "A classifier recognizes defects in images.", "failure": "wrong_data_shape"}]
+    },
+    {
+      "id": "ts_anomaly_zh",
+      "query": "时间序列异常检测",
+      "required_concepts": ["time_series", "anomaly_detection"],
+      "optional_concepts": ["multivariate", "root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Robust Time Series Anomaly Detection", "abstract": "The detector identifies anomalies in temporal sequences."}],
+      "unacceptable_candidates": [{"title": "时间序列预测方法", "abstract": "本文研究未来数值预测。", "failure": "forecasting_not_detection"}]
+    },
+    {
+      "id": "ts_anomaly_mixed",
+      "query": "time series 异常检测 transformer",
+      "required_concepts": ["time_series", "anomaly_detection"],
+      "optional_concepts": ["multivariate", "root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Transformer-based Time Series Anomaly Detection", "abstract": "Attention detects anomalous temporal patterns."}],
+      "unacceptable_candidates": [{"title": "Transformer Time Series Forecasting", "abstract": "The model forecasts future temporal values.", "failure": "historical_forecasting_mismatch"}]
+    },
+    {
+      "id": "multivariate_forecasting_en",
+      "query": "multivariate time series forecasting",
+      "required_concepts": ["time_series", "multivariate", "forecasting"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Multivariate Time Series Forecasting with Transformers", "abstract": "We forecast future values for multiple sensor variables."}],
+      "unacceptable_candidates": [{"title": "Multivariate Time Series Anomaly Detection", "abstract": "We detect anomalies across multiple sensors.", "failure": "historical_anomaly_selected_for_forecasting"}]
+    },
+    {
+      "id": "multivariate_forecasting_zh",
+      "query": "多变量时间序列预测",
+      "required_concepts": ["time_series", "multivariate", "forecasting"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Deep Multivariate Time Series Forecasting", "abstract": "The method predicts future multivariable temporal observations."}],
+      "unacceptable_candidates": [{"title": "Multivariate Missing Value Imputation", "abstract": "We impute missing values in multivariate sequences.", "failure": "imputation_not_forecasting"}]
+    },
+    {
+      "id": "multivariate_forecasting_mixed",
+      "query": "多变量 time series forecasting",
+      "required_concepts": ["time_series", "multivariate", "forecasting"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Probabilistic Multivariate Time Series Forecasting", "abstract": "A probabilistic model forecasts future multiple-variable sequences."}],
+      "unacceptable_candidates": [{"title": "Clustering Multivariate Time Series", "abstract": "We cluster temporal sequences into groups.", "failure": "clustering_not_forecasting"}]
+    },
+    {
+      "id": "multivariate_imputation_en",
+      "query": "multivariate time series imputation",
+      "required_concepts": ["time_series", "multivariate", "imputation"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Multivariate Time Series Imputation by Masked Modeling", "abstract": "We impute missing values in multiple temporal variables."}],
+      "unacceptable_candidates": [{"title": "Multivariate Time Series Forecasting", "abstract": "We predict future values for multiple sensors.", "failure": "historical_forecasting_selected_for_imputation"}]
+    },
+    {
+      "id": "multivariate_imputation_zh",
+      "query": "多变量时间序列缺失值补全",
+      "required_concepts": ["time_series", "multivariate", "imputation"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Multivariate Temporal Missing Value Imputation", "abstract": "The model recovers missing data in time series with multiple variables."}],
+      "unacceptable_candidates": [{"title": "Time Series Anomaly Detection", "abstract": "This detector finds anomalous temporal observations.", "failure": "detection_not_imputation"}]
+    },
+    {
+      "id": "multivariate_imputation_mixed",
+      "query": "multivariate 时序 imputation",
+      "required_concepts": ["time_series", "multivariate", "imputation"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Attention for Multivariate Time Series Imputation", "abstract": "Missing values are imputed across temporal sensor variables."}],
+      "unacceptable_candidates": [{"title": "Multivariate Time Series Classification", "abstract": "A classifier assigns sequence labels.", "failure": "classification_not_imputation"}]
+    },
+    {
+      "id": "graph_anomaly_en",
+      "query": "graph anomaly detection",
+      "required_concepts": ["anomaly_detection", "graph"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Graph Anomaly Detection with Structural Context", "abstract": "We detect anomalous nodes in graph-structured data."}],
+      "unacceptable_candidates": [{"title": "Image Anomaly Detection", "abstract": "Visual defects are detected in images.", "failure": "graph_constraint_dropped"}]
+    },
+    {
+      "id": "graph_anomaly_zh",
+      "query": "图异常检测",
+      "required_concepts": ["anomaly_detection", "graph"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Attributed Graph Anomaly Detection", "abstract": "The detector finds anomalous nodes in a graph."}],
+      "unacceptable_candidates": [{"title": "Graph Clustering", "abstract": "Nodes are grouped by community structure.", "failure": "clustering_not_detection"}]
+    },
+    {
+      "id": "gnn_anomaly_en",
+      "query": "graph neural network anomaly detection",
+      "required_concepts": ["anomaly_detection", "graph", "gnn"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Graph Neural Networks for Anomaly Detection", "abstract": "A GNN detects anomalous graph nodes."}],
+      "unacceptable_candidates": [{"title": "Graph Autoencoder Anomaly Detection", "abstract": "A non-neural structural score detects graph anomalies.", "failure": "gnn_method_constraint_dropped"}]
+    },
+    {
+      "id": "gnn_anomaly_mixed",
+      "query": "GNN 用于图异常检测",
+      "required_concepts": ["anomaly_detection", "graph", "gnn"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "GNN-based Graph Anomaly Detection", "abstract": "Graph neural message passing identifies anomalous nodes."}],
+      "unacceptable_candidates": [{"title": "GNN Graph Classification", "abstract": "Graph neural networks classify whole graphs.", "failure": "classification_not_detection"}]
+    },
+    {
+      "id": "diffusion_forecasting_en",
+      "query": "diffusion models for forecasting",
+      "required_concepts": ["forecasting", "diffusion"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Diffusion Models for Probabilistic Forecasting", "abstract": "A denoising diffusion model forecasts future values."}],
+      "unacceptable_candidates": [{"title": "Diffusion Models for Time Series Imputation", "abstract": "A diffusion model imputes missing values.", "failure": "historical_imputation_selected_for_forecasting"}]
+    },
+    {
+      "id": "diffusion_forecasting_zh",
+      "query": "扩散模型用于时间序列预测",
+      "required_concepts": ["time_series", "forecasting", "diffusion"],
+      "optional_concepts": ["multivariate"],
+      "forbidden_intent_mismatches": ["anomaly_detection", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Diffusion Time Series Forecasting", "abstract": "Denoising diffusion forecasts future temporal sequences."}],
+      "unacceptable_candidates": [{"title": "Diffusion Image Generation", "abstract": "A diffusion model generates images.", "failure": "forecasting_and_data_shape_dropped"}]
+    },
+    {
+      "id": "diffusion_imputation_en",
+      "query": "diffusion models for imputation",
+      "required_concepts": ["imputation", "diffusion"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Diffusion Models for Missing Value Imputation", "abstract": "A denoising diffusion model imputes missing data."}],
+      "unacceptable_candidates": [{"title": "Diffusion Probabilistic Forecasting", "abstract": "The diffusion process forecasts future observations.", "failure": "historical_forecasting_selected_for_imputation"}]
+    },
+    {
+      "id": "diffusion_imputation_mixed",
+      "query": "diffusion model 做缺失值补全",
+      "required_concepts": ["imputation", "diffusion"],
+      "optional_concepts": [],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Conditional Diffusion for Data Imputation", "abstract": "Missing values are imputed by a diffusion model."}],
+      "unacceptable_candidates": [{"title": "Diffusion Anomaly Detection", "abstract": "A diffusion model detects anomalies.", "failure": "detection_not_imputation"}]
+    },
+    {
+      "id": "anomaly_survey_en",
+      "query": "anomaly detection survey",
+      "required_concepts": ["anomaly_detection", "survey"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification"],
+      "allow_survey": true,
+      "acceptable_candidates": [{"title": "A Survey of Anomaly Detection", "abstract": "This literature review provides a taxonomy of anomaly detectors."}],
+      "unacceptable_candidates": [{"title": "A New Anomaly Detector", "abstract": "We propose one anomaly detection method.", "failure": "survey_intent_dropped"}]
+    },
+    {
+      "id": "anomaly_survey_zh",
+      "query": "异常检测研究综述",
+      "required_concepts": ["anomaly_detection", "survey"],
+      "optional_concepts": ["root_cause_analysis"],
+      "forbidden_intent_mismatches": ["forecasting", "imputation", "clustering", "classification"],
+      "allow_survey": true,
+      "acceptable_candidates": [{"title": "Anomaly Detection: A Systematic Review", "abstract": "The survey organizes anomaly detection methods and benchmarks."}],
+      "unacceptable_candidates": [{"title": "Time Series Forecasting Review", "abstract": "This survey reviews forecasting methods.", "failure": "wrong_survey_topic"}]
+    },
+    {
+      "id": "time_series_rca_en",
+      "query": "root cause analysis for time series",
+      "required_concepts": ["time_series", "root_cause_analysis"],
+      "optional_concepts": ["multivariate"],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Root Cause Analysis for Time Series Incidents", "abstract": "The method localizes root causes in temporal sensor data."}],
+      "unacceptable_candidates": [{"title": "Time Series Anomaly Detection", "abstract": "The detector flags anomalous sequences without diagnosis.", "failure": "historical_detection_selected_for_rca"}]
+    },
+    {
+      "id": "time_series_rca_mixed",
+      "query": "时序 anomaly root cause analysis",
+      "required_concepts": ["time_series", "root_cause_analysis"],
+      "optional_concepts": ["multivariate"],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Temporal Root Cause Localization for Anomalies", "abstract": "Root cause analysis diagnoses anomalous time series."}],
+      "unacceptable_candidates": [{"title": "Temporal Forecasting after Anomalies", "abstract": "The model forecasts future sequence values.", "failure": "forecasting_not_rca"}]
+    },
+    {
+      "id": "llm_aiops_rca_en",
+      "query": "LLM for AIOps root cause analysis",
+      "required_concepts": ["root_cause_analysis", "llm", "aiops"],
+      "optional_concepts": ["time_series"],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "Large Language Models for AIOps Root Cause Analysis", "abstract": "An LLM diagnoses root causes in IT operations incidents."}],
+      "unacceptable_candidates": [{"title": "LLMs for AIOps Log Classification", "abstract": "A large language model classifies IT operations logs.", "failure": "historical_generic_llm_selected_for_rca"}]
+    },
+    {
+      "id": "llm_aiops_rca_zh",
+      "query": "大语言模型用于智能运维根因分析",
+      "required_concepts": ["root_cause_analysis", "llm", "aiops"],
+      "optional_concepts": ["time_series"],
+      "forbidden_intent_mismatches": ["anomaly_detection", "forecasting", "imputation", "clustering", "classification", "survey"],
+      "allow_survey": false,
+      "acceptable_candidates": [{"title": "LLM-assisted Root Cause Diagnosis for AIOps", "abstract": "Large language models localize incident root causes in IT operations."}],
+      "unacceptable_candidates": [{"title": "Large Language Models for General Question Answering", "abstract": "An LLM answers open-domain questions.", "failure": "aiops_and_rca_constraints_dropped"}]
+    }
+  ]
+}
