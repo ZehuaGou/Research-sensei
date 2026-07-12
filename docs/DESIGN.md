@@ -14,9 +14,9 @@ ResearchSensei is a research-reading system with four active surfaces:
    audit reports.
 3. M3 renders a Chinese workflow for direction search, seed expansion, upload,
    settings, and the PaperWorkspace card reader.
-4. M4 v1 provides evidence-bound interaction inside PaperWorkspace: selected
+4. M4 v1 provides claim-level evidence-bound interaction inside PaperWorkspace: selected
    text explanation, formula explanation, paper Q&A, advisor questions,
-   advisor evaluation, and JSON memory.
+   advisor evaluation, and atomic bounded JSON memory.
 
 Live LLM execution defaults to ccswitch (`cc_switch` config key). The project
 calls the local ccswitch endpoint and sends the model selected in settings.
@@ -25,6 +25,7 @@ calls the local ccswitch endpoint and sends the model selected in settings.
 
 ```text
 direction query / uploaded source / arXiv / DOI
+  -> deterministic task/concept relevance gate
   -> legal source resolver
   -> M1 canonical candidate or source file
   -> M2 parse, evidence, cards, audit
@@ -33,6 +34,34 @@ direction query / uploaded source / arXiv / DOI
   -> Chinese PaperWorkspace
   -> M4 evidence-bound tutoring
 ```
+
+Pipeline completion, candidate relevance, source readiness, and understanding
+quality are independent status dimensions. No single `SUCCESS` value is allowed
+to imply all four.
+
+## Runtime Composition
+
+`researchsensei.web.app:create_app` is a compatibility entry point. The real
+composition lives in `web/app_factory.py`; it loads one complete configuration,
+builds dependencies, and mounts focused settings, jobs, library, directions,
+and M4 routers. Bounded Pydantic request models define API input. Upload and job
+logic live in focused services instead of route functions.
+
+Long direction search and deep-read operations use a small local executor with
+SQLite-backed task state. A task records stage, progress, result, typed failure,
+cancellation, and restart interruption. This is intentionally local and
+maintainable; ResearchSensei does not require a distributed queue.
+
+SQLite stores use a busy timeout, WAL, explicit transactions, and schema
+versions. Cleanup is permitted only under workspace-managed roots.
+
+## M1 Relevance Boundary
+
+Deterministic required-concept coverage and forbidden intent-mismatch penalties
+gate Top-1 and deep-read candidates. Survey, forecasting, imputation, anomaly,
+clustering, graph, GNN, diffusion, and RCA intent are not interchangeable. An
+optional LLM judge can veto or annotate but cannot rescue a deterministic
+failure. Insufficient relevance returns `DEGRADED` or `BLOCKED`.
 
 ## M2 Fail-Closed Rules
 
@@ -59,6 +88,22 @@ direction query / uploaded source / arXiv / DOI
 - Text selection opens a small M4 action toolbar positioned from the selection
   rectangle and clamped to the viewport to avoid browser-native selection UI.
 - M4 controls mount only when the job is allowed to show cards.
+- Workspace API access is centralized in a typed client. Formula dock, tab and
+  scroll memory, chat resizing, and workspace data are separate typed units.
+- Floating controls are viewport-clamped after drag, resize, zoom/layout
+  change, and persisted-coordinate migration; keyboard operation is required.
+
+## M4 Evidence Design
+
+M4 produces internal claims, each with its own evidence refs, supporting text,
+and uncertainty. The backend validates both ref membership and semantic support
+before rendering Chinese prose. Formulae, thresholds, numbers, datasets,
+metrics, and experimental results use stricter matching. Unsupported claims are
+removed or cause `DEGRADED`; all allowed refs are never attached wholesale.
+
+Memory schema `m4_memory.v2` uses per-job locking and temp-file plus atomic
+replace. Corruption is quarantined and surfaced as a warning rather than
+silently overwritten.
 
 ## External Tool Position
 

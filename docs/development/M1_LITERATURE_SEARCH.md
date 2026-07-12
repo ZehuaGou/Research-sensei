@@ -10,6 +10,7 @@ M1 is responsible for:
 - direction query normalization;
 - PaperSearch MCP multi-source paper discovery;
 - dedup and FlashRank semantic reranking;
+- deterministic concept-coverage and intent-mismatch relevance gating;
 - CCF/venue-registry annotation and reporting before download;
 - local paper-library reuse and duplicate avoidance;
 - legal full-text discovery;
@@ -24,12 +25,38 @@ It is not responsible for M4 tutoring, long-term memory, or drills.
 
 | Surface | Status label to use | Notes |
 |---|---|---|
-| Focused acquisition / selected-paper canonical handoff | narrow real verified | Do not expand this to full M1 completion. |
-| Direction Exploration | DEGRADED_SMOKE | Returns overview, sub-directions, method families, candidates, reading order, source metrics, and handoff metadata. |
-| Seed Expansion | DEGRADED_SMOKE | Returns upstream/downstream/same-route/survey/follow-up groups; weak relation claims are explicitly marked weak when citation graph is not verified. |
-| Local paper library | UNIT_TESTED | Stores downloaded paper metadata, local paths, search runs, and delete state in `workspace/sensei.sqlite3`; used by M1 before network download. |
-| Legal full-text discovery | DEGRADED_SMOKE | PaperSearch MCP supplies multi-source discovery metadata; arXiv/source links, OA venue landing pages, OpenAlex/Semantic Scholar OA metadata already present on candidates, and Unpaywall participate as full-text resolution inputs. Metadata-only papers stay visible with `needs_user_upload=true`. |
-| deep_read handoff | DEGRADED_SMOKE / partial real | Source-backed candidates can create PaperWorkspace jobs. DOI-only handoff is narrowly implemented through Unpaywall/legal OA PDF when available; broad DOI acceptance remains pending. |
+| Deterministic relevance benchmark | OFFLINE_VERIFIED | Fixed English, Chinese, and mixed-language cases cover task/data/method concepts and historical semantic mismatches. |
+| Direction Exploration | UNIT_TESTED | Returns overview, sub-directions, method families, candidates, reading order, four-layer status, source metrics, and handoff metadata. Current live provider state is recorded separately in `docs/STATUS.md`. |
+| Seed Expansion | UNIT_TESTED | Returns upstream/downstream/same-route/survey/follow-up groups; weak relation claims are explicitly marked weak when citation graph is not verified. |
+| Local paper library | UNIT_TESTED | Stores downloaded paper metadata, local paths, search runs, and delete state in `workspace/sensei.sqlite3`; uses WAL, busy timeout, migrations, and guarded cleanup. |
+| Legal full-text discovery | UNIT_TESTED_WITH_FIXTURES | PaperSearch MCP metadata, official/OA landing extraction, arXiv, and Unpaywall feed source resolution. Metadata-only papers stay visible with `needs_user_upload=true`; current live download status is separate. |
+| deep_read handoff | UNIT_TESTED | Only relevance-gated and source-backed candidates can create PaperWorkspace jobs. Long execution has a persistent asynchronous job path; the synchronous route remains compatible. |
+
+## Deterministic Relevance Contract
+
+Relevance is not inferred from pipeline completion and is not delegated solely
+to another LLM. For every query, M1 evaluates:
+
+- required task, data-shape, and method concepts;
+- optional concepts that improve confidence;
+- forbidden intent mismatches;
+- whether survey papers are allowed;
+- compound-query concept coverage;
+- explicit penalties for survey, forecasting, imputation, anomaly detection,
+  clustering, graph, GNN, diffusion, and RCA mismatches.
+
+Top-1 and deep-read candidates use explicit minimum thresholds. An optional LLM
+judge may veto or annotate but cannot rescue a deterministic failure. If no
+candidate clears the gate, M1 returns `DEGRADED` or `BLOCKED` and does not pick
+an incorrect paper to keep the pipeline moving.
+
+The maintained offline fixture has at least twenty English, Chinese, and mixed
+queries. It includes acceptable/unacceptable examples and historical wrong
+selections. Run it with:
+
+```powershell
+.venv\Scripts\python.exe scripts\run_m1_relevance_benchmark.py
+```
 
 ## Source And Full-Text Priority
 
@@ -44,25 +71,28 @@ The default M1 product flow is:
    ID when present, and source metadata.
 3. Deduplicate candidates and annotate the venue against the local CCF venue
    registry when a true venue/journal name is available.
-4. Rerank the deduplicated, full-text-enriched candidate pool with FlashRank
+4. Apply deterministic task/concept relevance scoring and mismatch penalties.
+   Candidates below the query gate remain visible for diagnostics but cannot
+   become Top-1 or deep-read selections.
+5. Rerank the gated, deduplicated, full-text-enriched candidate pool with FlashRank
    (`ms-marco-MiniLM-L-12-v2` by default), while preserving the original
    external search rank as `search_rank`. The small in-repo quality guard only
    nudges candidates with usable legal full-text/source metadata, known CCF
    venue rank, and citation signal, while penalizing obviously weak metadata;
    it is not a hand-written relevance model.
-5. Select top reranked candidates for download attempts, defaulting to the top
+6. Select top reranked candidates for download attempts, defaulting to the top
    10. Runtime fields use `download_selected`, `download_decision`, and
    `download_reason`. CCF rank remains an annotation and quality hint, not a
    hard download gate.
-6. Compare the selected candidates against the local paper library by DOI,
+7. Compare the selected candidates against the local paper library by DOI,
    arXiv ID, normalized title, and known URLs.
-7. Preserve queue order during reuse: if a selected paper already exists in the local
+8. Preserve queue order during reuse: if a selected paper already exists in the local
    library, reuse it in place. Do not redownload just to recreate the same PDF.
-8. Pass the selected download queue into the legal downloader/source
+9. Pass the selected download queue into the legal downloader/source
    resolver. Library hits are returned as `library_reuse`; failed downloads,
    landing-only candidates, non-PDF responses, and missing PDF URLs are recorded
    explicitly instead of being silently replaced by lower-ranked papers.
-9. Normalize downloaded source/PDF material into canonical M1 artifacts and
+10. Normalize downloaded source/PDF material into canonical M1 artifacts and
    hand only M2-ready artifacts onward.
 
 This design intentionally uses PaperSearch MCP as the external discovery layer
@@ -128,11 +158,11 @@ Failed downloads remain visible in `search_runs`. If too many selected papers
 cannot be downloaded, M1 reports the high failure rate so the next step can be a
 manual upload, a different query, or a clearly labeled supplemental search.
 
-Current known quality note: broad RCA/LLM/AIOps queries are now recoverable via
-fallback discovery, but relevance is still wider than ideal. They may include
-forecasting, benchmarking, or general log-analysis papers unless the query is
-made more specific, for example `LLM root cause localization AIOps incident
-diagnosis` or `time series anomaly attribution root cause localization`.
+Broad RCA/LLM/AIOps queries remain difficult for live discovery, but the
+deterministic gate now blocks forecasting, generic benchmarking, or unrelated
+log-analysis candidates when required RCA/AIOps concepts are missing. A live
+provider may still return no acceptable candidate; that outcome is an explicit
+relevance degradation, not a reason to lower the threshold.
 
 Management API:
 
@@ -197,6 +227,11 @@ Candidate output must preserve:
 Direction Exploration output must include:
 
 - status: SUCCESS, DEGRADED, EMPTY_RESULT, or BLOCKED;
+- `pipeline_status`: whether search/source/M2/card execution completed;
+- `relevance_status`: whether the selected candidate cleared the deterministic
+  query gate;
+- `source_status`: whether legal verified full text can enter M2;
+- `understanding_status`: whether cards/evidence are safe for user display;
 - overview;
 - key sub-directions;
 - method families;
@@ -207,7 +242,8 @@ Direction Exploration output must include:
 
 Each candidate must include source, title, authors/year, URL/DOI/arXiv ID when
 known, relevance score, verification status, source confidence, and whether it
-can enter M2.
+can enter M2. The four status dimensions are independent; a pipeline success
+does not erase a relevance, source, or understanding failure.
 
 ## SeedExpansionBundle Requirements
 
@@ -251,4 +287,4 @@ report files.
   MCP or another explicit external provider with a working anti-bot strategy.
 - No fake PDF, DOI, arXiv ID, OA status, or citation relation.
 - Do not hide metadata-only high-value papers.
-- Do not treat DEGRADED_SMOKE as broad M1 REAL_E2E.
+- Do not treat offline fixtures or a completed pipeline as broad M1 REAL_E2E.

@@ -1,4 +1,4 @@
-# ResearchSensei
+# ResearchSensei v0.6 Reliability Baseline
 
 ResearchSensei is a research-reading workflow for moving from a research
 direction to legal paper discovery, full-text acquisition, evidence-backed
@@ -8,17 +8,21 @@ single-paper understanding, and a Chinese PaperWorkspace with an M4 tutor.
 intent and contracts; if they disagree, update `docs/STATUS.md` and then bring
 the other docs back into sync.
 
+The v0.6 baseline separates pipeline completion, semantic relevance, legal
+source readiness, and learner-facing understanding. See `docs/STATUS.md` for
+the exact final commit, commands, pass/fail counts, and live-verification state.
+
 ## Current Scope
 
 - M1: literature acquisition, direction exploration, seed expansion, legal
   full-text discovery, and deep-read handoff.
 - M2: passage/claim evidence, formula provenance, paper/formula/teaching card
   generation, quality audit, and fail-closed understanding status.
-- M3: Chinese Vue workspace for upload, direction search, seed expansion,
-  status gating, cards, and settings.
-- M4 v1: evidence-bound PaperWorkspace interactions: selected text explanation,
-  formula explanation, single-paper Q&A, advisor questions/evaluation, and
-  `m4_memory.json`.
+- M3: typed Chinese Vue workspace for streamed upload, asynchronous direction
+  jobs, seed expansion, four-layer status gating, cards, and settings.
+- M4 v1: claim-level evidence-bound PaperWorkspace interactions: selected text
+  explanation, formula explanation, single-paper Q&A, advisor
+  questions/evaluation, and atomic bounded `m4_memory.json`.
 
 Live LLM runs default to ccswitch (`cc_switch` config key). ResearchSensei calls
 the local ccswitch endpoint; the request model can be selected from the settings
@@ -38,7 +42,7 @@ Frontend:
 
 ```powershell
 cd frontend
-npm install
+npm ci
 ```
 
 Create a local `.env` when live LLM or external source lookups are needed. Do
@@ -60,6 +64,14 @@ S2_API_KEY=...
 `/v1/messages` route; the OpenAI-compatible `/chat/completions` route is not the
 local ccswitch path for this project.
 
+Configuration precedence is: explicit constructor/app-factory override,
+environment variable, ignored `config/local.toml`, checked-in
+`config/sensei.example.toml`, then code defaults. The app factory loads the
+configuration once and injects it into search, parsing, upload, server, and LLM
+services. `GET /api/v1/settings` is secret-safe; use
+`POST /api/v1/settings/validate` for local validation and opt in explicitly to
+the bounded live provider probe.
+
 ## Useful Commands
 
 Default backend tests, excluding opt-in live runs:
@@ -79,7 +91,9 @@ Frontend tests and build:
 ```powershell
 cd frontend
 npm test
+npm run typecheck
 npm run build
+npm run test:e2e
 ```
 
 Local backend and frontend dev servers:
@@ -93,6 +107,11 @@ npm run dev
 
 The frontend dev server runs on port `13000` and proxies API traffic to backend
 port `8765`.
+
+Direction search and deep-read have persistent local task endpoints that return
+a job id and expose stage, progress, result, typed failure, and cancellation.
+The synchronous endpoints remain compatibility paths, while the frontend uses
+the asynchronous task flow for long operations.
 
 Main-chain acceptance with ccswitch:
 

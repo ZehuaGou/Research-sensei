@@ -1,12 +1,14 @@
 # M4 Interactive Learning Contract
 
-M4 v1 is implemented for PaperWorkspace. It is not a raw-PDF chatbot; it is an
-evidence-bound tutor over M2 artifacts.
+M4 v1 is an evidence-bound tutor inside PaperWorkspace. It is not a raw-PDF
+chatbot and it is not a general assistant. Current verification evidence lives
+in `docs/STATUS.md`.
 
-## Implemented
+## Implemented Surface
 
 - Backend service: `src/researchsensei/m4/service.py`
 - Schemas: `src/researchsensei/schemas/m4.py`
+- Router: `src/researchsensei/web/routers/m4.py`
 - API routes:
   - `POST /api/v1/jobs/{job_id}/selection/explain`
   - `POST /api/v1/jobs/{job_id}/formula/explain`
@@ -15,49 +17,98 @@ evidence-bound tutor over M2 artifacts.
   - `POST /api/v1/jobs/{job_id}/advisor/evaluate`
   - `GET /api/v1/jobs/{job_id}/memory`
   - `DELETE /api/v1/jobs/{job_id}/memory`
-- Frontend:
-  - `AskPanel.vue`
-  - `TextSelectionToolbar.vue`
-  - Paper/formula card M4 actions
-- Memory artifact: `m4_memory.json`
+- Frontend tutor, selected-text actions, formula actions, and advisor flow
+- Memory artifact: `m4_memory.json`, schema `m4_memory.v2`
 
-## Runtime Rules
+## Input Boundary
 
-- M4 reads user-facing M2 artifacts only: paper card, formula cards, teaching
-  cards, passage index, claim evidence, evidence index, and previous M4 memory.
-- M4 controls mount only when `/cards` is allowed.
-- Answers must cite allowed evidence refs when evidence is available.
-- Non-paper/off-task prompts such as weather, jokes, code writing, travel
-  booking, or creative writing are rejected as `DEGRADED` without calling the
-  LLM or writing M4 memory.
-- If the configured LLM answer is missing, invalid, empty, or cites unknown
-  evidence refs, M4 falls back to deterministic artifact answers and emits a
-  warning.
-- The configured live LLM path uses ccswitch by default. M4 tutor calls pass a
-  route-specific override of `disable_thinking=True`, `max_tokens=2400`, and
-  `timeout=90` so interactive answers fail over quickly to deterministic
-  evidence-card responses when the live model is unavailable or invalid.
-- User-facing M4 text is Chinese by default.
+M4 reads only user-facing artifacts for the current job: paper cards, formula
+cards, teaching cards, passage index, claim evidence, evidence index, and
+previous valid M4 memory. M4 controls mount only when `/cards` is allowed.
+
+Non-paper prompts such as weather, jokes, travel booking, creative writing, or
+unrelated code generation return a clear refusal/degraded result without
+calling the LLM or writing memory.
+
+## Claim-Level Grounding
+
+The LLM first produces an internal structure containing claims. Every claim has:
+
+- natural-language content;
+- its own `evidence_refs`;
+- supporting text/quotation;
+- uncertainty.
+
+The backend then validates:
+
+1. every ref exists in the current allowed set;
+2. the evidence text supports that specific claim;
+3. formulae, thresholds, numeric values, datasets, metrics, comparisons, and
+   experiment results satisfy stricter matching;
+4. unsupported claims are removed or explicitly degraded.
+
+It is not valid to attach all allowed refs to a fluent answer. A correct ref
+does not make an unsupported conclusion correct. If no material claim survives,
+M4 returns `DEGRADED` rather than disguising the result as `SUCCESS`.
+
+## Deterministic Fallback Boundary
+
+Deterministic fallback may summarize existing paper/formula/teaching cards and
+their evidence. It must not infer spectral residual, Fourier processing,
+threshold rules, datasets, metrics, or any named method merely from broad words
+such as “time series” or “anomaly”. Such details are allowed only when the
+current paper artifacts contain the corresponding method/formula/step and a
+supporting evidence ref.
+
+A teaching toy example may use clearly fictional numbers, but its calculation
+rule must come directly from the current paper context. Missing support produces
+an explicit limitation, not a general-domain answer.
+
+## Memory Reliability
+
+- Schema version is `m4_memory.v2`; legacy records are migrated explicitly.
+- A per-job/path lock protects concurrent read-modify-write operations.
+- Writes use a sibling temporary file, flush, `fsync`, and atomic replace.
+- Record count and file size are bounded.
+- Blank, duplicate, and low-quality records are removed.
+- Damaged JSON is renamed to a timestamped `m4_memory.corrupt-*.json` artifact
+  and surfaced as a warning. It is never silently overwritten with an empty
+  history.
+- A write interruption leaves the previously committed file readable.
+
+## Provider and Failure Handling
+
+The configured live path defaults to ccswitch. Interactive requests are bounded
+by route-specific token/timeout settings. Missing, empty, invalid, timed-out, or
+unsupported LLM output goes through evidence-safe fallback/degradation. Provider
+readiness or a listening port is not a live acceptance result.
+
+User-facing M4 text remains Chinese. Evidence refs and memory counts may appear
+as compact technical details.
 
 ## Frontend Interaction
 
-- Selected text opens a toolbar with `追问`, `讲简单点`, and `举例`.
-- The toolbar is positioned from the selected text rectangle and clamped to the
-  viewport so it is less likely to overlap Edge's native selection menu.
-- The right M4 panel behaves like a tutor chat, not a debug console.
-- Memory count and evidence refs are visible in Chinese.
+- Selected text exposes Chinese follow-up/simplify/example actions.
+- The toolbar is positioned from the selection rectangle and clamped to the
+  viewport.
+- The M4 panel is bounded by the actual viewport and uses overlay/drawer behavior
+  on small screens.
+- Open, close, and resize flows support Escape/focus/keyboard semantics.
+- Formula dock and M4 panel coordinate structurally and do not obscure one
+  another through arbitrary z-index escalation.
 
-## Not Yet Implemented
+## Not Implemented
 
-- Direction-level interactive chat.
-- Seed-expansion interactive chat.
-- PaperQA/vector-memory adapter.
-- Full drill/pattern generation beyond advisor v1.
-- Broad live M4 acceptance matrix.
+- Direction-level interactive chat
+- Seed-expansion interactive chat
+- Broad cross-paper vector memory
+- Full drill/pattern engine beyond advisor v1
 
 ## Validation
 
-- `tests/test_m4_api.py` covers backend gating, fallback, evidence validation,
-  advisor, and memory behavior.
-- `frontend/src/components/tests/AskPanel.spec.ts` covers frontend M4 chat,
-  memory, selected text, and advisor request flow.
+Backend regressions cover gating, claim/ref support, legal-ref-but-unsupported
+content, numeric/formula strictness, broad-keyword fallback refusal, advisor
+flows, concurrent memory writes, interrupted writes, corruption quarantine,
+migration, and bounds. Frontend tests cover the tutor interaction; default
+browser E2E uses local fixtures/mocks. Exact current commands and counts live in
+`docs/STATUS.md`.

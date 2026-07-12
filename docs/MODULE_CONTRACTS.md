@@ -30,7 +30,10 @@ Output: deduplicated candidates with relevance, confidence, `discovery_sources`,
 source IDs, DOI, arXiv ID, URL, CCF venue rank, FlashRank/download queue fields
 (`search_rank`, `rerank_rank`, `rank_score`, `download_selected`,
 `download_decision`), and full-text readiness retained.
-Boundary: metadata-only high-value papers must not be discarded merely because
+Boundary: deterministic required-concept coverage and forbidden
+intent-mismatch penalties gate Top-1 and deep-read candidates. An optional LLM
+judge cannot rescue a deterministic failure. Metadata-only high-value papers
+must not be discarded merely because
 they cannot immediately enter M2. The default M1 download queue is produced from
 the external PaperSearch result pool by the configured reranker, with the
 original external result position preserved as `search_rank`. CCF rank is
@@ -108,7 +111,9 @@ strict.
 Input: direction query or seed paper payload.
 Output: DirectionBundle, SeedExpansionBundle, source metrics, grouped papers,
 reading order, and deep_read handoff payloads.
-Boundary: citation graph claims must be real or clearly marked as weak
+Boundary: `pipeline_status`, `relevance_status`, `source_status`, and
+`understanding_status` are independent; one `SUCCESS` cannot stand for all of
+them. Citation graph claims must be real or clearly marked as weak
 query/title-similarity relations. DOI/landing URLs must not be smuggled through
 `arxiv_url`; only actual arXiv URLs belong there.
 
@@ -130,11 +135,16 @@ Boundary: do not present v1 advisor checks as a complete drill engine.
 
 Input: current job id, selected text, formula id/symbol, user question, advisor
 mode, and existing user-facing M2 artifacts.
-Output: selected-text explanations, formula/symbol explanations,
-evidence-bound answers, advisor questions/evaluations, and `m4_memory.json`.
-Boundary: answers must be grounded in paper cards, formula cards, passage index,
-claim evidence, or stored M4 memory. No raw PDF access, no free-form answer
-without evidence/degraded status, and no direction-level chat yet.
+Output: selected-text explanations, formula/symbol explanations, claim-level
+evidence-bound answers, advisor questions/evaluations, and schema-versioned
+`m4_memory.json`.
+Boundary: each material claim must bind to allowed refs whose text supports that
+claim. A legal ref does not legalize unrelated prose, and all allowed refs must
+not be attached wholesale. Formulae, thresholds, numbers, datasets, metrics,
+and results use stricter support checks. Memory writes are locked, atomic, and
+bounded; corruption is quarantined with a warning. No raw PDF access, no
+free-form answer without evidence/degraded status, and no direction-level chat
+yet.
 
 ## context
 
@@ -157,7 +167,33 @@ Output: DirectionSearchView, SeedExpansionPanel, SettingsView, HomeView, and
 PaperWorkspace UI.
 Boundary: render status before cards; BLOCKED, BASELINE_ONLY, and FAILED never
 show explanatory card content. Mount M4 chat/QA controls only when cards are
-allowed and the backend M4 gate accepts the job.
+allowed and the backend M4 gate accepts the job. API calls use the typed client;
+floating controls remain viewport-clamped and keyboard-operable.
+
+## configuration
+
+Input: explicit app overrides, environment, local TOML, example TOML, and code
+defaults in that precedence order.
+Output: one validated runtime configuration injected into all services.
+Boundary: no adapter-owned shadow defaults, ineffective options, invalid search
+sources, negative timeouts, unsafe limits, or secret-bearing settings output.
+
+## upload
+
+Input: supported user document stream plus declared extension/MIME.
+Output: a generated workspace-managed file or a typed validation failure.
+Boundary: read fixed chunks, enforce maximum bytes during write, verify basic
+signature, never use the user filename as the final path, and clean temporary
+files after failure or cancellation.
+
+## jobs
+
+Input: bounded direction search or deep-read request.
+Output: persistent local job id, stage, progress, result, typed failure, and
+cancellation state.
+Boundary: restart marks stale running work explicitly; duplicate active source
+identity is rejected unless force semantics create a distinct identity; cleanup
+is restricted to workspace-managed roots.
 
 ## Canonical Parser Boundary
 
