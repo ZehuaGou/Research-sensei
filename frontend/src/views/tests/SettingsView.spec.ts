@@ -29,7 +29,7 @@ describe('SettingsView', () => {
     const wrapper = mount(SettingsView)
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/settings')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/settings')
     const inputs = wrapper.findAll('input')
     expect((inputs[0].element as HTMLInputElement).value).toBe('ccswitch')
     expect((inputs[1].element as HTMLInputElement).value).toBe('http://127.0.0.1:15721/v1')
@@ -93,7 +93,7 @@ describe('SettingsView', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/settings')
     expect(fetchMock.mock.calls[1][1]).toMatchObject({
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'content-type': 'application/json' },
     })
     expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toEqual({
       model: 'deepseek-v4-flash',
@@ -130,7 +130,7 @@ describe('SettingsView', () => {
     await flushPromises()
 
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/settings/test')
-    expect(fetchMock.mock.calls[1][1]).toEqual({ method: 'POST' })
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST' })
     expect(wrapper.text()).toContain('连接可用')
   })
 })

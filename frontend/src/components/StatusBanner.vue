@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { PaperWorkspaceStatus } from '../types/workspace'
 
 const props = defineProps<{
   status: string
   blockingReason?: string
   warnings?: Array<{ code: string; message: string }>
   missingComponents?: string[]
-  paperWorkspaceStatus?: Record<string, any>
+  paperWorkspaceStatus?: PaperWorkspaceStatus
   componentStatus?: Record<string, string>
   allowedDownstream?: Record<string, boolean>
 }>()
@@ -97,7 +98,7 @@ function readableKey(value: unknown) {
   return labels[text] || text
 }
 
-function valueText(value: any) {
+function valueText(value: unknown) {
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (Array.isArray(value)) return value.map(readableKey).join('、')
   return readableKey(value)

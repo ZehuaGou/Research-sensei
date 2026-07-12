@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 
 type SourceMode = 'file' | 'pdf_url' | 'arxiv_id' | 'arxiv_url' | 'doi' | 'm2_artifact_dir'
 
@@ -16,7 +17,12 @@ const m2ArtifactDir = ref('')
 const isDragging = ref(false)
 const isUploading = ref(false)
 const error = ref('')
-const sourceStatus = ref<Record<string, any> | null>(null)
+interface SourceStatus {
+  warnings?: string[]
+  [key: string]: unknown
+}
+
+const sourceStatus = ref<SourceStatus | null>(null)
 
 const sourceOptions: Array<{ key: SourceMode; label: string; hint: string }> = [
   { key: 'file', label: '本地文件', hint: 'PDF / LaTeX / 文本' },
@@ -85,19 +91,13 @@ async function upload() {
   try {
     const formData = new FormData()
     appendFields(formData)
-    const res = await fetch('/api/v1/documents/parse', {
-      method: 'POST',
-      body: formData,
-    })
-    const data = await res.json().catch(() => ({}))
-    if (res.ok && data.job_id) {
-      await router.push(`/learn/${data.job_id}`)
-      return
+    const data = await researchApi.parseDocument(formData)
+    await router.push(`/learn/${data.job_id}`)
+  } catch (uploadError) {
+    if (uploadError instanceof ApiClientError && uploadError.detail?.source_status && typeof uploadError.detail.source_status === 'object') {
+      sourceStatus.value = uploadError.detail.source_status as SourceStatus
     }
-    sourceStatus.value = data.detail?.source_status || null
-    error.value = sourceStatus.value?.warnings?.join('，') || data.detail?.message || data.error || '深读任务创建失败。'
-  } catch {
-    error.value = '网络请求失败，请确认后端服务正在运行。'
+    error.value = sourceStatus.value?.warnings?.join('，') || apiErrorMessage(uploadError, '深读任务创建失败。')
   } finally {
     isUploading.value = false
   }

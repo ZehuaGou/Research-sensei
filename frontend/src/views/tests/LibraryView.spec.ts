@@ -103,7 +103,7 @@ describe('LibraryView', () => {
     await flushPromises()
 
     expect(fetchMock.mock.calls[3][0]).toBe('/api/v1/library/papers/p1')
-    expect(fetchMock.mock.calls[3][1]).toEqual({ method: 'DELETE' })
+    expect(fetchMock.mock.calls[3][1]).toMatchObject({ method: 'DELETE' })
     expect(wrapper.text()).toContain('Paper removed')
   })
 

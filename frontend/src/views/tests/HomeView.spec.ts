@@ -39,7 +39,7 @@ describe('HomeView', () => {
     })
     await flushPromises()
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/v1/jobs')
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/jobs')
     expect(wrapper.text()).toContain('paper.pdf')
     expect(wrapper.text()).toContain('已完成')
   })
@@ -77,7 +77,7 @@ describe('HomeView', () => {
     await flushPromises()
 
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/jobs/job-1')
-    expect(fetchMock.mock.calls[1][1]).toEqual({ method: 'DELETE' })
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'DELETE' })
     expect(wrapper.text()).not.toContain('paper.pdf')
     expect(window.localStorage.getItem('researchsensei.deletedJobIds')).toContain('job-1')
   })

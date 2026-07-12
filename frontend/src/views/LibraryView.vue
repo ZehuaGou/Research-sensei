@@ -1,30 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-
-type LibraryPaper = {
-  paper_id: string
-  title: string
-  authors?: string[]
-  year?: number | null
-  venue?: string
-  venue_canonical_name?: string
-  venue_rank?: string
-  doi?: string
-  arxiv_id?: string
-  local_path?: string
-  file_size?: number
-  downloaded_at?: string
-}
-
-type SearchRun = {
-  run_id: string
-  query: string
-  created_at: string
-  candidate_count: number
-  downloaded_count: number
-  reused_count: number
-}
+import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
+import type { LibraryPaper, SearchRun } from '../types/api'
 
 const query = ref('')
 const papers = ref<LibraryPaper[]>([])
@@ -52,17 +30,11 @@ async function refresh() {
 async function loadPapers() {
   loading.value = true
   error.value = ''
-  const params = new URLSearchParams({ query: query.value.trim(), limit: '200' })
   try {
-    const res = await fetch(`/api/v1/library/papers?${params.toString()}`)
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      error.value = data.detail || 'Failed to load paper library.'
-      return
-    }
+    const data = await researchApi.listLibraryPapers(query.value.trim(), 200)
     papers.value = Array.isArray(data.papers) ? data.papers : []
-  } catch {
-    error.value = 'Failed to reach the backend paper library API.'
+  } catch (loadError) {
+    error.value = apiErrorMessage(loadError, 'Failed to reach the backend paper library API.')
   } finally {
     loading.value = false
   }
@@ -70,9 +42,8 @@ async function loadPapers() {
 
 async function loadSearchRuns() {
   try {
-    const res = await fetch('/api/v1/library/search_runs?limit=20')
-    const data = await res.json().catch(() => ({}))
-    searchRuns.value = res.ok && Array.isArray(data.search_runs) ? data.search_runs : []
+    const data = await researchApi.listSearchRuns(20)
+    searchRuns.value = data.search_runs
   } catch {
     searchRuns.value = []
   }
@@ -87,17 +58,12 @@ async function removePaper(paper: LibraryPaper) {
   message.value = ''
   error.value = ''
   try {
-    const res = await fetch(`/api/v1/library/papers/${paper.paper_id}`, { method: 'DELETE' })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      error.value = data.detail || 'Delete failed.'
-      return
-    }
+    await researchApi.deleteLibraryPaper(paper.paper_id)
     papers.value = papers.value.filter(item => item.paper_id !== paper.paper_id)
     message.value = 'Paper removed from the local library.'
     await loadSearchRuns()
-  } catch {
-    error.value = 'Delete request failed.'
+  } catch (deleteError) {
+    error.value = apiErrorMessage(deleteError, 'Delete request failed.')
   } finally {
     deletingId.value = ''
   }
@@ -112,29 +78,25 @@ async function openPaperWorkspace(paper: LibraryPaper) {
     const form = new FormData()
     form.append('local_path', paper.local_path)
     form.append('title', paper.title || '')
-    const res = await fetch('/api/v1/documents/parse', {
-      method: 'POST',
-      body: form,
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.job_id) {
-      error.value = parseOpenError(data)
-      return
-    }
+    const data = await researchApi.parseDocument(form)
     await router.push(`/learn/${data.job_id}`)
-  } catch {
-    error.value = 'Failed to prepare PaperWorkspace for this local paper.'
+  } catch (openError) {
+    error.value = parseOpenError(openError)
   } finally {
     openingId.value = ''
   }
 }
 
-function parseOpenError(data: Record<string, any>) {
-  const detail = data.detail || data
-  if (typeof detail === 'string') return detail
-  if (detail?.message) return detail.message
-  if (detail?.source_status?.warnings?.length) return detail.source_status.warnings.join(', ')
-  if (detail?.status) return detail.status
+function parseOpenError(error: unknown) {
+  if (error instanceof ApiClientError && error.detail) {
+    const sourceStatus = error.detail.source_status
+    if (sourceStatus && typeof sourceStatus === 'object') {
+      const warnings = (sourceStatus as { warnings?: unknown }).warnings
+      if (Array.isArray(warnings)) return warnings.join(', ')
+    }
+    if (error.detail.message) return error.detail.message
+    if (error.detail.status) return error.detail.status
+  }
   return 'Failed to prepare PaperWorkspace for this local paper.'
 }
 

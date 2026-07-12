@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ApiClientError, researchApi } from '../api/client'
+import type { JobSummary } from '../types/api'
 
 const router = useRouter()
-const recentJobs = ref<any[]>([])
+const recentJobs = ref<JobSummary[]>([])
 const deletingJobId = ref('')
 const deleteMessage = ref('')
 const deletedJobIds = ref<Set<string>>(new Set())
@@ -15,14 +17,10 @@ onMounted(() => {
 
 async function loadRecentJobs() {
   try {
-    const res = await fetch('/api/v1/jobs')
-    if (res.ok) {
-      const data = await res.json()
-      const jobs = Array.isArray(data.jobs) ? data.jobs : []
-      recentJobs.value = jobs
-        .filter((job: any) => !deletedJobIds.value.has(String(job.job_id || '')))
-        .slice(0, 8)
-    }
+    const data = await researchApi.listJobs()
+    recentJobs.value = data.jobs
+      .filter(job => !deletedJobIds.value.has(String(job.job_id || '')))
+      .slice(0, 8)
   } catch {}
 }
 
@@ -31,16 +29,18 @@ async function deleteJob(jobId: string) {
   deletingJobId.value = jobId
   deleteMessage.value = ''
   try {
-    const res = await fetch(`/api/v1/jobs/${jobId}`, { method: 'DELETE' })
-    if (res.ok || res.status === 404) {
+    await researchApi.deleteJob(jobId)
+    rememberDeletedJobId(jobId)
+    recentJobs.value = recentJobs.value.filter(job => job.job_id !== jobId)
+    deleteMessage.value = '已从最近任务移除。'
+  } catch (deleteError) {
+    if (deleteError instanceof ApiClientError && deleteError.code === 'NOT_FOUND') {
       rememberDeletedJobId(jobId)
       recentJobs.value = recentJobs.value.filter(job => job.job_id !== jobId)
       deleteMessage.value = '已从最近任务移除。'
     } else {
-      deleteMessage.value = '删除失败，请确认后端服务已更新并正在运行。'
+      deleteMessage.value = '删除请求失败，请确认后端服务正在运行。'
     }
-  } catch {
-    deleteMessage.value = '删除请求失败，请确认后端服务正在运行。'
   } finally {
     deletingJobId.value = ''
   }
@@ -67,11 +67,11 @@ function rememberDeletedJobId(jobId: string) {
   }
 }
 
-function jobTitle(job: any) {
+function jobTitle(job: JobSummary) {
   return job.source_path?.split(/[\\/]/).pop() || job.title || job.job_id || '未命名论文'
 }
 
-function statusText(status: string) {
+function statusText(status?: string) {
   const map: Record<string, string> = {
     succeeded: '已完成',
     running: '处理中',

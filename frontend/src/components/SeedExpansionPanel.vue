@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 
 const props = defineProps<{
   status?: string
@@ -136,26 +137,16 @@ async function expandSeed() {
   result.value = null
   handoffStates.value = {}
   try {
-    const res = await fetch('/api/v1/directions/seed_expansion', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        seed: {
-          title: seedTitle.value.trim(),
-          arxiv_id: seedArxivId.value.trim(),
-          doi: seedDoi.value.trim(),
-          paper_url: seedPaperUrl.value.trim(),
-          pdf_url: seedPdfUrl.value.trim(),
-        },
-      }),
+    const data = await researchApi.expandSeed({
+      title: seedTitle.value.trim(),
+      arxiv_id: seedArxivId.value.trim(),
+      doi: seedDoi.value.trim(),
+      paper_url: seedPaperUrl.value.trim(),
+      pdf_url: seedPdfUrl.value.trim(),
     })
-    const data = await res.json().catch(() => ({}))
     result.value = data
-    if (!res.ok) {
-      error.value = data.detail?.message || data.message || '相关论文扩展失败。'
-    }
-  } catch {
-    error.value = '网络请求失败，请确认后端服务正在运行。'
+  } catch (expandError) {
+    error.value = apiErrorMessage(expandError, '相关论文扩展失败。')
   } finally {
     isLoading.value = false
   }
@@ -171,30 +162,24 @@ async function prepareDeepRead(paper: Record<string, any>) {
 
   setHandoffState(paper, { loading: true, error: '' })
   try {
-    const res = await fetch('/api/v1/directions/deep_read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        candidate: {
-          title: paper.title || '',
-          doi: paper.doi || '',
-          arxiv_id: paper.arxiv_id || '',
-          arxiv_url: arxivHandoffUrl(paper),
-          pdf_url: paper.pdf_url || '',
-        },
-      }),
+    const data = await researchApi.deepReadAsync({
+      title: String(paper.title || ''),
+      doi: String(paper.doi || ''),
+      arxiv_id: String(paper.arxiv_id || ''),
+      arxiv_url: arxivHandoffUrl(paper),
+      pdf_url: String(paper.pdf_url || ''),
+      relevance_gate_evaluated: paper.relevance_gate_evaluated,
+      relevance_gate_passed: paper.relevance_gate_passed,
+      deep_read_relevance_passed: paper.deep_read_relevance_passed,
+      rule_relevance_score: paper.rule_relevance_score,
+      relevance_reason: paper.relevance_reason,
     })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.job_id) {
-      const detail = data.detail || data
-      setHandoffState(paper, {
-        error: `${detail.status || detail.handoff_status || 'HANDOFF_FAILED'}：${detail.message || '扩展论文移交深读失败。'}`,
-      })
-      return
-    }
     await router.push(`/learn/${data.job_id}`)
-  } catch {
-    setHandoffState(paper, { error: '网络请求失败，暂时不能创建深读任务。' })
+  } catch (handoffError) {
+    const code = handoffError instanceof ApiClientError
+      ? String(handoffError.detail?.status || handoffError.detail?.handoff_status || handoffError.code)
+      : 'HANDOFF_FAILED'
+    setHandoffState(paper, { error: `${code}：${apiErrorMessage(handoffError, '扩展论文移交深读失败。')}` })
   } finally {
     const state = handoffState(paper)
     if (state.loading) {

@@ -2,8 +2,10 @@
 import { nextTick, onMounted, ref } from 'vue'
 import katex from 'katex'
 import { useLearningStore } from '../../stores/learning'
+import { apiErrorMessage, workspaceApi } from '../../api/client'
+import type { FormulaCard } from '../../types/workspace'
 
-const props = defineProps<{ card: any }>()
+const props = defineProps<{ card: FormulaCard }>()
 const store = useLearningStore()
 const formulaEl = ref<HTMLElement>()
 const renderError = ref(false)
@@ -69,19 +71,14 @@ async function explainFormula() {
     timestamp: Date.now(),
   })
   try {
-    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/formula/explain`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ formula_id: props.card.formula_id || props.card.formula_ref || '' }),
-    })
-    const data = await res.json()
+    const data = await workspaceApi.explainFormula(store.currentJobId, props.card)
     store.addMessage({
       role: 'assistant',
       content: (([data.meaning, data.intuition ? `直觉：${data.intuition}` : '', data.numeric_example ? `例子：${data.numeric_example}` : '', data.role_in_method ? `在方法里的作用：${data.role_in_method}` : ''].filter(Boolean).join('\n\n')) || '这条公式还没有可展示的解释。'),
       timestamp: Date.now(),
     })
-  } catch {
-    store.addMessage({ role: 'assistant', content: '公式解释请求失败，请稍后再试。', timestamp: Date.now() })
+  } catch (error) {
+    store.addMessage({ role: 'assistant', content: apiErrorMessage(error, '公式解释请求失败，请稍后再试。'), timestamp: Date.now() })
   } finally {
     formulaExplainLoading.value = false
   }
@@ -93,7 +90,7 @@ function askFormula() {
   store.isAskPanelOpen = true
 }
 
-function termDetail(term: any) {
+function termDetail(term: NonNullable<FormulaCard['terms']>[number]) {
   return [
     term.encourages ? `鼓励：${term.encourages}` : '',
     term.penalizes ? `惩罚：${term.penalizes}` : '',

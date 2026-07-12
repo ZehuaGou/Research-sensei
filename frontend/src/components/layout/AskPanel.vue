@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useLearningStore } from '../../stores/learning'
+import { apiErrorMessage, workspaceApi } from '../../api/client'
+import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest } from '../../types/api'
 
 const store = useLearningStore()
 const input = ref('')
@@ -201,17 +203,6 @@ function highlightSegments(text: string): AnswerSegment[] {
   return segments.length ? segments : [{ text, highlighted: false }]
 }
 
-function extractApiError(data: unknown) {
-  if (!data || typeof data !== 'object') return 'M4 请求失败，请稍后再试。'
-  const detail = (data as { detail?: unknown }).detail
-  if (typeof detail === 'string') return detail
-  if (detail && typeof detail === 'object') {
-    const message = (detail as { message?: unknown }).message
-    if (typeof message === 'string' && message.trim()) return message
-  }
-  return 'M4 请求失败，请稍后再试。'
-}
-
 function stringList(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
@@ -246,8 +237,7 @@ function advisorEvaluationText(session: AdvisorSession) {
 async function loadMemory() {
   if (!store.currentJobId) return
   try {
-    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/memory`)
-    const data = await res.json()
+    const data = await workspaceApi.getMemory(store.currentJobId)
     memoryCount.value = Array.isArray(data.records) ? data.records.length : 0
   } catch {
     memoryCount.value = 0
@@ -265,20 +255,13 @@ async function send() {
   await scrollToBottom()
 
   try {
-    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question,
-        selected_text: selectedText,
-        context_scope: selectedText ? 'selection' : 'paper',
-        conversation_history: conversationHistory,
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(extractApiError(data))
+    const request: AskRequest = {
+      question,
+      selected_text: selectedText,
+      context_scope: selectedText ? 'selection' : 'paper',
+      conversation_history: conversationHistory,
     }
+    const data = await workspaceApi.ask(store.currentJobId, request)
     store.addMessage({
       role: 'assistant',
       content: normalizeMessageText(data.answer || 'M4 暂时无法回答这个问题。'),
@@ -286,7 +269,7 @@ async function send() {
     })
     await loadMemory()
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'M4 请求失败，请稍后再试。'
+    const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
     store.addMessage({ role: 'assistant', content: message, timestamp: Date.now() })
   } finally {
     isLoading.value = false
@@ -307,20 +290,12 @@ async function requestAdvisorQuestion() {
   isLoading.value = true
   try {
     if (focusQuestion) {
-      const answerRes = await fetch(`/api/v1/jobs/${store.currentJobId}/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: focusQuestion,
-          selected_text: selectedText,
-          context_scope: selectedText ? 'selection' : 'paper',
-          conversation_history: conversationHistory,
-        }),
+      const answerData = await workspaceApi.ask(store.currentJobId, {
+        question: focusQuestion,
+        selected_text: selectedText,
+        context_scope: selectedText ? 'selection' : 'paper',
+        conversation_history: conversationHistory,
       })
-      const answerData = await answerRes.json().catch(() => ({}))
-      if (!answerRes.ok) {
-        throw new Error(extractApiError(answerData))
-      }
       const answerEvidenceRefs = stringList(answerData.evidence_refs)
       store.addMessage({
         role: 'assistant',
@@ -332,18 +307,10 @@ async function requestAdvisorQuestion() {
         return
       }
     }
-    const advisorPayload: Record<string, string> = { advisor_mode: 'group_meeting' }
+    const advisorPayload: AdvisorQuestionRequest = { advisor_mode: 'group_meeting' }
     if (focusQuestion) advisorPayload.user_question = focusQuestion
     if (selectedText) advisorPayload.selected_text = selectedText
-    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/advisor/question`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(advisorPayload),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(extractApiError(data))
-    }
+    const data = await workspaceApi.advisorQuestion(store.currentJobId, advisorPayload)
     advisorSession.value = {
       question: typeof data.question === 'string' ? data.question : '',
       userQuestion: typeof data.user_question === 'string' && data.user_question ? data.user_question : focusQuestion,
@@ -363,8 +330,8 @@ async function requestAdvisorQuestion() {
       timestamp: Date.now(),
     })
     await loadMemory()
-  } catch {
-    store.addMessage({ role: 'assistant', content: '组会追问生成失败。', timestamp: Date.now() })
+  } catch (error) {
+    store.addMessage({ role: 'assistant', content: apiErrorMessage(error, '组会追问生成失败。'), timestamp: Date.now() })
   } finally {
     isLoading.value = false
     await scrollToBottom()
@@ -378,21 +345,14 @@ async function submitAdvisorAnswer() {
   isAdvisorEvaluating.value = true
   store.addMessage({ role: 'user', content: userAnswer, timestamp: Date.now() })
   try {
-    const res = await fetch(`/api/v1/jobs/${store.currentJobId}/advisor/evaluate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: session.question,
-        user_question: session.userQuestion,
-        user_answer: userAnswer,
-        expected_answer_points: session.expectedAnswerPoints,
-        evidence_refs: session.evidenceRefs,
-      }),
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) {
-      throw new Error(extractApiError(data))
+    const request: AdvisorEvaluateRequest = {
+      question: session.question,
+      user_question: session.userQuestion,
+      user_answer: userAnswer,
+      expected_answer_points: session.expectedAnswerPoints,
+      evidence_refs: session.evidenceRefs,
     }
+    const data = await workspaceApi.advisorEvaluate(store.currentJobId, request)
     advisorSession.value = {
       ...session,
       feedback: typeof data.feedback === 'string' ? data.feedback : '',
@@ -409,7 +369,7 @@ async function submitAdvisorAnswer() {
     })
     await loadMemory()
   } catch (error) {
-    const message = error instanceof Error ? error.message : '组会反馈生成失败。'
+    const message = apiErrorMessage(error, '组会反馈生成失败。')
     store.addMessage({ role: 'assistant', content: message, timestamp: Date.now() })
   } finally {
     isAdvisorEvaluating.value = false
@@ -419,7 +379,7 @@ async function submitAdvisorAnswer() {
 
 async function clearMemory() {
   if (!store.currentJobId) return
-  await fetch(`/api/v1/jobs/${store.currentJobId}/memory`, { method: 'DELETE' }).catch(() => null)
+  await workspaceApi.clearMemory(store.currentJobId).catch(() => undefined)
   store.clearChat()
   memoryCount.value = 0
   advisorSession.value = null
@@ -432,6 +392,20 @@ function chooseMode(nextMode: AskMode) {
   if (prompt && !input.value.trim()) {
     input.value = prompt
   }
+}
+
+async function handleModeKeydown(event: KeyboardEvent, currentIndex: number) {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+  const nextIndex = event.key === 'Home'
+    ? 0
+    : event.key === 'End'
+      ? modeOptions.length - 1
+      : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + modeOptions.length) % modeOptions.length
+  const nextMode = modeOptions[nextIndex].key
+  event.preventDefault()
+  chooseMode(nextMode)
+  await nextTick()
+  document.getElementById(`m4-mode-${nextMode}`)?.focus()
 }
 
 async function submitActiveMode() {
@@ -496,12 +470,17 @@ watch(fontSize, (value) => {
 
     <div class="mode-tabs" role="tablist" aria-label="M4 提问模式">
       <button
-        v-for="option in modeOptions"
+        v-for="(option, optionIndex) in modeOptions"
+        :id="`m4-mode-${option.key}`"
         :key="option.key"
         type="button"
+        role="tab"
         :class="{ active: mode === option.key }"
-        :aria-pressed="mode === option.key"
+        :aria-selected="mode === option.key"
+        aria-controls="m4-mode-panel"
+        :tabindex="mode === option.key ? 0 : -1"
         @click="chooseMode(option.key)"
+        @keydown="handleModeKeydown($event, optionIndex)"
       >
         <span>{{ option.label }}</span>
         <small>{{ option.hint }}</small>
@@ -513,7 +492,14 @@ watch(fontSize, (value) => {
       <p>{{ selectedPreviewText() }}</p>
     </div>
 
-    <div ref="chatContainer" class="messages">
+    <div
+      id="m4-mode-panel"
+      ref="chatContainer"
+      class="messages"
+      role="tabpanel"
+      :aria-labelledby="`m4-mode-${mode}`"
+      aria-live="polite"
+    >
       <div v-if="!store.chatHistory.length && !isLoading" class="empty">
         <h3>还没有对话</h3>
         <p>问题越具体，回答越容易贴住论文证据。</p>

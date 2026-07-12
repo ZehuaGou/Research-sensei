@@ -164,7 +164,7 @@ describe('SeedExpansionPanel', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/deep_read')
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/jobs/deep_read')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).candidate.arxiv_id).toBe('2401.00001')
     expect(routerPush).toHaveBeenCalledWith('/learn/job-456')
   })

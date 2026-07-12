@@ -2,16 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useThemeStore } from '../../stores/theme'
-
-type SearchRun = {
-  run_id: string
-  query: string
-  created_at: string
-  candidate_count: number
-  downloaded_count: number
-  reused_count: number
-  papers?: Array<Record<string, any>>
-}
+import { researchApi } from '../../api/client'
+import type { SearchRun } from '../../types/api'
 
 type CommandItem = {
   id: string
@@ -128,9 +120,8 @@ watch(() => route.fullPath, () => {
 
 async function loadSearchRuns() {
   try {
-    const res = await fetch('/api/v1/library/search_runs?limit=60')
-    const data = await res.json().catch(() => ({}))
-    searchRuns.value = res.ok && Array.isArray(data.search_runs) ? data.search_runs : []
+    const data = await researchApi.listSearchRuns(60)
+    searchRuns.value = data.search_runs
   } catch {
     searchRuns.value = []
   }

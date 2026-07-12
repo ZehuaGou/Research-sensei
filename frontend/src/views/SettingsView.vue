@@ -1,24 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-
-interface SettingsPayload {
-  active_provider: string
-  provider_display_name?: string
-  provider_key?: string
-  provider_kind?: string
-  base_url: string
-  request_endpoint?: string
-  api_key_env: string
-  auth_header?: string
-  model: string
-  model_options?: Array<{ id: string; label?: string; source?: string }>
-  model_env?: string
-  route_note?: string
-  enable_env?: string
-  llm_enabled?: boolean
-  api_key_configured?: boolean
-  provider_known?: boolean
-}
+import { apiErrorMessage, researchApi } from '../api/client'
+import type { SettingsPayload } from '../types/api'
 
 const settings = ref<SettingsPayload>({
   active_provider: '',
@@ -58,11 +41,8 @@ const requestModeLabel = computed(() => (
 
 onMounted(async () => {
   try {
-    const res = await fetch('/api/v1/settings')
-    if (res.ok) {
-      settings.value = await res.json()
-      modelDraft.value = settings.value.model
-    }
+    settings.value = await researchApi.getSettings()
+    modelDraft.value = settings.value.model
   } catch {}
 })
 
@@ -72,21 +52,12 @@ async function saveModel() {
   isSaving.value = true
   saveResult.value = ''
   try {
-    const res = await fetch('/api/v1/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      saveResult.value = data.detail || '模型名保存失败。'
-      return
-    }
+    const data = await researchApi.updateSettings({ model })
     settings.value = data
     modelDraft.value = data.model || model
     saveResult.value = `模型已保存。后续请求会把这个 model 字段发送给 ${providerLabel.value}。`
-  } catch {
-    saveResult.value = '保存请求失败，请确认后端服务正在运行。'
+  } catch (saveError) {
+    saveResult.value = apiErrorMessage(saveError, '保存请求失败，请确认后端服务正在运行。')
   } finally {
     isSaving.value = false
   }
@@ -96,13 +67,12 @@ async function testConnection() {
   isTesting.value = true
   testResult.value = ''
   try {
-    const res = await fetch('/api/v1/settings/test', { method: 'POST' })
-    const data = await res.json()
+    const data = await researchApi.validateSettings()
     testResult.value = data.ok
       ? `连接可用。Research Sensei 会通过 ${requestModeLabel.value} 通道发送请求。`
       : (data.message || '连接未就绪，请检查 ccswitch 是否运行，以及环境变量是否启用。')
-  } catch {
-    testResult.value = '设置请求失败，请确认后端服务正在运行。'
+  } catch (testError) {
+    testResult.value = apiErrorMessage(testError, '设置请求失败，请确认后端服务正在运行。')
   } finally {
     isTesting.value = false
   }

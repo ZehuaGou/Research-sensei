@@ -1,33 +1,40 @@
 <script setup lang="ts">
 import { useLearningStore } from '../../stores/learning'
+import type { EvidenceText, PaperCard } from '../../types/workspace'
 
-const props = defineProps<{ card: any; skeleton: any }>()
+interface PaperSkeleton {
+  problem?: { plain?: string }
+  mechanism?: { plain?: string }
+}
+
+const props = defineProps<{ card: PaperCard; skeleton: PaperSkeleton }>()
 const store = useLearningStore()
 
-function textOf(value: any) {
+function textOf(value: string | EvidenceText | undefined) {
   return typeof value === 'string' ? value : value?.text || ''
 }
 
-function isInsufficientText(value: any) {
+function isInsufficientText(value: string | EvidenceText | undefined) {
   const text = textOf(value).trim()
   return !text || /^INSUFFICIENT_EVIDENCE$/i.test(text) || /^UNKNOWN$/i.test(text) || text === '证据不足，暂不展开。'
 }
 
-function displayText(value: any, fallback = '暂无') {
+function displayText(value: string | EvidenceText | undefined, fallback = '暂无') {
   const text = textOf(value).trim()
   if (!text && fallback !== '暂无') return fallback
   return isInsufficientText(value) ? '证据不足，暂不展开。' : text || fallback
 }
 
-function canAsk(value: any) {
+function canAsk(value: string | EvidenceText | undefined) {
   return Boolean(textOf(value)) && !isInsufficientText(value)
 }
 
-function refOf(value: any) {
+function refOf(value: string | EvidenceText | undefined) {
+  if (typeof value === 'string') return ''
   return value?.evidence_ref || ''
 }
 
-function evidenceLabel(value: any) {
+function evidenceLabel(value: string | EvidenceText | undefined) {
   return refOf(value) ? '证据已定位' : ''
 }
 

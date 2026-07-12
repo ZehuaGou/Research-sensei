@@ -2,33 +2,15 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import SeedExpansionPanel from '../components/SeedExpansionPanel.vue'
-
-type SearchRunPaper = {
-  paper_id?: string
-  title: string
-  search_rank?: number
-  action?: string
-  reason?: string
-  download_selected?: boolean
-  venue?: string
-  venue_rank?: string
-  local_path?: string
-}
-
-type SearchRun = {
-  run_id: string
-  query: string
-  created_at: string
-  candidate_count: number
-  downloaded_count: number
-  reused_count: number
-  papers?: SearchRunPaper[]
-}
+import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
+import type { SearchRun, SearchRunPaper } from '../types/api'
 
 const router = useRouter()
 const route = useRoute()
 const query = ref('')
 const isLoading = ref(false)
+const taskStage = ref('')
+const taskProgress = ref(0)
 const isHistoryLoading = ref(false)
 const error = ref('')
 const historyError = ref('')
@@ -103,21 +85,19 @@ async function search() {
   historyRun.value = null
   handoffStates.value = {}
   selectedSeed.value = null
+  taskStage.value = 'queued'
+  taskProgress.value = 0
   try {
-    const res = await fetch('/api/v1/directions/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: query.value.trim() }),
+    const data = await researchApi.searchDirectionsAsync(query.value.trim(), task => {
+      taskStage.value = task.stage
+      taskProgress.value = task.progress
     })
-    const data = await res.json().catch(() => ({}))
     result.value = data
-    if (!res.ok) {
-      error.value = data.detail?.message || '方向检索失败。'
-    }
-  } catch {
-    error.value = '网络请求失败，请确认后端服务正在运行。'
+  } catch (searchError) {
+    error.value = apiErrorMessage(searchError, '方向检索失败。')
   } finally {
     isLoading.value = false
+    taskStage.value = ''
   }
 }
 
@@ -131,9 +111,8 @@ async function loadHistoryRun({ runId, query: historyQuery }: { runId?: string; 
   handoffStates.value = {}
   selectedSeed.value = null
   try {
-    const res = await fetch('/api/v1/library/search_runs?limit=200')
-    const data = await res.json().catch(() => ({}))
-    const runs: SearchRun[] = res.ok && Array.isArray(data.search_runs) ? data.search_runs : []
+    const data = await researchApi.listSearchRuns(200)
+    const runs = data.search_runs
     const target = runId
       ? runs.find((run) => run.run_id === runId)
       : runs.find((run) => normalizeDirection(run.query) === normalizeDirection(historyQuery || ''))
@@ -144,8 +123,8 @@ async function loadHistoryRun({ runId, query: historyQuery }: { runId?: string; 
     }
     historyRun.value = target
     query.value = target.query
-  } catch {
-    historyError.value = '历史论文列表加载失败，请确认后端服务正在运行。'
+  } catch (historyLoadError) {
+    historyError.value = apiErrorMessage(historyLoadError, '历史论文列表加载失败，请确认后端服务正在运行。')
   } finally {
     isHistoryLoading.value = false
   }
@@ -426,18 +405,10 @@ async function openHistoryPaper(paper: SearchRunPaper) {
     const form = new FormData()
     form.append('local_path', paper.local_path)
     form.append('title', paper.title || '')
-    const res = await fetch('/api/v1/documents/parse', {
-      method: 'POST',
-      body: form,
-    })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.job_id) {
-      historyError.value = data.detail?.message || data.detail || '这篇历史论文创建深读任务失败。'
-      return
-    }
+    const data = await researchApi.parseDocument(form)
     await router.push(`/learn/${data.job_id}`)
-  } catch {
-    historyError.value = '网络请求失败，暂时不能打开这篇历史论文。'
+  } catch (openError) {
+    historyError.value = apiErrorMessage(openError, '网络请求失败，暂时不能打开这篇历史论文。')
   } finally {
     openingHistoryKey.value = ''
   }
@@ -458,30 +429,24 @@ async function openDeepRead(paper: Record<string, any>) {
 
   setHandoffState(paper, { loading: true, error: '' })
   try {
-    const res = await fetch('/api/v1/directions/deep_read', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        candidate: {
-          title: paper.title || '',
-          doi: paper.doi || '',
-          arxiv_id: paper.arxiv_id || '',
-          arxiv_url: arxivHandoffUrl(paper),
-          pdf_url: fulltextPdfUrl(paper),
-        },
-      }),
+    const data = await researchApi.deepReadAsync({
+      title: String(paper.title || ''),
+      doi: String(paper.doi || ''),
+      arxiv_id: String(paper.arxiv_id || ''),
+      arxiv_url: arxivHandoffUrl(paper),
+      pdf_url: fulltextPdfUrl(paper),
+      relevance_gate_evaluated: paper.relevance_gate_evaluated,
+      relevance_gate_passed: paper.relevance_gate_passed,
+      deep_read_relevance_passed: paper.deep_read_relevance_passed,
+      rule_relevance_score: paper.rule_relevance_score,
+      relevance_reason: paper.relevance_reason,
     })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data.job_id) {
-      const detail = data.detail || data
-      setHandoffState(paper, {
-        error: `${detail.status || detail.handoff_status || 'HANDOFF_FAILED'}：${detail.message || '候选论文移交深读失败。'}`,
-      })
-      return
-    }
     await router.push(`/learn/${data.job_id}`)
-  } catch {
-    setHandoffState(paper, { error: '网络请求失败，暂时不能创建深读任务。' })
+  } catch (handoffError) {
+    const code = handoffError instanceof ApiClientError
+      ? String(handoffError.detail?.status || handoffError.detail?.handoff_status || handoffError.code)
+      : 'HANDOFF_FAILED'
+    setHandoffState(paper, { error: `${code}：${apiErrorMessage(handoffError, '候选论文移交深读失败。')}` })
   } finally {
     const state = handoffState(paper)
     if (state.loading) {
@@ -514,6 +479,10 @@ async function openDeepRead(paper: Record<string, any>) {
 
         <article v-if="isHistoryLoading" class="codex-card loading-card">
           正在加载这个方向已有的论文列表...
+        </article>
+
+        <article v-if="isLoading" class="codex-card loading-card" role="status" data-testid="direction-task-progress">
+          后台任务：{{ taskStage || 'queued' }} · {{ taskProgress }}%
         </article>
 
         <div v-if="historyError" class="error-box">
