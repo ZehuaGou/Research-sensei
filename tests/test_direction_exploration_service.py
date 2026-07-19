@@ -463,10 +463,12 @@ def test_fallback_continues_variants_to_expand_venue_pool() -> None:
     assert metrics[-1]["count"] == 3
 
 
-def test_acquisition_skips_fallback_when_primary_has_results() -> None:
-    primary = RecordingAdapter({
-        "graph anomaly detection": [_candidate(paper_id="primary", title="Primary Graph Anomaly Detection")],
-    })
+def test_acquisition_skips_fallback_when_primary_has_healthy_oa_coverage() -> None:
+    primary_papers = [
+        _candidate(paper_id=f"primary-{index}", title=f"Graph Anomaly Detection Method {index}")
+        for index in range(5)
+    ]
+    primary = RecordingAdapter({"graph anomaly detection": primary_papers})
     fallback = RecordingAdapter({
         "graph anomaly detection": [_candidate(paper_id="fallback", title="Fallback Graph Anomaly Detection")],
     })
@@ -480,10 +482,50 @@ def test_acquisition_skips_fallback_when_primary_has_results() -> None:
 
     candidates, warnings, _search_log, metrics = service._acquire("graph anomaly detection")
 
-    assert [candidate.paper_id for candidate in candidates] == ["primary"]
+    assert [candidate.paper_id for candidate in candidates] == [f"primary-{index}" for index in range(5)]
     assert warnings == []
     assert fallback.calls == []
     assert len(metrics) == 1
+
+
+def test_acquisition_supplements_nonempty_primary_when_oa_coverage_is_thin() -> None:
+    primary = RecordingAdapter({
+        "graph anomaly detection": [
+            _candidate(
+                paper_id="primary-metadata",
+                title="Graph Anomaly Detection Overview",
+                arxiv_id="",
+                pdf_url="",
+                url="https://example.org/paper",
+                landing_url="https://example.org/paper",
+                open_access=False,
+                pdf_available=False,
+            )
+        ],
+    })
+    fallback = RecordingAdapter({
+        "graph anomaly detection": [
+            _candidate(paper_id="fallback-oa", title="Open Graph Anomaly Detection")
+        ],
+    })
+    service = DirectionExplorationService(
+        adapters={"paper_search": primary},  # type: ignore[arg-type]
+        sources=["paper_search"],
+        verifier=StaticVerifier(),  # type: ignore[arg-type]
+        fallback_adapters={"openalex_fallback": fallback},  # type: ignore[arg-type]
+        max_results_per_source=5,
+    )
+
+    candidates, warnings, search_log, metrics = service._acquire(
+        "graph anomaly detection",
+        query_variants=["graph neural network anomaly detection"],
+    )
+
+    assert [candidate.paper_id for candidate in candidates] == ["primary-metadata", "fallback-oa"]
+    assert warnings == []
+    assert fallback.calls == ["graph anomaly detection", "graph neural network anomaly detection"]
+    assert any("needs OA supplement" in line for line in search_log)
+    assert metrics[-1]["trigger"] == "low_coverage_oa_supplement"
 
 
 def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:

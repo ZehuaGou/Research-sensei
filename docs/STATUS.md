@@ -54,6 +54,55 @@ live model again; task cancellation is cooperative and cannot pre-empt a parser 
 LLM call already executing; and the prior 12-query external acquisition matrix
 remains a failed live acceptance rather than being reclassified by local success.
 
+## 2026-07-19 M1/M4 Main-Flow Optimization
+
+This follow-up targets the main learner workflows rather than additional
+reliability plumbing.
+
+- M4 now resolves pronouns and short follow-ups against the previous user turn
+  before deciding that a question is underspecified. The resolved focus and the
+  previous turn's verified refs seed retrieval, while conversation history and
+  memory are explicitly forbidden from acting as paper evidence or supporting
+  quotations.
+- Every M4 response can expose a user-safe context trace: current paper versus
+  selected text, whether the turn continues the previous question, and how many
+  verified evidence refs survived. Model-proposed follow-up questions are
+  bounded and presented as reusable prompts.
+- Frontend conversations are isolated per paper. Reload recovery shows only the
+  last question and a safe recovery notice; legacy answer bodies are not replayed
+  because older memory may predate current claim-level validation. The next
+  answer is retrieved and validated again.
+- The M4 pane shows the active paper title, evidence scope, context continuity,
+  selected-text controls, evidence counts, uncertainty, and follow-up actions.
+  The successful status ledger is one row on desktop so the paper content starts
+  higher in the reading pane.
+- M1 no longer treats any non-empty primary result as sufficient. Thin candidate
+  pools, weak topic coverage, or too few open-fulltext hints trigger a bounded
+  two-query supplement through the configured OpenAlex/Semantic Scholar fallback
+  adapters. Source metrics record the trigger, and the direction UI displays a
+  source ledger instead of hiding which provider returned or failed.
+- Query-planning instructions now require complementary exact, task/domain,
+  terminology, and survey/foundational variants that work across arXiv,
+  OpenAlex, and Semantic Scholar.
+
+Verification for this follow-up:
+
+| Command / surface | Result | Classification |
+|---|---|---|
+| `.venv\Scripts\python.exe -m pytest -q` | `778 passed, 15 skipped` in 153.30s | Complete local backend/offline suite. |
+| `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
+| `.venv\Scripts\python.exe -m mypy src/researchsensei` | No issues in 126 source files | Full backend type boundary. |
+| `npm test`, `npm run typecheck`, `npm run build` | 15 files / 75 tests passed; typecheck and production build passed | Frontend unit/static acceptance. |
+| `npm run test:e2e` | 6/6 Chromium fixture tests passed | Deterministic browser E2E. |
+| Real browser, configured paper `55b9e24aec49` | Paper-scoped recovery, active title, context trace, evidence count, composer scope, and zero console errors verified | Local runtime UI smoke. |
+| Live M1 query `graph neural network multivariate time series anomaly detection` | Persistent task succeeded in 50.8s; 30 candidates; bundle remained `DEGRADED`; 2/7 attempted downloads succeeded | Live acquisition probe, explicitly not full acceptance. |
+| Live ccswitch validation and M4 follow-up | 8-second provider probe succeeded; one evidence-retrieved follow-up reached 8 refs but the structured model request failed and the UI refused unvalidated output | Provider connection passed; full M4 live answer failed safely. |
+
+Remaining risks: the live M1 result still had a high download failure rate and no
+candidate cleared every A_READ/M2 gate in the search response; ccswitch accepted
+a connection probe but did not complete the tested structured M4 request. These
+are live-service failures, not reclassified by the green offline suites.
+
 ## Release Identity
 
 - Target: `ResearchSensei v0.6 Reliability Baseline`

@@ -1,10 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { M4ContextTrace } from '../types/api'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: number
+  evidenceRefs?: string[]
+  uncertainty?: string
+  followUpSuggestions?: string[]
+  contextTrace?: M4ContextTrace
+  status?: string
 }
 
 function normalizeSelectedText(text: string) {
@@ -18,16 +24,33 @@ function normalizeSelectedText(text: string) {
 export const useLearningStore = defineStore('learning', () => {
   const currentJobId = ref('')
   const chatHistory = ref<ChatMessage[]>([])
+  const chatByJob = ref<Record<string, ChatMessage[]>>({})
   const selectedText = ref('')
   const selectedIntent = ref<'explain' | 'simplify' | 'example'>('explain')
   const isAskPanelOpen = ref(false)
 
   function addMessage(msg: ChatMessage) {
     chatHistory.value.push(msg)
+    if (currentJobId.value) chatByJob.value[currentJobId.value] = [...chatHistory.value]
   }
 
   function clearChat() {
     chatHistory.value = []
+    if (currentJobId.value) chatByJob.value[currentJobId.value] = []
+  }
+
+  function replaceChat(messages: ChatMessage[]) {
+    chatHistory.value = [...messages]
+    if (currentJobId.value) chatByJob.value[currentJobId.value] = [...messages]
+  }
+
+  function setCurrentJob(jobId: string) {
+    const nextJobId = jobId.trim()
+    if (nextJobId === currentJobId.value) return
+    if (currentJobId.value) chatByJob.value[currentJobId.value] = [...chatHistory.value]
+    currentJobId.value = nextJobId
+    chatHistory.value = [...(chatByJob.value[nextJobId] || [])]
+    selectedText.value = ''
   }
 
   function setSelectedText(text: string, intent: 'explain' | 'simplify' | 'example' = 'explain') {
@@ -43,6 +66,8 @@ export const useLearningStore = defineStore('learning', () => {
     isAskPanelOpen,
     addMessage,
     clearChat,
+    replaceChat,
+    setCurrentJob,
     setSelectedText,
   }
 })

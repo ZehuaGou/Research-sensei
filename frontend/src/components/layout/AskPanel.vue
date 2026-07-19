@@ -2,9 +2,10 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useLearningStore } from '../../stores/learning'
 import { apiErrorMessage, workspaceApi } from '../../api/client'
-import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest } from '../../types/api'
+import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest, AskResponse } from '../../types/api'
 
 const store = useLearningStore()
+const props = defineProps<{ paperTitle?: string }>()
 const input = ref('')
 const chatContainer = ref<HTMLElement>()
 const isLoading = ref(false)
@@ -219,6 +220,27 @@ function conversationHistoryPayload(limit = 10) {
     .filter(message => message.content.length > 0)
 }
 
+function assistantMessage(data: AskResponse) {
+  return {
+    role: 'assistant' as const,
+    content: normalizeMessageText(data.answer || 'M4 暂时无法回答这个问题。'),
+    timestamp: Date.now(),
+    evidenceRefs: stringList(data.evidence_refs),
+    uncertainty: typeof data.uncertainty === 'string' ? data.uncertainty : '',
+    followUpSuggestions: stringList(data.follow_up_suggestions),
+    contextTrace: data.context_trace,
+    status: typeof data.status === 'string' ? data.status : '',
+  }
+}
+
+function useSuggestion(suggestion: string) {
+  input.value = suggestion
+}
+
+function clearSelectedContext() {
+  store.setSelectedText('')
+}
+
 function advisorPromptText(session: AdvisorSession) {
   const focus = session.userQuestion ? `围绕你的问题：${session.userQuestion}\n\n` : ''
   const points = session.expectedAnswerPoints.length
@@ -239,6 +261,36 @@ async function loadMemory() {
   try {
     const data = await workspaceApi.getMemory(store.currentJobId)
     memoryCount.value = Array.isArray(data.records) ? data.records.length : 0
+    if (!store.chatHistory.length && Array.isArray(data.records)) {
+      const records = data.records
+        .filter((record): record is Record<string, unknown> => (
+          Boolean(record)
+          && typeof record === 'object'
+          && (record as Record<string, unknown>).memory_type === 'interactive_answer'
+        ))
+      const latest = records.at(-1)
+      const question = typeof latest?.question === 'string' ? normalizeMessageText(latest.question) : ''
+      if (latest && question) {
+        const evidenceRefs = stringList(latest.evidence_refs)
+        const timestamp = typeof latest.created_at === 'string' ? Date.parse(latest.created_at) : Date.now()
+        store.replaceChat([
+          { role: 'user', content: question, timestamp },
+          {
+            role: 'assistant',
+            content: '已恢复这篇论文的上一轮问题。你可以直接继续追问；M4 会重新检索并验证当前证据，不回放旧版本答案。',
+            timestamp: timestamp + 1,
+            evidenceRefs,
+            contextTrace: {
+              scope: 'paper',
+              continued_from_history: true,
+              focus_question: question,
+              evidence_count: evidenceRefs.length,
+              selected_text_used: false,
+            },
+          },
+        ])
+      }
+    }
   } catch {
     memoryCount.value = 0
   }
@@ -262,11 +314,7 @@ async function send() {
       conversation_history: conversationHistory,
     }
     const data = await workspaceApi.ask(store.currentJobId, request)
-    store.addMessage({
-      role: 'assistant',
-      content: normalizeMessageText(data.answer || 'M4 暂时无法回答这个问题。'),
-      timestamp: Date.now(),
-    })
+    store.addMessage(assistantMessage(data))
     await loadMemory()
   } catch (error) {
     const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
@@ -297,11 +345,7 @@ async function requestAdvisorQuestion() {
         conversation_history: conversationHistory,
       })
       const answerEvidenceRefs = stringList(answerData.evidence_refs)
-      store.addMessage({
-        role: 'assistant',
-        content: normalizeMessageText(answerData.answer || 'M4 暂时无法回答这个问题。'),
-        timestamp: Date.now(),
-      })
+      store.addMessage(assistantMessage(answerData))
       if (answerData.status === 'DEGRADED' && answerEvidenceRefs.length === 0) {
         await loadMemory()
         return
@@ -456,7 +500,8 @@ watch(fontSize, (value) => {
     <header>
       <div>
         <h2>M4 论文助教</h2>
-        <p>{{ store.selectedText ? '正在基于选中文本回答' : '正在基于当前论文回答' }}</p>
+        <strong v-if="props.paperTitle" class="paper-focus" :title="props.paperTitle">{{ props.paperTitle }}</strong>
+        <p>{{ store.selectedText ? '当前论文 · 选中文本已加入上下文' : '当前论文证据已锁定 · 支持连续追问' }}</p>
       </div>
       <div class="header-actions">
         <div class="font-controls" aria-label="M4 字体大小">
@@ -488,7 +533,10 @@ watch(fontSize, (value) => {
     </div>
 
     <div v-if="store.selectedText" class="selected" data-testid="selected-context">
-      <span>已选中文本</span>
+      <div class="selected-head">
+        <span>本轮附加上下文</span>
+        <button type="button" aria-label="移除选中文本" @click="clearSelectedContext">移除</button>
+      </div>
       <p>{{ selectedPreviewText() }}</p>
     </div>
 
@@ -501,8 +549,14 @@ watch(fontSize, (value) => {
       aria-live="polite"
     >
       <div v-if="!store.chatHistory.length && !isLoading" class="empty">
-        <h3>还没有对话</h3>
-        <p>问题越具体，回答越容易贴住论文证据。</p>
+        <span class="scope-badge">仅当前论文</span>
+        <h3>从理解论文开始</h3>
+        <p>先问一个具体问题，之后可以直接用“它”“为什么”“展开讲”连续追问。</p>
+        <div class="starter-prompts">
+          <button type="button" @click="useSuggestion('这篇论文真正解决了什么问题？')">真正解决了什么问题？</button>
+          <button type="button" @click="useSuggestion('核心方法为什么有效？')">核心方法为什么有效？</button>
+          <button type="button" @click="useSuggestion('实验结果足以支持作者的结论吗？')">实验是否支撑结论？</button>
+        </div>
       </div>
 
       <article
@@ -513,24 +567,41 @@ watch(fontSize, (value) => {
         data-testid="chat-message"
       >
         <div class="avatar">{{ msg.role === 'user' ? '你' : 'M4' }}</div>
-        <div v-if="msg.role === 'assistant'" class="bubble answer-bubble">
-          <p
-            v-for="(block, blockIndex) in answerBlocks(msg.content)"
-            :key="`${index}-${blockIndex}-${block.text.slice(0, 18)}`"
-            class="answer-block"
-            :class="`tone-${block.tone}`"
-          >
-            <span class="answer-label">{{ block.label }}</span>
-            <span class="answer-text">
-              <template
-                v-for="(segment, segmentIndex) in highlightSegments(block.text)"
-                :key="`${segmentIndex}-${segment.text}`"
-              >
-                <mark v-if="segment.highlighted" class="answer-keyword">{{ segment.text }}</mark>
-                <span v-else>{{ segment.text }}</span>
-              </template>
-            </span>
-          </p>
+        <div v-if="msg.role === 'assistant'" class="message-body">
+          <div class="context-trace" v-if="msg.contextTrace" data-testid="context-trace">
+            <span>{{ msg.contextTrace.continued_from_history ? '承接上一问' : msg.contextTrace.scope === 'selection' ? '选中文本' : '当前论文' }}</span>
+            <span>{{ msg.contextTrace.evidence_count }} 条已验证证据</span>
+          </div>
+          <div class="bubble answer-bubble">
+            <p
+              v-for="(block, blockIndex) in answerBlocks(msg.content)"
+              :key="`${index}-${blockIndex}-${block.text.slice(0, 18)}`"
+              class="answer-block"
+              :class="`tone-${block.tone}`"
+            >
+              <span class="answer-label">{{ block.label }}</span>
+              <span class="answer-text">
+                <template
+                  v-for="(segment, segmentIndex) in highlightSegments(block.text)"
+                  :key="`${segmentIndex}-${segment.text}`"
+                >
+                  <mark v-if="segment.highlighted" class="answer-keyword">{{ segment.text }}</mark>
+                  <span v-else>{{ segment.text }}</span>
+                </template>
+              </span>
+            </p>
+          </div>
+          <p v-if="msg.status === 'DEGRADED' && msg.uncertainty" class="answer-uncertainty">{{ msg.uncertainty }}</p>
+          <div v-if="msg.followUpSuggestions?.length" class="follow-up-row" aria-label="建议追问">
+            <button
+              v-for="suggestion in msg.followUpSuggestions"
+              :key="suggestion"
+              type="button"
+              @click="useSuggestion(suggestion)"
+            >
+              {{ suggestion }}
+            </button>
+          </div>
         </div>
         <div v-else class="bubble compact">{{ msg.content }}</div>
       </article>
@@ -580,13 +651,19 @@ watch(fontSize, (value) => {
     </div>
 
     <form class="composer" @submit.prevent="submitActiveMode">
-      <textarea
-        v-model="input"
-        data-testid="ask-input"
-        rows="2"
-        :placeholder="inputPlaceholder"
-        @keydown="handleKeydown"
-      />
+      <div class="composer-box">
+        <textarea
+          v-model="input"
+          data-testid="ask-input"
+          rows="2"
+          :placeholder="inputPlaceholder"
+          @keydown="handleKeydown"
+        />
+        <div class="composer-meta">
+          <span>回答范围：当前论文{{ store.selectedText ? ' + 选中文本' : '' }}</span>
+          <span>Enter 发送 · Shift+Enter 换行</span>
+        </div>
+      </div>
       <button type="submit" data-testid="ask-submit" class="primary-btn" :disabled="isLoading || (mode !== 'advisor' && !input.trim())">{{ submitLabel }}</button>
     </form>
   </section>
@@ -614,6 +691,19 @@ h2 {
   color: var(--text-primary);
   font-size: calc(var(--m4-font-size, 14px) + 2px);
   font-weight: 720;
+}
+
+.paper-focus {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-weight: 620;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 header p {
@@ -717,6 +807,25 @@ header p {
   font-weight: 650;
 }
 
+.selected-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selected-head button {
+  border-radius: 6px;
+  padding: 3px 7px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.selected-head button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text-primary);
+}
+
 .selected p {
   margin-top: 4px;
   max-height: 118px;
@@ -803,7 +912,7 @@ header p {
 }
 
 .empty {
-  margin: 70px auto 0;
+  margin: 46px auto 0;
   max-width: 320px;
   border: 1px dashed var(--border-subtle);
   border-radius: 8px;
@@ -812,10 +921,43 @@ header p {
   text-align: left;
 }
 
+.scope-badge {
+  display: inline-flex;
+  border: 1px solid color-mix(in srgb, var(--success) 28%, var(--border-subtle));
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--success) 9%, transparent);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .empty h3 {
+  margin-top: 12px;
   color: var(--text-primary);
   font-size: 17px;
   font-weight: 720;
+}
+
+.starter-prompts {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.starter-prompts button {
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+}
+
+.starter-prompts button:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border-subtle));
+  color: var(--text-primary);
 }
 
 .empty p {
@@ -874,6 +1016,32 @@ header p {
   overflow-wrap: break-word;
   white-space: pre-wrap;
   word-break: normal;
+}
+
+.message-body {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
+.context-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.context-trace span {
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.context-trace span:first-child {
+  background: color-mix(in srgb, var(--accent) 9%, var(--bg-secondary));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text-primary));
 }
 
 .answer-bubble {
@@ -983,6 +1151,38 @@ header p {
   color: var(--text-muted);
 }
 
+.answer-uncertainty {
+  border-left: 2px solid var(--warning);
+  padding-left: 9px;
+  color: var(--text-muted);
+  font-size: calc(var(--m4-font-size, 14px) - 2px);
+  line-height: 1.55;
+}
+
+.follow-up-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.follow-up-row button {
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.follow-up-row button:hover {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-subtle));
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .quick-row {
   display: flex;
   flex-wrap: wrap;
@@ -1008,8 +1208,36 @@ header p {
 .composer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 10px;
+  align-items: end;
+  gap: 8px;
   padding: 0 16px 16px;
+}
+
+.composer-box {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+}
+
+.composer-box textarea {
+  min-height: 64px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.composer-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.composer-meta span:last-child {
+  white-space: nowrap;
 }
 
 textarea {

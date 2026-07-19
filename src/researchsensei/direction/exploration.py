@@ -382,6 +382,28 @@ class DirectionExplorationService:
             warnings.extend(fallback_warnings)
             search_log.extend(fallback_log)
             source_metrics.extend(fallback_metrics)
+        elif candidates and self.fallback_adapters:
+            supplement_reasons = _discovery_supplement_reasons(
+                query,
+                candidates,
+                expected_count=min(max(self.max_results_per_source, 1), 8),
+            )
+            if supplement_reasons:
+                search_log.append(
+                    "primary discovery needs OA supplement: " + ", ".join(supplement_reasons)
+                )
+                fallback_candidates, fallback_warnings, fallback_log, fallback_metrics = self._acquire_fallback(
+                    query,
+                    query_variants=query_variants,
+                    primary_warning="",
+                    primary_source=self.sources[0] if self.sources else "paper_search",
+                    query_limit=2,
+                    trigger="low_coverage_oa_supplement",
+                )
+                candidates.extend(fallback_candidates)
+                warnings.extend(fallback_warnings)
+                search_log.extend(fallback_log)
+                source_metrics.extend(fallback_metrics)
 
         return candidates, warnings, search_log, source_metrics
 
@@ -392,15 +414,21 @@ class DirectionExplorationService:
         query_variants: list[str] | None = None,
         primary_warning: str = "PRIMARY_DISCOVERY_EMPTY:paper_search",
         primary_source: str = "paper_search",
+        query_limit: int | None = None,
+        trigger: str = "primary_empty_or_blocked",
     ) -> tuple[list[CandidatePaper], list[str], list[str], list[dict[str, object]]]:
-        warnings = [primary_warning]
+        warnings = [primary_warning] if primary_warning else []
         candidates: list[CandidatePaper] = []
-        search_log = [f"{primary_source}: {primary_warning}; trying fallback discovery"]
+        search_log = (
+            [f"{primary_source}: {primary_warning}; trying fallback discovery"]
+            if primary_warning
+            else [f"{primary_source}: supplementing discovery with open-access indexes"]
+        )
         source_metrics: list[dict[str, object]] = []
         queries_to_search = _prioritized_search_queries(
             query,
             query_variants or [],
-            limit=self.max_search_queries,
+            limit=query_limit or self.max_search_queries,
         )
         for source, adapter in self.fallback_adapters.items():
             source_candidates: list[CandidatePaper] = []
@@ -437,6 +465,7 @@ class DirectionExplorationService:
                     "latency_ms": total_latency,
                     "error": "",
                     "fallback": True,
+                    "trigger": trigger,
                 })
             else:
                 warnings.append(f"ACQUISITION_FAILED:{source}: {source_error or 'no results'}")
@@ -448,6 +477,7 @@ class DirectionExplorationService:
                     "latency_ms": total_latency,
                     "error": source_error or "no results",
                     "fallback": True,
+                    "trigger": trigger,
                 })
         return candidates, warnings, search_log, source_metrics
 
@@ -932,6 +962,54 @@ def _prioritized_search_queries(query: str, query_variants: list[str], *, limit:
         if variant and variant.lower() != query.lower():
             queries.append(variant)
     return _unique(queries)[: max(limit, 1)]
+
+
+def _discovery_supplement_reasons(
+    query: str,
+    candidates: list[CandidatePaper],
+    *,
+    expected_count: int,
+) -> list[str]:
+    """Explain when a non-empty primary result still needs OA-index coverage."""
+
+    expected = max(expected_count, 1)
+    query_terms = {
+        token
+        for token in re.findall(r"[a-z0-9\u4e00-\u9fff]+", query.lower())
+        if len(token) >= 3 and token not in {"the", "and", "for", "with", "from", "using", "method", "methods"}
+    }
+    relevant_count = 0
+    oa_hint_count = 0
+    for candidate in candidates:
+        searchable = f"{candidate.title} {candidate.abstract}".lower()
+        overlap = sum(1 for term in query_terms if term in searchable)
+        if not query_terms or overlap >= min(2, len(query_terms)):
+            relevant_count += 1
+        if _candidate_has_open_fulltext_hint(candidate):
+            oa_hint_count += 1
+
+    reasons: list[str] = []
+    if len(candidates) < expected:
+        reasons.append(f"candidate_count={len(candidates)}<{expected}")
+    relevant_target = min(4, expected)
+    if relevant_count < relevant_target:
+        reasons.append(f"topic_matches={relevant_count}<{relevant_target}")
+    oa_target = min(3, expected)
+    if oa_hint_count < oa_target:
+        reasons.append(f"open_fulltext_hints={oa_hint_count}<{oa_target}")
+    return reasons
+
+
+def _candidate_has_open_fulltext_hint(candidate: CandidatePaper) -> bool:
+    if candidate.arxiv_id or candidate.pdf_url or candidate.candidate_pdf_urls or candidate.candidate_source_urls:
+        return True
+    if candidate.open_access or candidate.pdf_available:
+        return True
+    raw = candidate.raw_source_metadata or {}
+    if isinstance(raw.get("best_oa_location"), dict):
+        return True
+    open_access_pdf = raw.get("openAccessPdf")
+    return isinstance(open_access_pdf, dict) and bool(open_access_pdf.get("url"))
 
 
 def _direction_download_dir(root: Path | None, query_plan: QueryPlan) -> Path | None:

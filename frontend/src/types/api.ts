@@ -46,10 +46,21 @@ export interface AskRequest {
   conversation_history?: ConversationMessageRequest[]
 }
 
+export interface M4ContextTrace {
+  scope: 'selection' | 'paper'
+  continued_from_history: boolean
+  focus_question: string
+  evidence_count: number
+  selected_text_used: boolean
+}
+
 export interface AskResponse {
   answer: string
   status?: string
   evidence_refs?: string[]
+  uncertainty?: string
+  follow_up_suggestions?: string[]
+  context_trace?: M4ContextTrace
   [key: string]: unknown
 }
 

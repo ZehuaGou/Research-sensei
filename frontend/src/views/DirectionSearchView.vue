@@ -54,6 +54,9 @@ const queryPlanMode = computed(() => {
 })
 const queryVariants = computed(() => toTextList(queryPlan.value?.query_variants).slice(0, 6))
 const queryCoreTerms = computed(() => toTextList(queryPlan.value?.core_terms).slice(0, 8))
+const sourceMetrics = computed<Array<Record<string, any>>>(() => (
+  Array.isArray(result.value?.source_metrics) ? result.value.source_metrics : []
+))
 
 onMounted(() => {
   syncQueryFromRoute()
@@ -248,6 +251,16 @@ function fulltextSourceLabel(value: unknown) {
     doi: 'DOI',
   }
   return labels[String(value || '')] || String(value || '待确认')
+}
+
+function discoverySourceLabel(value: unknown) {
+  const labels: Record<string, string> = {
+    paper_search: '聚合搜索',
+    arxiv_fallback: 'arXiv',
+    openalex_fallback: 'OpenAlex',
+    semantic_scholar_fallback: 'Semantic Scholar',
+  }
+  return labels[String(value || '')] || String(value || '未知来源')
 }
 
 function m2ReadinessNote(paper: Record<string, any>) {
@@ -550,6 +563,16 @@ async function openDeepRead(paper: Record<string, any>) {
           <div v-if="warnings.length" class="warning-list">
             <span v-for="warning in warnings" :key="warning.code" data-testid="direction-warning">
               {{ warningText(warning) }}
+            </span>
+          </div>
+          <div v-if="sourceMetrics.length" class="source-ledger" data-testid="source-ledger">
+            <span
+              v-for="metric in sourceMetrics"
+              :key="`${metric.source}-${metric.trigger || 'primary'}`"
+              :class="{ failed: !metric.success, supplement: metric.trigger === 'low_coverage_oa_supplement' }"
+            >
+              {{ discoverySourceLabel(metric.source) }} · {{ metric.success ? `${metric.count || 0} 篇` : '不可用' }}
+              <small v-if="metric.trigger === 'low_coverage_oa_supplement'">开放来源补搜</small>
             </span>
           </div>
         </section>
@@ -990,6 +1013,42 @@ async function openDeepRead(paper: Record<string, any>) {
 .warning-list {
   display: grid;
   gap: 4px;
+}
+
+.source-ledger {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.source-ledger > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.source-ledger > span.supplement {
+  border-color: color-mix(in srgb, var(--success) 35%, var(--border-subtle));
+}
+
+.source-ledger > span.failed {
+  color: var(--text-muted);
+  opacity: 0.78;
+}
+
+.source-ledger small {
+  border-radius: 999px;
+  padding: 1px 5px;
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+  color: var(--success);
+  font-size: 10px;
 }
 
 .query-plan {

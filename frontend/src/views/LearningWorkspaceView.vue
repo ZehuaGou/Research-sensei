@@ -239,7 +239,7 @@ watch([isAskPanelOpen, chatResize.compactViewport], async ([open, compact]) => {
 })
 
 onMounted(async () => {
-  store.currentJobId = jobId
+  store.setCurrentJob(jobId)
   topbarTargetReady.value = Boolean(document.getElementById('workbench-topbar-center'))
   document.addEventListener('keydown', handleDialogKeys)
   await workspace.loadWorkspace()
@@ -440,7 +440,7 @@ onBeforeUnmount(() => {
         @pointerdown="chatResize.startResize"
         @keydown="chatResize.handleSeparatorKeydown"
       />
-      <AskPanel />
+      <AskPanel :paper-title="workspaceTitle" />
     </aside>
 
     <div
@@ -459,7 +459,7 @@ onBeforeUnmount(() => {
         aria-label="M4 论文助教"
         tabindex="-1"
       >
-        <AskPanel />
+        <AskPanel :paper-title="workspaceTitle" />
       </aside>
     </div>
 

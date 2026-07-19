@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import threading
@@ -18,6 +19,7 @@ from researchsensei.schemas.m4 import (
     FormulaSymbolExplanation,
     GroundedClaim,
     InteractiveAnswer,
+    M4ContextTrace,
     M4MemoryBundle,
     M4MemoryRecord,
     SelectionExplanation,
@@ -29,6 +31,8 @@ M4_MEMORY_SCHEMA_VERSION = "m4_memory.v2"
 M4_MEMORY_MAX_RECORDS = 200
 M4_MEMORY_MAX_BYTES = 1_048_576
 M4_MEMORY_MAX_WARNINGS = 16
+
+logger = logging.getLogger(__name__)
 
 _MEMORY_LOCKS: dict[str, threading.RLock] = {}
 _MEMORY_LOCKS_GUARD = threading.Lock()
@@ -173,6 +177,13 @@ class M4InteractionService:
                 uncertainty="M4 需要一个问题，或者需要你先选中一段论文内容。",
                 warnings=[_warning("QUESTION_MISSING", "缺少 question。")],
             )
+        conversation_focus = self._conversation_focus(
+            question=question,
+            selected_text=selected_text,
+            conversation_history=conversation_history,
+        )
+        effective_question = _clean(conversation_focus.get("resolved_question")) or question
+        continued_from_history = bool(conversation_focus.get("continued_from_history"))
         if not selected_text and _is_non_paper_question(question):
             return InteractiveAnswer(
                 status="DEGRADED",
@@ -192,7 +203,7 @@ class M4InteractionService:
                 used_context={"memory": False, "artifacts": False, "llm": False},
                 warnings=[_warning("M4_GENERAL_CHAT", "问题没有指向当前论文证据。")],
             )
-        if not selected_text and _is_underspecified_question(question):
+        if not selected_text and _is_underspecified_question(question) and not continued_from_history:
             paper_card = _as_dict(self.artifacts.get("paper_card"))
             return InteractiveAnswer(
                 status="DEGRADED",
@@ -205,9 +216,9 @@ class M4InteractionService:
                 warnings=[_warning("QUESTION_UNDERSPECIFIED", "问题太宽或指代不清，需要先澄清。")],
             )
 
-        is_formula_question = _is_formula_question(question, selected_text)
-        ignore_selection = _should_ignore_selection(question, selected_text)
-        memory_hit = self._memory_hit(question=question, selected_text=selected_text)
+        is_formula_question = _is_formula_question(effective_question, selected_text)
+        ignore_selection = _should_ignore_selection(effective_question, selected_text)
+        memory_hit = self._memory_hit(question=effective_question, selected_text=selected_text)
         memory_claims = self._claims_from_memory(memory_hit) if memory_hit is not None else []
         if (
             memory_hit is not None
@@ -230,9 +241,16 @@ class M4InteractionService:
                 uncertainty="这次回答来自 M4 记忆，并沿用当时记录的证据引用。",
                 follow_up_suggestions=_follow_ups(),
                 used_context={"memory": True, "artifacts": False, "llm": False},
+                context_trace=M4ContextTrace(
+                    scope="selection" if selected_text else "paper",
+                    continued_from_history=continued_from_history,
+                    focus_question=effective_question,
+                    evidence_count=len(_unique([ref for claim in memory_claims for ref in claim.evidence_refs])),
+                    selected_text_used=bool(selected_text),
+                ),
             )
 
-        formula = self._formula_from_text(question=question, selected_text=selected_text) if is_formula_question else None
+        formula = self._formula_from_text(question=effective_question, selected_text=selected_text) if is_formula_question else None
         if formula is not None:
             answer, evidence_refs, confidence, warnings = self._answer_from_formula_card(formula)
         elif selected_text and not ignore_selection:
@@ -242,7 +260,7 @@ class M4InteractionService:
             warnings = selection.warnings
             confidence = selection.confidence
         else:
-            answer, evidence_refs, confidence, warnings = self._answer_from_artifacts(question)
+            answer, evidence_refs, confidence, warnings = self._answer_from_artifacts(effective_question)
 
         grounded_claims = (
             [
@@ -262,16 +280,20 @@ class M4InteractionService:
         llm_uncertainty = ""
 
         llm_evidence_refs = self._expanded_question_evidence_refs(
-            question=question,
+            question=effective_question,
             selected_text=selected_text,
-            seed_refs=evidence_refs,
+            seed_refs=[*evidence_refs, *_string_list(conversation_focus.get("continuity_evidence_refs"))],
         )
         used_context = {"memory": False, "artifacts": True, "llm": False}
+        if continued_from_history:
+            used_context["conversation"] = True
+        follow_up_suggestions = _follow_ups()
         llm_result = self._answer_with_grounded_llm(
             question=question,
             selected_text=selected_text,
             allowed_evidence_refs=llm_evidence_refs or evidence_refs,
             conversation_history=conversation_history,
+            conversation_focus=conversation_focus,
         )
         if llm_result.get("ok"):
             answer = _clean(llm_result.get("answer"))
@@ -288,6 +310,9 @@ class M4InteractionService:
             if isinstance(raw_warnings, list):
                 warnings.extend(warning for warning in raw_warnings if isinstance(warning, WarningItem))
             used_context = {"memory": False, "artifacts": True, "llm": True}
+            if continued_from_history:
+                used_context["conversation"] = True
+            follow_up_suggestions = _string_list(llm_result.get("follow_up_suggestions")) or _follow_ups()
             raw_llm_confidence = llm_result.get("confidence")
             llm_confidence = (
                 float(raw_llm_confidence) if isinstance(raw_llm_confidence, (int, float)) else 0.0
@@ -304,6 +329,13 @@ class M4InteractionService:
                 uncertainty="M4 已经拿到论文上下文，但 LLM 没有返回可用解释；本次没有改用本地兜底答案。",
                 follow_up_suggestions=_follow_ups(),
                 used_context={"memory": False, "artifacts": bool(llm_evidence_refs or evidence_refs), "llm": False},
+                context_trace=M4ContextTrace(
+                    scope="selection" if selected_text else "paper",
+                    continued_from_history=continued_from_history,
+                    focus_question=effective_question,
+                    evidence_count=len(llm_evidence_refs or evidence_refs),
+                    selected_text_used=bool(selected_text),
+                ),
                 warnings=[*warnings, _warning(code, message)],
             )
 
@@ -322,8 +354,15 @@ class M4InteractionService:
             evidence_refs=evidence_refs,
             claims=grounded_claims,
             uncertainty=uncertainty,
-            follow_up_suggestions=_follow_ups(),
+            follow_up_suggestions=follow_up_suggestions,
             used_context=used_context,
+            context_trace=M4ContextTrace(
+                scope="selection" if selected_text else "paper",
+                continued_from_history=continued_from_history,
+                focus_question=effective_question,
+                evidence_count=len(evidence_refs),
+                selected_text_used=bool(selected_text),
+            ),
             warnings=warnings,
         )
         self._append_memory(
@@ -472,6 +511,56 @@ class M4InteractionService:
             self._write_memory_unlocked(bundle)
             return bundle
 
+    def _conversation_focus(
+        self,
+        *,
+        question: str,
+        selected_text: str,
+        conversation_history: list[dict[str, str]],
+    ) -> dict[str, object]:
+        """Resolve follow-up language without treating chat history as paper evidence."""
+
+        recent_history = conversation_history[-8:]
+        previous_user_question = next(
+            (
+                item["content"]
+                for item in reversed(recent_history)
+                if item.get("role") == "user" and item.get("content")
+            ),
+            "",
+        )
+        previous_answer = next(
+            (
+                item["content"]
+                for item in reversed(recent_history)
+                if item.get("role") == "assistant" and item.get("content")
+            ),
+            "",
+        )
+        continued = bool(previous_user_question) and (
+            _is_underspecified_question(question) or _has_followup_reference(question)
+        )
+        resolved_question = question
+        continuity_refs: list[str] = []
+        if continued:
+            resolved_question = (
+                f"上一轮讨论的问题是“{_compact_user_text(previous_user_question, max_chars=420)}”。"
+                f"用户现在追问“{question}”。请把当前追问理解为上一轮话题的延续。"
+            )
+            for record in reversed(self._read_memory().records):
+                if record.memory_type != "interactive_answer" or not record.evidence_refs:
+                    continue
+                continuity_refs = record.evidence_refs[:4]
+                break
+        return {
+            "continued_from_history": continued,
+            "resolved_question": _compact_user_text(resolved_question, max_chars=1000),
+            "prior_user_question": _compact_user_text(previous_user_question, max_chars=420) if continued else "",
+            "prior_answer_summary": _compact_user_text(previous_answer, max_chars=700) if continued else "",
+            "continuity_evidence_refs": continuity_refs,
+            "selected_text_used": bool(selected_text),
+        }
+
     def _expanded_question_evidence_refs(
         self,
         *,
@@ -508,6 +597,7 @@ class M4InteractionService:
         selected_text: str,
         allowed_evidence_refs: list[str],
         conversation_history: list[dict[str, str]],
+        conversation_focus: dict[str, object],
     ) -> dict[str, object]:
         if self.llm_client is None:
             return _llm_error_result("M4_LLM_DISABLED", "当前没有启用 M4 LLM 客户端。")
@@ -522,7 +612,13 @@ class M4InteractionService:
         context = {
             "retrieved_evidence": evidence_rows,
             "recent_memory": self._memory_context(),
-            "conversation_history": conversation_history[-10:],
+            "conversation_history": conversation_history[-8:],
+            "conversation_focus": {
+                "continued_from_history": bool(conversation_focus.get("continued_from_history")),
+                "resolved_question": _compact_user_text(conversation_focus.get("resolved_question"), max_chars=1000),
+                "prior_user_question": _compact_user_text(conversation_focus.get("prior_user_question"), max_chars=420),
+                "prior_answer_summary": _compact_user_text(conversation_focus.get("prior_answer_summary"), max_chars=700),
+            },
             "allowed_evidence_refs": allowed_evidence_refs,
         }
         prompt = {
@@ -538,6 +634,8 @@ class M4InteractionService:
                 "公式、阈值、数值、数据集、指标和实验结果只有在 supporting quote 明确出现时才允许写入。",
                 "玩具数字只能放在 toy_example claim 中，且计算规则必须在引用证据里明确出现。",
                 "证据不足的细节不要猜；写进顶层 uncertainty，而不是伪造 claim。",
+                "conversation_history 和 recent_memory 只用于理解指代与追问，不能作为论文事实或 supporting quote。",
+                "如果 conversation_focus.continued_from_history 为 true，要直接承接上一轮话题，不要再次追问“这个指什么”。",
             ],
             "required_json_schema": {
                 "claims": [
@@ -565,6 +663,7 @@ class M4InteractionService:
                     "你是 ResearchSensei 的 M4 论文助教。你只能根据提供的逐条证据生成 claim。"
                     "每条 claim 都必须逐引用绑定原文 quote；合法引用不等于内容获得支持。"
                     "不要引入证据里没有的算法、公式、阈值、数值、数据集、指标或实验结果。"
+                    "对话历史只能帮助理解追问，绝不能替代 retrieved_evidence。"
                     "只能返回 JSON，不要输出 Markdown。"
                 ),
             ),
@@ -591,6 +690,7 @@ class M4InteractionService:
                 )
             )
         except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
+            logger.warning("M4 grounded LLM request failed for job %s: %s", self.job_id, exc, exc_info=True)
             error_text = str(exc).lower()
             if "json" in error_text or "parse" in error_text:
                 return _llm_error_result(
@@ -658,6 +758,7 @@ class M4InteractionService:
             "degraded": bool(rejected_reasons),
             "uncertainty": uncertainty,
             "warnings": warnings,
+            "follow_up_suggestions": _paper_follow_up_suggestions(data.get("follow_up_suggestions")),
         }
 
     def _answer_from_artifacts(self, question: str) -> tuple[str, list[str], float, list[WarningItem]]:
@@ -2538,6 +2639,29 @@ def _is_underspecified_question(question: str) -> bool:
     return False
 
 
+def _has_followup_reference(question: str) -> bool:
+    text = re.sub(r"\s+", "", question.lower())
+    return any(
+        marker in text
+        for marker in [
+            "它",
+            "这个",
+            "这种",
+            "上述",
+            "前面",
+            "刚才",
+            "那为什么",
+            "那怎么",
+            "那它",
+            "继续",
+            "展开讲",
+            "再具体",
+            "和前者",
+            "与前者",
+        ]
+    )
+
+
 def _is_evidence_question(question: str) -> bool:
     text = question.lower()
     return any(term in text for term in ["证据", "evidence", "对应哪", "引用"])
@@ -2830,6 +2954,18 @@ def _normalize(value: str) -> str:
 
 def _tokens(value: str) -> list[str]:
     return [token.lower() for token in re.findall(r"[\w\u4e00-\u9fff]+", value) if len(token) > 1]
+
+
+def _paper_follow_up_suggestions(value: object) -> list[str]:
+    suggestions: list[str] = []
+    for item in _string_list(value):
+        suggestion = _compact_user_text(item, max_chars=120)
+        if not suggestion or _is_non_paper_question(suggestion):
+            continue
+        suggestions.append(suggestion)
+        if len(suggestions) >= 3:
+            break
+    return _unique(suggestions)
 
 
 def _follow_ups() -> list[str]:

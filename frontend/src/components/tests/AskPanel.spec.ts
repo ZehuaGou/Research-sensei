@@ -31,6 +31,15 @@ function mockM4Fetch() {
         ].join('\n\n'),
         evidence_refs: ['paper:b001'],
         memory_refs: ['m4_memory_2'],
+        uncertainty: '回答基于当前论文证据。',
+        follow_up_suggestions: ['为什么这种机制能连接稀疏证据？'],
+        context_trace: {
+          scope: bodyHasSelection(init) ? 'selection' : 'paper',
+          continued_from_history: false,
+          focus_question: 'How does it work?',
+          evidence_count: 1,
+          selected_text_used: bodyHasSelection(init),
+        },
       })
     }
     if (url.endsWith('/advisor/question')) {
@@ -91,7 +100,7 @@ describe('AskPanel', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="selected-context"]').text()).toContain('attention architecture')
-    expect(wrapper.text()).toContain('正在基于选中文本回答')
+    expect(wrapper.text()).toContain('选中文本已加入上下文')
     expect(wrapper.text()).not.toContain('已记住')
 
     await wrapper.get('[data-testid="ask-input"]').setValue('How does it work?')
@@ -112,6 +121,8 @@ describe('AskPanel', () => {
     expect(wrapper.find('.answer-block.tone-concept').text()).toContain('关键机制')
     expect(wrapper.find('.answer-block.tone-evidence').text()).toContain('证据')
     expect(wrapper.findAll('.answer-keyword').map(node => node.text())).toContain('证据')
+    expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('1 条已验证证据')
+    expect(wrapper.text()).toContain('为什么这种机制能连接稀疏证据？')
     expect(wrapper.text()).not.toContain('paper:b001')
     expect(wrapper.text()).not.toContain('m4_memory_2')
   })
@@ -186,3 +197,9 @@ describe('AskPanel', () => {
     expect(wrapper.text()).not.toContain('paper:b002')
   })
 })
+
+function bodyHasSelection(init?: RequestInit) {
+  if (!init?.body) return false
+  const body = JSON.parse(String(init.body)) as { selected_text?: string }
+  return Boolean(body.selected_text)
+}

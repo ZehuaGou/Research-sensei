@@ -52,6 +52,16 @@ class GroundedClaim(SenseiModel):
     uncertainty: str = ""
 
 
+class M4ContextTrace(SenseiModel):
+    """User-safe description of how M4 interpreted the current turn."""
+
+    scope: Literal["paper", "selection"] = "paper"
+    continued_from_history: bool = False
+    focus_question: str = ""
+    evidence_count: int = 0
+    selected_text_used: bool = False
+
+
 class InteractiveAnswer(SenseiModel):
     status: str = "SUCCESS"
     answer: str = ""
@@ -61,6 +71,7 @@ class InteractiveAnswer(SenseiModel):
     uncertainty: str = ""
     follow_up_suggestions: list[str] = Field(default_factory=list)
     used_context: dict[str, bool] = Field(default_factory=dict)
+    context_trace: M4ContextTrace = Field(default_factory=M4ContextTrace)
     warnings: list[WarningItem] = Field(default_factory=list)
 
 

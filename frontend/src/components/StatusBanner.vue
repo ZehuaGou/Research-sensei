@@ -121,7 +121,7 @@ function valueText(value: unknown) {
       </div>
     </div>
 
-    <div v-if="compactRows.length" class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+    <div v-if="compactRows.length" class="status-ledger mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
       <div v-for="[label, value] in compactRows" :key="String(label)" class="rounded-[10px] px-3 py-2" style="background: var(--bg-secondary);">
         <div class="text-xs font-semibold" style="color: var(--text-muted);">{{ label }}</div>
         <div class="truncate text-sm font-medium" style="color: var(--text-primary);">{{ valueText(value) }}</div>
@@ -163,5 +163,11 @@ function valueText(value: unknown) {
 .status-pill.neutral {
   background: var(--accent-light);
   color: var(--text-primary);
+}
+
+@media (min-width: 900px) {
+  .status-banner.success .status-ledger {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
 }
 </style>

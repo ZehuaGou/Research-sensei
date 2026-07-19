@@ -339,6 +339,48 @@ def test_m4_ask_uses_llm_when_client_is_configured(tmp_path: Path) -> None:
     assert llm.calls == 1
 
 
+def test_m4_followup_resolves_previous_turn_without_using_chat_as_evidence(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_followup")
+    llm = ScriptedM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    first_question = "论文为什么要用注意力连接稀疏证据？"
+    first = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": first_question})
+    assert first.status_code == 200
+
+    followup = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "为什么？",
+            "conversation_history": [
+                {"role": "user", "content": first_question},
+                {"role": "assistant", "content": first.json()["answer"]},
+            ],
+        },
+    )
+
+    assert followup.status_code == 200
+    data = followup.json()
+    assert data["status"] == "SUCCESS"
+    assert data["used_context"]["conversation"] is True
+    assert data["context_trace"]["continued_from_history"] is True
+    assert first_question in data["context_trace"]["focus_question"]
+    assert data["context_trace"]["evidence_count"] == 1
+    assert data["evidence_refs"] == ["paper:b001"]
+    prompt = json.loads(llm.messages[-1][1].content)
+    assert prompt["context"]["conversation_focus"]["continued_from_history"] is True
+    assert first_question in prompt["context"]["conversation_focus"]["resolved_question"]
+    assert "只用于理解指代与追问" in "".join(prompt["output_rules"])
+    assert prompt["context"]["allowed_evidence_refs"] == ["paper:b001"]
+
+
 def test_m4_rejects_legal_ref_when_evidence_does_not_support_claim(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "unsupported_claim")
     llm = ScriptedM4LLM(

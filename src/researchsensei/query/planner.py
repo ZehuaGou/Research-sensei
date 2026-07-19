@@ -60,6 +60,8 @@ class QueryPlanner:
                 "Convert the user's research direction into precise English academic search terms.\n"
                 "Preserve every core constraint in the user's query: data type, task, method family, and application domain.\n"
                 "Do not broaden the query by dropping task/domain terms. If the user writes Chinese, translate the full phrase.\n"
+                "Create complementary variants for discovery coverage: exact task+method, task+domain, terminology/abbreviation, and survey/foundational.\n"
+                "Prefer queries that work in arXiv, OpenAlex, and Semantic Scholar; do not make every variant venue-specific.\n"
                 "Return strict JSON only. Do not include markdown."
             ),
             user=f"""Analyze this research direction: "{user_query}"
@@ -80,7 +82,7 @@ Return JSON with this schema:
   "direction_zh": "Chinese direction name, if applicable",
   "direction_en": "English direction name",
   "english_query": "best single English academic search query",
-  "query_variants": ["variant query 1", "variant query 2"],
+  "query_variants": ["4-6 complementary queries ordered from exact to broader, without dropping the core task"],
   "core_terms": ["core term 1", "core term 2"],
   "related_terms": ["related term"],
   "exclude_terms": ["noise term to exclude"],
