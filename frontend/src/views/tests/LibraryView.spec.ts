@@ -131,7 +131,7 @@ describe('LibraryView', () => {
     await wrapper.get('[data-testid="open-library-paper"]').trigger('click')
     await flushPromises()
 
-    expect(fetchMock.mock.calls[2][0]).toBe('/api/v1/documents/parse')
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/v1/documents/jobs/parse')
     const parseInit = fetchMock.mock.calls[2][1] as RequestInit
     expect(parseInit.method).toBe('POST')
     const body = parseInit.body as FormData

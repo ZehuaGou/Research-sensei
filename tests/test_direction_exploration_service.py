@@ -1,5 +1,7 @@
 ﻿from __future__ import annotations
 
+from pathlib import Path
+
 from researchsensei.direction.exploration import DirectionExplorationService, build_heuristic_query_plan
 from researchsensei.library import PaperLibraryStore
 from researchsensei.ranking import PaperRanker

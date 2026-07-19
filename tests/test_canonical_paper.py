@@ -7,17 +7,12 @@ from researchsensei.canonical import MaterialNormalizer, FormulaRegionDetector, 
 from researchsensei.schemas import (
     CandidatePaper,
     CanonicalizationResult,
-    CanonicalPaper,
     FormulaBlock,
     ResolvedPaperSource,
     SourcePriority,
-    VerificationStatus,
 )
 from researchsensei.schemas.canonical import (
     AdapterInfo,
-    CanonicalPaperFrontMatter,
-    FormulaOcrResult,
-    FormulaRegionResult,
 )
 from researchsensei.schemas.enums import (
     AdapterStatus,

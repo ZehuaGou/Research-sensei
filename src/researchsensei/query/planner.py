@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Iterable
+from typing import Iterable, Protocol
 
 from researchsensei.acquisition.venue_registry import VENUE_REGISTRY, lookup_venue
-from researchsensei.llm.client import LLMClient, parse_llm_json
+from researchsensei.llm.client import parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
+from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
 from researchsensei.schemas import QueryPlan
 from researchsensei.schemas.enums import SearchIntent
 
@@ -17,10 +18,19 @@ class QueryPlanningError(RuntimeError):
     """Raised when M1 cannot produce a real LLM query plan."""
 
 
+class QueryPlannerClient(Protocol):
+    async def chat(
+        self,
+        messages: list[ChatMessage],
+        *,
+        config: LLMConfig | None = None,
+    ) -> ChatResponse: ...
+
+
 class QueryPlanner:
     """Generates structured query plans from user direction input."""
 
-    def __init__(self, llm_client: LLMClient | None = None) -> None:
+    def __init__(self, llm_client: QueryPlannerClient | None = None) -> None:
         self.llm = llm_client
 
     async def plan(self, user_query: str) -> QueryPlan:
@@ -40,6 +50,9 @@ class QueryPlanner:
             raise QueryPlanningError(f"M1_QUERY_PLANNING_FAILED: {type(exc).__name__}: {exc}") from exc
 
     async def _plan_with_llm(self, user_query: str) -> QueryPlan:
+        llm = self.llm
+        if llm is None:
+            raise QueryPlanningError("M1_QUERY_PLANNING_REQUIRES_REAL_LLM")
         prompt_builder = PromptBuilder()
         messages = prompt_builder.build_simple(
             system=(
@@ -78,7 +91,7 @@ Return JSON with this schema:
 }}""",
         )
 
-        response = await self.llm.chat(messages)
+        response = await llm.chat(messages)
         data = parse_llm_json(response.content)
 
         direction_en = str(data.get("direction_en") or data.get("english_query") or "").strip()

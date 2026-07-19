@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 import time
@@ -128,3 +129,52 @@ def test_direction_search_async_api_returns_job_and_result(tmp_path: Path) -> No
         assert result["progress"] == 100
         assert result["result"]["status"] == "SUCCESS"
         assert result["result"]["papers"] == []
+
+
+def test_document_parse_and_reparse_use_persistent_tasks(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    with TestClient(create_app(workspace_root=workspace)) as client:
+        created = client.post(
+            "/api/v1/documents/jobs/parse",
+            data={"title": "Trusted Library Title"},
+            files={
+                "file": (
+                    "paper.md",
+                    b"## Abstract\nA short paper.\n\n## Method\nA grounded method description.",
+                    "text/markdown",
+                )
+            },
+        )
+        assert created.status_code == 202
+        parse_task = _wait_api_task(client, created.json()["task_id"])
+
+        assert parse_task["status"] == "SUCCEEDED"
+        job_id = parse_task["result"]["job_id"]
+        paper_card = json.loads(
+            (workspace / "runs" / job_id / "paper_card.json").read_text(encoding="utf-8")
+        )
+        assert paper_card["title"] == "Trusted Library Title"
+
+        reparse = client.post(f"/api/v1/documents/jobs/{job_id}/reparse")
+        assert reparse.status_code == 202
+        reparse_task = _wait_api_task(client, reparse.json()["task_id"])
+
+        assert reparse_task["status"] == "SUCCEEDED"
+        assert reparse_task["result"]["source_job_id"] == job_id
+        assert reparse_task["result"]["job_id"] != job_id
+
+
+def _wait_api_task(
+    client: TestClient,
+    task_id: str,
+    timeout: float = 3.0,
+) -> dict[str, object]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        response = client.get(f"/api/v1/documents/jobs/{task_id}")
+        assert response.status_code == 200
+        task = response.json()
+        if task["status"] in {"SUCCEEDED", "FAILED", "CANCELLED", "INTERRUPTED"}:
+            return task
+        time.sleep(0.01)
+    raise AssertionError(f"document task {task_id} did not finish")

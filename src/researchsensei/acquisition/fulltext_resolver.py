@@ -13,7 +13,7 @@ from researchsensei.acquisition.arxiv_crosslink import ArxivCrosslink
 from researchsensei.acquisition.landing_extractor import LandingPdfExtractor
 from researchsensei.acquisition.pdf_cache import PdfCache
 from researchsensei.acquisition.venue_registry import is_known_oa_landing
-from researchsensei.schemas import CandidatePaper
+from researchsensei.schemas import CandidatePaper, SourceStatus
 from researchsensei.source_resolver import SourceResolver
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,7 @@ class FullTextResolver:
         )
         self.arxiv_crosslink = arxiv_crosslink or ArxivCrosslink()
         # PDF cache: explicit instance wins; otherwise construct from env/cache_root.
+        self.pdf_cache: PdfCache | None
         if pdf_cache is not None:
             self.pdf_cache = pdf_cache
         else:
@@ -172,11 +173,6 @@ class FullTextResolver:
                 pdf_url=selected_url or (pdf_urls[0] if pdf_urls else ""),
             )
             if cached_path is not None:
-                cached_meta = self.pdf_cache.meta(
-                    doi=candidate.doi,
-                    arxiv_id=candidate.arxiv_id or arxiv_id,
-                    pdf_url=selected_url or (pdf_urls[0] if pdf_urls else ""),
-                )
                 started = time.perf_counter()
                 metrics.append(_metric(
                     "pdf_cache",
@@ -370,6 +366,7 @@ class FullTextResolver:
             max_download_bytes=self.max_download_bytes,
         )
         run_dir.mkdir(parents=True, exist_ok=True)
+        status: SourceStatus | None
         if selected_source == "arxiv_source" and candidate.arxiv_id:
             status = resolver.resolve_arxiv_id(candidate.arxiv_id, run_dir)
         elif selected_source == "arxiv_source":
@@ -422,12 +419,14 @@ class FullTextResolver:
                 pdf = str((location or {}).get(key) or "")
                 if pdf:
                     urls.append(pdf)
-        open_access = raw.get("open_access") if isinstance(raw.get("open_access"), dict) else {}
-        oa_url = str((open_access or {}).get("oa_url") or "")
+        raw_open_access = raw.get("open_access")
+        open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
+        oa_url = str(open_access.get("oa_url") or "")
         if _is_legal_pdf_url(oa_url):
             urls.append(oa_url)
-        open_access_pdf = raw.get("openAccessPdf") if isinstance(raw.get("openAccessPdf"), dict) else {}
-        s2_pdf = str((open_access_pdf or {}).get("url") or "")
+        raw_open_access_pdf = raw.get("openAccessPdf")
+        open_access_pdf = raw_open_access_pdf if isinstance(raw_open_access_pdf, dict) else {}
+        s2_pdf = str(open_access_pdf.get("url") or "")
         if s2_pdf:
             urls.append(s2_pdf)
         return [url for url in urls if _is_legal_pdf_url(url)]
@@ -456,8 +455,9 @@ class FullTextResolver:
         for location in _metadata_locations(raw):
             for key in ("landing_page_url", "url_for_landing_page", "url"):
                 urls.append(str((location or {}).get(key) or ""))
-        open_access = raw.get("open_access") if isinstance(raw.get("open_access"), dict) else {}
-        oa_url = str((open_access or {}).get("oa_url") or "")
+        raw_open_access = raw.get("open_access")
+        open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
+        oa_url = str(open_access.get("oa_url") or "")
         if oa_url and not _is_legal_pdf_url(oa_url):
             urls.append(oa_url)
         return _unique([url for url in urls if url])

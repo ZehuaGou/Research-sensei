@@ -4,6 +4,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from collections.abc import Sequence
 
 from researchsensei.core.sqlite import connect_sqlite
 from researchsensei.schemas import JobRecord, JobStatus, WarningItem, WorkspaceArtifact
@@ -264,7 +265,7 @@ class JobStore:
         )
 
 
-def _dump_models(values: list[object]) -> str:
+def _dump_models(values: Sequence[object]) -> str:
     return json.dumps(
         [
             value.model_dump(mode="json") if hasattr(value, "model_dump") else value

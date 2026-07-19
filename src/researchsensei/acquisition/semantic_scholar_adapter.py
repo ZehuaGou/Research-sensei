@@ -5,6 +5,7 @@ import os
 import threading
 import time
 from collections.abc import Callable
+from typing import Any
 
 import httpx
 
@@ -37,7 +38,7 @@ class SemanticScholarAdapter:
         self,
         *,
         timeout: float = 15.0,
-        http_client: object | None = None,
+        http_client: Any | None = None,
         cache_ttl_seconds: float = 15 * 60,
         min_request_interval_seconds: float = 1.0,
         rate_limit_cooldown_seconds: float = 60.0,

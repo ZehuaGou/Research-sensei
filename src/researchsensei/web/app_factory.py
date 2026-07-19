@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import hashlib
 import os
 import re
 import sqlite3
+import threading
 import uuid
 from contextlib import asynccontextmanager
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Callable
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.concurrency import run_in_threadpool
 
@@ -43,6 +48,8 @@ from researchsensei.web.dependencies import WebDependencies
 from researchsensei.web.services import (
     JobService,
     PersistentTaskService,
+    TaskExecutionError,
+    TaskNotFoundError,
     UploadService,
     UploadValidationError,
 )
@@ -304,6 +311,7 @@ def create_app(
                     job_id=job_id,
                     source_status=source_status,
                     source_identity=source_identity,
+                    title_hint=title,
                 )
                 return _job_parse_response(job)
             finally:
@@ -397,8 +405,101 @@ def create_app(
             job_id=job_id,
             source_status=source_status,
             source_identity=source_identity,
+            title_hint=title,
         )
         return _job_parse_response(job)
+
+    @app.post("/api/v1/documents/jobs/parse", status_code=202)
+    async def create_document_parse_job(
+        file: UploadFile | None = File(None),
+        title: str = Form(""),
+        doi: str = Form(""),
+        local_path: str = Form(""),
+        pdf_url: str = Form(""),
+        arxiv_id: str = Form(""),
+        arxiv_url: str = Form(""),
+        force: bool = Form(False),
+    ) -> dict[str, object]:
+        """Queue document parsing so slow M2/LLM work survives HTTP timeouts."""
+        upload_service = UploadService(
+            workspace.root / "incoming",
+            max_bytes=resolved_max_bytes,
+        )
+        saved_upload = None
+        if file is not None and file.filename:
+            try:
+                saved_upload = await upload_service.save(file)
+            except UploadValidationError as error:
+                raise HTTPException(
+                    status_code=error.status_code,
+                    detail={"code": error.code, "message": error.message},
+                ) from error
+
+        def operation(
+            progress: Callable[[str, int], None],
+            cancelled: threading.Event,
+        ) -> dict[str, object]:
+            if cancelled.is_set():
+                upload_service.cleanup(saved_upload)
+                return {}
+            progress("resolving_source", 10)
+            background_upload: UploadFile | None = None
+            upload_handle = None
+            try:
+                if saved_upload is not None:
+                    upload_handle = saved_upload.path.open("rb")
+                    background_upload = UploadFile(
+                        file=upload_handle,
+                        filename=saved_upload.original_filename,
+                        headers=Headers({"content-type": saved_upload.content_type}),
+                    )
+                result = asyncio.run(
+                    parse_document(
+                        file=background_upload,
+                        title=title,
+                        doi=doi,
+                        local_path=local_path,
+                        pdf_url=pdf_url,
+                        arxiv_id=arxiv_id,
+                        arxiv_url=arxiv_url,
+                        force=force,
+                    )
+                )
+                progress("building_understanding", 90)
+                return result
+            except HTTPException as error:
+                detail = error.detail
+                if isinstance(detail, dict):
+                    error_type = str(
+                        detail.get("status")
+                        or detail.get("code")
+                        or f"HTTP_{error.status_code}"
+                    )
+                    message = str(detail.get("message") or detail)
+                else:
+                    error_type = f"HTTP_{error.status_code}"
+                    message = str(detail)
+                raise TaskExecutionError(error_type, message) from error
+            finally:
+                if background_upload is None and upload_handle is not None:
+                    upload_handle.close()
+                upload_service.cleanup(saved_upload)
+
+        payload = {
+            "title": title,
+            "doi": doi,
+            "local_path": local_path,
+            "pdf_url": pdf_url,
+            "arxiv_id": arxiv_id,
+            "arxiv_url": arxiv_url,
+            "force": force,
+            "upload_filename": saved_upload.original_filename if saved_upload is not None else "",
+        }
+        try:
+            return background_tasks.submit("document_parse", payload, operation)
+        except Exception:
+            upload_service.cleanup(saved_upload)
+            raise
 
     @app.post("/api/v1/jobs/{job_id}/reparse")
     async def reparse_job(job_id: str) -> dict[str, object]:
@@ -428,6 +529,7 @@ def create_app(
             job_id=new_job_id,
             source_status=source_status,
             source_identity=source_identity,
+            title_hint=_job_title_hint(original),
         )
         return {
             **_job_parse_response(job),
@@ -435,6 +537,61 @@ def create_app(
             "handoff_status": "JOB_CREATED",
             "source_job_id": job_id,
         }
+
+    @app.post("/api/v1/documents/jobs/{job_id}/reparse", status_code=202)
+    def create_document_reparse_job(job_id: str) -> dict[str, object]:
+        _get_job_or_404(jobs, job_id)
+
+        def operation(
+            progress: Callable[[str, int], None],
+            cancelled: threading.Event,
+        ) -> dict[str, object]:
+            if cancelled.is_set():
+                return {}
+            progress("validating_source", 10)
+            try:
+                result = asyncio.run(reparse_job(job_id))
+            except HTTPException as error:
+                detail = error.detail
+                if isinstance(detail, dict):
+                    error_type = str(
+                        detail.get("status")
+                        or detail.get("code")
+                        or f"HTTP_{error.status_code}"
+                    )
+                    message = str(detail.get("message") or detail)
+                else:
+                    error_type = f"HTTP_{error.status_code}"
+                    message = str(detail)
+                raise TaskExecutionError(error_type, message) from error
+            progress("building_understanding", 90)
+            return result
+
+        return background_tasks.submit(
+            "document_reparse",
+            {"source_job_id": job_id},
+            operation,
+        )
+
+    @app.get("/api/v1/documents/jobs/{task_id}")
+    def get_document_task(task_id: str) -> dict[str, object]:
+        try:
+            return background_tasks.get(task_id)
+        except TaskNotFoundError as error:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "TASK_NOT_FOUND", "message": "Task not found."},
+            ) from error
+
+    @app.delete("/api/v1/documents/jobs/{task_id}")
+    def cancel_document_task(task_id: str) -> dict[str, object]:
+        try:
+            return background_tasks.cancel(task_id)
+        except TaskNotFoundError as error:
+            raise HTTPException(
+                status_code=404,
+                detail={"code": "TASK_NOT_FOUND", "message": "Task not found."},
+            ) from error
 
     @app.get("/api/v1/jobs/{job_id}/artifacts")
     def get_job_artifacts(job_id: str) -> dict[str, object]:
@@ -483,6 +640,8 @@ def create_app(
             raise HTTPException(status_code=404, detail="understanding_status not found.")
 
         status_content = _read_artifact_content(job, us_artifact.path)
+        if not isinstance(status_content, dict):
+            raise HTTPException(status_code=500, detail="understanding_status is not a JSON object.")
         status = status_content.get("status", "")
         blocking_reason = status_content.get("blocking_reason", "")
         paper_workspace_status = _paper_workspace_status(job, status_content)
@@ -647,7 +806,8 @@ def _try_register_m2_artifact_job(
     warnings = [
         WarningItem(code="M2_ARTIFACT_JOB", message="Registered existing M2 artifact run for PaperWorkspace display.")
     ]
-    for warning in status_content.get("warnings", []):
+    raw_warnings = status_content.get("warnings", [])
+    for warning in raw_warnings if isinstance(raw_warnings, list) else []:
         if isinstance(warning, dict):
             warnings.append(WarningItem(
                 code=str(warning.get("code") or "M2_WARNING"),
@@ -964,7 +1124,7 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
     }
 
 
-def _canonical_provider_name(name: str, providers: dict[str, object]) -> str:
+def _canonical_provider_name(name: str, providers: Mapping[str, object]) -> str:
     if name == "ccswitch" and "cc_switch" in providers:
         return "cc_switch"
     return name
@@ -1012,13 +1172,9 @@ def _model_options_for_provider(provider: object) -> list[dict[str, str]]:
     if _public_provider_name(str(getattr(provider, "name", "") or "")) == "ccswitch":
         for model in _ccswitch_current_provider_models():
             add(model, source="ccswitch 当前 provider")
-        for model in _ccswitch_live_models(str(getattr(provider, "base_url", "") or "")):
-            add(model.get("id"), label=model.get("label"), source="ccswitch 接口")
-        for model in _ccswitch_recent_models():
-            add(model, source="ccswitch 请求历史")
-        for model_id, label in _ccswitch_pricing_models():
-            add(model_id, label=label, source="ccswitch 模型库")
-    return options[:80]
+        for live_model in _ccswitch_live_models(str(getattr(provider, "base_url", "") or "")):
+            add(live_model.get("id"), label=live_model.get("label"), source="ccswitch 接口")
+    return options[:24]
 
 
 def _ccswitch_live_models(base_url: str) -> list[dict[str, str]]:
@@ -1311,6 +1467,16 @@ def _find_artifact(job: JobRecord, artifact_type: str) -> WorkspaceArtifact | No
     return None
 
 
+def _job_title_hint(job: JobRecord) -> str:
+    artifact = _find_artifact(job, "paper_card")
+    if artifact is None:
+        return ""
+    content = _read_artifact_content(job, artifact.path)
+    if isinstance(content, dict):
+        return str(content.get("title") or "").strip()
+    return ""
+
+
 def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dict[str, object]:
     status_content = understanding_status if isinstance(understanding_status, dict) else {}
     source_status = _artifact_content_dict(job, "source_status")
@@ -1323,6 +1489,12 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
         passage_index=passage_index,
     )
     component_status = status_content.get("component_status", {})
+    raw_degraded_flags = source_status.get("degraded_flags", [])
+    degraded_flags = (
+        [str(flag) for flag in raw_degraded_flags]
+        if isinstance(raw_degraded_flags, list)
+        else []
+    )
     source_type = str(source_status.get("source_type", "unknown"))
     source_resolved = source_status.get("status") == "resolved"
     m2_ready = canonical_status.get("m2_ready")
@@ -1344,7 +1516,7 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
         "m2_ready": m2_ready,
         "degradation_reason": (
             canonical_status.get("degradation_reason")
-            or "; ".join(source_status.get("degraded_flags", []))
+            or "; ".join(degraded_flags)
             or status_content.get("blocking_reason", "")
         ),
         "formula_origin": formula_origin,

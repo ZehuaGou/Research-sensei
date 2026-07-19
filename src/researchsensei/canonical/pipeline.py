@@ -118,8 +118,9 @@ class M1CanonicalPipeline:
             working_blocks = self.rule_refiner.refine(working_blocks)
 
         ollama_enabled = bool(apply_ollama and self.ollama_refiner is not None)
-        if ollama_enabled:
-            working_blocks = self.ollama_refiner.refine(working_blocks)
+        ollama_refiner = self.ollama_refiner
+        if ollama_enabled and ollama_refiner is not None:
+            working_blocks = ollama_refiner.refine(working_blocks)
 
         output_dir_path = Path(output_dir)
         slots = formula_slots if formula_slots is not None else self._slots_from_blocks(working_blocks)
@@ -150,7 +151,7 @@ class M1CanonicalPipeline:
 
         quality = self.quality_gate.evaluate(working_blocks, slots)
         elapsed = time.perf_counter() - start
-        metrics = {
+        metrics: dict[str, Any] = {
             "primary_parser": "mineru25pro",
             "ollama_enabled": ollama_enabled,
             "ollama_latex_requested": latex_requested,
@@ -204,7 +205,7 @@ class M1CanonicalPipeline:
             quality=quality,
             output_dir=output_dir,
             formula_slots=slots,
-            parser_name=metrics["primary_parser"],
+            parser_name=str(metrics["primary_parser"]),
             source_pdf_path=source_pdf_path,
             metrics=metrics,
         )
@@ -787,7 +788,8 @@ class M1CanonicalPipeline:
             return {"mineru_raw_payload_present": False}
 
         pages = raw_payload.get("pages")
-        stats = raw_payload.get("stats") if isinstance(raw_payload.get("stats"), dict) else {}
+        raw_stats = raw_payload.get("stats")
+        stats: dict[Any, Any] = raw_stats if isinstance(raw_stats, dict) else {}
         metrics: dict[str, Any] = {
             "mineru_raw_payload_present": True,
             "mineru_raw_payload_stats": stats,

@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, Callable
+from typing import Any
 
 import httpx
 
@@ -137,8 +137,9 @@ class ArxivCrosslink:
             return _strip_version(arxiv_id)
 
         # 3. Live OpenAlex lookup (opt-in)
-        if self.network_lookup and getattr(candidate, "doi", ""):
-            arxiv_id = self._api_lookup_doi(candidate.doi)
+        doi = str(getattr(candidate, "doi", "") or "")
+        if self.network_lookup and doi:
+            arxiv_id = self._api_lookup_doi(doi)
             if arxiv_id:
                 return _strip_version(arxiv_id)
 

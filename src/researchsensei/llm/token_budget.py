@@ -75,12 +75,13 @@ class TokenBudget:
         """
         target = target_input_tokens or self.max_input_tokens
         estimate = self.estimate_messages(messages)
-        if not estimate.over_budget:
+        effective_target = min(target, self.max_total_tokens - self.max_output_tokens)
+        if estimate.input_tokens <= effective_target:
             return messages
 
         # Don't truncate system message
         result = list(messages)
-        excess_chars = estimate.suggested_truncation
+        excess_chars = int((estimate.input_tokens - effective_target) * self.chars_per_token)
 
         # Find the longest non-system message and truncate it
         for i in range(len(result) - 1, -1, -1):

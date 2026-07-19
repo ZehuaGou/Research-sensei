@@ -97,4 +97,31 @@ describe('api client error contract', () => {
       detail: { code: 'RELEVANCE_GATE_FAILED', status: 'FAILED' },
     })
   })
+
+  it('polls the persistent document task until parsing succeeds', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response(202, {
+        job_id: 'doc-task', task_id: 'doc-task', kind: 'document_parse', status: 'PENDING',
+        stage: 'queued', progress: 0, result: {}, error_type: '', error: '',
+        cancel_requested: false, created_at: '', updated_at: '',
+      }))
+      .mockResolvedValueOnce(response(200, {
+        job_id: 'doc-task', task_id: 'doc-task', kind: 'document_parse', status: 'SUCCEEDED',
+        stage: 'completed', progress: 100, result: { job_id: 'paper-job' },
+        error_type: '', error: '', cancel_requested: false, created_at: '', updated_at: '',
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+    const progress: number[] = []
+
+    const pending = researchApi.parseDocumentAsync(new FormData(), task => progress.push(task.progress))
+    await vi.advanceTimersByTimeAsync(800)
+
+    await expect(pending).resolves.toEqual({ job_id: 'paper-job' })
+    expect(fetchMock.mock.calls.map(call => call[0])).toEqual([
+      '/api/v1/documents/jobs/parse',
+      '/api/v1/documents/jobs/doc-task',
+    ])
+    expect(progress).toEqual([0, 100])
+  })
 })

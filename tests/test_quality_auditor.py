@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 
 from researchsensei.audit.quality_auditor import QualityAuditor
 from researchsensei.schemas import (

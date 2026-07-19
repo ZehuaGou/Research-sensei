@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 
@@ -16,7 +16,11 @@ const arxivUrl = ref('')
 const m2ArtifactDir = ref('')
 const isDragging = ref(false)
 const isUploading = ref(false)
+const taskId = ref('')
+const taskStage = ref('')
+const taskProgress = ref(0)
 const error = ref('')
+const ACTIVE_TASK_KEY = 'researchsensei.uploadDocumentTask'
 interface SourceStatus {
   warnings?: string[]
   [key: string]: unknown
@@ -91,17 +95,73 @@ async function upload() {
   try {
     const formData = new FormData()
     appendFields(formData)
-    const data = await researchApi.parseDocument(formData)
+    const data = await researchApi.parseDocumentAsync(formData, updateTaskProgress)
+    clearActiveTask()
     await router.push(`/learn/${data.job_id}`)
   } catch (uploadError) {
     if (uploadError instanceof ApiClientError && uploadError.detail?.source_status && typeof uploadError.detail.source_status === 'object') {
       sourceStatus.value = uploadError.detail.source_status as SourceStatus
     }
     error.value = sourceStatus.value?.warnings?.join('，') || apiErrorMessage(uploadError, '深读任务创建失败。')
+    if (!isRecoverableTaskError(uploadError)) clearActiveTask()
   } finally {
     isUploading.value = false
   }
 }
+
+function updateTaskProgress(task: { task_id: string; stage: string; progress: number }) {
+  taskId.value = task.task_id
+  taskStage.value = task.stage
+  taskProgress.value = task.progress
+  window.localStorage.setItem(ACTIVE_TASK_KEY, task.task_id)
+}
+
+function clearActiveTask() {
+  taskId.value = ''
+  taskStage.value = ''
+  taskProgress.value = 0
+  window.localStorage.removeItem(ACTIVE_TASK_KEY)
+}
+
+async function resumeActiveTask(savedTaskId: string) {
+  isUploading.value = true
+  error.value = ''
+  try {
+    const data = await researchApi.resumeDocumentParseTask(savedTaskId, updateTaskProgress)
+    clearActiveTask()
+    await router.push(`/learn/${data.job_id}`)
+  } catch (resumeError) {
+    if (!isRecoverableTaskError(resumeError)) clearActiveTask()
+    error.value = apiErrorMessage(resumeError, '之前的深读任务无法恢复，请重新提交。')
+  } finally {
+    isUploading.value = false
+  }
+}
+
+function isRecoverableTaskError(value: unknown) {
+  return Boolean(
+    taskId.value
+    && value instanceof ApiClientError
+    && ['TIMEOUT', 'NETWORK_ERROR', 'CANCELLED'].includes(value.code),
+  )
+}
+
+async function cancelActiveTask() {
+  if (!taskId.value) return
+  const activeTaskId = taskId.value
+  clearActiveTask()
+  try {
+    await researchApi.cancelDocumentJob(activeTaskId)
+    error.value = '已请求取消后台深读任务。'
+  } catch (cancelError) {
+    error.value = apiErrorMessage(cancelError, '取消后台任务失败。')
+  }
+}
+
+onMounted(() => {
+  const savedTaskId = window.localStorage.getItem(ACTIVE_TASK_KEY)
+  if (savedTaskId) void resumeActiveTask(savedTaskId)
+})
 </script>
 
 <template>
@@ -198,6 +258,13 @@ async function upload() {
         >
           {{ isUploading ? '正在创建深读任务...' : '开始深读' }}
         </button>
+
+        <section v-if="isUploading && taskId" class="source-status" data-testid="document-task-progress">
+          <strong>后台深读 {{ taskProgress }}%</strong>
+          <span>阶段：{{ taskStage || 'queued' }}</span>
+          <span>任务：{{ taskId }}</span>
+          <button type="button" class="secondary-btn" @click="cancelActiveTask">取消任务</button>
+        </section>
 
         <section v-if="sourceStatus" class="source-status" data-testid="source-status">
           <strong>来源解析：{{ sourceStatus.status }}</strong>

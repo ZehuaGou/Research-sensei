@@ -243,6 +243,11 @@ onMounted(async () => {
   topbarTargetReady.value = Boolean(document.getElementById('workbench-topbar-center'))
   document.addEventListener('keydown', handleDialogKeys)
   await workspace.loadWorkspace()
+  const resumedJobId = await workspace.resumeReparseTask()
+  if (resumedJobId) {
+    window.location.assign(`/learn/${encodeURIComponent(resumedJobId)}`)
+    return
+  }
   activateFirstAvailableTab()
   await tabsState.restoreCurrentScroll()
 })
@@ -303,7 +308,7 @@ onBeforeUnmount(() => {
           </div>
           <div v-if="workspace.canShowCards.value" class="reader-actions">
             <button type="button" class="secondary-btn" :disabled="workspace.isReparsing.value" @click="reparseCurrentPaper">
-              {{ workspace.isReparsing.value ? '重新解析中' : '重新解析' }}
+              {{ workspace.isReparsing.value ? `重新解析 ${workspace.reparseProgress.value}% ${workspace.reparseStage.value}` : '重新解析' }}
             </button>
             <button
               v-if="!isAskPanelOpen"

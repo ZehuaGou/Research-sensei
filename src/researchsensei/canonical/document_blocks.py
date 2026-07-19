@@ -49,7 +49,7 @@ class CanonicalDocumentBlock(SenseiModel):
     @field_validator("page", mode="before")
     @classmethod
     def _normalize_page(cls, value: object) -> int:
-        page = int(value or 1)
+        page = int(str(value or 1))
         return max(page, 1)
 
     @field_validator("bbox", mode="before")

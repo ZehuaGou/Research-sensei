@@ -4,6 +4,7 @@ import logging
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from researchsensei.acquisition import (
     ArxivAdapter,
@@ -226,7 +227,7 @@ class DirectionRunner:
         self.workspace.write_json(run_dir / "reading_plan.json", reading_plan)
 
         # Always write a fresh summary so live eval never reads stale canonicalization data.
-        canon_summary = {
+        canon_summary: dict[str, Any] = {
             "total": len(canonicalization_results),
             "canonical_paper_generated_count": sum(1 for cr in canonicalization_results if cr.canonical_paper_path),
             "m2_ready_count": sum(1 for cr in canonicalization_results if cr.m2_ready),

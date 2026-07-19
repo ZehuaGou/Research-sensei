@@ -26,9 +26,12 @@ from researchsensei.paper_skeleton import build_paper_skeleton
 from researchsensei.parser.adapter import ParserAdapter
 from researchsensei.schemas import (
     ArtifactBundle,
+    BlockType,
     ClaimEvidenceBundle,
     DownstreamGates,
     EvidencePack,
+    DocumentBlock,
+    DocumentIngestion,
     JobRecord,
     JobStatus,
     PaperCard,
@@ -88,6 +91,7 @@ class SinglePaperIngestionRunner:
         job_id: str | None = None,
         source_status: SourceStatus | None = None,
         source_identity: str = "",
+        title_hint: str = "",
     ) -> JobRecord:
         source = Path(source_path)
         actual_job_id = job_id or source.stem
@@ -120,6 +124,7 @@ class SinglePaperIngestionRunner:
                 document = result.document
             else:
                 document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
+            document = _apply_title_hint(document, title_hint)
             passage_index = build_passage_index(document)
             claim_evidence = build_claim_evidence(document, passage_index)
             evidence_index = build_evidence_index(document)
@@ -534,6 +539,24 @@ class SinglePaperIngestionRunner:
             ".pdf": "application/pdf",
             ".tex": "text/x-tex",
         }.get(path.suffix.lower(), "")
+
+
+def _apply_title_hint(document: DocumentIngestion, title_hint: str) -> DocumentIngestion:
+    """Attach trusted request/library title metadata before skeleton construction."""
+    title = " ".join(str(title_hint or "").split()).strip()
+    if not title:
+        return document
+    title_block = DocumentBlock(
+        block_id="title-meta",
+        type=BlockType.TITLE,
+        text=title,
+        normalized_text=title.casefold(),
+        section="title",
+        evidence_ref=f"{document.paper_id}:title-meta",
+        block_source="request_metadata",
+    )
+    blocks = [block for block in document.blocks if block.type != BlockType.TITLE]
+    return document.model_copy(update={"blocks": [title_block, *blocks]})
 
 
 # ---------------------------------------------------------------------------

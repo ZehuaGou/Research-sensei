@@ -5,7 +5,6 @@ import re
 
 from researchsensei.llm.client import LLMClient, LLMResponseError, parse_llm_json
 from researchsensei.llm.prompt_builder import PromptBuilder
-from researchsensei.llm.types import ChatMessage
 from researchsensei.schemas import (
     BlockType,
     DocumentIngestion,

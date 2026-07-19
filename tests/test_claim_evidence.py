@@ -4,20 +4,15 @@ import json
 from pathlib import Path
 
 from researchsensei.evidence.claim_extractor import build_claim_evidence
-from researchsensei.evidence.passage_index import build_passage_index
-from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.schemas import (
-    BlockType,
     ClaimEvidence,
     ClaimEvidenceBundle,
     ClaimEvidenceRecord,
-    DocumentBlock,
     DocumentIngestion,
     EvidenceIndex,
     EvidenceType,
-    JobStatus,
     Passage,
     PassageIndex,
 )
@@ -333,7 +328,7 @@ def test_runner_writes_claim_evidence_artifact(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-ce")
+    runner.run(source, job_id="test-ce")
 
     claim_evidence_path = tmp_path / "workspace" / "runs" / "test-ce" / "claim_evidence.json"
     assert claim_evidence_path.exists()
@@ -368,7 +363,7 @@ def test_runner_evidence_index_still_exists(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-ei")
+    runner.run(source, job_id="test-ei")
 
     evidence_path = tmp_path / "workspace" / "runs" / "test-ei" / "evidence_index.json"
     assert evidence_path.exists()
@@ -382,7 +377,7 @@ def test_runner_card_artifacts_unchanged(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-cards")
+    runner.run(source, job_id="test-cards")
 
     run_dir = tmp_path / "workspace" / "runs" / "test-cards"
     assert (run_dir / "paper_card.json").exists()
@@ -399,7 +394,7 @@ def test_runner_claim_evidence_does_not_change_old_card_outputs(tmp_path: Path) 
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-unchanged")
+    runner.run(source, job_id="test-unchanged")
 
     run_dir = tmp_path / "workspace" / "runs" / "test-unchanged"
     card_data = json.loads((run_dir / "paper_card.json").read_text(encoding="utf-8"))

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from researchsensei.evidence.retriever import EvidenceRetriever, bm25_score, compute_idf, tokenize
-from researchsensei.schemas import EvidenceRetrievalResult, Passage, PassageIndex, WarningItem
+from researchsensei.schemas import EvidenceRetrievalResult, Passage, PassageIndex
 
 
 # ---------------------------------------------------------------------------

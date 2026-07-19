@@ -148,3 +148,21 @@ def test_paper_library_records_schema_version_and_wal(tmp_path: Path) -> None:
         assert conn.execute(
             "select version from schema_meta where component='paper_library'"
         ).fetchone()[0] == 1
+
+
+def test_paper_library_infers_aaai_venue_from_doi(tmp_path: Path) -> None:
+    db = PaperLibraryStore(tmp_path / "sensei.sqlite3")
+    pdf = tmp_path / "paper.pdf"
+    pdf.write_bytes(PDF_BYTES)
+    paper = _candidate(
+        venue="",
+        venue_canonical_name="",
+        venue_rank=VenueRank.UNRANKED,
+        doi="10.1609/aaai.v38i1.12345",
+    )
+
+    record = db.upsert_download(paper, _resolved(paper, pdf))
+
+    assert record is not None
+    assert record.venue_canonical_name == "AAAI"
+    assert record.venue_rank == VenueRank.A_STAR.value

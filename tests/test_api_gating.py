@@ -6,7 +6,10 @@ from pathlib import Path
 
 from starlette.testclient import TestClient
 
+from researchsensei.jobs import JobStore
+from researchsensei.schemas import JobRecord, JobStatus, WorkspaceArtifact
 from researchsensei.web.app import create_app
+from researchsensei.workspace import WorkspaceStore
 
 
 def _parse_sample(client: TestClient) -> str:
@@ -392,11 +395,6 @@ def test_health_endpoint_still_works(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Helpers for constructing test jobs
 # ---------------------------------------------------------------------------
-
-from researchsensei.jobs import JobStore
-from researchsensei.schemas import JobRecord, JobStatus, WorkspaceArtifact
-from researchsensei.workspace import WorkspaceStore
-
 
 def _write_json(workspace: WorkspaceStore, run_dir: Path, name: str, data: dict) -> Path:
     path = run_dir / name

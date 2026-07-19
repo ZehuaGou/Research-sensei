@@ -4,14 +4,12 @@ import json
 from pathlib import Path
 
 from researchsensei.evidence.passage_index import build_passage_index
-from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.ingestion.pipeline import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.schemas import (
     BlockType,
     DocumentBlock,
     DocumentIngestion,
-    JobStatus,
     Passage,
     PassageIndex,
     PassageIndexBuildConfig,
@@ -239,7 +237,7 @@ def test_runner_writes_passage_index_artifact(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-pi")
+    runner.run(source, job_id="test-pi")
 
     passage_index_path = tmp_path / "workspace" / "runs" / "test-pi" / "passage_index.json"
     assert passage_index_path.exists()
@@ -254,7 +252,7 @@ def test_runner_existing_evidence_index_still_exists(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-ei")
+    runner.run(source, job_id="test-ei")
 
     evidence_path = tmp_path / "workspace" / "runs" / "test-ei" / "evidence_index.json"
     assert evidence_path.exists()
@@ -287,7 +285,7 @@ def test_runner_card_artifacts_unchanged(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-cards")
+    runner.run(source, job_id="test-cards")
 
     run_dir = tmp_path / "workspace" / "runs" / "test-cards"
     card_path = run_dir / "paper_card.json"

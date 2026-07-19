@@ -42,6 +42,9 @@ def test_library_api_imports_manifest_and_deletes_paper(tmp_path: Path) -> None:
     assert response.status_code == 200
     papers = response.json()["papers"]
     assert len(papers) == 1
+    assert response.json()["total"] == 1
+    assert response.json()["limit"] == 100
+    assert response.json()["offset"] == 0
     assert papers[0]["title"] == "Manifest Imported Paper"
     assert papers[0]["local_path"] == str(pdf.resolve())
 
@@ -50,3 +53,7 @@ def test_library_api_imports_manifest_and_deletes_paper(tmp_path: Path) -> None:
     assert delete_response.status_code == 200
     assert delete_response.json()["status"] == "DELETED"
     assert not pdf.exists()
+
+    empty_page = client.get("/api/v1/library/papers?limit=1&offset=1")
+    assert empty_page.status_code == 200
+    assert empty_page.json()["papers"] == []

@@ -309,7 +309,7 @@ def _search_rank(candidate: CandidatePaper, *, fallback: int) -> int:
     for key in ("search_rank", "rank", "download_queue_rank"):
         value = metadata.get(key)
         try:
-            rank = int(value)  # type: ignore[arg-type]
+            rank = int(str(value))
         except (TypeError, ValueError):
             continue
         if rank > 0:

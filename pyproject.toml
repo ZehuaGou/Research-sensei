@@ -55,14 +55,7 @@ select = ["E4", "E7", "E9", "F"]
 
 [tool.mypy]
 python_version = "3.10"
-files = [
-  "src/researchsensei/core/config.py",
-  "src/researchsensei/core/sqlite.py",
-  "src/researchsensei/relevance.py",
-  "src/researchsensei/web/request_models.py",
-  "src/researchsensei/web/services/upload_service.py",
-  "src/researchsensei/web/services/task_service.py",
-]
+files = ["src/researchsensei"]
 follow_imports = "skip"
 ignore_missing_imports = true
 check_untyped_defs = true

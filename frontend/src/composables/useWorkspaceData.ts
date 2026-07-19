@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
-import { ApiClientError, apiErrorMessage, workspaceApi } from '../api/client'
+import { ApiClientError, apiErrorMessage, researchApi, workspaceApi } from '../api/client'
 import type {
   FormulaCard,
   PaperWorkspaceStatus,
@@ -7,6 +7,7 @@ import type {
   UnderstandingStatus,
   WorkspaceCards,
 } from '../types/workspace'
+import type { ReparseResponse } from '../types/workspace'
 import { isUsableFormulaCard } from '../utils/workspaceCards'
 
 export function useWorkspaceData(jobId: string) {
@@ -17,9 +18,12 @@ export function useWorkspaceData(jobId: string) {
   const missingComponents = ref<string[]>([])
   const isLoading = ref(true)
   const isReparsing = ref(false)
+  const reparseProgress = ref(0)
+  const reparseStage = ref('')
   const error = ref('')
   let loadController: AbortController | null = null
   let reparseController: AbortController | null = null
+  const reparseTaskKey = `researchsensei.reparseTask.${jobId}`
 
   const status = computed(() => understandingStatus.value?.status || '')
   const canShowCards = computed(() => ['SUCCESS', 'DEGRADED_STRUCTURAL'].includes(status.value))
@@ -95,12 +99,18 @@ export function useWorkspaceData(jobId: string) {
     isReparsing.value = true
     error.value = ''
     try {
-      const result = await workspaceApi.reparse(jobId, controller.signal)
+      const result = await workspaceApi.reparse(jobId, controller.signal, task => {
+        reparseProgress.value = task.progress
+        reparseStage.value = task.stage
+        window.localStorage.setItem(reparseTaskKey, task.task_id)
+      })
+      window.localStorage.removeItem(reparseTaskKey)
       return result.job_id
     } catch (reparseError) {
       if (!(reparseError instanceof ApiClientError && reparseError.code === 'CANCELLED')) {
         error.value = apiErrorMessage(reparseError, '重新解析任务创建失败。')
       }
+      if (!isRecoverableTaskError(reparseError)) window.localStorage.removeItem(reparseTaskKey)
       return null
     } finally {
       if (reparseController === controller) {
@@ -108,6 +118,31 @@ export function useWorkspaceData(jobId: string) {
         reparseController = null
       }
     }
+  }
+
+  async function resumeReparseTask() {
+    const taskId = window.localStorage.getItem(reparseTaskKey)
+    if (!taskId || isReparsing.value) return null
+    isReparsing.value = true
+    try {
+      const result = await researchApi.resumeDocumentTask<ReparseResponse>(taskId, task => {
+        reparseProgress.value = task.progress
+        reparseStage.value = task.stage
+      })
+      window.localStorage.removeItem(reparseTaskKey)
+      return result.job_id
+    } catch (resumeError) {
+      if (!isRecoverableTaskError(resumeError)) window.localStorage.removeItem(reparseTaskKey)
+      error.value = apiErrorMessage(resumeError, '之前的重新解析任务无法恢复。')
+      return null
+    } finally {
+      isReparsing.value = false
+    }
+  }
+
+  function isRecoverableTaskError(value: unknown) {
+    return value instanceof ApiClientError
+      && ['TIMEOUT', 'NETWORK_ERROR', 'CANCELLED'].includes(value.code)
   }
 
   onBeforeUnmount(() => {
@@ -123,6 +158,8 @@ export function useWorkspaceData(jobId: string) {
     missingComponents,
     isLoading,
     isReparsing,
+    reparseProgress,
+    reparseStage,
     error,
     status,
     canShowCards,
@@ -133,5 +170,6 @@ export function useWorkspaceData(jobId: string) {
     hiddenRawFormulaCount,
     loadWorkspace,
     reparseCurrentPaper,
+    resumeReparseTask,
   }
 }

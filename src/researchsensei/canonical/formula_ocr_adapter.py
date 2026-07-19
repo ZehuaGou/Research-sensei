@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import time
 from pathlib import Path
+from typing import Any
 
 from researchsensei.schemas.canonical import FormulaOcrResult
 from researchsensei.schemas.enums import FormulaOrigin, FormulaOcrStatus
@@ -41,7 +42,7 @@ class FormulaOCRAdapter:
         self.max_batch = max_batch
         self.timeout_seconds = timeout_seconds
         self._ocr_count = 0
-        self._model = None
+        self._model: Any | None = None
         self._model_load_attempted = False
 
     def ocr(
@@ -211,12 +212,13 @@ class FormulaOCRAdapter:
 
     def _run_ocr(self, image) -> str:
         """Run OCR on an image."""
-        if hasattr(self._model, "latexocr"):
+        model = self._model
+        if model is not None and hasattr(model, "latexocr"):
             # pix2tex interface
-            return self._model.latexocr(image)
-        elif callable(self._model):
+            return model.latexocr(image)
+        elif callable(model):
             # Direct callable interface
-            return self._model(image)
+            return model(image)
         else:
             raise RuntimeError("OCR model has no callable interface.")
 

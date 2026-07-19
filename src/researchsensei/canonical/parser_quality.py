@@ -57,7 +57,7 @@ def score_parser_output(text: str, parser_name: str) -> ParserQualityScore:
 
     # Calculate spacing quality
     lines = text.split('\n')
-    non_empty_lines = [l for l in lines if l.strip()]
+    non_empty_lines = [line for line in lines if line.strip()]
     if non_empty_lines:
         # Check average word length (concatenated text has very long "words")
         words = re.findall(r'[A-Za-z]+', text)
@@ -73,7 +73,7 @@ def score_parser_output(text: str, parser_name: str) -> ParserQualityScore:
 
     # Calculate garbled line ratio
     if non_empty_lines:
-        garbled = sum(1 for l in non_empty_lines if _is_garbled_line(l))
+        garbled = sum(1 for line in non_empty_lines if _is_garbled_line(line))
         score.garbled_line_ratio = garbled / len(non_empty_lines)
 
     # Calculate overall score

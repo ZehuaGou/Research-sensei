@@ -7,12 +7,18 @@ import type { LibraryPaper, SearchRun } from '../types/api'
 const query = ref('')
 const papers = ref<LibraryPaper[]>([])
 const searchRuns = ref<SearchRun[]>([])
+const totalPapers = ref(0)
+const page = ref(1)
+const pageSize = 30
 const loading = ref(false)
 const deletingId = ref('')
 const openingId = ref('')
 const error = ref('')
 const message = ref('')
 const router = useRouter()
+const openingProgress = ref(0)
+const openingStage = ref('')
+const pageCount = computed(() => Math.max(1, Math.ceil(totalPapers.value / pageSize)))
 
 const totalSizeMb = computed(() => {
   const total = papers.value.reduce((sum, paper) => sum + Number(paper.file_size || 0), 0)
@@ -31,13 +37,25 @@ async function loadPapers() {
   loading.value = true
   error.value = ''
   try {
-    const data = await researchApi.listLibraryPapers(query.value.trim(), 200)
+    const data = await researchApi.listLibraryPapers(query.value.trim(), pageSize, undefined, (page.value - 1) * pageSize)
     papers.value = Array.isArray(data.papers) ? data.papers : []
+    totalPapers.value = Number(data.total || 0)
   } catch (loadError) {
     error.value = apiErrorMessage(loadError, 'Failed to reach the backend paper library API.')
   } finally {
     loading.value = false
   }
+}
+
+async function searchPapers() {
+  page.value = 1
+  await loadPapers()
+}
+
+async function changePage(nextPage: number) {
+  if (nextPage < 1 || nextPage > pageCount.value || loading.value) return
+  page.value = nextPage
+  await loadPapers()
 }
 
 async function loadSearchRuns() {
@@ -60,6 +78,7 @@ async function removePaper(paper: LibraryPaper) {
   try {
     await researchApi.deleteLibraryPaper(paper.paper_id)
     papers.value = papers.value.filter(item => item.paper_id !== paper.paper_id)
+    totalPapers.value = Math.max(0, totalPapers.value - 1)
     message.value = 'Paper removed from the local library.'
     await loadSearchRuns()
   } catch (deleteError) {
@@ -78,12 +97,17 @@ async function openPaperWorkspace(paper: LibraryPaper) {
     const form = new FormData()
     form.append('local_path', paper.local_path)
     form.append('title', paper.title || '')
-    const data = await researchApi.parseDocument(form)
+    const data = await researchApi.parseDocumentAsync(form, task => {
+      openingProgress.value = task.progress
+      openingStage.value = task.stage
+    })
     await router.push(`/learn/${data.job_id}`)
   } catch (openError) {
     error.value = parseOpenError(openError)
   } finally {
     openingId.value = ''
+    openingProgress.value = 0
+    openingStage.value = ''
   }
 }
 
@@ -133,14 +157,14 @@ function formatDate(value: string | undefined) {
         </p>
       </div>
       <div class="stats surface">
-        <span>{{ papers.length }}</span>
+        <span>{{ totalPapers }}</span>
         <small>papers</small>
         <span>{{ totalSizeMb }} MB</span>
-        <small>local files</small>
+        <small>this page</small>
       </div>
     </section>
 
-    <form class="toolbar surface" @submit.prevent="loadPapers">
+    <form class="toolbar surface" @submit.prevent="searchPapers">
       <input
         v-model="query"
         data-testid="library-query"
@@ -182,7 +206,7 @@ function formatDate(value: string | undefined) {
             :disabled="!paper.local_path || openingId === paper.paper_id"
             @click="openPaperWorkspace(paper)"
           >
-            {{ openingId === paper.paper_id ? 'Opening...' : 'Analyze' }}
+            {{ openingId === paper.paper_id ? `${openingProgress}% ${openingStage}` : 'Analyze' }}
           </button>
           <button
             type="button"
@@ -199,6 +223,12 @@ function formatDate(value: string | undefined) {
         No downloaded papers are in the local library yet.
       </div>
     </section>
+
+    <nav v-if="totalPapers > pageSize" class="pagination surface" aria-label="Paper library pages">
+      <button type="button" class="secondary-btn" :disabled="page <= 1 || loading" @click="changePage(page - 1)">上一页</button>
+      <span>第 {{ page }} / {{ pageCount }} 页，共 {{ totalPapers }} 篇</span>
+      <button type="button" class="secondary-btn" :disabled="page >= pageCount || loading" @click="changePage(page + 1)">下一页</button>
+    </nav>
 
     <section class="runs surface" data-testid="library-runs">
       <header>
@@ -223,6 +253,17 @@ function formatDate(value: string | undefined) {
   width: min(1040px, calc(100vw - 36px));
   margin: 0 auto;
   padding: 34px 0 60px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 18px 0;
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .library-head {

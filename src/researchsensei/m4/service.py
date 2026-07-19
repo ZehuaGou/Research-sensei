@@ -8,7 +8,6 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
 
 from researchsensei.llm.client import LLMClient, LLMClientError
 from researchsensei.llm.types import ChatMessage, LLMConfig
@@ -572,8 +571,13 @@ class M4InteractionService:
             ChatMessage(role="user", content=json.dumps(prompt, ensure_ascii=False)),
         ]
         try:
+            chat_json = getattr(
+                self.llm_client,
+                "chat_json_with_repair",
+                self.llm_client.chat_json,
+            )
             data = _run_async_llm(
-                self.llm_client.chat_json(
+                chat_json(
                     messages,
                     config=LLMConfig(
                         temperature=0.15,
@@ -587,7 +591,18 @@ class M4InteractionService:
                 )
             )
         except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
-            return _llm_error_result("M4_LLM_REQUEST_FAILED", _compact_user_text(str(exc), max_chars=800))
+            error_text = str(exc).lower()
+            if "json" in error_text or "parse" in error_text:
+                return _llm_error_result(
+                    "M4_LLM_INVALID_JSON",
+                    "模型连续两次返回了无法验证的结构化格式；原始输出已隐藏。",
+                )
+            if "timeout" in error_text or "timed out" in error_text:
+                return _llm_error_result("M4_LLM_TIMEOUT", "模型服务响应超时，请稍后重试。")
+            return _llm_error_result(
+                "M4_LLM_REQUEST_FAILED",
+                "模型服务请求失败；详细响应未向界面暴露。",
+            )
         if not isinstance(data, dict):
             return _llm_error_result("M4_LLM_INVALID_STRUCTURE", "LLM 没有返回 claim 结构。")
 
@@ -1587,9 +1602,9 @@ def _grounding_terms(value: str) -> set[str]:
 
 def _llm_failure_answer(*, code: str, message: str) -> str:
     return (
-        "M4 这次没有拿到可用的大模型解释，所以没有改用本地卡片兜底。\n\n"
+        "M4 这次没有拿到可用的大模型解释：返回内容未通过证据验证，因此没有改用本地卡片兜底，也没有展示未经校验的内容。\n\n"
         f"失败原因：{code}。{message}\n\n"
-        "你可以先点“新对话/清空记忆”清掉这篇论文的 M4 记忆；如果是公式卡片解析失败，建议重新解析论文，让公式卡片重新走一次 LLM。"
+        "可以直接重试当前问题；若持续失败，请到设置页检查模型连接或切换模型。"
     )
 
 

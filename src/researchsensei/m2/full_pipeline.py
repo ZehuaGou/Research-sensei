@@ -32,7 +32,6 @@ from researchsensei.schemas import (
     FormulaCardBundle,
     QualityReport,
     SourceStatus,
-    TeachingCardBundle,
     UnderstandingStatus,
     WarningItem,
 )

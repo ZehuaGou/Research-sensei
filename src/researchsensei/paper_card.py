@@ -284,7 +284,7 @@ def _summary_phrase(text: str, title: str = "", *, limit: int) -> str:
 
 
 def _keywords(text: str, title: str = "") -> list[str]:
-    candidates = []
+    candidates: list[str] = []
     combined = f"{title} {text}"
     case_sensitive_patterns = (
         r"\b[A-Z][A-Z0-9-]{2,}\b",

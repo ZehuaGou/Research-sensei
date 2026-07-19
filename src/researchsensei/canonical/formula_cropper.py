@@ -6,9 +6,11 @@ Bbox coordinates are in PDF points (1/72 inch), which is exactly what PyMuPDF us
 from __future__ import annotations
 
 import logging
+from importlib.util import find_spec
 from pathlib import Path
 
 from researchsensei.schemas.canonical import FormulaSlot
+from researchsensei.schemas.enums import FormulaOcrStatus
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +31,7 @@ class FormulaCropper:
         self.dpi = dpi
 
     def is_available(self) -> bool:
-        try:
-            import fitz
-            return True
-        except ImportError:
-            return False
+        return find_spec("fitz") is not None
 
     def crop(
         self,
@@ -75,13 +73,13 @@ class FormulaCropper:
         try:
             for slot in slots:
                 if not slot.bbox or len(slot.bbox) != 4:
-                    slot.ocr_status = "skipped_by_policy"
+                    slot.ocr_status = FormulaOcrStatus.SKIPPED_BY_POLICY
                     slot.unresolved_reason = "invalid_bbox"
                     continue
 
                 page_num = slot.page
                 if page_num < 0 or page_num >= len(doc):
-                    slot.ocr_status = "skipped_by_policy"
+                    slot.ocr_status = FormulaOcrStatus.SKIPPED_BY_POLICY
                     slot.unresolved_reason = f"page_{page_num}_out_of_range"
                     continue
 
@@ -89,14 +87,14 @@ class FormulaCropper:
                     crop_path = self._crop_one(doc, page_num, slot, output_dir)
                     if crop_path:
                         slot.crop_path = str(crop_path.relative_to(output_dir))
-                        slot.ocr_status = "cropped"
+                        slot.ocr_status = FormulaOcrStatus.CROPPED
                         cropped_count += 1
                     else:
-                        slot.ocr_status = "skipped_by_policy"
+                        slot.ocr_status = FormulaOcrStatus.SKIPPED_BY_POLICY
                         slot.unresolved_reason = "crop_failed"
                 except Exception as exc:
                     logger.warning("Crop failed for %s: %s", slot.formula_id, exc)
-                    slot.ocr_status = "skipped_by_policy"
+                    slot.ocr_status = FormulaOcrStatus.SKIPPED_BY_POLICY
                     slot.unresolved_reason = f"crop_error: {type(exc).__name__}"
         finally:
             doc.close()

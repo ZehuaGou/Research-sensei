@@ -29,6 +29,8 @@ import type {
 const DEFAULT_TIMEOUT_MS = 20_000
 const DIRECTION_TASK_POLL_MS = 250
 const DIRECTION_TASK_TIMEOUT_MS = 180_000
+const DOCUMENT_TASK_POLL_MS = 750
+const DOCUMENT_TASK_TIMEOUT_MS = 15 * 60_000
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   body?: BodyInit | object
@@ -177,8 +179,18 @@ export const workspaceApi: WorkspaceApi = {
   getCards(jobId, signal) {
     return apiRequest<CardsResponse>(jobPath(jobId, 'cards'), { signal })
   },
-  reparse(jobId, signal) {
-    return apiRequest<ReparseResponse>(jobPath(jobId, 'reparse'), { method: 'POST', signal, timeoutMs: 30_000 })
+  reparse(jobId, signal, onProgress) {
+    return waitForSubmittedTask<ReparseResponse>(
+      apiRequest<DirectionTask<ReparseResponse>>(`/api/v1/documents/jobs/${encodeURIComponent(jobId)}/reparse`, {
+        method: 'POST',
+        signal,
+      }),
+      taskId => researchApi.getDocumentJob<ReparseResponse>(taskId, signal),
+      onProgress,
+      signal,
+      DOCUMENT_TASK_POLL_MS,
+      DOCUMENT_TASK_TIMEOUT_MS,
+    )
   },
   getMemory(jobId, signal) {
     return apiRequest<MemoryResponse>(jobPath(jobId, 'memory'), { signal })
@@ -222,8 +234,8 @@ export const researchApi = {
   async deleteJob(jobId: string, signal?: AbortSignal) {
     await apiRequest<void>(`/api/v1/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE', signal })
   },
-  listLibraryPapers(query: string, limit: number, signal?: AbortSignal) {
-    const params = new URLSearchParams({ query, limit: String(limit) })
+  listLibraryPapers(query: string, limit: number, signal?: AbortSignal, offset = 0) {
+    const params = new URLSearchParams({ query, limit: String(limit), offset: String(offset) })
     return apiRequest<LibraryPapersResponse>(`/api/v1/library/papers?${params.toString()}`, { signal })
   },
   listSearchRuns(limit: number, signal?: AbortSignal) {
@@ -239,6 +251,67 @@ export const researchApi = {
       signal,
       timeoutMs: 120_000,
     })
+  },
+  createDocumentParseJob(form: FormData, signal?: AbortSignal) {
+    return apiRequest<DirectionTask<DocumentParseResponse>>('/api/v1/documents/jobs/parse', {
+      method: 'POST',
+      body: form,
+      signal,
+      timeoutMs: 60_000,
+    })
+  },
+  getDocumentJob<T = Record<string, unknown>>(taskId: string, signal?: AbortSignal) {
+    return apiRequest<DirectionTask<T>>(`/api/v1/documents/jobs/${encodeURIComponent(taskId)}`, { signal })
+  },
+  cancelDocumentJob(taskId: string, signal?: AbortSignal) {
+    return apiRequest<DirectionTask>(`/api/v1/documents/jobs/${encodeURIComponent(taskId)}`, {
+      method: 'DELETE',
+      signal,
+    })
+  },
+  async parseDocumentAsync(
+    form: FormData,
+    onProgress?: (task: DirectionTask<DocumentParseResponse>) => void,
+    signal?: AbortSignal,
+  ) {
+    return waitForSubmittedTask(
+      this.createDocumentParseJob(form, signal),
+      taskId => this.getDocumentJob<DocumentParseResponse>(taskId, signal),
+      onProgress,
+      signal,
+      DOCUMENT_TASK_POLL_MS,
+      DOCUMENT_TASK_TIMEOUT_MS,
+    )
+  },
+  async resumeDocumentParseTask(
+    taskId: string,
+    onProgress?: (task: DirectionTask<DocumentParseResponse>) => void,
+    signal?: AbortSignal,
+  ) {
+    const task = await this.getDocumentJob<DocumentParseResponse>(taskId, signal)
+    return waitForTask(
+      task,
+      id => this.getDocumentJob<DocumentParseResponse>(id, signal),
+      onProgress,
+      signal,
+      DOCUMENT_TASK_POLL_MS,
+      DOCUMENT_TASK_TIMEOUT_MS,
+    )
+  },
+  async resumeDocumentTask<T>(
+    taskId: string,
+    onProgress?: (task: DirectionTask<T>) => void,
+    signal?: AbortSignal,
+  ) {
+    const task = await this.getDocumentJob<T>(taskId, signal)
+    return waitForTask(
+      task,
+      id => this.getDocumentJob<T>(id, signal),
+      onProgress,
+      signal,
+      DOCUMENT_TASK_POLL_MS,
+      DOCUMENT_TASK_TIMEOUT_MS,
+    )
   },
   searchDirections(query: string, signal?: AbortSignal) {
     return apiRequest<DirectionResponse>('/api/v1/directions/search', {
@@ -278,7 +351,7 @@ export const researchApi = {
   ) {
     const task = await this.createDirectionSearchJob(query, signal)
     if (!isDirectionTask(task)) return task as unknown as DirectionResponse
-    return waitForDirectionTask(task, onProgress, signal)
+    return waitForTask(task, id => this.getDirectionJob<DirectionResponse>(id, signal), onProgress, signal)
   },
   expandSeed(seed: DirectionCandidate, signal?: AbortSignal) {
     return apiRequest<DirectionResponse>('/api/v1/directions/seed_expansion', {
@@ -303,7 +376,7 @@ export const researchApi = {
   ) {
     const task = await this.createDirectionDeepReadJob(candidate, signal)
     if (!isDirectionTask(task)) return task as unknown as DocumentParseResponse
-    return waitForDirectionTask(task, onProgress, signal)
+    return waitForTask(task, id => this.getDirectionJob<DocumentParseResponse>(id, signal), onProgress, signal)
   },
   getSettings(signal?: AbortSignal) {
     return apiRequest<SettingsPayload>('/api/v1/settings', { signal })
@@ -324,10 +397,26 @@ function isDirectionTask(value: unknown): value is DirectionTask<never> {
     && typeof task.status === 'string'
 }
 
-async function waitForDirectionTask<T>(
-  initialTask: DirectionTask<T>,
+async function waitForSubmittedTask<T>(
+  submission: Promise<DirectionTask<T>>,
+  getTask: (taskId: string) => Promise<DirectionTask<T>>,
   onProgress?: (task: DirectionTask<T>) => void,
   signal?: AbortSignal,
+  pollMs = DIRECTION_TASK_POLL_MS,
+  timeoutMs = DIRECTION_TASK_TIMEOUT_MS,
+): Promise<T> {
+  const task = await submission
+  if (!isDirectionTask(task)) return task as unknown as T
+  return waitForTask(task, getTask, onProgress, signal, pollMs, timeoutMs)
+}
+
+async function waitForTask<T>(
+  initialTask: DirectionTask<T>,
+  getTask: (taskId: string) => Promise<DirectionTask<T>>,
+  onProgress?: (task: DirectionTask<T>) => void,
+  signal?: AbortSignal,
+  pollMs = DIRECTION_TASK_POLL_MS,
+  timeoutMs = DIRECTION_TASK_TIMEOUT_MS,
 ): Promise<T> {
   const startedAt = Date.now()
   let task = initialTask
@@ -350,11 +439,11 @@ async function waitForDirectionTask<T>(
     if (signal?.aborted) {
       throw new ApiClientError({ code: 'CANCELLED', message: '请求已取消。' })
     }
-    if (Date.now() - startedAt >= DIRECTION_TASK_TIMEOUT_MS) {
+    if (Date.now() - startedAt >= timeoutMs) {
       throw new ApiClientError({ code: 'TIMEOUT', message: '后台任务超时，请稍后重试。' })
     }
-    await pollDelay(DIRECTION_TASK_POLL_MS, signal)
-    task = await researchApi.getDirectionJob<T>(task.task_id, signal)
+    await pollDelay(pollMs, signal)
+    task = await getTask(task.task_id)
   }
 }
 

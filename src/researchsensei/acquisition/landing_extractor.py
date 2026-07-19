@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from dataclasses import dataclass
 from typing import Callable
 from urllib.parse import urljoin
@@ -146,7 +145,6 @@ class LandingPdfExtractor:
         html = resp.text
         base_url = str(resp.url)
         extractor = _EXTRACTOR_REGISTRY.get(archive_kind, _generic_extract)
-        extracted_via = ""
         try:
             url = extractor(html=html, base_url=base_url, archive_kind=archive_kind)
         except Exception as exc:

@@ -36,6 +36,7 @@ describe('UploadView', () => {
     await flushPromises()
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/documents/jobs/parse')
     const body = fetchMock.mock.calls[0][1].body as FormData
     expect(body.get('pdf_url')).toBe('https://example.org/paper.pdf')
     expect(routerMock.push).toHaveBeenCalledWith('/learn/job-url')

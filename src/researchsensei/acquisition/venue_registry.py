@@ -20,7 +20,7 @@ search falls back to free-text search when no source IDs are present.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable
 
 from researchsensei.schemas.enums import VenueRank

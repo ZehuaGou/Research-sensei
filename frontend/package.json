@@ -13,8 +13,8 @@
     "build": "vue-tsc -b && vite build",
     "typecheck": "vue-tsc -b",
     "preview": "vite preview",
-    "test": "vitest run --exclude e2e/**",
-    "test:watch": "vitest --exclude e2e/**",
+    "test": "vitest run --exclude \"e2e/**\"",
+    "test:watch": "vitest --exclude \"e2e/**\"",
     "test:e2e": "playwright test --grep-invert @live",
     "test:e2e:live": "playwright test --grep @live"
   },

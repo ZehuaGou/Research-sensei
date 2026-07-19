@@ -69,7 +69,7 @@ def create_directions_router(
         force = payload.force
         if candidate.get("relevance_gate_evaluated") is True:
             deep_read_passed = candidate.get("deep_read_relevance_passed")
-            score = float(candidate.get("rule_relevance_score") or 0.0)
+            score = float(str(candidate.get("rule_relevance_score") or 0.0))
             if (
                 candidate.get("relevance_gate_passed") is not True
                 or deep_read_passed is False
@@ -151,6 +151,7 @@ def create_directions_router(
             job_id=job_id,
             source_status=source_status,
             source_identity=identity,
+            title_hint=title,
         )
         if job.status == JobStatus.FAILED:
             raise HTTPException(

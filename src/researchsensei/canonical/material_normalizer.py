@@ -23,14 +23,12 @@ from researchsensei.schemas.canonical import (
     FormulaBlock,
     FormulaSlot,
 )
-from researchsensei.schemas.common import WarningItem
 from researchsensei.schemas.direction import CandidatePaper, ResolvedPaperSource
 from researchsensei.schemas.enums import (
     AdapterStatus,
     CanonicalQualityStatus,
     CanonicalizationStatus,
     FormulaOrigin,
-    FormulaOcrStatus,
     PaperSourceStatus,
     SourcePriority,
 )
@@ -450,7 +448,7 @@ class MaterialNormalizer:
         Only triggers Marker if quality is low and paper is high priority.
         """
         from researchsensei.canonical.adapters import MarkItDownAdapter, MarkerPdfAdapter
-        from researchsensei.canonical.parser_quality import select_best_parser, extract_formula_candidates
+        from researchsensei.canonical.parser_quality import select_best_parser
 
         warnings: list[str] = []
         formula_blocks: list[FormulaBlock] = []
@@ -814,7 +812,7 @@ class MaterialNormalizer:
                 lines.append("")
             # Append formulas that belong to this section
             if section_name in formulas_by_section:
-                lines.append(f"### Formula Slots")
+                lines.append("### Formula Slots")
                 lines.append("")
                 for fs in formulas_by_section[section_name]:
                     lines.extend(_render_formula_slot(fs))
@@ -838,7 +836,7 @@ class MaterialNormalizer:
                 lines.append(content)
                 lines.append("")
                 if section_name in formulas_by_section:
-                    lines.append(f"### Formula Slots")
+                    lines.append("### Formula Slots")
                     lines.append("")
                     for fs in formulas_by_section[section_name]:
                         lines.extend(_render_formula_slot(fs))
@@ -870,7 +868,7 @@ class MaterialNormalizer:
                     lines.append(fb.latex)
                     lines.append("```")
                 else:
-                    lines.append(f"<!-- No formula content -->")
+                    lines.append("<!-- No formula content -->")
                 lines.append("")
 
         return "\n".join(lines)
@@ -1158,7 +1156,7 @@ class MaterialNormalizer:
             logger.warning("Failed to scan PDF pages: %s", exc)
 
         # Sort by density and return
-        results.sort(key=lambda x: x["density"], reverse=True)
+        results.sort(key=lambda row: float(str(row.get("density") or 0.0)), reverse=True)
         return results
 
     def _get_page_text(self, text: str, page_num: int) -> str:
@@ -1489,7 +1487,7 @@ class MaterialNormalizer:
                     lines.append("```")
                 else:
                     # Unknown/empty - skip
-                    lines.append(f"<!-- No formula content -->")
+                    lines.append("<!-- No formula content -->")
                 lines.append("")
 
         return "\n".join(lines)
@@ -1556,7 +1554,10 @@ class MaterialNormalizer:
 
         # PyMuPDF
         try:
-            import fitz
+            from importlib.util import find_spec
+
+            if find_spec("fitz") is None:
+                raise ImportError
             adapters.append(AdapterInfo(
                 name="pymupdf",
                 status=AdapterStatus.IMPLEMENTED,
@@ -1727,7 +1728,6 @@ def _find_matching_text_formula(
     if not page_formulas or not slot.bbox:
         return None
 
-    slot_area = _bbox_area(slot.bbox)
     best_match = None
     best_overlap = 0.0
 

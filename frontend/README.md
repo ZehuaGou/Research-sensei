@@ -19,7 +19,7 @@ The Vite dev server runs on port `13000` and proxies `/api` and `/ws` to
 Start the backend from the repository root:
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn "researchsensei.web.app:create_app" --factory --host 127.0.0.1 --port 8765
+.venv\Scripts\python.exe -m researchsensei serve
 ```
 
 ## UI Contract

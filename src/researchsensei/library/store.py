@@ -12,6 +12,7 @@ from pathlib import Path
 from researchsensei.core.sqlite import connect_sqlite
 from researchsensei.schemas import CandidatePaper, ResolvedPaperSource
 from researchsensei.schemas.enums import VenueRank
+from researchsensei.selection.venue_rankings import venue_config_for_paper
 
 
 @dataclass(frozen=True)
@@ -139,7 +140,14 @@ class PaperLibraryStore:
         title = candidate.title or item.title
         authors = candidate.authors
         year = candidate.year
+        venue_config = venue_config_for_paper(candidate)
+        venue = candidate.venue or (venue_config.canonical_name if venue_config is not None else "")
+        venue_canonical_name = candidate.venue_canonical_name or (
+            venue_config.canonical_name if venue_config is not None else ""
+        )
         venue_rank = _venue_rank_value(candidate.venue_rank)
+        if venue_rank == VenueRank.UNRANKED.value and venue_config is not None:
+            venue_rank = _venue_rank_value(venue_config.rank)
         pdf_url = item.pdf_url or candidate.pdf_url
         landing_url = item.landing_url or candidate.landing_url or candidate.url
         source_url = item.source_url or candidate.source_url or pdf_url or landing_url
@@ -181,8 +189,8 @@ class PaperLibraryStore:
                     normalized_title,
                     json.dumps(authors, ensure_ascii=False),
                     year,
-                    candidate.venue,
-                    candidate.venue_canonical_name,
+                    venue,
+                    venue_canonical_name,
                     venue_rank,
                     doi,
                     arxiv_id,
@@ -288,6 +296,7 @@ class PaperLibraryStore:
         *,
         query: str = "",
         limit: int = 100,
+        offset: int = 0,
         include_deleted: bool = False,
     ) -> list[dict[str, object]]:
         where = []
@@ -301,11 +310,27 @@ class PaperLibraryStore:
         sql = "select * from papers"
         if where:
             sql += " where " + " and ".join(where)
-        sql += " order by last_seen_at desc limit ?"
-        args.append(max(1, min(limit, 500)))
+        sql += " order by last_seen_at desc limit ? offset ?"
+        args.extend([max(1, min(limit, 500)), max(0, offset)])
         with self._connect() as conn:
             rows = conn.execute(sql, tuple(args)).fetchall()
         return [_record_from_row(row).to_dict() for row in rows]
+
+    def count_papers(self, *, query: str = "", include_deleted: bool = False) -> int:
+        where = []
+        args: list[object] = []
+        if not include_deleted:
+            where.append("deleted_at = ''")
+        if query.strip():
+            needle = f"%{query.strip().lower()}%"
+            where.append("(lower(title) like ? or lower(venue) like ? or lower(venue_canonical_name) like ?)")
+            args.extend([needle, needle, needle])
+        sql = "select count(*) from papers"
+        if where:
+            sql += " where " + " and ".join(where)
+        with self._connect() as conn:
+            row = conn.execute(sql, tuple(args)).fetchone()
+        return int(row[0]) if row is not None else 0
 
     def list_search_runs(self, *, limit: int = 50) -> list[dict[str, object]]:
         with self._connect() as conn:
@@ -662,7 +687,7 @@ def _search_rank(candidate: CandidatePaper, *, fallback: int) -> int:
     for key in ("search_rank", "rank", "download_queue_rank"):
         value = metadata.get(key)
         try:
-            rank = int(value)  # type: ignore[arg-type]
+            rank = int(str(value))
         except (TypeError, ValueError):
             continue
         if rank > 0:
@@ -689,7 +714,7 @@ def _as_int(value: object) -> int | None:
     try:
         if value is None or value == "":
             return None
-        return int(value)
+        return int(str(value))
     except (TypeError, ValueError):
         return None
 

@@ -137,7 +137,6 @@ def test_report_md_contains_correct_max(tmp_path):
     import sys
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
     from m1_unseen_paper_search import _write_outputs, parse_args
-    import datetime
 
     args = parse_args(["--output-dir", str(tmp_path), "--max-results-per-query", "2", "--dry-run"])
     out = tmp_path
@@ -410,7 +409,7 @@ def test_acceptance_verify_index_table_latex_y_count():
     verify_md = (accept_dir / "FINAL_MANUAL_VERIFY_INDEX.md").read_text(encoding="utf-8")
     # Count rows where LaTeX column is Y (format: | ... | Y | ... |)
     lines = verify_md.splitlines()
-    table_rows = [l for l in lines if l.startswith("|") and "| Y |" in l and "formula_" in l]
+    table_rows = [line for line in lines if line.startswith("|") and "| Y |" in line and "formula_" in line]
     assert len(table_rows) == expected_latex, f"Table LaTeX=Y rows: {len(table_rows)}, expected: {expected_latex}"
 
 

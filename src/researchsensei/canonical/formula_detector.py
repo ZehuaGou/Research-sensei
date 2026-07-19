@@ -7,6 +7,7 @@ provides position data.
 from __future__ import annotations
 
 import logging
+from importlib.util import find_spec
 from pathlib import Path
 
 from researchsensei.schemas.canonical import FormulaSlot
@@ -31,8 +32,7 @@ class MarkerDocumentFormulaDetector:
 
     def is_available(self) -> bool:
         try:
-            import importlib
-            spec = importlib.util.find_spec("marker")
+            spec = find_spec("marker")
             return spec is not None
         except (ImportError, ValueError):
             return False

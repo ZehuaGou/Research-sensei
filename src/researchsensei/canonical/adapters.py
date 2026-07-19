@@ -10,9 +10,10 @@ from __future__ import annotations
 
 import logging
 import re
-import tempfile
 from dataclasses import dataclass, field
+from importlib.util import find_spec
 from pathlib import Path
+from typing import Any
 
 from researchsensei.schemas.canonical import FormulaBlock
 from researchsensei.schemas.enums import AdapterStatus, FormulaOrigin, FormulaOcrStatus
@@ -47,8 +48,7 @@ class MarkItDownAdapter:
 
     def is_available(self) -> bool:
         try:
-            import importlib
-            spec = importlib.util.find_spec("markitdown")
+            spec = find_spec("markitdown")
             return spec is not None
         except (ImportError, ValueError):
             return False
@@ -98,7 +98,6 @@ class MarkItDownAdapter:
 
     def _parse_sections(self, text: str) -> dict[str, str]:
         """Parse text into sections. MarkItDown doesn't produce headers, so use heuristics."""
-        import re
         sections: dict[str, str] = {}
 
         # Try to find section-like patterns
@@ -180,8 +179,7 @@ class MarkerPdfAdapter:
 
     def is_available(self) -> bool:
         try:
-            import importlib
-            spec = importlib.util.find_spec("marker")
+            spec = find_spec("marker")
             return spec is not None
         except (ImportError, ValueError):
             return False
@@ -306,14 +304,13 @@ class Pix2TexFormulaOCRAdapter:
     NAME = "pix2tex"
 
     def __init__(self) -> None:
-        self._model = None
+        self._model: Any | None = None
         self._model_loaded = False
         self._load_error = ""
 
     def is_available(self) -> bool:
         try:
-            import importlib
-            spec = importlib.util.find_spec("pix2tex")
+            spec = find_spec("pix2tex")
             return spec is not None
         except (ImportError, ValueError):
             return False
@@ -359,7 +356,10 @@ class Pix2TexFormulaOCRAdapter:
             else:
                 return "", FormulaOrigin.UNKNOWN, FormulaOcrStatus.NOT_TRIGGERED, 0.0, "No image provided"
 
-            latex = self._model.latexocr(img)
+            model = self._model
+            if model is None:
+                return "", FormulaOrigin.UNKNOWN, FormulaOcrStatus.UNAVAILABLE, 0.0, "OCR model unavailable"
+            latex = model.latexocr(img)
 
             if not latex or not latex.strip():
                 return "", FormulaOrigin.OCR_LATEX, FormulaOcrStatus.FAILED, 0.0, "Empty OCR result"

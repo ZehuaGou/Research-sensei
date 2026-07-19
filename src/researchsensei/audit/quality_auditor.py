@@ -1040,7 +1040,7 @@ class QualityAuditor:
     @staticmethod
     def _float(value: object, default: float) -> float:
         try:
-            return float(value)
+            return float(str(value))
         except (TypeError, ValueError):
             return default
 

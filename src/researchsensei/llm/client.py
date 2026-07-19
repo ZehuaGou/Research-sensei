@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import re
-import time
 from typing import AsyncIterator
 
 import httpx
@@ -208,6 +207,39 @@ class LLMClient:
         response = await self.chat(messages, config=cfg)
         return parse_llm_json(response.content)
 
+    async def chat_json_with_repair(
+        self,
+        messages: list[ChatMessage],
+        *,
+        config: LLMConfig | None = None,
+    ) -> dict:
+        """Parse structured output and make one bounded format-only repair attempt."""
+        cfg = config or self.config.model_copy(update={"json_mode": True, "temperature": 0.2})
+        response = await self.chat(messages, config=cfg)
+        try:
+            return parse_llm_json(response.content)
+        except LLMResponseError:
+            repair_messages = [
+                ChatMessage(
+                    role="system",
+                    content=(
+                        "Repair the following model output into one valid JSON object. "
+                        "Preserve its meaning and values. Do not add claims, evidence, or commentary. "
+                        "Return JSON only."
+                    ),
+                ),
+                ChatMessage(role="user", content=response.content[:16_000]),
+            ]
+            repair_config = cfg.model_copy(
+                update={
+                    "temperature": 0.0,
+                    "json_mode": True,
+                    "max_retries": 0,
+                }
+            )
+            repaired = await self.chat(repair_messages, config=repair_config)
+            return parse_llm_json(repaired.content)
+
     async def chat_stream(
         self,
         messages: list[ChatMessage],
@@ -364,39 +396,23 @@ def parse_llm_json(content: str) -> dict:
     # Remove control characters except newline and tab
     text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
 
-    # Try to find the first valid JSON object
-    start = text.find("{")
-    if start != -1:
-        text = text[start:]
-
-    # First attempt
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
-    # Fix trailing commas
-    fixed = re.sub(r",\s*([}\]])", r"\1", text)
-    try:
-        return json.loads(fixed)
-    except json.JSONDecodeError:
-        pass
-
-    # Try to find balanced braces
-    depth = 0
-    end = 0
-    for i, c in enumerate(text):
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0:
-                end = i + 1
-                break
-    if end > 0:
+    decoder = json.JSONDecoder()
+    candidates = [text, re.sub(r",\s*([}\]])", r"\1", text)]
+    for candidate in candidates:
         try:
-            return json.loads(text[:end])
+            value = json.loads(candidate)
+            if isinstance(value, dict):
+                return value
         except json.JSONDecodeError:
             pass
 
-    raise LLMResponseError(f"Failed to parse JSON from LLM output: {text[:200]}...")
+        # raw_decode accepts trailing prose and correctly handles braces inside strings.
+        for match in re.finditer(r"{", candidate):
+            try:
+                value, _end = decoder.raw_decode(candidate[match.start() :])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+
+    raise LLMResponseError("LLM returned invalid JSON output")

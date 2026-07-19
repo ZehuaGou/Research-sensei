@@ -14,6 +14,8 @@ pure-data.
 
 from __future__ import annotations
 
+import re
+
 from researchsensei.acquisition.venue_registry import VENUE_REGISTRY, VenueConfig, is_known_oa_landing, lookup_venue
 from researchsensei.schemas import CandidatePaper
 from researchsensei.schemas.enums import VenueRank
@@ -53,6 +55,12 @@ def venue_config_for_paper(paper: CandidatePaper) -> VenueConfig | None:
     cfg = lookup_venue(paper.venue or "")
     if cfg is not None:
         return cfg
+    doi = str(paper.doi or "").strip().lower()
+    if doi.startswith("10.1609/aaai."):
+        return VENUE_REGISTRY.get("aaai")
+    for venue_key in ("acl", "emnlp", "naacl", "ijcai", "vldb", "sigmod"):
+        if re.search(rf"(?:^|[./_-]){venue_key}(?:[./_-]|$)", doi):
+            return VENUE_REGISTRY.get(venue_key)
     for url in _candidate_venue_urls(paper):
         _is_oa, _archive_kind, url_cfg = is_known_oa_landing(url)
         if url_cfg is not None:

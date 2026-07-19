@@ -85,8 +85,8 @@ class ArxivAdapter:
                     resp = client.get(pdf_url, headers=self.headers)
 
                     if resp.status_code in _RETRY_CODES:
-                        backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
-                        wait = backoff[min(attempt, len(backoff) - 1)]
+                        backoff_schedule = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
+                        wait = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
                         logger.warning(
                             "arXiv PDF download %s got %d, retry %d/%d in %.1fs",
                             arxiv_id, resp.status_code, attempt + 1, _MAX_RETRIES, wait,
@@ -113,8 +113,8 @@ class ArxivAdapter:
 
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in _RETRY_CODES:
-                    backoff = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
-                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    backoff_schedule = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
+                    wait = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
                     logger.warning(
                         "arXiv PDF download %s got %d, retry %d/%d in %.1fs",
                         arxiv_id, exc.response.status_code, attempt + 1, _MAX_RETRIES, wait,
@@ -167,8 +167,8 @@ class ArxivAdapter:
                         continue
 
                     if resp.status_code in _RETRY_CODES:
-                        backoff = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
-                        wait = backoff[min(attempt, len(backoff) - 1)]
+                        backoff_schedule = _BACKOFF_429 if resp.status_code == 429 else _BACKOFF_503
+                        wait = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
                         last_retry_reason = "rate limited (429)" if resp.status_code == 429 else "service unavailable (503)"
                         logger.warning(
                             "arXiv API got %d, retry %d/%d in %.1fs",
@@ -182,8 +182,8 @@ class ArxivAdapter:
 
             except httpx.HTTPStatusError as exc:
                 if exc.response.status_code in _RETRY_CODES:
-                    backoff = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
-                    wait = backoff[min(attempt, len(backoff) - 1)]
+                    backoff_schedule = _BACKOFF_429 if exc.response.status_code == 429 else _BACKOFF_503
+                    wait = backoff_schedule[min(attempt, len(backoff_schedule) - 1)]
                     last_retry_reason = "rate limited (429)" if exc.response.status_code == 429 else "service unavailable (503)"
                     logger.warning(
                         "arXiv API got %d, retry %d/%d in %.1fs",

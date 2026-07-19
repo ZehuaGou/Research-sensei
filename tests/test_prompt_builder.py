@@ -5,7 +5,6 @@ from researchsensei.llm.prompt_builder import (
     SYSTEM_INSTRUCTION,
     USER_QUESTION_ISOLATION_MARKER,
 )
-from researchsensei.llm.types import ChatMessage
 
 
 def test_prompt_builder_returns_two_messages() -> None:

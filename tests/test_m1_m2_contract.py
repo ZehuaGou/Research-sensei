@@ -146,7 +146,7 @@ def test_formula_slot_has_all_m2_contract_fields(tmp_path) -> None:
         _block("b009", page=3, block_type="text", text="Method description.", section="Method"),
     ]
 
-    result = M1CanonicalPipeline().run_from_blocks(
+    M1CanonicalPipeline().run_from_blocks(
         paper_id="p-contract-fields",
         title="Contract Fields Test",
         blocks=blocks,

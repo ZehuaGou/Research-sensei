@@ -153,6 +153,9 @@ export interface SearchRun {
 
 export interface LibraryPapersResponse {
   papers: LibraryPaper[]
+  total: number
+  limit: number
+  offset: number
 }
 
 export interface SearchRunsResponse {
@@ -235,7 +238,11 @@ export interface SettingsValidationResponse {
 export interface WorkspaceApi {
   getUnderstandingStatus(jobId: string, signal?: AbortSignal): Promise<UnderstandingStatusResponse>
   getCards(jobId: string, signal?: AbortSignal): Promise<CardsResponse>
-  reparse(jobId: string, signal?: AbortSignal): Promise<ReparseResponse>
+  reparse(
+    jobId: string,
+    signal?: AbortSignal,
+    onProgress?: (task: DirectionTask<ReparseResponse>) => void,
+  ): Promise<ReparseResponse>
   getMemory(jobId: string, signal?: AbortSignal): Promise<MemoryResponse>
   clearMemory(jobId: string, signal?: AbortSignal): Promise<void>
   ask(jobId: string, request: AskRequest, signal?: AbortSignal): Promise<AskResponse>

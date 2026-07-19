@@ -60,20 +60,9 @@ jobs:
       - name: Run encoding and mojibake gate
         run: python -m pytest tests/test_encoding_hygiene.py -v
 
-      - name: Lint reliability boundary
+      - name: Lint backend and tests
         if: matrix.python-version == '3.13'
-        run: >-
-          python -m ruff check
-          src/researchsensei/core
-          src/researchsensei/web
-          src/researchsensei/relevance.py
-          tests/test_api_contract_v06.py
-          tests/test_config_contract_v06.py
-          tests/test_upload_service.py
-          tests/test_background_tasks.py
-          tests/test_job_service.py
-          tests/test_m1_relevance_benchmark.py
-          tests/test_m4_memory.py
+        run: python -m ruff check src tests
 
       - name: Type-check reliability boundary
         if: matrix.python-version == '3.13'

@@ -155,7 +155,7 @@ def test_pipeline_baseline_still_writes_old_card_artifacts(tmp_path: Path) -> No
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-cards")
+    runner.run(source, job_id="test-cards")
 
     run_dir = tmp_path / "workspace" / "runs" / "test-cards"
     assert (run_dir / "paper_card.json").exists()
@@ -189,7 +189,7 @@ def test_no_llm_client_baseline_component_status(tmp_path: Path) -> None:
     jobs = JobStore(tmp_path / "jobs.sqlite3")
     runner = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs)
 
-    job = runner.run(source, job_id="test-comp")
+    runner.run(source, job_id="test-comp")
 
     status_path = tmp_path / "workspace" / "runs" / "test-comp" / "understanding_status.json"
     data = json.loads(status_path.read_text(encoding="utf-8"))

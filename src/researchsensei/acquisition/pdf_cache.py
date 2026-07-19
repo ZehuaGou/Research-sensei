@@ -38,7 +38,6 @@ import hashlib
 import json
 import os
 import re
-import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -186,7 +185,7 @@ class PdfCache:
         entry_dir = self.cache_root / key
         meta_path = entry_dir / "meta.json"
         blob_name = self._blob_name_for_key(entry_dir)
-        if not meta_path.exists() or not blob_name.exists():
+        if blob_name is None or not meta_path.exists() or not blob_name.exists():
             return None
         try:
             meta = CacheMeta.from_dict(json.loads(meta_path.read_text(encoding="utf-8")))
@@ -278,7 +277,6 @@ class PdfCache:
         """Remove entries older than max_age_days. Returns evicted count."""
         if self.max_age_days is None or self.max_age_days < 0:
             return 0
-        now = time.time()
         evicted = 0
         for entry in self.cache_root.iterdir():
             if not entry.is_dir():

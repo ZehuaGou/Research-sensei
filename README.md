@@ -99,7 +99,7 @@ npm run test:e2e
 Local backend and frontend dev servers:
 
 ```powershell
-.venv\Scripts\python.exe -m uvicorn "researchsensei.web.app:create_app" --factory --host 127.0.0.1 --port 8765
+.venv\Scripts\python.exe -m researchsensei serve
 
 cd frontend
 npm run dev

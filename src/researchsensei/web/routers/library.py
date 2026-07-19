@@ -12,14 +12,22 @@ def create_library_router(paper_library: PaperLibraryStore) -> APIRouter:
     def list_library_papers(
         query: str = Query(default="", max_length=500),
         limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
         include_deleted: bool = False,
     ) -> dict[str, object]:
         return {
             "papers": paper_library.list_papers(
                 query=query,
                 limit=limit,
+                offset=offset,
                 include_deleted=include_deleted,
-            )
+            ),
+            "total": paper_library.count_papers(
+                query=query,
+                include_deleted=include_deleted,
+            ),
+            "limit": limit,
+            "offset": offset,
         }
 
     @router.get("/search_runs")

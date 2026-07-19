@@ -1,11 +1,58 @@
 # ResearchSensei v0.6 Reliability Baseline Status
 
-Last updated: 2026-07-12 (Asia/Shanghai).
+Last updated: 2026-07-19 (Asia/Shanghai).
 
 This is the authoritative implementation and verification ledger for
 ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
+
+## 2026-07-19 Full-Project Remediation Refresh
+
+This section supersedes the earlier local gate counts below without rewriting
+the historical v0.6 release ledger.
+
+- Document upload, local-path parsing, and reparse now have persistent background
+  task endpoints with 202 submission, progress polling, typed terminal failures,
+  cancellation requests, restart interruption state, and frontend task recovery.
+  The synchronous parse/reparse endpoints remain compatibility paths.
+- M4 structured output accepts fenced/trailing JSON, performs one bounded
+  format-only repair attempt, and never exposes raw malformed model output in a
+  learner-facing error. Existing claim/evidence validation remains unchanged.
+- Request/library title metadata enters the ingestion skeleton before card
+  generation. New library downloads infer known venue/rank from registry URLs and
+  confident DOI patterns such as AAAI. Existing rows are not silently rewritten.
+- The library API and UI use total/limit/offset pagination; the live local library
+  was rendered as 30 + 25 rows instead of loading 55 records at once.
+- ccswitch model options now show the current setting, current provider models,
+  and live `/models` results only, capped at 24; request-history and the full
+  pricing catalog are no longer mixed into the learner setting.
+- `python -m researchsensei serve` reads `server.host`, `server.port`, and
+  `server.reload`; checked local/example configuration and the frontend proxy now
+  agree on port 8765.
+- CI quotes the Vitest exclude glob for Linux shells, runs Ruff over all `src` and
+  `tests`, and mypy now checks all 126 backend modules instead of six selected
+  files. The npm lock was refreshed to remove the reported `undici` advisory.
+
+Current verification:
+
+| Command / surface | Result | Classification |
+|---|---|---|
+| `.venv\Scripts\python.exe -m pytest -q` | `776 passed, 15 skipped` in 149.04s | Complete local backend/offline suite. |
+| `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
+| `.venv\Scripts\python.exe -m mypy` | No issues in 126 source files | Full backend type boundary. |
+| `npm test` | 14 files, 74 tests passed | Frontend unit/contract suite. |
+| `npm run typecheck` and `npm run build` | Passed; Vite transformed 94 modules | Frontend static and production build. |
+| `npm audit --registry=https://registry.npmjs.org` | 0 vulnerabilities | Full npm dependency tree, including dev dependencies. |
+| `npm run test:e2e` | 6/6 Chromium fixture tests passed | Deterministic browser E2E. |
+| Real local browser against configured workspace | 55-paper pagination, six visible ccswitch choices, and persistent document task handoff verified; zero console errors | Runtime/local-services smoke, not an external paper/LLM acceptance. |
+
+Remaining external boundaries are explicit: the pre-existing GitHub Actions run
+remains red until this checkout is pushed and GitHub reruns the updated workflow;
+the repaired M4 format path has deterministic tests but was not charged against a
+live model again; task cancellation is cooperative and cannot pre-empt a parser or
+LLM call already executing; and the prior 12-query external acquisition matrix
+remains a failed live acceptance rather than being reclassified by local success.
 
 ## Release Identity
 
