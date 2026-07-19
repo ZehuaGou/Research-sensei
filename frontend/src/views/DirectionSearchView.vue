@@ -19,10 +19,16 @@ const historyRun = ref<SearchRun | null>(null)
 const openingHistoryKey = ref('')
 const handoffStates = ref<Record<string, { loading?: boolean; error?: string }>>({})
 const selectedSeed = ref<Record<string, any> | null>(null)
+const showFilteredCandidates = ref(false)
 
 const status = computed(() => result.value?.direction_workspace_status || result.value?.status || '')
 const warnings = computed(() => normalizeWarnings(result.value?.warnings || []))
-const papers = computed(() => result.value?.papers || result.value?.candidate_cards || [])
+const allPapers = computed<Array<Record<string, any>>>(() => result.value?.papers || result.value?.candidate_cards || [])
+const relevantPapers = computed(() => allPapers.value.filter((paper) => (
+  paper.relevance_gate_passed === true || paper.download_selected === true || paper.priority !== 'D_IGNORE'
+)))
+const papers = computed(() => showFilteredCandidates.value ? allPapers.value : relevantPapers.value)
+const filteredCandidateCount = computed(() => Math.max(allPapers.value.length - relevantPapers.value.length, 0))
 const hasEmptyResult = computed(() => ['EMPTY_RESULT', 'BLOCKED'].includes(String(status.value)))
 const queryPlan = computed(() => result.value?.query_plan || null)
 const historyPapers = computed(() => historyRun.value?.papers || [])
@@ -57,6 +63,13 @@ const queryCoreTerms = computed(() => toTextList(queryPlan.value?.core_terms).sl
 const sourceMetrics = computed<Array<Record<string, any>>>(() => (
   Array.isArray(result.value?.source_metrics) ? result.value.source_metrics : []
 ))
+const acquisitionSourceMetrics = computed(() => sourceMetrics.value.filter((metric) => (
+  !String(metric.source || '').startsWith('landing_extractor:') && metric.source !== 'unpaywall'
+)))
+const fulltextProbeMetrics = computed(() => sourceMetrics.value.filter((metric) => (
+  String(metric.source || '').startsWith('landing_extractor:') || metric.source === 'unpaywall'
+)))
+const successfulFulltextProbes = computed(() => fulltextProbeMetrics.value.filter((metric) => metric.success).length)
 
 onMounted(() => {
   syncQueryFromRoute()
@@ -169,7 +182,7 @@ function warningText(warning: { code: string; message: string }) {
     return `${source} 暂时不可用，已用其它来源降级继续。`
   }
   if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
-  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '当前没有候选同时满足深读全文下载与质量门槛。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return 'M1 已完成全文下载；候选需进入 M2 解析与质量校验后才能标记为深读就绪。'
   if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
   if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已标记为暂不推荐。`
   if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
@@ -557,7 +570,7 @@ async function openDeepRead(paper: Record<string, any>) {
         <section v-if="result" class="codex-card status-card" data-testid="direction-status">
           <div class="status-line">
             <strong>{{ statusLabel(status) }}</strong>
-            <span>{{ papers.length }} 篇候选论文</span>
+            <span>{{ relevantPapers.length }} 篇严格相关 · {{ allPapers.length }} 篇去重候选</span>
           </div>
           <p v-if="result.message">{{ directionMessage(result.message) }}</p>
           <div v-if="warnings.length" class="warning-list">
@@ -565,9 +578,9 @@ async function openDeepRead(paper: Record<string, any>) {
               {{ warningText(warning) }}
             </span>
           </div>
-          <div v-if="sourceMetrics.length" class="source-ledger" data-testid="source-ledger">
+          <div v-if="acquisitionSourceMetrics.length" class="source-ledger" data-testid="source-ledger">
             <span
-              v-for="metric in sourceMetrics"
+              v-for="metric in acquisitionSourceMetrics"
               :key="`${metric.source}-${metric.trigger || 'primary'}`"
               :class="{ failed: !metric.success, supplement: metric.trigger === 'low_coverage_oa_supplement' }"
             >
@@ -575,6 +588,20 @@ async function openDeepRead(paper: Record<string, any>) {
               <small v-if="metric.trigger === 'low_coverage_oa_supplement'">开放来源补搜</small>
             </span>
           </div>
+          <details v-if="fulltextProbeMetrics.length" class="source-probe-details">
+            <summary>
+              全文来源解析 {{ fulltextProbeMetrics.length }} 次 · {{ successfulFulltextProbes }} 次发现可用候选
+            </summary>
+            <div class="source-ledger source-ledger-probes">
+              <span
+                v-for="(metric, index) in fulltextProbeMetrics"
+                :key="`${metric.source}-${metric.trigger || 'probe'}-${index}`"
+                :class="{ failed: !metric.success }"
+              >
+                {{ discoverySourceLabel(metric.source) }} · {{ metric.success ? `${metric.count || 0} 篇` : '未发现' }}
+              </span>
+            </div>
+          </details>
         </section>
 
         <section v-if="queryPlan" class="codex-card query-plan" data-testid="query-plan">
@@ -622,7 +649,18 @@ async function openDeepRead(paper: Record<string, any>) {
         </section>
 
         <section v-if="papers.length" class="thread-section">
-          <h2>候选论文</h2>
+          <div class="section-heading-row">
+            <h2>候选论文</h2>
+            <button
+              v-if="filteredCandidateCount"
+              type="button"
+              class="secondary-btn"
+              data-testid="toggle-filtered-candidates"
+              @click="showFilteredCandidates = !showFilteredCandidates"
+            >
+              {{ showFilteredCandidates ? '隐藏低相关结果' : `查看 ${filteredCandidateCount} 篇已过滤结果` }}
+            </button>
+          </div>
           <div class="candidate-list">
             <article
               v-for="paper in papers"
@@ -1051,6 +1089,24 @@ async function openDeepRead(paper: Record<string, any>) {
   font-size: 10px;
 }
 
+.source-probe-details {
+  margin-top: 10px;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.source-probe-details summary {
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+}
+
+.source-ledger-probes {
+  margin-top: 10px;
+  max-height: 180px;
+  overflow: auto;
+}
+
 .query-plan {
   display: grid;
   gap: 12px;
@@ -1090,6 +1146,19 @@ async function openDeepRead(paper: Record<string, any>) {
 .thread-section {
   display: grid;
   gap: 10px;
+}
+
+.section-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.section-heading-row .secondary-btn {
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 
 .thread-section h2 {

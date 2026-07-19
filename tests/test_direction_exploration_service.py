@@ -142,6 +142,21 @@ class RecordingDownloadedResolver(DownloadedResolver):
         return super().resolve_many(query, candidates, download_dir=download_dir)
 
 
+class RecordingFullTextResolver:
+    def __init__(self) -> None:
+        self.resolved_ids: list[str] = []
+
+    def resolve_many(
+        self,
+        candidates: list[CandidatePaper],
+        *,
+        download_top_n: int = 0,
+        workspace: str | None = None,
+    ) -> tuple[list[CandidatePaper], list[dict[str, object]]]:
+        self.resolved_ids = [candidate.paper_id for candidate in candidates]
+        return candidates, []
+
+
 def _candidate(**overrides: object) -> CandidatePaper:
     base = {
         "paper_id": "paper-1",
@@ -171,6 +186,7 @@ def _service(
     *,
     sources: list[str] | None = None,
     source_resolver: object | None = None,
+    fulltext_resolver: object | None = None,
     paper_library: PaperLibraryStore | None = None,
     max_download_candidates: int = 8,
 ) -> DirectionExplorationService:
@@ -179,6 +195,7 @@ def _service(
         sources=sources or list(adapters.keys()),
         verifier=StaticVerifier(),  # type: ignore[arg-type]
         source_resolver=source_resolver,  # type: ignore[arg-type]
+        fulltext_resolver=fulltext_resolver,  # type: ignore[arg-type]
         paper_library=paper_library,
         paper_ranker=PaperRanker(enabled=False),
         max_download_candidates=max_download_candidates,
@@ -208,6 +225,26 @@ def test_direction_query_returns_structured_bundle() -> None:
     assert bundle.candidate_cards
     assert bundle.recommended_reading_order
     assert bundle.candidate_cards[0]["title"] == "Time Series Anomaly Detection with Transformers"
+
+
+def test_fulltext_discovery_runs_only_after_deterministic_relevance_gate() -> None:
+    fulltext = RecordingFullTextResolver()
+    relevant = _candidate(paper_id="relevant")
+    irrelevant = _candidate(
+        paper_id="irrelevant",
+        title="Image Classification with Convolutional Networks",
+        abstract="This paper classifies natural images.",
+        arxiv_id="2401.00002",
+        pdf_url="https://arxiv.org/pdf/2401.00002.pdf",
+    )
+    service = _service(
+        {"paper_search": StaticAdapter([relevant, irrelevant])},
+        fulltext_resolver=fulltext,
+    )
+
+    service.explore("time series anomaly detection")
+
+    assert fulltext.resolved_ids == ["relevant"]
 
 
 def test_chinese_mixed_forecasting_query_generates_aligned_variants() -> None:
@@ -526,6 +563,40 @@ def test_acquisition_supplements_nonempty_primary_when_oa_coverage_is_thin() -> 
     assert fallback.calls == ["graph anomaly detection", "graph neural network anomaly detection"]
     assert any("needs OA supplement" in line for line in search_log)
     assert metrics[-1]["trigger"] == "low_coverage_oa_supplement"
+
+
+def test_optional_supplement_failure_does_not_degrade_successful_openalex_fallback() -> None:
+    primary = RecordingAdapter({
+        "graph anomaly detection": [
+            _candidate(
+                paper_id="primary-metadata",
+                title="Graph Anomaly Detection Overview",
+                arxiv_id="",
+                pdf_url="",
+                open_access=False,
+                pdf_available=False,
+            )
+        ],
+    })
+    openalex = RecordingAdapter({
+        "graph anomaly detection": [_candidate(paper_id="openalex-oa")],
+    })
+    service = DirectionExplorationService(
+        adapters={"paper_search": primary},  # type: ignore[arg-type]
+        sources=["paper_search"],
+        verifier=StaticVerifier(),  # type: ignore[arg-type]
+        fallback_adapters={
+            "openalex_fallback": openalex,  # type: ignore[dict-item]
+            "semantic_scholar_fallback": FailingAdapter(),
+        },
+        max_results_per_source=5,
+    )
+
+    _candidates, warnings, _search_log, metrics = service._acquire("graph anomaly detection")
+
+    assert warnings == []
+    assert metrics[-1]["source"] == "semantic_scholar_fallback"
+    assert metrics[-1]["success"] is False
 
 
 def test_partial_source_failure_returns_degraded_with_real_candidates() -> None:

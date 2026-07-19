@@ -154,3 +154,43 @@ def test_resolver_reuses_local_library_before_network(tmp_path: Path) -> None:
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.metadata["resolution_strategy"] == "library_reuse"
     assert result.local_path == str(pdf.resolve())
+
+
+def test_resolver_retries_alternative_pdf_urls_until_valid_pdf(tmp_path: Path) -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if "blocked" in str(request.url):
+            return httpx.Response(403, request=request)
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/pdf"},
+            content=b"%PDF-1.4\nvalid fallback\n%%EOF",
+            request=request,
+        )
+
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="fallback-paper",
+            title="Fallback Paper",
+            pdf_url="https://publisher.test/blocked.pdf",
+            candidate_pdf_urls=[
+                "https://publisher.test/blocked.pdf",
+                "https://mirror.test/working.pdf",
+            ],
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.pdf_url == "https://mirror.test/working.pdf"
+    assert calls == [
+        "https://publisher.test/blocked.pdf",
+        "https://mirror.test/working.pdf",
+    ]
+    assert result.metadata["fallback_count"] == 1

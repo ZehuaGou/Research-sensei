@@ -116,9 +116,11 @@ class DirectionExplorationService:
 
         query_plan = self._build_query_plan(query)
         search_query = query_plan.english_query or query_plan.direction_en or query_plan.user_query
+        acquisition_variants = _unique([query_plan.user_query, *query_plan.query_variants])
         candidates, warnings, search_log, source_metrics = self._acquire(
             search_query,
-            query_variants=query_plan.query_variants,
+            query_variants=acquisition_variants,
+            query_plan=query_plan,
         )
         raw_pool = self.selection_service.build_candidate_pool(
             query=search_query,
@@ -129,7 +131,18 @@ class DirectionExplorationService:
         )
         deduplicated = self.selection_service.deduplicate(candidates)
         verified = self._verify(deduplicated)
-        fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(verified, download_top_n=0)
+        # Apply the deterministic task/concept gate before issuing DOI,
+        # repository, and landing-page requests. A large OA supplement can
+        # contain 100+ candidates; only relevance-cleared papers need costly
+        # full-text discovery for ranking and download selection.
+        relevance_screened = self.relevance_evaluator.evaluate_and_rank(query_plan, verified)
+        fulltext_targets = [candidate for candidate in relevance_screened if candidate.relevance_gate_passed]
+        enriched_targets, fulltext_metrics = self.fulltext_resolver.resolve_many(fulltext_targets, download_top_n=0)
+        enriched_by_id = {candidate.paper_id: candidate for candidate in enriched_targets}
+        fulltext_enriched = [
+            enriched_by_id.get(candidate.paper_id, candidate)
+            for candidate in relevance_screened
+        ]
         source_metrics = [*source_metrics, *fulltext_metrics]
         externally_ranked = self.paper_ranker.rank(search_query, fulltext_enriched)
         ranked_candidates = self.relevance_evaluator.evaluate_and_rank(query_plan, externally_ranked)
@@ -261,6 +274,7 @@ class DirectionExplorationService:
         query: str,
         *,
         query_variants: list[str] | None = None,
+        query_plan: QueryPlan | None = None,
     ) -> tuple[list[CandidatePaper], list[str], list[str], list[dict[str, object]]]:
         candidates: list[CandidatePaper] = []
         warnings: list[str] = []
@@ -387,6 +401,8 @@ class DirectionExplorationService:
                 query,
                 candidates,
                 expected_count=min(max(self.max_results_per_source, 1), 8),
+                query_plan=query_plan,
+                relevance_evaluator=self.relevance_evaluator,
             )
             if supplement_reasons:
                 search_log.append(
@@ -397,7 +413,7 @@ class DirectionExplorationService:
                     query_variants=query_variants,
                     primary_warning="",
                     primary_source=self.sources[0] if self.sources else "paper_search",
-                    query_limit=2,
+                    query_limit=3,
                     trigger="low_coverage_oa_supplement",
                 )
                 candidates.extend(fallback_candidates)
@@ -418,6 +434,7 @@ class DirectionExplorationService:
         trigger: str = "primary_empty_or_blocked",
     ) -> tuple[list[CandidatePaper], list[str], list[str], list[dict[str, object]]]:
         warnings = [primary_warning] if primary_warning else []
+        fallback_failures: list[str] = []
         candidates: list[CandidatePaper] = []
         search_log = (
             [f"{primary_source}: {primary_warning}; trying fallback discovery"]
@@ -440,7 +457,12 @@ class DirectionExplorationService:
                     time.sleep(0.25)
                 started = time.perf_counter()
                 try:
-                    results = adapter.search(q, max_results=self.max_results_per_source)
+                    fallback_max_results = (
+                        max(self.max_results_per_source, 50)
+                        if trigger == "low_coverage_oa_supplement"
+                        else self.max_results_per_source
+                    )
+                    results = adapter.search(q, max_results=fallback_max_results)
                     source_candidates.extend(results)
                     adapter_responded = True
                     latency_ms = int((time.perf_counter() - started) * 1000)
@@ -468,7 +490,7 @@ class DirectionExplorationService:
                     "trigger": trigger,
                 })
             else:
-                warnings.append(f"ACQUISITION_FAILED:{source}: {source_error or 'no results'}")
+                fallback_failures.append(f"ACQUISITION_FAILED:{source}: {source_error or 'no results'}")
                 source_metrics.append({
                     "source": source,
                     "attempted": True,
@@ -479,6 +501,11 @@ class DirectionExplorationService:
                     "fallback": True,
                     "trigger": trigger,
                 })
+        # A supplement is intentionally redundant. If at least one OA index
+        # succeeds, another optional index being rate-limited must remain
+        # visible in metrics without degrading an otherwise healthy M1 run.
+        if trigger != "low_coverage_oa_supplement" or not candidates:
+            warnings.extend(fallback_failures)
         return candidates, warnings, search_log, source_metrics
 
     def _verify(self, candidates: list[CandidatePaper]) -> list[CandidatePaper]:
@@ -969,6 +996,8 @@ def _discovery_supplement_reasons(
     candidates: list[CandidatePaper],
     *,
     expected_count: int,
+    query_plan: QueryPlan | None = None,
+    relevance_evaluator: DeterministicRelevanceEvaluator | None = None,
 ) -> list[str]:
     """Explain when a non-empty primary result still needs OA-index coverage."""
 
@@ -979,14 +1008,23 @@ def _discovery_supplement_reasons(
         if len(token) >= 3 and token not in {"the", "and", "for", "with", "from", "using", "method", "methods"}
     }
     relevant_count = 0
-    oa_hint_count = 0
-    for candidate in candidates:
-        searchable = f"{candidate.title} {candidate.abstract}".lower()
-        overlap = sum(1 for term in query_terms if term in searchable)
-        if not query_terms or overlap >= min(2, len(query_terms)):
-            relevant_count += 1
-        if _candidate_has_open_fulltext_hint(candidate):
-            oa_hint_count += 1
+    relevant_oa_hint_count = 0
+    if query_plan is not None and relevance_evaluator is not None:
+        assessed = relevance_evaluator.evaluate_and_rank(query_plan, candidates)
+        relevant = [candidate for candidate in assessed if candidate.relevance_gate_passed]
+        relevant_count = len(relevant)
+        relevant_oa_hint_count = sum(
+            1 for candidate in relevant if _candidate_has_open_fulltext_hint(candidate)
+        )
+    else:
+        for candidate in candidates:
+            searchable = f"{candidate.title} {candidate.abstract}".lower()
+            overlap = sum(1 for term in query_terms if term in searchable)
+            likely_relevant = not query_terms or overlap >= min(2, len(query_terms))
+            if likely_relevant:
+                relevant_count += 1
+                if _candidate_has_open_fulltext_hint(candidate):
+                    relevant_oa_hint_count += 1
 
     reasons: list[str] = []
     if len(candidates) < expected:
@@ -994,9 +1032,11 @@ def _discovery_supplement_reasons(
     relevant_target = min(4, expected)
     if relevant_count < relevant_target:
         reasons.append(f"topic_matches={relevant_count}<{relevant_target}")
-    oa_target = min(3, expected)
-    if oa_hint_count < oa_target:
-        reasons.append(f"open_fulltext_hints={oa_hint_count}<{oa_target}")
+    # The user-facing download queue needs enough relevant *and* open papers;
+    # unrelated arXiv hits must not suppress OA supplementation.
+    oa_target = min(7, expected)
+    if relevant_oa_hint_count < oa_target:
+        reasons.append(f"relevant_open_fulltext_hints={relevant_oa_hint_count}<{oa_target}")
     return reasons
 
 

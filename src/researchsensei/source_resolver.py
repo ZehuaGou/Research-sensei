@@ -129,7 +129,10 @@ class PaperSourceResolver:
             )
 
         source_url = ""
-        pdf_url = paper.pdf_url
+        pdf_urls = _ordered_pdf_urls(
+            [paper.pdf_url, paper.selected_fulltext_url, *paper.candidate_pdf_urls]
+        )
+        pdf_url = pdf_urls[0] if pdf_urls else ""
         landing_url = paper.landing_url or paper.url or _doi_url(paper.doi)
         source_type = PaperSourceType.PDF if pdf_url else PaperSourceType.METADATA_ONLY
 
@@ -152,13 +155,38 @@ class PaperSourceResolver:
 
         if pdf_url:
             if self.network_enabled and (download_dir or self.download_dir):
-                return self._download_pdf(
-                    paper,
-                    pdf_url=pdf_url,
-                    source_url=source_url or pdf_url,
-                    landing_url=landing_url,
-                    source_type=source_type,
-                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                failures: list[ResolvedPaperSource] = []
+                for candidate_pdf_url in pdf_urls:
+                    attempt = self._download_pdf(
+                        paper,
+                        pdf_url=candidate_pdf_url,
+                        source_url=source_url or candidate_pdf_url,
+                        landing_url=landing_url,
+                        source_type=source_type,
+                        download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                    )
+                    if attempt.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED:
+                        if failures:
+                            attempt = attempt.model_copy(
+                                update={
+                                    "metadata": {
+                                        **attempt.metadata,
+                                        "attempted_pdf_urls": [item.pdf_url for item in failures] + [candidate_pdf_url],
+                                        "fallback_count": len(failures),
+                                    }
+                                }
+                            )
+                        return attempt
+                    failures.append(attempt)
+                last_failure = failures[-1]
+                return last_failure.model_copy(
+                    update={
+                        "metadata": {
+                            **last_failure.metadata,
+                            "attempted_pdf_urls": [item.pdf_url for item in failures],
+                            "fallback_count": max(len(failures) - 1, 0),
+                        }
+                    }
                 )
             return self._base_result(
                 paper,
@@ -1146,6 +1174,54 @@ def select_latex_main_file(source_dir: str | Path) -> tuple[Path | None, str]:
 
     tex_files.sort(key=lambda path: path.stat().st_size, reverse=True)
     return tex_files[0], "largest_tex"
+
+
+def _ordered_pdf_urls(values: list[str]) -> list[str]:
+    """Prefer stable OA/repository endpoints while retaining publisher fallbacks."""
+
+    unique: list[str] = []
+    for value in values:
+        url = str(value or "").strip()
+        lower = url.lower()
+        if not url.startswith(("http://", "https://")):
+            continue
+        if not (
+            lower.endswith(".pdf")
+            or "/pdf" in lower
+            or "pdf" in lower
+            or "ojs.aaai.org" in lower and "/article/download/" in lower
+        ):
+            continue
+        if url not in unique:
+            unique.append(url)
+
+    def reliability(url: str) -> int:
+        lower = url.lower()
+        if any(
+            marker in lower
+            for marker in (
+                "arxiv.org/",
+                "pmc.ncbi.nlm.nih.gov/",
+                "pdfs.semanticscholar.org/",
+                "ojs.aaai.org/",
+                "aaai.org/ojs/",
+                "ijcai.org/proceedings/",
+                "proceedings.mlr.press/",
+                "openaccess.thecvf.com/",
+                "aclanthology.org/",
+                "eprints.",
+                "repository.",
+                "hal.science/",
+            )
+        ):
+            return 0
+        if "mdpi.com/" in lower:
+            return 2
+        if any(marker in lower for marker in ("dl.acm.org/", "ieeexplore.ieee.org/", "sciencedirect.com/")):
+            return 3
+        return 1
+
+    return sorted(unique, key=reliability)
 
 
 def _unique_warnings(values: list[str]) -> list[str]:

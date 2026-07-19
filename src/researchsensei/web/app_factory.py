@@ -22,7 +22,7 @@ from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.concurrency import run_in_threadpool
 
-from researchsensei.acquisition import PaperSearchMcpAdapter
+from researchsensei.acquisition import OpenAlexAdapter, PaperSearchMcpAdapter, SemanticScholarAdapter
 from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import AppConfig, ConfigService
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
@@ -164,6 +164,10 @@ def create_app(
     )
     resolved_direction_service = direction_service or DirectionExplorationService(
         adapters={"paper_search": configured_search_adapter},
+        fallback_adapters={
+            "openalex_fallback": OpenAlexAdapter(http_client=http_client),
+            "semantic_scholar_fallback": SemanticScholarAdapter(http_client=http_client),
+        },
         source_resolver=PaperSourceResolver(
             network_enabled=True,
             download_dir=m1_source_dir,
@@ -176,6 +180,7 @@ def create_app(
         source_download_dir=m1_source_dir,
         paper_library=paper_library,
         max_results_per_source=runtime_config.search.max_results,
+        max_download_candidates=7,
         query_planner=QueryPlanner(resolved_llm_client) if resolved_llm_client is not None else None,
     )
     resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService(

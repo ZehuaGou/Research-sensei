@@ -10,7 +10,7 @@ from urllib.parse import quote
 import httpx
 
 from researchsensei.acquisition.arxiv_crosslink import ArxivCrosslink
-from researchsensei.acquisition.landing_extractor import LandingPdfExtractor
+from researchsensei.acquisition.landing_extractor import LandingPdfExtractor, classify_landing_url
 from researchsensei.acquisition.pdf_cache import PdfCache
 from researchsensei.acquisition.venue_registry import is_known_oa_landing
 from researchsensei.schemas import CandidatePaper, SourceStatus
@@ -19,7 +19,7 @@ from researchsensei.source_resolver import SourceResolver
 logger = logging.getLogger(__name__)
 
 READY_STATUSES = {"source_ready", "pdf_ready", "html_ready"}
-PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other"}
+PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other", "doi", "repository"}
 UNVERIFIED_OFFICIAL_PDF_SOURCE = "official_pdf_url_unverified"
 UNVERIFIED_OFFICIAL_PDF_REASON = "PDF_URL_REQUIRES_DOWNLOAD_VERIFICATION"
 
@@ -126,6 +126,19 @@ class FullTextResolver:
             if not pending_landing_urls:
                 return
             extracted_pdfs, landing_metrics, landing_errors = self._extract_oa_landing_pdfs(pending_landing_urls)
+            pdf_urls.extend(extracted_pdfs)
+            metrics.extend(landing_metrics)
+            lookup_errors.extend(landing_errors)
+
+        # Repository copies are frequently listed as secondary OpenAlex
+        # locations. Probe them even when the publisher supplied a PDF URL:
+        # publisher CDNs may reject server-side downloads while PMC/HAL works.
+        repository_landings = [
+            url for url in landing_urls if classify_landing_url(url)[1] == "repository"
+        ]
+        if repository_landings:
+            extracted_pdfs, landing_metrics, landing_errors = self._extract_oa_landing_pdfs(repository_landings)
+            attempted_landing_urls.update(repository_landings)
             pdf_urls.extend(extracted_pdfs)
             metrics.extend(landing_metrics)
             lookup_errors.extend(landing_errors)
@@ -392,7 +405,7 @@ class FullTextResolver:
         metrics: list[dict[str, object]] = []
         errors: list[str] = []
         for landing_url in landing_urls:
-            is_oa, archive_kind, cfg = is_known_oa_landing(landing_url)
+            is_oa, archive_kind, cfg = classify_landing_url(landing_url)
             can_probe = archive_kind in PROBE_ONLY_ARCHIVE_KINDS
             if not is_oa and not can_probe:
                 continue
@@ -414,21 +427,27 @@ class FullTextResolver:
         if arxiv_id:
             urls.append(SourceResolver.arxiv_to_pdf_url(arxiv_id=arxiv_id))
         raw = candidate.raw_source_metadata or {}
+        for metadata in _metadata_dicts(raw):
+            for key in ("pdf_url", "url_for_pdf"):
+                pdf = str(metadata.get(key) or "")
+                if pdf:
+                    urls.append(pdf)
         for location in _metadata_locations(raw):
             for key in ("pdf_url", "url_for_pdf"):
                 pdf = str((location or {}).get(key) or "")
                 if pdf:
                     urls.append(pdf)
-        raw_open_access = raw.get("open_access")
-        open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
-        oa_url = str(open_access.get("oa_url") or "")
-        if _is_legal_pdf_url(oa_url):
-            urls.append(oa_url)
-        raw_open_access_pdf = raw.get("openAccessPdf")
-        open_access_pdf = raw_open_access_pdf if isinstance(raw_open_access_pdf, dict) else {}
-        s2_pdf = str(open_access_pdf.get("url") or "")
-        if s2_pdf:
-            urls.append(s2_pdf)
+        for metadata in _metadata_dicts(raw):
+            raw_open_access = metadata.get("open_access")
+            open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
+            oa_url = str(open_access.get("oa_url") or "")
+            if _is_legal_pdf_url(oa_url):
+                urls.append(oa_url)
+            raw_open_access_pdf = metadata.get("openAccessPdf")
+            open_access_pdf = raw_open_access_pdf if isinstance(raw_open_access_pdf, dict) else {}
+            s2_pdf = str(open_access_pdf.get("url") or "")
+            if s2_pdf:
+                urls.append(s2_pdf)
         return [url for url in urls if _is_legal_pdf_url(url)]
 
     def _metadata_source_urls(self, candidate: CandidatePaper, arxiv_id: str = "") -> list[str]:
@@ -455,11 +474,14 @@ class FullTextResolver:
         for location in _metadata_locations(raw):
             for key in ("landing_page_url", "url_for_landing_page", "url"):
                 urls.append(str((location or {}).get(key) or ""))
-        raw_open_access = raw.get("open_access")
-        open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
-        oa_url = str(open_access.get("oa_url") or "")
-        if oa_url and not _is_legal_pdf_url(oa_url):
-            urls.append(oa_url)
+        for metadata in _metadata_dicts(raw):
+            for key in ("landing_url", "landing_page_url"):
+                urls.append(str(metadata.get(key) or ""))
+            raw_open_access = metadata.get("open_access")
+            open_access = raw_open_access if isinstance(raw_open_access, dict) else {}
+            oa_url = str(open_access.get("oa_url") or "")
+            if oa_url and not _is_legal_pdf_url(oa_url):
+                urls.append(oa_url)
         return _unique([url for url in urls if url])
 
 
@@ -508,16 +530,37 @@ def _candidate_arxiv_id(candidate: CandidatePaper) -> str:
 
 def _metadata_locations(raw: dict[str, object]) -> list[dict[str, object]]:
     locations: list[dict[str, object]] = []
-    for key in ("best_oa_location", "primary_location"):
-        location = raw.get(key) if isinstance(raw.get(key), dict) else None
-        if isinstance(location, dict):
-            locations.append(location)
-    for key in ("locations", "oa_locations"):
-        values = raw.get(key)
-        if not isinstance(values, list):
-            continue
-        locations.extend(location for location in values if isinstance(location, dict))
+    for metadata in _metadata_dicts(raw):
+        for key in ("best_oa_location", "primary_location"):
+            location = metadata.get(key) if isinstance(metadata.get(key), dict) else None
+            if isinstance(location, dict):
+                locations.append(location)
+        for key in ("locations", "oa_locations"):
+            values = metadata.get(key)
+            if not isinstance(values, list):
+                continue
+            locations.extend(location for location in values if isinstance(location, dict))
     return locations
+
+
+def _metadata_dicts(raw: dict[str, object]) -> list[dict[str, object]]:
+    """Return source-specific metadata wrappers produced during deduplication."""
+
+    result: list[dict[str, object]] = []
+    pending: list[tuple[dict[str, object], int]] = [(raw, 0)]
+    seen: set[int] = set()
+    while pending:
+        current, depth = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        result.append(current)
+        if depth >= 3:
+            continue
+        for value in current.values():
+            if isinstance(value, dict):
+                pending.append((value, depth + 1))
+    return result
 
 
 def _normalize_doi(doi: str) -> str:

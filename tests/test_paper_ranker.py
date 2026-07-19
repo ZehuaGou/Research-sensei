@@ -73,6 +73,32 @@ def test_select_downloads_marks_primary_download_fields() -> None:
     assert selected[2].download_decision == "SKIPPED_OVER_DOWNLOAD_LIMIT"
 
 
+def test_select_downloads_prefers_reliable_open_source_within_relevance_queue() -> None:
+    ranked = [
+        _paper(
+            paper_id="closed-top",
+            title="Closed top result",
+            search_rank=1,
+            rerank_rank=1,
+            landing_url="https://dl.acm.org/doi/10.1145/example",
+        ),
+        _paper(
+            paper_id="open-second",
+            title="Open second result",
+            search_rank=2,
+            rerank_rank=2,
+            arxiv_id="2401.12345",
+            pdf_url="https://arxiv.org/pdf/2401.12345",
+            fulltext_status="source_ready",
+        ),
+    ]
+
+    selected = select_downloads(ranked, max_download_candidates=1)
+
+    assert [paper.download_selected for paper in selected] == [False, True]
+    assert "source-readiness tier=1" in selected[1].download_reason
+
+
 def test_paper_ranker_disabled_preserves_external_search_order() -> None:
     ranker = PaperRanker(enabled=False)
     papers = [

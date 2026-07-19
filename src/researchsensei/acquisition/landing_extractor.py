@@ -26,12 +26,12 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Callable
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
-from researchsensei.acquisition.venue_registry import is_known_oa_landing
+from researchsensei.acquisition.venue_registry import VenueConfig, is_known_oa_landing
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,33 @@ class LandingResult:
 # ---------------------------------------------------------------------------
 ExtractorFn = Callable[..., str | None]
 _EXTRACTOR_REGISTRY: dict[str, ExtractorFn] = {}
-PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other"}
+PROBE_ONLY_ARCHIVE_KINDS = {"acm_dl", "ieee", "springer", "other", "doi", "repository"}
+
+
+def classify_landing_url(url: str) -> tuple[bool, str, VenueConfig | None]:
+    """Classify publisher redirects and reputable repository landing pages."""
+
+    is_oa, archive_kind, cfg = is_known_oa_landing(url)
+    if is_oa or archive_kind:
+        return is_oa, archive_kind, cfg
+    parsed = urlparse(str(url or ""))
+    host = parsed.netloc.lower()
+    path = parsed.path.lower()
+    if host in {"doi.org", "dx.doi.org"}:
+        return False, "doi", None
+    repository_markers = (
+        "pmc.ncbi.nlm.nih.gov",
+        "ncbi.nlm.nih.gov/pmc",
+        "europepmc.org/articles",
+        "hal.science",
+        "vbn.aau.dk",
+        "repository.",
+        "eprints.",
+    )
+    combined = f"{host}{path}"
+    if any(marker in combined for marker in repository_markers):
+        return True, "repository", None
+    return False, "", None
 
 
 def register(archive_kind: str) -> Callable[[ExtractorFn], ExtractorFn]:
@@ -123,7 +149,7 @@ class LandingPdfExtractor:
         - Try the archive's specific extractor first; on miss, run the generic fallback.
         - Network/parse errors become (warnings, pdf_url="").
         """
-        is_oa, archive_kind, _ = is_known_oa_landing(landing_url)
+        is_oa, archive_kind, _ = classify_landing_url(landing_url)
         if not is_oa and archive_kind not in PROBE_ONLY_ARCHIVE_KINDS:
             return LandingResult(pdf_url="", warnings=("NOT_KNOWN_OA_VENUE",), archive_kind=archive_kind)
         warnings: list[str] = []
@@ -144,6 +170,10 @@ class LandingPdfExtractor:
             return LandingResult(pdf_url="", warnings=tuple(warnings), archive_kind=archive_kind)
         html = resp.text
         base_url = str(resp.url)
+        redirected_is_oa, redirected_kind, _ = classify_landing_url(base_url)
+        if redirected_is_oa or redirected_kind:
+            is_oa = redirected_is_oa
+            archive_kind = redirected_kind
         extractor = _EXTRACTOR_REGISTRY.get(archive_kind, _generic_extract)
         try:
             url = extractor(html=html, base_url=base_url, archive_kind=archive_kind)

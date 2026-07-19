@@ -7,6 +7,50 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-19 M1 Open-Fulltext Rescue
+
+This section supersedes the earlier single-query M1 `2/7` result below.
+
+- Git history is consolidated on `main`; local and remote have no other branch.
+- The production direction service now actually wires OpenAlex and Semantic
+  Scholar as OA supplements. Supplementation is decided by the deterministic
+  relevance gate's count of relevant/open papers, not rough keyword overlap or
+  unrelated arXiv hits.
+- OA supplement queries always include the user's original query, use three
+  complementary variants, and request at least 50 results per index. Optional
+  index rate limits remain visible in source metrics but do not degrade a run
+  when another OA index succeeds.
+- Deterministic relevance runs before DOI, repository, Unpaywall, and publisher
+  probing, so full-text discovery is limited to relevance-cleared candidates.
+- Deduplicated OpenAlex/Semantic Scholar metadata is scanned recursively for
+  secondary OA locations. DOI redirects and reputable repositories such as
+  PMC, HAL, and institutional repositories are eligible for HTML PDF-link
+  extraction.
+- The downloader orders stable OA endpoints ahead of publisher fallbacks and
+  tries every legal candidate PDF URL until a validated PDF succeeds. The
+  seven-paper queue prefers cached, arXiv, repository, and open proceedings
+  sources among candidates that already passed the strict relevance gate.
+- The direction UI shows strict-related versus total deduplicated counts and
+  hides `D_IGNORE` candidates by default behind an explicit disclosure button.
+
+Live acceptance progression for the same query
+`graph neural network multivariate time series anomaly detection`:
+
+| Revision stage | Live result | Interpretation |
+|---|---|---|
+| Previous implementation | 30 raw candidates, 7 relevant, 2/7 downloaded, 50.8s | Primary-only discovery and single-URL failure. |
+| OA supplement wired | 76 raw candidates, 10 relevant, 6/10 downloaded, 106.7s | Better discovery, but closed papers still occupied the queue. |
+| Seven-paper source-aware queue | 146 raw candidates, 17 relevant, 7/7 downloaded, 223.2s | Full download target passed, but full-text probing happened too early. |
+| Final optimized live run | 254 raw candidates, 146 deduplicated, 46 strict-related, 7/7 downloaded, 134.1s | `SUCCESS`; all selected papers were validated and landed locally. |
+| Final browser acceptance | 114 deduplicated, 17 strict-related, 7/7 downloaded | `SUCCESS` even while Semantic Scholar was unavailable; OpenAlex supplementation and legal-source fallback carried the queue. |
+
+The final live run is a single-query acceptance, not a claim that every
+publisher or every research direction will achieve 7/7. ACM was Cloudflare-403
+from the automation environment, MDPI PDF/page requests were 403, and the tested
+IEEE/Elsevier papers had no OA copy in OpenAlex, Semantic Scholar, or Europe PMC.
+The implementation therefore uses legal alternative copies and source-aware
+candidate selection rather than bypassing access controls.
+
 ## 2026-07-19 Full-Project Remediation Refresh
 
 This section supersedes the earlier local gate counts below without rewriting
@@ -38,10 +82,10 @@ Current verification:
 
 | Command / surface | Result | Classification |
 |---|---|---|
-| `.venv\Scripts\python.exe -m pytest -q` | `776 passed, 15 skipped` in 149.04s | Complete local backend/offline suite. |
+| `.venv\Scripts\python.exe -m pytest -q` | `783 passed, 15 skipped` in 197.81s | Complete local backend/offline suite. |
 | `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
 | `.venv\Scripts\python.exe -m mypy` | No issues in 126 source files | Full backend type boundary. |
-| `npm test` | 14 files, 74 tests passed | Frontend unit/contract suite. |
+| `npm test` | 15 files, 76 tests passed | Frontend unit/contract suite. |
 | `npm run typecheck` and `npm run build` | Passed; Vite transformed 94 modules | Frontend static and production build. |
 | `npm audit --registry=https://registry.npmjs.org` | 0 vulnerabilities | Full npm dependency tree, including dev dependencies. |
 | `npm run test:e2e` | 6/6 Chromium fixture tests passed | Deterministic browser E2E. |
@@ -106,7 +150,7 @@ are live-service failures, not reclassified by the green offline suites.
 ## Release Identity
 
 - Target: `ResearchSensei v0.6 Reliability Baseline`
-- Working branch: `codex/reliability-hardening-v06`
+- Working branch: `main` (the only local and remote branch)
 - Baseline branch: `main`
 - Baseline HEAD: `769bf2ceda9ef17acd1b8e60b5e955c41f27a6d9`
 - Verified code/CI HEAD: `3c41f133eb6a22209ce01ceee7d22466320b287b`

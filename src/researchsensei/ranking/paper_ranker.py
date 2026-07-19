@@ -120,9 +120,29 @@ def select_downloads(
     require_relevance_gate: bool = False,
 ) -> list[CandidatePaper]:
     limit = max(max_download_candidates, 0)
+    candidate_list = list(candidates)
+    cached_by_index = {
+        index: paper_library.find_match(candidate) if paper_library is not None else None
+        for index, candidate in enumerate(candidate_list)
+    }
+    eligible_indexes = [
+        index
+        for index, candidate in enumerate(candidate_list)
+        if (
+            not require_relevance_gate
+            or (candidate.relevance_gate_evaluated and candidate.relevance_gate_passed)
+        )
+    ]
+    eligible_indexes.sort(
+        key=lambda index: (
+            _downloadability_tier(candidate_list[index], cached=bool(cached_by_index[index])),
+            index,
+        )
+    )
+    selected_indexes = set(eligible_indexes[:limit])
     selected: list[CandidatePaper] = []
-    selected_count = 0
-    for index, candidate in enumerate(candidates, start=1):
+    for zero_index, candidate in enumerate(candidate_list):
+        index = zero_index + 1
         relevance_eligible = bool(
             not require_relevance_gate
             or (
@@ -130,10 +150,8 @@ def select_downloads(
                 and candidate.relevance_gate_passed
             )
         )
-        is_selected = relevance_eligible and selected_count < limit
-        if is_selected:
-            selected_count += 1
-        cached = paper_library.find_match(candidate) if paper_library is not None else None
+        is_selected = zero_index in selected_indexes
+        cached = cached_by_index[zero_index]
         download_rank = int(candidate.rerank_rank or candidate.search_rank or index)
         raw_metadata = {
             **candidate.raw_source_metadata,
@@ -157,8 +175,10 @@ def select_downloads(
         elif is_selected:
             decision = "SELECTED_BY_RERANKER"
             reuse_note = " local library hit; reuse before network download." if cached is not None else ""
+            source_tier = _downloadability_tier(candidate, cached=cached is not None)
             reason = (
-                f"Selected for download by reranked order #{download_rank}; "
+                f"Selected from the relevance-cleared queue at reranked order #{download_rank}; "
+                f"source-readiness tier={source_tier}; "
                 f"venue='{venue}', CCF rank={venue_rank}.{reuse_note}"
             )
         else:
@@ -177,6 +197,37 @@ def select_downloads(
             )
         )
     return selected
+
+
+def _downloadability_tier(candidate: CandidatePaper, *, cached: bool = False) -> int:
+    if cached:
+        return 0
+    urls = [candidate.pdf_url, candidate.selected_fulltext_url, *candidate.candidate_pdf_urls]
+    lower_urls = " ".join(url.lower() for url in urls if url)
+    if candidate.arxiv_id or candidate.fulltext_status == "source_ready":
+        return 1
+    if any(
+        marker in lower_urls
+        for marker in (
+            "arxiv.org/",
+            "pdfs.semanticscholar.org/",
+            "ojs.aaai.org/",
+            "aaai.org/ojs/",
+            "ijcai.org/proceedings/",
+            "proceedings.mlr.press/",
+            "openaccess.thecvf.com/",
+            "aclanthology.org/",
+            "eprints.",
+            "repository.",
+            "hal.science/",
+        )
+    ):
+        return 1
+    if candidate.pdf_url or candidate.candidate_pdf_urls:
+        if any(marker in lower_urls for marker in ("mdpi.com/", "dl.acm.org/", "ieeexplore.ieee.org/")):
+            return 3
+        return 2
+    return 4
 
 
 def _with_search_rank(candidate: CandidatePaper, fallback: int) -> CandidatePaper:

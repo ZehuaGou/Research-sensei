@@ -856,6 +856,36 @@ def test_multiple_sources_merge_preserves_discovery_and_fulltext_urls() -> None:
     assert merged.candidate_html_urls == []
 
 
+def test_nested_openalex_repository_location_adds_pmc_pdf_fallback() -> None:
+    pmc_landing = "https://pmc.ncbi.nlm.nih.gov/articles/PMC10490803/"
+    pmc_pdf = "https://pmc.ncbi.nlm.nih.gov/articles/PMC10490803/pdf/sensors-23-07552.pdf"
+    client = LandingClient(
+        f'<html><head><meta name="citation_pdf_url" content="{pmc_pdf}"></head></html>'
+    )
+    resolver = FullTextResolver(http_client=client, unpaywall_email="")
+    candidate = paper(
+        doi="10.3390/s23177552",
+        pdf_url="https://www.mdpi.com/1424-8220/23/17/7552/pdf",
+        raw_source_metadata={
+            "openalex": {
+                "locations": [
+                    {
+                        "landing_page_url": pmc_landing,
+                        "pdf_url": None,
+                        "source": {"display_name": "PubMed Central"},
+                    }
+                ]
+            }
+        },
+    )
+
+    resolved, metrics = resolver.resolve(candidate)
+
+    assert pmc_pdf in resolved.candidate_pdf_urls
+    assert any(metric["source"] == "landing_extractor:repository" for metric in metrics)
+    assert client.calls[0]["url"] == pmc_landing
+
+
 def test_acceptance_keeps_metadata_only_candidates_visible(tmp_path: Path) -> None:
     result = run_literature_acquisition_acceptance(
         query="time series anomaly detection",

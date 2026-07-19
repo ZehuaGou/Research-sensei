@@ -204,6 +204,44 @@ describe('DirectionSearchView', () => {
     expect(card.text()).toContain('M2 待验证')
   })
 
+  it('hides rejected candidates by default and keeps fulltext probes collapsed', async () => {
+    const accepted = directionResponse().papers[0]
+    mockFetch(directionResponse({
+      warnings: ['NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT'],
+      source_metrics: [
+        { source: 'paper_search_mcp', success: true, count: 30 },
+        { source: 'openalex', success: true, count: 50, trigger: 'low_coverage_oa_supplement' },
+        { source: 'unpaywall', success: false, count: 0 },
+        { source: 'landing_extractor:repository', success: true, count: 1 },
+      ],
+      papers: [
+        accepted,
+        {
+          ...accepted,
+          paper_id: 'p-filtered',
+          title: 'Unrelated Candidate',
+          priority: 'D_IGNORE',
+          relevance_gate_passed: false,
+          download_selected: false,
+        },
+      ],
+    }))
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.findAll('[data-testid="candidate-card"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="toggle-filtered-candidates"]').text()).toContain('查看 1 篇已过滤结果')
+    expect(wrapper.get('[data-testid="direction-warning"]').text()).toContain('M2 解析与质量校验')
+    expect(wrapper.get('[data-testid="source-ledger"]').text()).not.toContain('unpaywall')
+    expect(wrapper.get('.source-probe-details').attributes('open')).toBeUndefined()
+
+    await wrapper.get('[data-testid="toggle-filtered-candidates"]').trigger('click')
+    expect(wrapper.findAll('[data-testid="candidate-card"]')).toHaveLength(2)
+  })
+
   it('shows prepare deep-read when candidate has a supported source', async () => {
     mockFetch(directionResponse())
 
