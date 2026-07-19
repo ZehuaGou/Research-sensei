@@ -266,6 +266,21 @@ only after ordinary HTTP candidates fail or a publisher landing page has no
 extractable PDF URL; the resulting file must still pass the same PDF magic,
 size, SHA-256, and metadata checks before M2 can use it.
 
+Before interacting with a publisher PDF control, the helper checks visible
+Cookie/privacy overlays in the page and embedded consent frames. It prefers
+rejecting optional cookies or continuing with necessary cookies; it accepts
+cookies only when the consent component exposes no privacy-preserving
+continuation. Matching is constrained to explicit Cookie/consent controls so a
+generic article-page button is not clicked accidentally.
+
+Transient publisher security checks are allowed a bounded wait for the normal
+page to finish hydrating. A real CAPTCHA or human-verification prompt is never
+clicked or bypassed. Failed attempts save `*.cookie-consent.png` (when a consent
+panel was found) and `*.browser-failure.png` beside the intended PDF. The M1
+source result and direction manifest record `cookie_consent_action`,
+`page_barrier`, and these diagnostic paths. Common barriers are distinguished as
+Cookie blocking, user verification, subscription/login, and PDF not exposed.
+
 This is a publisher-agnostic fallback, not an ACM-specific branch. ACM, IEEE,
 Springer, Elsevier, or another site can use it when a legitimate user session
 can access the paper and the ordinary machine route fails. Conversely, arXiv,
@@ -273,6 +288,11 @@ PMC Cloud, repository PDFs, and other direct OA responses never open Chrome
 when their normal download succeeds. The runtime records
 `resolution_strategy=authorized_browser_session` and
 `browser_mode=native_chrome_cdp` when this final fallback is actually used.
+Concrete publisher PDF candidates remain publisher-agnostic. For a DOI-only
+candidate with no PDF/OA signal, automatic landing-page discovery is restricted
+to publisher routes that have passed live acceptance (currently ACM); this
+prevents repeated browser windows for metadata-only IEEE/Elsevier candidates
+while retaining the proven ACM recovery path.
 
 ## Adapter Status
 

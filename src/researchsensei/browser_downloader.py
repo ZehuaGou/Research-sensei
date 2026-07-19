@@ -15,6 +15,12 @@ class BrowserDownloadResult:
     final_url: str = ""
     content_type: str = ""
     browser_mode: str = ""
+    cookie_consent_detected: bool = False
+    cookie_consent_action: str = ""
+    cookie_consent_dismissed: bool = False
+    consent_screenshot: str = ""
+    diagnostic_screenshot: str = ""
+    page_barrier: str = ""
     error_code: str = ""
     error: str = ""
 
@@ -112,6 +118,12 @@ class BrowserSessionDownloader:
             final_url=str(payload.get("finalUrl") or ""),
             content_type=str(payload.get("contentType") or ""),
             browser_mode=str(payload.get("browserMode") or ""),
+            cookie_consent_detected=bool(payload.get("cookieConsentDetected")),
+            cookie_consent_action=str(payload.get("cookieConsentAction") or ""),
+            cookie_consent_dismissed=bool(payload.get("cookieConsentDismissed")),
+            consent_screenshot=str(payload.get("consentScreenshot") or ""),
+            diagnostic_screenshot=str(payload.get("diagnosticScreenshot") or ""),
+            page_barrier=str(payload.get("pageBarrier") or ""),
             error_code=str(payload.get("errorCode") or ("" if success else "BROWSER_SESSION_FAILED")),
             error=str(payload.get("error") or completed.stderr or "")[:300],
         )

@@ -685,6 +685,7 @@ class DirectionExplorationService:
                                 "download_status": resolved.download_status,
                                 "error": resolved.error,
                                 "error_code": resolved.error_code,
+                                "metadata": resolved.metadata,
                             },
                         },
                     }
@@ -1522,7 +1523,9 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "fulltext_failure_reason": paper.fulltext_failure_reason,
             "download_status": source_resolution.get("download_status", ""),
             "download_error": source_resolution.get("error", "") or paper.degradation_reason,
+            "download_error_code": source_resolution.get("error_code", ""),
             "download_local_path": source_resolution.get("local_path", ""),
+            "browser_diagnostics": source_resolution.get("metadata", {}),
             "can_deep_read": paper.can_deep_read,
             "needs_user_upload": paper.needs_user_upload,
             "relevance_score": item.scoring_breakdown.relevance_score,

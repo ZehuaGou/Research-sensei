@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import httpx
@@ -34,6 +35,10 @@ class FakeBrowserDownloader:
             final_url=final_url,
             content_type="application/pdf",
             browser_mode="native_chrome_cdp",
+            cookie_consent_detected=True,
+            cookie_consent_action="rejected_optional",
+            cookie_consent_dismissed=True,
+            consent_screenshot=str(target.with_suffix(".cookie-consent.png")),
         )
 
 
@@ -45,6 +50,11 @@ class FailingBrowserDownloader:
             attempted=True,
             success=False,
             browser_mode="native_chrome_cdp",
+            cookie_consent_detected=True,
+            cookie_consent_action="accepted_required",
+            cookie_consent_dismissed=False,
+            diagnostic_screenshot="workspace/browser-failure.png",
+            page_barrier="subscription_or_login",
             error_code="BROWSER_PDF_NOT_FOUND",
             error="No validated PDF was exposed by the publisher page.",
         )
@@ -439,14 +449,26 @@ def test_resolver_uses_native_chrome_session_for_any_publisher_after_http_failur
         pdf_url="https://journals.example.org/article/relevant-paper.pdf",
     )
 
-    result = resolver.resolve_one(paper, download_dir=tmp_path)
+    resolution = resolver.resolve_many(
+        "relevant publisher paper",
+        [paper],
+        download_dir=tmp_path,
+    )
+    result = resolution.items[0]
 
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.metadata["resolution_strategy"] == "authorized_browser_session"
     assert result.metadata["browser_mode"] == "native_chrome_cdp"
+    assert result.metadata["cookie_consent_detected"] == "true"
+    assert result.metadata["cookie_consent_action"] == "rejected_optional"
+    assert result.metadata["cookie_consent_dismissed"] == "true"
+    assert str(result.metadata["consent_screenshot"]).endswith(".cookie-consent.png")
     assert result.pdf_url == "https://journals.example.org/article/relevant-paper.pdf"
     assert Path(result.local_path).read_bytes().startswith(b"%PDF")
     assert len(browser.calls) == 1
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["papers"][0]["cookie_consent_action"] == "rejected_optional"
+    assert manifest["papers"][0]["consent_screenshot"].endswith(".cookie-consent.png")
 
 
 def test_resolver_can_discover_pdf_from_landing_with_authorized_browser_session(
@@ -468,6 +490,75 @@ def test_resolver_can_discover_pdf_from_landing_with_authorized_browser_session(
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.metadata["resolution_strategy"] == "authorized_browser_session"
     assert browser.calls[0]["pdf_urls"] == []
+
+
+def test_resolver_follows_doi_redirect_before_browser_landing_fallback(
+    tmp_path: Path,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "pmc.ncbi.nlm.nih.gov":
+            return httpx.Response(200, json={"status": "ok", "records": []}, request=request)
+        if request.url.host == "doi.org":
+            return httpx.Response(
+                302,
+                headers={"location": "https://dl.acm.org/doi/10.1145/3534678.3539117"},
+                request=request,
+            )
+        return httpx.Response(403, request=request)
+
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    paper = CandidatePaper(
+        paper_id="acm-doi-only",
+        title="Learning Sparse Latent Graph Representations",
+        doi="10.1145/3534678.3539117",
+        landing_url="https://doi.org/10.1145/3534678.3539117",
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert len(browser.calls) == 1
+    assert browser.calls[0]["landing_url"] == (
+        "https://dl.acm.org/doi/10.1145/3534678.3539117"
+    )
+
+
+def test_resolver_does_not_open_browser_for_unproven_doi_only_publisher(
+    tmp_path: Path,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "pmc.ncbi.nlm.nih.gov":
+            return httpx.Response(200, json={"status": "ok", "records": []}, request=request)
+        if request.url.host == "doi.org":
+            return httpx.Response(
+                302,
+                headers={"location": "https://ieeexplore.ieee.org/document/10582541/"},
+                request=request,
+            )
+        return httpx.Response(202, request=request)
+
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    paper = CandidatePaper(
+        paper_id="ieee-doi-only",
+        title="Adversarial Graph Neural Network",
+        doi="10.1109/tkde.2024.3419891",
+        landing_url="https://doi.org/10.1109/tkde.2024.3419891",
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.RESOLVED_LANDING_ONLY
+    assert browser.calls == []
 
 
 @pytest.mark.parametrize(
@@ -519,3 +610,8 @@ def test_resolver_preserves_native_chrome_failure_reason(tmp_path: Path) -> None
     assert result.error_code == "BROWSER_PDF_NOT_FOUND"
     assert result.metadata["resolution_strategy"] == "authorized_browser_session_failed"
     assert result.metadata["browser_mode"] == "native_chrome_cdp"
+    assert result.metadata["cookie_consent_detected"] == "true"
+    assert result.metadata["cookie_consent_action"] == "accepted_required"
+    assert result.metadata["cookie_consent_dismissed"] == "false"
+    assert result.metadata["diagnostic_screenshot"] == "workspace/browser-failure.png"
+    assert result.metadata["page_barrier"] == "subscription_or_login"

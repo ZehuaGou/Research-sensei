@@ -381,6 +381,24 @@ describe('DirectionSearchView', () => {
     expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('尚未通过 M2 深读门槛')
   })
 
+  it('explains publisher browser barriers on the candidate card', async () => {
+    const base = directionResponse()
+    mockFetch(directionResponse({
+      papers: [{
+        ...base.papers[0],
+        download_error_code: 'BROWSER_ACCESS_REQUIRED',
+        browser_diagnostics: { page_barrier: 'subscription_or_login' },
+      }],
+    }))
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="browser-download-note"]').text()).toContain('机构订阅或购买')
+  })
+
   it('passes a selected candidate into SeedExpansionPanel', async () => {
     mockFetch(directionResponse())
 

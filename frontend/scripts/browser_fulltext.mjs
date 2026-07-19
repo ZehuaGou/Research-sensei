@@ -172,6 +172,238 @@ async function landingPdfLinks(page) {
   })
 }
 
+function browserDiagnosticPath(targetPath, suffix) {
+  return targetPath.replace(/\.pdf$/i, '') + suffix
+}
+
+async function inspectCookieConsentFrame(frame) {
+  return frame.evaluate(() => {
+    const marker = 'data-researchsensei-cookie-choice'
+    for (const existing of document.querySelectorAll(`[${marker}]`)) existing.removeAttribute(marker)
+
+    const visible = element => {
+      const style = window.getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity || 1) > 0
+        && rect.width > 0
+        && rect.height > 0
+    }
+    const normalized = value => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase()
+    const labelFor = element => normalized([
+      element.textContent || '',
+      element.getAttribute('aria-label') || '',
+      element.getAttribute('title') || '',
+      element.getAttribute('value') || '',
+    ].join(' '))
+    const cookieContext = value => /cookie|consent|privacy|datenschutz|confidentialit|隐私|同意|쿠키|クッキー/i.test(value)
+    const rejectChoice = value => /reject all|reject optional|reject|decline|deny|only necessary|necessary only|continue without accepting|do not consent|refuse all|tout refuser|ablehnen|nur notwendige|拒绝全部|拒绝|仅必要|不同意/i.test(value)
+    const acceptChoice = value => /accept all|allow all|agree and proceed|i agree|accept|allow cookies|tout accepter|alle akzeptieren|接受全部|接受|全部同意|同意/i.test(value)
+    const closeChoice = value => /close|dismiss|continue with necessary|继续使用|关闭/i.test(value)
+
+    const directRejectSelectors = [
+      '#onetrust-reject-all-handler',
+      '[data-testid="uc-reject-all-button"]',
+      '[data-testid="consent-reject-all"]',
+      'button[aria-label="Reject All"]',
+      'button[aria-label="Reject all"]',
+    ]
+    const directAcceptSelectors = [
+      '#onetrust-accept-btn-handler',
+      '[data-testid="uc-accept-all-button"]',
+      '[data-testid="consent-accept-all"]',
+      'button[aria-label="Accept All"]',
+      'button[aria-label="Accept all"]',
+    ]
+    const findDirect = selectors => {
+      for (const selector of selectors) {
+        const element = document.querySelector(selector)
+        if (element && visible(element)) return element
+      }
+      return null
+    }
+
+    let choice = findDirect(directRejectSelectors)
+    let action = choice ? 'rejected_optional' : ''
+    if (!choice) {
+      choice = findDirect(directAcceptSelectors)
+      action = choice ? 'accepted_required' : ''
+    }
+
+    const containers = Array.from(document.querySelectorAll([
+      '[role="dialog"]',
+      '[aria-modal="true"]',
+      '[id*="cookie" i]',
+      '[class*="cookie" i]',
+      '[id*="consent" i]',
+      '[class*="consent" i]',
+      '[aria-label*="cookie" i]',
+      '[aria-label*="privacy" i]',
+    ].join(','))).filter(container => visible(container) && cookieContext(normalized(container.textContent)))
+    const blockingContainers = containers.filter(container => {
+      const style = window.getComputedStyle(container)
+      const rect = container.getBoundingClientRect()
+      const modal = container.getAttribute('role') === 'dialog' || container.getAttribute('aria-modal') === 'true'
+      return modal || (
+        ['fixed', 'sticky'].includes(style.position)
+        && rect.width * rect.height > window.innerWidth * window.innerHeight * 0.15
+      )
+    })
+    const globalCookieControls = Array.from(document.querySelectorAll(
+      'button, [role="button"], input[type="button"], input[type="submit"]',
+    )).filter(control => visible(control) && cookieContext(labelFor(control)))
+
+    if (!choice) {
+      choice = globalCookieControls.find(control => rejectChoice(labelFor(control))) || null
+      if (choice) action = 'rejected_optional'
+    }
+    if (!choice) {
+      choice = globalCookieControls.find(control => acceptChoice(labelFor(control))) || null
+      if (choice) action = 'accepted_required'
+    }
+
+    if (!choice) {
+      for (const container of containers) {
+        const controls = Array.from(container.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"], a[href]')).filter(visible)
+        choice = controls.find(control => rejectChoice(labelFor(control))) || null
+        if (choice) {
+          action = 'rejected_optional'
+          break
+        }
+      }
+    }
+    if (!choice) {
+      for (const container of containers) {
+        const controls = Array.from(container.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"], a[href]')).filter(visible)
+        choice = controls.find(control => acceptChoice(labelFor(control))) || null
+        if (choice) {
+          action = 'accepted_required'
+          break
+        }
+      }
+    }
+    if (!choice) {
+      for (const container of containers) {
+        const controls = Array.from(container.querySelectorAll('button, [role="button"]')).filter(visible)
+        choice = controls.find(control => closeChoice(labelFor(control))) || null
+        if (choice) {
+          action = 'dismissed'
+          break
+        }
+      }
+    }
+    if (!choice) return { detected: blockingContainers.length > 0, actionable: false, action: '', label: '' }
+
+    choice.setAttribute(marker, 'true')
+    return {
+      detected: true,
+      actionable: true,
+      action,
+      label: labelFor(choice).slice(0, 120),
+    }
+  })
+}
+
+async function handleCookieConsent(page, targetPath) {
+  const empty = {
+    detected: false,
+    action: '',
+    label: '',
+    dismissed: false,
+    screenshotPath: '',
+  }
+  for (const frame of page.frames()) {
+    let inspection = null
+    try {
+      inspection = await inspectCookieConsentFrame(frame)
+    } catch {
+      continue
+    }
+    if (!inspection?.detected) continue
+    const screenshotPath = browserDiagnosticPath(targetPath, '.cookie-consent.png')
+    await page.screenshot({ path: screenshotPath, fullPage: false }).catch(() => {})
+    if (!inspection.actionable) {
+      return { ...empty, detected: true, screenshotPath }
+    }
+    const choice = frame.locator('[data-researchsensei-cookie-choice="true"]')
+    if (await choice.count() !== 1) {
+      return { ...empty, detected: true, screenshotPath }
+    }
+    try {
+      await choice.click({ timeout: 5000 })
+      await page.waitForTimeout(400)
+      return {
+        detected: true,
+        action: inspection.action,
+        label: inspection.label,
+        dismissed: true,
+        screenshotPath,
+      }
+    } catch {
+      return {
+        detected: true,
+        action: inspection.action,
+        label: inspection.label,
+        dismissed: false,
+        screenshotPath,
+      }
+    }
+  }
+  return empty
+}
+
+async function detectPageBarrier(page, consent) {
+  let pageText = ''
+  try {
+    pageText = await page.evaluate(() => [
+      document.title || '',
+      (document.body?.innerText || '').slice(0, 50000),
+    ].join('\n').toLowerCase())
+  } catch {}
+  if (/verify you are human|security verification|captcha|checking your browser|are you a robot|正在进行安全验证|验证您不是自动程序|安全验证/.test(pageText)) {
+    return {
+      code: 'BROWSER_USER_VERIFICATION_REQUIRED',
+      kind: 'user_verification',
+      message: 'The publisher requires a user-completed security verification before PDF access can continue.',
+    }
+  }
+  if (consent.detected && !consent.dismissed) {
+    return {
+      code: 'BROWSER_COOKIE_CONSENT_BLOCKED',
+      kind: 'cookie_consent',
+      message: 'A publisher cookie-consent overlay remained visible after the safe dismissal attempt.',
+    }
+  }
+  if (/access this (chapter|article)|log in via an institution|institutional (access|sign in)|subscribe and save|buy (chapter|article)|purchase (chapter|article)|rent this article|need full-text access|contact ieee to subscribe/.test(pageText)) {
+    return {
+      code: 'BROWSER_ACCESS_REQUIRED',
+      kind: 'subscription_or_login',
+      message: 'The publisher page requires subscription, purchase, login, or institutional access for this item.',
+    }
+  }
+  return {
+    code: 'BROWSER_PDF_NOT_FOUND',
+    kind: 'pdf_not_exposed',
+    message: 'The authorized browser session did not expose a validated PDF response.',
+  }
+}
+
+async function waitForTransientPublisherVerification(page, timeoutMs) {
+  const deadline = Date.now() + Math.min(Math.max(timeoutMs, 0), 10000)
+  let barrier = await detectPageBarrier(page, { detected: false, dismissed: true })
+  while (barrier.kind === 'user_verification' && Date.now() < deadline) {
+    await page.waitForTimeout(1000)
+    barrier = await detectPageBarrier(page, { detected: false, dismissed: true })
+  }
+  const cleared = barrier.kind !== 'user_verification'
+  if (cleared) {
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {})
+    await page.waitForTimeout(1000)
+  }
+  return cleared
+}
+
 async function saveBrowserDownload(download, targetPath) {
   await mkdir(dirname(targetPath), { recursive: true })
   await download.saveAs(targetPath)
@@ -247,6 +479,13 @@ async function downloadWithSession(request) {
     if (!context) throw new Error('专用 Chrome 没有可用的浏览上下文。')
     const page = context.pages()[0] || await context.newPage()
     const timeoutMs = Math.max(Number(request.timeoutMs) || 90000, 1000)
+    let consent = {
+      detected: false,
+      action: '',
+      label: '',
+      dismissed: false,
+      screenshotPath: '',
+    }
 
     for (const url of uniqueHttpUrls(request.pdfUrls || [])) {
       const result = await tryPdfNavigation(page, context, url, targetPath, timeoutMs)
@@ -261,6 +500,8 @@ async function downloadWithSession(request) {
         // initial document response. Continue with bounded best-effort probes.
       }
       await page.waitForTimeout(1500).catch(() => {})
+      await waitForTransientPublisherVerification(page, Math.floor(timeoutMs / 3)).catch(() => {})
+      consent = await handleCookieConsent(page, targetPath)
       // Preserve candidate links before a real click can navigate away and
       // destroy the landing page's JavaScript execution context.
       let extractedLinks = []
@@ -271,16 +512,37 @@ async function downloadWithSession(request) {
       try {
         clicked = await tryLandingPdfClicks(page, targetPath, timeoutMs)
       } catch {}
-      if (clicked) return clicked
+      if (clicked) return {
+        ...clicked,
+        cookieConsentDetected: consent.detected,
+        cookieConsentAction: consent.action,
+        cookieConsentDismissed: consent.dismissed,
+        consentScreenshot: consent.screenshotPath,
+      }
       for (const url of extractedLinks) {
         const result = await tryPdfNavigation(page, context, url, targetPath, timeoutMs)
-        if (result) return result
+        if (result) return {
+          ...result,
+          cookieConsentDetected: consent.detected,
+          cookieConsentAction: consent.action,
+          cookieConsentDismissed: consent.dismissed,
+          consentScreenshot: consent.screenshotPath,
+        }
       }
     }
+    const diagnosticScreenshot = browserDiagnosticPath(targetPath, '.browser-failure.png')
+    await page.screenshot({ path: diagnosticScreenshot, fullPage: false }).catch(() => {})
+    const barrier = await detectPageBarrier(page, consent)
     return {
       success: false,
-      errorCode: 'BROWSER_PDF_NOT_FOUND',
-      error: 'The authorized browser session did not expose a validated PDF response.',
+      errorCode: barrier.code,
+      error: barrier.message,
+      pageBarrier: barrier.kind,
+      cookieConsentDetected: consent.detected,
+      cookieConsentAction: consent.action,
+      cookieConsentDismissed: consent.dismissed,
+      consentScreenshot: consent.screenshotPath,
+      diagnosticScreenshot,
     }
   } finally {
     await closeDedicatedChrome(browser, session.child)

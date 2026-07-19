@@ -61,6 +61,37 @@ candidate pool. Download success does not weaken the downstream M2 gate; the
 final bundle still warned that some candidate metadata was unverified and kept
 those papers out of `A_READ` until verification is complete.
 
+### Browser consent and page-hydration follow-up
+
+A visual inspection of the actual failed publisher windows confirmed that the
+browser helper previously attempted PDF controls before handling Cookie/privacy
+overlays. Springer displayed a viewport-blocking `Your privacy, your choice`
+panel. The updated helper now recognizes both standard consent-management
+markup and non-standard buttons whose labels explicitly mention cookies. It
+prefers `reject optional`/necessary-only choices, accepts only when that is the
+sole continuation control, and never treats an ordinary page-level `Accept` or
+`Continue` button as consent.
+
+The same screenshots separated genuine acquisition failures from UI blockers:
+
+- Springer's overlay was dismissed successfully, after which the page clearly
+  required chapter purchase or institutional login; this remains unavailable;
+- ACM first displayed a transient security-check page and then a partially
+  hydrated shell. Waiting for the check and network hydration recovered the
+  1,633,615-byte PDF for `10.1145/3534678.3539117` in 25.42s;
+- Elsevier displayed a human CAPTCHA. The helper records
+  `BROWSER_USER_VERIFICATION_REQUIRED` and does not solve or bypass it;
+- browser failures now retain the page-barrier category plus consent and final
+  diagnostic screenshot paths in the source result and direction manifest.
+
+A naive DOI-to-publisher retry downloaded 10/12 papers but opened three browser
+windows and took 149.38s. Restricting DOI-only browser discovery to the
+live-verified ACM route preserved 10/12 (83.3%) while reducing browser attempts
+to one and total time to 108.12s. Concrete PDF candidates from any publisher
+remain eligible for the authorized-browser fallback. The two unresolved papers
+were the IEEE and Elsevier items with no OA/PDF candidate; no lower-relevance
+paper was substituted.
+
 ## 2026-07-19 M1 Open-Fulltext Rescue
 
 ### Relevance-first correction
@@ -138,6 +169,7 @@ Live acceptance progression for the same query
 | Final browser acceptance | 114 deduplicated, 17 strict-related, 7/7 downloaded | `SUCCESS` even while Semantic Scholar was unavailable; OpenAlex supplementation and legal-source fallback carried the queue. |
 | Relevance-first dynamic acceptance | 204 deduplicated, 18 strict-related, 18 attempted, 12 downloaded | `DEGRADED` because six relevant papers remain unresolved; no lower-relevance paper was substituted. PMC Cloud recovery restored GTAD. |
 | 2026-07-20 final revalidation | 204 raw, 140 deduplicated, 12 strict-related attempted, 9 downloaded | `SUCCESS` in 77.73s; three DOI/PMC recoveries, zero browser attempts, and no relevance substitution. |
+| Cookie-aware optimized revalidation | 204 raw, 140 deduplicated, 12 attempted, 10 downloaded | `SUCCESS` in 108.12s; one ACM browser recovery, one browser attempt, and two honest landing-only results. |
 
 The final live run is a single-query acceptance, not a claim that every
 publisher or every research direction will achieve a fixed count. The captured
@@ -179,10 +211,10 @@ Current verification:
 
 | Command / surface | Result | Classification |
 |---|---|---|
-| `.venv\Scripts\python.exe -m pytest -q --maxfail=1` | `796 passed, 15 skipped` in 149.38s | Complete local backend/offline suite after the live fixes. |
+| `.venv\Scripts\python.exe -m pytest -q --maxfail=1` | `798 passed, 15 skipped` in 155.36s | Complete local backend/offline suite after the live fixes. |
 | `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
 | `.venv\Scripts\python.exe -m mypy` | No issues in 127 source files | Full backend type boundary. |
-| `npm test` | 15 files, 76 tests passed | Frontend unit/contract suite. |
+| `npm test` | 15 files, 77 tests passed | Frontend unit/contract suite. |
 | `npm run typecheck` and `npm run build` | Passed; Vite transformed 94 modules | Frontend static and production build. |
 | `npm audit --registry=https://registry.npmjs.org` | 0 vulnerabilities | Full npm dependency tree, including dev dependencies. |
 | `npm run test:e2e` | 6/6 Chromium fixture tests passed | Deterministic browser E2E. |

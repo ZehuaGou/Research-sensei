@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from researchsensei.browser_downloader import BrowserSessionDownloader
+from researchsensei.browser_downloader import BrowserDownloadResult, BrowserSessionDownloader
 from researchsensei.library import PaperLibraryRecord, PaperLibraryStore
 from researchsensei.schemas import (
     CandidatePaper,
@@ -49,6 +49,11 @@ BROWSER_METADATA_HOSTS = {
     "www.doi.org",
     "www.openalex.org",
     "www.semanticscholar.org",
+}
+BROWSER_DOI_DISCOVERY_HOSTS = {
+    # Live-verified: DOI-only ACM pages can expose a downloadable PDF after
+    # their transient security check and full page hydration complete.
+    "dl.acm.org",
 }
 
 
@@ -262,9 +267,10 @@ class PaperSourceResolver:
                 )
                 if pmc_result is not None:
                     return pmc_result
+                browser_landing_url = self._publisher_landing_url(landing_url)
                 browser_result = self._download_with_browser_session(
                     paper,
-                    landing_url=landing_url,
+                    landing_url=browser_landing_url,
                     pdf_urls=[],
                     download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
                 )
@@ -292,6 +298,28 @@ class PaperSourceResolver:
             error_code="NO_SOURCE_FOUND",
             metadata={"resolution_strategy": "metadata_only"},
         )
+
+    def _publisher_landing_url(self, landing_url: str) -> str:
+        """Resolve DOI-only candidates to live-verified browser discovery hosts."""
+
+        parsed = urlparse(landing_url)
+        if (parsed.hostname or "").lower() not in {"doi.org", "www.doi.org"}:
+            return landing_url
+        try:
+            with self.http_client.stream(
+                "GET",
+                landing_url,
+                headers={"Range": "bytes=0-0"},
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+            ) as response:
+                final_url = str(response.url)
+        except httpx.HTTPError:
+            return landing_url
+        final_host = (urlparse(final_url).hostname or "").lower()
+        if final_host in BROWSER_DOI_DISCOVERY_HOSTS:
+            return final_url
+        return landing_url
 
     def _download_with_browser_session(
         self,
@@ -331,8 +359,10 @@ class PaperSourceResolver:
                 update={
                     "metadata": {
                         **failure.metadata,
-                        "resolution_strategy": "authorized_browser_session_failed",
-                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                        **_browser_diagnostic_metadata(
+                            result,
+                            strategy="authorized_browser_session_failed",
+                        ),
                     }
                 }
             )
@@ -352,8 +382,10 @@ class PaperSourceResolver:
                 update={
                     "metadata": {
                         **failure.metadata,
-                        "resolution_strategy": "authorized_browser_session_failed",
-                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                        **_browser_diagnostic_metadata(
+                            result,
+                            strategy="authorized_browser_session_failed",
+                        ),
                     }
                 }
             )
@@ -374,8 +406,10 @@ class PaperSourceResolver:
                 update={
                     "metadata": {
                         **failure.metadata,
-                        "resolution_strategy": "authorized_browser_session_failed",
-                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                        **_browser_diagnostic_metadata(
+                            result,
+                            strategy="authorized_browser_session_failed",
+                        ),
                     }
                 }
             )
@@ -396,10 +430,10 @@ class PaperSourceResolver:
             pdf_metadata_check=meta_check,
             pdf_title_match=title_match,
             pdf_metadata_warning=meta_warning,
-            metadata={
-                "resolution_strategy": "authorized_browser_session",
-                "browser_mode": result.browser_mode or "native_chrome_cdp",
-            },
+            metadata=_browser_diagnostic_metadata(
+                result,
+                strategy="authorized_browser_session",
+            ),
         )
 
     def _download_pmc_cloud_pdf(
@@ -899,6 +933,15 @@ class PaperSourceResolver:
                 "source_status": item.status.value if item is not None else "",
                 "source_type": item.source_type.value if item is not None else "",
                 "sha256": item.sha256 if item is not None else "",
+                "error_code": item.error_code if item is not None else "",
+                "resolution_strategy": item.metadata.get("resolution_strategy", "") if item is not None else "",
+                "browser_mode": item.metadata.get("browser_mode", "") if item is not None else "",
+                "cookie_consent_detected": item.metadata.get("cookie_consent_detected", "") if item is not None else "",
+                "cookie_consent_action": item.metadata.get("cookie_consent_action", "") if item is not None else "",
+                "cookie_consent_dismissed": item.metadata.get("cookie_consent_dismissed", "") if item is not None else "",
+                "consent_screenshot": item.metadata.get("consent_screenshot", "") if item is not None else "",
+                "diagnostic_screenshot": item.metadata.get("diagnostic_screenshot", "") if item is not None else "",
+                "page_barrier": item.metadata.get("page_barrier", "") if item is not None else "",
             })
         manifest = {
             "query": query,
@@ -1574,6 +1617,29 @@ def _browser_fallback_eligible(landing_url: str, pdf_urls: list[str]) -> bool:
         return True
     host = urlparse(landing_url).hostname or ""
     return bool(host and host.lower() not in BROWSER_METADATA_HOSTS)
+
+
+def _browser_diagnostic_metadata(
+    result: BrowserDownloadResult,
+    *,
+    strategy: str,
+) -> dict[str, str]:
+    metadata: dict[str, str] = {
+        "resolution_strategy": strategy,
+        "browser_mode": result.browser_mode or "native_chrome_cdp",
+    }
+    if result.cookie_consent_detected:
+        metadata["cookie_consent_detected"] = "true"
+        metadata["cookie_consent_dismissed"] = str(result.cookie_consent_dismissed).lower()
+    if result.cookie_consent_action:
+        metadata["cookie_consent_action"] = result.cookie_consent_action
+    if result.consent_screenshot:
+        metadata["consent_screenshot"] = result.consent_screenshot
+    if result.diagnostic_screenshot:
+        metadata["diagnostic_screenshot"] = result.diagnostic_screenshot
+    if result.page_barrier:
+        metadata["page_barrier"] = result.page_barrier
+    return metadata
 
 
 def _pmc_metadata_version(key: str) -> int:

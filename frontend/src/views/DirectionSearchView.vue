@@ -291,6 +291,20 @@ function m2ReadinessNote(paper: Record<string, any>) {
   return reason
 }
 
+function downloadDiagnosticNote(paper: Record<string, any>) {
+  const code = String(paper.download_error_code || '')
+  const diagnostics = paper.browser_diagnostics && typeof paper.browser_diagnostics === 'object'
+    ? paper.browser_diagnostics
+    : {}
+  if (code === 'BROWSER_USER_VERIFICATION_REQUIRED') return '出版社要求在专用 Chrome 中完成人机验证，本次没有自动绕过。'
+  if (code === 'BROWSER_ACCESS_REQUIRED') return '出版社要求登录、机构订阅或购买，Cookie 并不是剩余阻塞原因。'
+  if (code === 'BROWSER_COOKIE_CONSENT_BLOCKED') return 'Cookie/隐私弹窗未能安全关闭，已保存失败页面诊断截图。'
+  if (diagnostics.cookie_consent_action === 'rejected_optional') return '已关闭 Cookie 弹窗，并拒绝可选 Cookie。'
+  if (diagnostics.cookie_consent_action === 'accepted_required') return '页面只提供接受 Cookie 的继续入口，已完成该操作。'
+  if (diagnostics.cookie_consent_action === 'dismissed') return '已关闭 Cookie/隐私提示后继续下载。'
+  return ''
+}
+
 function readingOrderText(item: Record<string, any>) {
   const priorityLabels: Record<string, string> = {
     A_READ: '优先深读',
@@ -720,6 +734,9 @@ async function openDeepRead(paper: Record<string, any>) {
               <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="note" data-testid="fulltext-note">
                 全文来源：{{ fulltextSourceLabel(paper.selected_fulltext_source || 'metadata_only') }}
                 {{ paper.fulltext_failure_reason ? ` · ${paper.fulltext_failure_reason}` : '' }}
+              </p>
+              <p v-if="downloadDiagnosticNote(paper)" class="note" data-testid="browser-download-note">
+                {{ downloadDiagnosticNote(paper) }}
               </p>
               <p v-if="!paper.can_enter_m2" class="note" data-testid="m2-readiness-note">
                 M2 门槛：{{ m2ReadinessNote(paper) }}
