@@ -36,6 +36,20 @@ SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf", ".tex"}
 PDF_BYTES = b"%PDF"
 GZIP_BYTES = b"\x1f\x8b"
 PMC_CLOUD_BASE_URL = "https://pmc-oa-opendata.s3.amazonaws.com"
+PMC_ID_CONVERTER_URL = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/"
+BROWSER_METADATA_HOSTS = {
+    "api.openalex.org",
+    "crossref.org",
+    "dblp.org",
+    "doi.org",
+    "openalex.org",
+    "semanticscholar.org",
+    "www.crossref.org",
+    "www.dblp.org",
+    "www.doi.org",
+    "www.openalex.org",
+    "www.semanticscholar.org",
+}
 
 
 @dataclass(frozen=True)
@@ -195,6 +209,21 @@ class PaperSourceResolver:
                         return attempt
                     failures.append(attempt)
                 last_failure = failures[-1]
+                pmc_result = self._download_pmc_pdf_for_doi(
+                    paper,
+                    landing_url=landing_url,
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
+                if pmc_result is not None:
+                    return pmc_result.model_copy(
+                        update={
+                            "metadata": {
+                                **pmc_result.metadata,
+                                "attempted_pdf_urls": [item.pdf_url for item in failures],
+                                "fallback_count": len(failures),
+                            }
+                        }
+                    )
                 browser_result = self._download_with_browser_session(
                     paper,
                     landing_url=landing_url,
@@ -226,6 +255,13 @@ class PaperSourceResolver:
 
         if landing_url:
             if self.network_enabled and (download_dir or self.download_dir):
+                pmc_result = self._download_pmc_pdf_for_doi(
+                    paper,
+                    landing_url=landing_url,
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
+                if pmc_result is not None:
+                    return pmc_result
                 browser_result = self._download_with_browser_session(
                     paper,
                     landing_url=landing_url,
@@ -266,7 +302,11 @@ class PaperSourceResolver:
         download_dir: Path,
     ) -> ResolvedPaperSource | None:
         downloader = self.browser_downloader
-        if downloader is None or not downloader.available:
+        if (
+            downloader is None
+            or not downloader.available
+            or not _browser_fallback_eligible(landing_url, pdf_urls)
+        ):
             return None
         target = _paper_pdf_path(download_dir, paper)
         result = downloader.download(
@@ -278,7 +318,7 @@ class PaperSourceResolver:
         if not result.attempted:
             return None
         if not result.success:
-            return self._download_failed(
+            failure = self._download_failed(
                 paper,
                 pdf_url=pdf_urls[0] if pdf_urls else "",
                 source_url=result.final_url or landing_url,
@@ -287,10 +327,19 @@ class PaperSourceResolver:
                 code=result.error_code or "BROWSER_SESSION_FAILED",
                 message=result.error or "Authorized browser session did not yield a PDF.",
             )
+            return failure.model_copy(
+                update={
+                    "metadata": {
+                        **failure.metadata,
+                        "resolution_strategy": "authorized_browser_session_failed",
+                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                    }
+                }
+            )
         try:
             content = target.read_bytes()
         except OSError as exc:
-            return self._download_failed(
+            failure = self._download_failed(
                 paper,
                 pdf_url=result.final_url or (pdf_urls[0] if pdf_urls else ""),
                 source_url=result.final_url or landing_url,
@@ -299,9 +348,18 @@ class PaperSourceResolver:
                 code="BROWSER_SESSION_FILE_MISSING",
                 message=str(exc)[:300],
             )
+            return failure.model_copy(
+                update={
+                    "metadata": {
+                        **failure.metadata,
+                        "resolution_strategy": "authorized_browser_session_failed",
+                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                    }
+                }
+            )
         if not content.startswith(PDF_BYTES) or len(content) > self.max_download_bytes:
             target.unlink(missing_ok=True)
-            return self._download_failed(
+            failure = self._download_failed(
                 paper,
                 pdf_url=result.final_url or (pdf_urls[0] if pdf_urls else ""),
                 source_url=result.final_url or landing_url,
@@ -311,6 +369,15 @@ class PaperSourceResolver:
                 message="Browser-assisted response failed PDF signature or size validation.",
                 content_type=result.content_type,
                 file_size=len(content),
+            )
+            return failure.model_copy(
+                update={
+                    "metadata": {
+                        **failure.metadata,
+                        "resolution_strategy": "authorized_browser_session_failed",
+                        "browser_mode": result.browser_mode or "native_chrome_cdp",
+                    }
+                }
             )
         meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
         return self._base_result(
@@ -410,6 +477,64 @@ class PaperSourceResolver:
                     "pmc_version": str(metadata.get("version") or _pmc_metadata_version(metadata_key)),
                 }
             }
+        )
+
+    def _download_pmc_pdf_for_doi(
+        self,
+        paper: CandidatePaper,
+        *,
+        landing_url: str,
+        download_dir: Path,
+    ) -> ResolvedPaperSource | None:
+        """Recover an open PMC copy when a publisher route rejected the PDF.
+
+        DOI conversion is intentionally delayed until direct PDF attempts fail,
+        avoiding an extra network request for sources that already work.
+        """
+
+        doi = _normalize_doi(paper.doi)
+        if not doi:
+            return None
+        try:
+            response = self.http_client.get(
+                PMC_ID_CONVERTER_URL,
+                params={
+                    "ids": doi,
+                    "idtype": "doi",
+                    "format": "json",
+                    "tool": "ResearchSensei",
+                    "email": "ZehuaGou@users.noreply.github.com",
+                },
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            if len(response.content) > 1024 * 1024:
+                return None
+            payload = response.json()
+            records = payload.get("records") if isinstance(payload, dict) else None
+            if not isinstance(records, list):
+                return None
+            pmcid = ""
+            for record in records:
+                if not isinstance(record, dict):
+                    continue
+                if _normalize_doi(str(record.get("doi") or "")) != doi:
+                    continue
+                candidate = str(record.get("pmcid") or "").upper()
+                if re.fullmatch(r"PMC\d+", candidate):
+                    pmcid = candidate
+                    break
+            if not pmcid:
+                return None
+        except (ValueError, httpx.HTTPError):
+            return None
+
+        return self._download_pmc_cloud_pdf(
+            paper,
+            pmcid=pmcid,
+            landing_url=landing_url,
+            download_dir=download_dir,
         )
 
     def _download_pdf(
@@ -1267,13 +1392,20 @@ def _clean_arxiv_id(value: str) -> str:
 
 
 def _doi_url(doi: str) -> str:
-    clean = doi.strip()
+    clean = _normalize_doi(doi)
     if not clean:
         return ""
-    if clean.lower().startswith(("http://", "https://")):
-        return clean
-    clean = clean.removeprefix("doi:").removeprefix("DOI:")
     return f"https://doi.org/{clean}"
+
+
+def _normalize_doi(doi: str) -> str:
+    clean = str(doi or "").strip()
+    lower = clean.lower()
+    for prefix in ("https://doi.org/", "http://doi.org/", "doi:"):
+        if lower.startswith(prefix):
+            clean = clean[len(prefix) :].strip()
+            break
+    return clean.lower()
 
 
 def _content_type_for_suffix(suffix: str) -> str:
@@ -1427,6 +1559,21 @@ def _paper_pmcid(paper: CandidatePaper) -> str:
         if match:
             return match.group(0).upper()
     return ""
+
+
+def _browser_fallback_eligible(landing_url: str, pdf_urls: list[str]) -> bool:
+    """Use native Chrome only when it can plausibly expose full text.
+
+    A concrete PDF candidate is always worth retrying with the authorized
+    session. A publisher landing page may expose a JavaScript download button.
+    Metadata/index pages cannot create a PDF after all OA resolution stages
+    already failed, so opening Chrome for them only adds latency and windows.
+    """
+
+    if any(url.startswith(("http://", "https://")) for url in pdf_urls):
+        return True
+    host = urlparse(landing_url).hostname or ""
+    return bool(host and host.lower() not in BROWSER_METADATA_HOSTS)
 
 
 def _pmc_metadata_version(key: str) -> int:

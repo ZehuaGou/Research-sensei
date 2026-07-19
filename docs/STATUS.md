@@ -1,11 +1,65 @@
 # ResearchSensei v0.6 Reliability Baseline Status
 
-Last updated: 2026-07-19 (Asia/Shanghai).
+Last updated: 2026-07-20 (Asia/Shanghai).
 
 This is the authoritative implementation and verification ledger for
 ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
+
+## 2026-07-20 Complete M1 Revalidation
+
+The configured user-authorized native-Chrome session and the production M1
+service were revalidated from clean workspaces. This was not a fixed fixture or
+a cached-library acceptance.
+
+Three live-only defects were found and corrected during the run:
+
+- publisher navigation could destroy the page execution context while the
+  helper was extracting links, incorrectly reporting a browser-session failure;
+  landing links are now captured before clicks and navigation is handled as an
+  expected page transition;
+- native Chrome was being opened for DOI, Semantic Scholar, and OpenAlex
+  metadata-only pages that could not expose a PDF. Browser fallback is now
+  limited to a concrete PDF candidate or a real publisher landing page;
+- after ordinary publisher PDF attempts fail, a DOI is checked with PMC's
+  [official ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/).
+  A matching open PMCID is downloaded through the
+  versioned PMC Cloud dataset before Chrome is considered.
+
+Layered live source acceptance used three unrelated delivery paths:
+
+| Source/path | Result | Evidence |
+|---|---|---|
+| PMLR direct OA | Passed | 673,298-byte validated PDF in 2.54s; no browser. |
+| PMC Cloud (`PMC10490803`) | Passed | 3,844,369-byte validated PDF in 4.16s; no browser. |
+| ACM OmniAnomaly with authorized native Chrome | Passed | 6,701,685-byte validated PDF in 6.64s; title matched. |
+
+Four fresh production runs used the same real query,
+`graph neural network multivariate time series anomaly detection`. Result count
+was never used as a quota: only candidates passing the deterministic relevance
+gate entered the download queue.
+
+| Run | Relevant attempts / downloads | Time | Finding |
+|---|---:|---:|---|
+| Initial reproduction | 11 / 7 | 193.30s | Exposed publisher navigation-context failure. |
+| High-variance external result | 49 / 21 | 457.12s | Exposed 28 unnecessary browser fallbacks, mostly metadata-only pages. |
+| Browser-eligibility fix | 17 / 10 | 217.86s | Browser attempts fell to two; exposed an MDPI DOI with an available PMC copy. |
+| Final production acceptance | 12 / 9 (75%) | 77.73s | `SUCCESS`; zero browser attempts and three DOI/PMC recoveries. |
+
+The final run retrieved 204 source records, deduplicated them to 140, and left
+three relevance-cleared IEEE, Elsevier, and ACM papers as landing-page-only
+instead of substituting lower-relevance papers. The three recovered PMC papers
+were GTAD (`PMC9222957`), Graph Attention Network and Informer
+(`PMC10935277`), and Masked Graph Neural Networks (`PMC10490803`). A direct
+repeat of the previously failing Masked GNN path completed in 5.01s with a
+3,844,369-byte PDF, passed metadata/title checks, and did not start Chrome.
+
+External search remains variable: Semantic Scholar returned HTTP 429 during the
+final run, while the configured paper-search/OpenAlex paths still supplied the
+candidate pool. Download success does not weaken the downstream M2 gate; the
+final bundle still warned that some candidate metadata was unverified and kept
+those papers out of `A_READ` until verification is complete.
 
 ## 2026-07-19 M1 Open-Fulltext Rescue
 
@@ -83,13 +137,14 @@ Live acceptance progression for the same query
 | Final optimized live run | 254 raw candidates, 146 deduplicated, 46 strict-related, 7/7 downloaded, 134.1s | `SUCCESS`; all selected papers were validated and landed locally. |
 | Final browser acceptance | 114 deduplicated, 17 strict-related, 7/7 downloaded | `SUCCESS` even while Semantic Scholar was unavailable; OpenAlex supplementation and legal-source fallback carried the queue. |
 | Relevance-first dynamic acceptance | 204 deduplicated, 18 strict-related, 18 attempted, 12 downloaded | `DEGRADED` because six relevant papers remain unresolved; no lower-relevance paper was substituted. PMC Cloud recovery restored GTAD. |
+| 2026-07-20 final revalidation | 204 raw, 140 deduplicated, 12 strict-related attempted, 9 downloaded | `SUCCESS` in 77.73s; three DOI/PMC recoveries, zero browser attempts, and no relevance substitution. |
 
 The final live run is a single-query acceptance, not a claim that every
-publisher or every research direction will achieve a fixed count. A fresh ACM
-automation context still reached a security challenge; the authorized-session
-fallback has deterministic contract coverage but still needs a one-time user
-session capture for live ACM acceptance. MDPI PDF/page requests were 403, and the tested
-IEEE/Elsevier papers had no OA copy in OpenAlex, Semantic Scholar, or Europe PMC.
+publisher or every research direction will achieve a fixed count. The captured
+authorized session passed the tested ACM OmniAnomaly path, but it does not imply
+universal ACM or subscription access. The tested IEEE/Elsevier papers still had
+no OA copy, while the blocked MDPI path was legally recovered through its DOI's
+PMC record.
 The implementation therefore uses legal alternative copies and source-aware
 candidate selection rather than bypassing access controls.
 
@@ -124,7 +179,7 @@ Current verification:
 
 | Command / surface | Result | Classification |
 |---|---|---|
-| `.venv\Scripts\python.exe -m pytest -q` | `789 passed, 15 skipped` in 178.01s | Complete local backend/offline suite. |
+| `.venv\Scripts\python.exe -m pytest -q --maxfail=1` | `796 passed, 15 skipped` in 149.38s | Complete local backend/offline suite after the live fixes. |
 | `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
 | `.venv\Scripts\python.exe -m mypy` | No issues in 127 source files | Full backend type boundary. |
 | `npm test` | 15 files, 76 tests passed | Frontend unit/contract suite. |

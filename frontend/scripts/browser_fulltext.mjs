@@ -114,7 +114,26 @@ async function startDedicatedChrome({ statePath, startUrl, headless }) {
 
 async function closeDedicatedChrome(browser, child) {
   if (browser) await browser.close().catch(() => {})
-  if (child && !child.killed) child.kill()
+  if (!child) return
+  await waitForChildExit(child, 2000)
+  if (child.exitCode === null && !child.killed) child.kill()
+  await waitForChildExit(child, 2000)
+}
+
+async function waitForChildExit(child, timeoutMs) {
+  if (!child || child.exitCode !== null) return
+  await new Promise(resolveExit => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      child.removeListener('exit', finish)
+      resolveExit()
+    }
+    const timer = setTimeout(finish, timeoutMs)
+    child.once('exit', finish)
+  })
 }
 
 async function tryPdfNavigation(page, context, url, targetPath, timeoutMs) {
@@ -235,11 +254,25 @@ async function downloadWithSession(request) {
     }
 
     if (request.landingUrl) {
-      await page.goto(request.landingUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
-      await page.waitForTimeout(1500)
-      const clicked = await tryLandingPdfClicks(page, targetPath, timeoutMs)
+      try {
+        await page.goto(request.landingUrl, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
+      } catch {
+        // Some challenge and publisher pages continue navigating after the
+        // initial document response. Continue with bounded best-effort probes.
+      }
+      await page.waitForTimeout(1500).catch(() => {})
+      // Preserve candidate links before a real click can navigate away and
+      // destroy the landing page's JavaScript execution context.
+      let extractedLinks = []
+      try {
+        extractedLinks = uniqueHttpUrls(await landingPdfLinks(page))
+      } catch {}
+      let clicked = null
+      try {
+        clicked = await tryLandingPdfClicks(page, targetPath, timeoutMs)
+      } catch {}
       if (clicked) return clicked
-      for (const url of uniqueHttpUrls(await landingPdfLinks(page))) {
+      for (const url of extractedLinks) {
         const result = await tryPdfNavigation(page, context, url, targetPath, timeoutMs)
         if (result) return result
       }
@@ -307,6 +340,7 @@ try {
 } catch (error) {
   process.stdout.write(JSON.stringify({
     success: false,
+    browserMode: 'native_chrome_cdp',
     errorCode: 'BROWSER_SESSION_FAILED',
     error: String(error?.message || error).slice(0, 500),
   }))

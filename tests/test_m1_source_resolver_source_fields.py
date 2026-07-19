@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import httpx
+import pytest
 
 from researchsensei.browser_downloader import BrowserDownloadResult
 from researchsensei.library import PaperLibraryStore
@@ -33,6 +34,19 @@ class FakeBrowserDownloader:
             final_url=final_url,
             content_type="application/pdf",
             browser_mode="native_chrome_cdp",
+        )
+
+
+class FailingBrowserDownloader:
+    available = True
+
+    def download(self, **kwargs: object) -> BrowserDownloadResult:
+        return BrowserDownloadResult(
+            attempted=True,
+            success=False,
+            browser_mode="native_chrome_cdp",
+            error_code="BROWSER_PDF_NOT_FOUND",
+            error="No validated PDF was exposed by the publisher page.",
         )
 
 
@@ -320,6 +334,92 @@ def test_resolver_uses_official_pmc_cloud_pdf_instead_of_html_download_screen(
     assert not any("pmc.ncbi.nlm.nih.gov/articles" in call for call in calls)
 
 
+def test_resolver_recovers_pmc_copy_by_doi_after_publisher_pdf_is_blocked(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        calls.append(url)
+        if request.url.host == "www.mdpi.com":
+            return httpx.Response(403, request=request)
+        if request.url.path == "/tools/idconv/api/v1/articles/":
+            assert request.url.params.get("ids") == "10.3390/s23177552"
+            assert request.url.params.get("idtype") == "doi"
+            return httpx.Response(
+                200,
+                json={
+                    "status": "ok",
+                    "records": [
+                        {
+                            "doi": "10.3390/s23177552",
+                            "pmcid": "PMC10490803",
+                        }
+                    ],
+                },
+                request=request,
+            )
+        if request.url.path == "/" and request.url.params.get("prefix") == "metadata/PMC10490803.":
+            return httpx.Response(
+                200,
+                content=(
+                    b'<?xml version="1.0" encoding="UTF-8"?>'
+                    b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                    b"<Contents><Key>metadata/PMC10490803.1.json</Key></Contents>"
+                    b"</ListBucketResult>"
+                ),
+                request=request,
+            )
+        if request.url.path == "/metadata/PMC10490803.1.json":
+            return httpx.Response(
+                200,
+                json={
+                    "pmcid": "PMC10490803",
+                    "version": 1,
+                    "is_pmc_openaccess": True,
+                    "is_manuscript": False,
+                    "pdf_url": "s3://pmc-oa-opendata/PMC10490803.1/PMC10490803.1.pdf",
+                },
+                request=request,
+            )
+        if request.url.path == "/PMC10490803.1/PMC10490803.1.pdf":
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/pdf"},
+                content=b"%PDF-1.4\nopen PMC DOI fallback\n%%EOF",
+                request=request,
+            )
+        return httpx.Response(404, request=request)
+
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="masked-gnn",
+            title="Masked Graph Neural Networks for Multivariate Time Series",
+            doi="https://doi.org/10.3390/S23177552",
+            landing_url="https://doi.org/10.3390/s23177552",
+            pdf_url="https://www.mdpi.com/1424-8220/23/17/7552/pdf",
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.metadata["resolution_strategy"] == "pmc_cloud_pdf"
+    assert result.metadata["pmcid"] == "PMC10490803"
+    assert result.metadata["fallback_count"] == 1
+    assert result.metadata["attempted_pdf_urls"] == [
+        "https://www.mdpi.com/1424-8220/23/17/7552/pdf"
+    ]
+    assert calls[0] == "https://www.mdpi.com/1424-8220/23/17/7552/pdf"
+    assert not browser.calls
+
+
 def test_resolver_uses_native_chrome_session_for_any_publisher_after_http_failure(
     tmp_path: Path,
 ) -> None:
@@ -368,3 +468,54 @@ def test_resolver_can_discover_pdf_from_landing_with_authorized_browser_session(
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.metadata["resolution_strategy"] == "authorized_browser_session"
     assert browser.calls[0]["pdf_urls"] == []
+
+
+@pytest.mark.parametrize(
+    "landing_url",
+    [
+        "https://www.semanticscholar.org/paper/metadata-id",
+        "https://doi.org/10.5555/metadata-only",
+        "https://openalex.org/W123456789",
+    ],
+)
+def test_resolver_does_not_open_chrome_for_metadata_only_landing_pages(
+    tmp_path: Path,
+    landing_url: str,
+) -> None:
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="metadata-only",
+            title="Relevant Metadata Only Paper",
+            landing_url=landing_url,
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_LANDING_ONLY
+    assert result.download_status == "not_available"
+    assert browser.calls == []
+
+
+def test_resolver_preserves_native_chrome_failure_reason(tmp_path: Path) -> None:
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        browser_downloader=FailingBrowserDownloader(),  # type: ignore[arg-type]
+    )
+    paper = CandidatePaper(
+        paper_id="publisher-no-pdf",
+        title="Relevant Publisher Paper Without PDF",
+        landing_url="https://publisher.example.org/article/no-pdf",
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.FAILED_DOWNLOAD
+    assert result.error_code == "BROWSER_PDF_NOT_FOUND"
+    assert result.metadata["resolution_strategy"] == "authorized_browser_session_failed"
+    assert result.metadata["browser_mode"] == "native_chrome_cdp"
