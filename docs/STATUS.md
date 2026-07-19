@@ -32,8 +32,14 @@ promote an easier source over a more relevant paper. The current behavior is:
 - local browser-helper acceptance covered installed-Chrome startup, post-user
   CDP handoff, storage-state persistence, and a real PDF navigation/download;
   the PDF-viewer abort case is recovered through the same context's cookies and
-  still requires `%PDF` validation. Live ACM acceptance remains user-session
-  dependent.
+  still requires `%PDF` validation.
+- 2026-07-20 live ACM acceptance used the user-authorized dedicated session for
+  OmniAnomaly (`10.1145/3292500.3330672`). The complete
+  `PaperSourceResolver` path returned `RESOLVED_PDF_DOWNLOADED` with
+  `resolution_strategy=authorized_browser_session`, 6,701,685 validated bytes,
+  and a matching PDF title. This proves the tested session/path, not universal
+  access to every ACM item; subscription and institutional permissions remain
+  unchanged.
 
 This section supersedes the earlier single-query M1 `2/7` result below.
 
