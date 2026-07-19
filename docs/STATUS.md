@@ -26,6 +26,14 @@ promote an easier source over a more relevant paper. The current behavior is:
   that are available in the user's legitimate browser session but rejected by
   backend HTTP. It remains fail-closed and never reads the normal Chrome
   profile or bypasses access controls.
+- session capture and assisted download use a dedicated installed-Chrome
+  profile launched without Playwright's automation marker; the helper connects
+  locally only after the user finishes the publisher's legitimate verification.
+- local browser-helper acceptance covered installed-Chrome startup, post-user
+  CDP handoff, storage-state persistence, and a real PDF navigation/download;
+  the PDF-viewer abort case is recovered through the same context's cookies and
+  still requires `%PDF` validation. Live ACM acceptance remains user-session
+  dependent.
 
 This section supersedes the earlier single-query M1 `2/7` result below.
 

@@ -91,6 +91,7 @@ def test_toml_search_settings_reach_real_adapter_and_services(
     assert adapter.timeout_seconds == 23
     assert deps.direction_service.max_results_per_source == 17
     assert deps.direction_service.max_download_candidates == 0
+    assert app.state.runtime_config.search.browser_headless is False
     assert deps.seed_expansion_service.max_results_per_source == 17
     assert app.state.runtime_config.app.max_upload_mb == 12
     assert deps.runner.ingestion.__class__.__name__ == "LightweightIngestionService"
@@ -107,6 +108,7 @@ def test_environment_overrides_toml_search_settings(
     monkeypatch.setenv("RESEARCHSENSEI_SEARCH_MAX_RESULTS", "31")
     monkeypatch.setenv("RESEARCHSENSEI_SEARCH_TIMEOUT_SECONDS", "41")
     monkeypatch.setenv("RESEARCHSENSEI_SEARCH_MAX_DOWNLOAD_CANDIDATES", "9")
+    monkeypatch.setenv("RESEARCHSENSEI_BROWSER_HEADLESS", "1")
 
     config = ConfigService(config_path=config_path, env_path=tmp_path / "missing.env").load()
 
@@ -114,6 +116,7 @@ def test_environment_overrides_toml_search_settings(
     assert config.search.max_results == 31
     assert config.search.timeout_seconds == 41
     assert config.search.max_download_candidates == 9
+    assert config.search.browser_headless is True
 
 
 @pytest.mark.parametrize(

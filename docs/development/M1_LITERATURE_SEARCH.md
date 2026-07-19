@@ -224,17 +224,25 @@ Candidate output must preserve:
 ## Optional Authorized Browser Session
 
 Some publisher sites serve a PDF in a normal, verified Chrome session while
-rejecting backend HTTP clients or fresh automated contexts. ResearchSensei can
-use an explicit, dedicated Chrome storage-state file as a last download
-fallback for papers that already passed strict relevance. It does not inspect
-the user's normal Chrome profile and does not bypass CAPTCHA, subscription, or
-institutional-access controls.
+rejecting backend HTTP clients or browsers launched with automation flags.
+ResearchSensei therefore starts a dedicated installed-Chrome profile without a
+Playwright launch marker. Only after the user completes legitimate verification
+does the helper connect locally and save an explicit storage-state file. This
+is a last download fallback for papers that already passed strict relevance; it
+does not inspect the user's normal Chrome profile and does not bypass CAPTCHA,
+subscription, or institutional-access controls.
 
 Create or refresh the dedicated session from the repository root:
 
 ```powershell
 node frontend/scripts/browser_fulltext.mjs capture-session workspace/browser-session.json https://dl.acm.org/
 ```
+
+If an older helper window loops on the human-verification page, stop that
+command with `Ctrl+C`, close the old window, update the checkout, and rerun the
+same command. The current helper uses the installed Chrome plus the dedicated
+`workspace/browser-profile/`; it does not launch the verification page through
+Playwright.
 
 Complete any legitimate login/security check in the opened Chrome window, then
 return to the terminal and press Enter. Enable the fallback in
@@ -244,14 +252,18 @@ return to the terminal and press Enter. Enable the fallback in
 [search]
 browser_download_enabled = true
 browser_session_state = "workspace/browser-session.json"
-browser_headless = true
+browser_headless = false
 max_download_candidates = 0
 ```
 
-The state file lives under the ignored `workspace/` directory and must never be
-committed or shared. Normal legal OA URLs are still tried first. The browser is
-used only after ordinary HTTP candidates fail or a publisher landing page has
-no extractable PDF URL; the resulting file must still pass the same PDF magic,
+The storage state and its paired `workspace/browser-profile/` live under the
+ignored `workspace/` directory and must never be committed or shared. The
+dedicated profile persists the browser trust/session data while remaining
+separate from the user's everyday Chrome profile. Keep visible mode for ACM or
+other security-sensitive publishers; headless mode is an opt-in after live
+validation. Normal legal OA URLs are still tried first. The browser is used
+only after ordinary HTTP candidates fail or a publisher landing page has no
+extractable PDF URL; the resulting file must still pass the same PDF magic,
 size, SHA-256, and metadata checks before M2 can use it.
 
 ## Adapter Status

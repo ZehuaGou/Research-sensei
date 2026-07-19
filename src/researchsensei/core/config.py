@@ -88,7 +88,9 @@ class SearchConfig(ConfigModel):
     max_download_candidates: int = Field(default=0, ge=0, le=500)
     browser_download_enabled: bool = False
     browser_session_state: str = ""
-    browser_headless: bool = True
+    # Visible Chrome is the reliable default for security-sensitive publisher
+    # sessions. Users may opt into headless mode after validating their site.
+    browser_headless: bool = False
 
     @field_validator("command")
     @classmethod

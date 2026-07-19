@@ -1,6 +1,9 @@
+import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { createServer } from 'node:net'
+import { dirname, join, resolve } from 'node:path'
 import { chromium } from '@playwright/test'
 
 const PDF_MAGIC = Buffer.from('%PDF')
@@ -18,17 +21,112 @@ async function savePdfResponse(response, targetPath) {
   }
 }
 
+async function tryContextPdfRequest(context, url, targetPath, timeoutMs) {
+  try {
+    const response = await context.request.get(url, {
+      failOnStatusCode: false,
+      timeout: timeoutMs,
+    })
+    if (!response.ok()) return null
+    const body = await response.body()
+    if (!body || !body.subarray(0, 4).equals(PDF_MAGIC)) return null
+    await mkdir(dirname(targetPath), { recursive: true })
+    await writeFile(targetPath, body)
+    return {
+      success: true,
+      finalUrl: response.url(),
+      contentType: response.headers()['content-type'] || 'application/pdf',
+    }
+  } catch {
+    return null
+  }
+}
+
 function uniqueHttpUrls(values) {
   return [...new Set(values.map(value => String(value || '').trim()).filter(value => /^https?:\/\//i.test(value)))]
 }
 
-async function tryPdfNavigation(page, url, targetPath, timeoutMs) {
+function installedChromePath() {
+  const candidates = process.platform === 'win32'
+    ? [
+        join(process.env.PROGRAMFILES || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+        join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      ]
+    : process.platform === 'darwin'
+      ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
+      : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium']
+  const executable = candidates.find(candidate => candidate && existsSync(candidate))
+  if (!executable) throw new Error('没有找到已安装的 Google Chrome。')
+  return executable
+}
+
+function dedicatedProfilePath(statePath) {
+  return resolve(dirname(resolve(statePath)), 'browser-profile')
+}
+
+async function availablePort() {
+  const server = createServer()
+  await new Promise((resolveListen, rejectListen) => {
+    server.once('error', rejectListen)
+    server.listen(0, '127.0.0.1', resolveListen)
+  })
+  const address = server.address()
+  const port = typeof address === 'object' && address ? address.port : 0
+  await new Promise(resolveClose => server.close(resolveClose))
+  if (!port) throw new Error('无法为专用 Chrome 分配本地调试端口。')
+  return port
+}
+
+async function startDedicatedChrome({ statePath, startUrl, headless }) {
+  const profilePath = dedicatedProfilePath(statePath)
+  await mkdir(profilePath, { recursive: true })
+  const port = await availablePort()
+  const args = [
+    `--remote-debugging-port=${port}`,
+    '--remote-debugging-address=127.0.0.1',
+    '--remote-allow-origins=*',
+    `--user-data-dir=${profilePath}`,
+    '--no-first-run',
+    '--no-default-browser-check',
+  ]
+  if (headless) args.push('--headless=new')
+  args.push(startUrl || 'about:blank')
+  let launchError = null
+  const child = spawn(installedChromePath(), args, {
+    stdio: 'ignore',
+    windowsHide: Boolean(headless),
+  })
+  child.once('error', error => { launchError = error })
+  const endpoint = `http://127.0.0.1:${port}`
+  const deadline = Date.now() + 20000
+  while (Date.now() < deadline) {
+    if (launchError) throw launchError
+    try {
+      const response = await fetch(`${endpoint}/json/version`)
+      if (response.ok) return { child, endpoint, profilePath }
+    } catch {}
+    await new Promise(resolveDelay => setTimeout(resolveDelay, 250))
+  }
+  child.kill()
+  throw new Error('专用 Chrome 启动超时。请确认没有安全软件阻止本地调试端口。')
+}
+
+async function closeDedicatedChrome(browser, child) {
+  if (browser) await browser.close().catch(() => {})
+  if (child && !child.killed) child.kill()
+}
+
+async function tryPdfNavigation(page, context, url, targetPath, timeoutMs) {
   try {
     const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs })
-    return await savePdfResponse(response, targetPath)
+    const navigated = await savePdfResponse(response, targetPath)
+    if (navigated) return navigated
   } catch {
-    return null
+    // Chrome's built-in PDF viewer may abort the page navigation even though
+    // the authenticated browser context can retrieve the PDF bytes.
   }
+  return await tryContextPdfRequest(context, url, targetPath, timeoutMs)
 }
 
 async function landingPdfLinks(page) {
@@ -115,14 +213,24 @@ async function downloadWithSession(request) {
   const statePath = resolve(request.storageStatePath)
   const targetPath = resolve(request.targetPath)
   await readFile(statePath)
-  const browser = await chromium.launch({ channel: 'chrome', headless: request.headless !== false })
+  if (!existsSync(dedicatedProfilePath(statePath))) {
+    throw new Error('专用 Chrome 配置不存在，请先重新运行 capture-session。')
+  }
+  const session = await startDedicatedChrome({
+    statePath,
+    startUrl: 'about:blank',
+    headless: request.headless === true,
+  })
+  let browser = null
   try {
-    const context = await browser.newContext({ storageState: statePath, acceptDownloads: true })
-    const page = await context.newPage()
+    browser = await chromium.connectOverCDP(session.endpoint)
+    const context = browser.contexts()[0]
+    if (!context) throw new Error('专用 Chrome 没有可用的浏览上下文。')
+    const page = context.pages()[0] || await context.newPage()
     const timeoutMs = Math.max(Number(request.timeoutMs) || 90000, 1000)
 
     for (const url of uniqueHttpUrls(request.pdfUrls || [])) {
-      const result = await tryPdfNavigation(page, url, targetPath, timeoutMs)
+      const result = await tryPdfNavigation(page, context, url, targetPath, timeoutMs)
       if (result) return result
     }
 
@@ -132,7 +240,7 @@ async function downloadWithSession(request) {
       const clicked = await tryLandingPdfClicks(page, targetPath, timeoutMs)
       if (clicked) return clicked
       for (const url of uniqueHttpUrls(await landingPdfLinks(page))) {
-        const result = await tryPdfNavigation(page, url, targetPath, timeoutMs)
+        const result = await tryPdfNavigation(page, context, url, targetPath, timeoutMs)
         if (result) return result
       }
     }
@@ -142,24 +250,45 @@ async function downloadWithSession(request) {
       error: 'The authorized browser session did not expose a validated PDF response.',
     }
   } finally {
-    await browser.close()
+    await closeDedicatedChrome(browser, session.child)
   }
 }
 
 async function captureSession(statePath, startUrl) {
-  const browser = await chromium.launch({ channel: 'chrome', headless: false })
-  const context = await browser.newContext()
-  const page = await context.newPage()
-  await page.goto(startUrl, { waitUntil: 'domcontentloaded' })
-  process.stderr.write('请在打开的 Chrome 中完成登录或安全验证，然后回到终端按 Enter。\n')
-  const readline = createInterface({ input: process.stdin, output: process.stderr })
-  await new Promise(resolveLine => readline.question('', () => resolveLine()))
-  readline.close()
   const resolvedState = resolve(statePath)
-  await mkdir(dirname(resolvedState), { recursive: true })
-  await context.storageState({ path: resolvedState })
-  await browser.close()
-  process.stdout.write(JSON.stringify({ success: true, storageStatePath: resolvedState }))
+  const session = await startDedicatedChrome({
+    statePath: resolvedState,
+    startUrl,
+    headless: false,
+  })
+  process.stderr.write(
+    '这是不带 Playwright 启动标记的专用 Chrome。请完成安全验证并手动确认 PDF 可以下载，然后回到终端按 Enter。\n',
+  )
+  const readline = createInterface({ input: process.stdin, output: process.stderr })
+  const stopCapture = () => {
+    readline.close()
+    if (!session.child.killed) session.child.kill()
+    process.exit(130)
+  }
+  process.once('SIGINT', stopCapture)
+  await new Promise(resolveLine => readline.question('', () => resolveLine()))
+  process.removeListener('SIGINT', stopCapture)
+  readline.close()
+  let browser = null
+  try {
+    browser = await chromium.connectOverCDP(session.endpoint)
+    const context = browser.contexts()[0]
+    if (!context) throw new Error('专用 Chrome 没有可保存的浏览上下文。')
+    await mkdir(dirname(resolvedState), { recursive: true })
+    await context.storageState({ path: resolvedState })
+    process.stdout.write(JSON.stringify({
+      success: true,
+      storageStatePath: resolvedState,
+      profilePath: session.profilePath,
+    }))
+  } finally {
+    await closeDedicatedChrome(browser, session.child)
+  }
 }
 
 const [mode, ...args] = process.argv.slice(2)

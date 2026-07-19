@@ -95,4 +95,4 @@ max_download_candidates = 0
 # documented in docs/development/M1_LITERATURE_SEARCH.md. Never commit it.
 browser_download_enabled = false
 browser_session_state = "workspace/browser-session.json"
-browser_headless = true
+browser_headless = false

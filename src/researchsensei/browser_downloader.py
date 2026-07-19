@@ -37,6 +37,7 @@ class BrowserSessionDownloader:
         helper_script: str | Path | None = None,
     ) -> None:
         self.storage_state_path = Path(storage_state_path).expanduser().resolve()
+        self.profile_path = self.storage_state_path.parent / "browser-profile"
         self.headless = headless
         self.timeout_seconds = max(float(timeout_seconds), 1.0)
         self.node_command = node_command
@@ -49,6 +50,7 @@ class BrowserSessionDownloader:
     def available(self) -> bool:
         return bool(
             self.storage_state_path.is_file()
+            and self.profile_path.is_dir()
             and self.helper_script.is_file()
             and shutil.which(self.node_command)
         )
@@ -64,7 +66,7 @@ class BrowserSessionDownloader:
         if not self.available:
             return BrowserDownloadResult(
                 error_code="BROWSER_SESSION_UNAVAILABLE",
-                error="Browser session state, helper, or Node.js is unavailable.",
+                error="Browser session state, dedicated profile, helper, or Node.js is unavailable.",
             )
 
         target = Path(target_path).resolve()

@@ -13,6 +13,7 @@ def test_browser_session_downloader_uses_only_explicit_state_and_candidate_urls(
 ) -> None:
     state = tmp_path / "browser-session.json"
     state.write_text('{"cookies": [], "origins": []}', encoding="utf-8")
+    (tmp_path / "browser-profile").mkdir()
     helper = tmp_path / "browser_fulltext.mjs"
     helper.write_text("// injected test helper", encoding="utf-8")
     target = tmp_path / "paper.pdf"
