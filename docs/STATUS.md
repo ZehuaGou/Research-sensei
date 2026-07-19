@@ -9,6 +9,24 @@ as a live acceptance result.
 
 ## 2026-07-19 M1 Open-Fulltext Rescue
 
+### Relevance-first correction
+
+The earlier implementation and acceptance table used a seven-paper download
+queue. That framing was incorrect: M1 must never treat a count as a quota or
+promote an easier source over a more relevant paper. The current behavior is:
+
+- strict deterministic relevance plus the deep-read score threshold is applied
+  before full-text discovery or download;
+- every qualifying candidate is attempted by default, so the result count is
+  dynamic; `search.max_download_candidates = 0` means no arbitrary cap;
+- a positive user-configured cap preserves relevance order;
+- OA supplementation is triggered by unresolved relevant papers, not by a
+  target such as "seven open PDFs";
+- an optional user-authorized Chrome storage state can recover publisher PDFs
+  that are available in the user's legitimate browser session but rejected by
+  backend HTTP. It remains fail-closed and never reads the normal Chrome
+  profile or bypasses access controls.
+
 This section supersedes the earlier single-query M1 `2/7` result below.
 
 - Git history is consolidated on `main`; local and remote have no other branch.
@@ -28,10 +46,14 @@ This section supersedes the earlier single-query M1 `2/7` result below.
   extraction.
 - The downloader orders stable OA endpoints ahead of publisher fallbacks and
   tries every legal candidate PDF URL until a validated PDF succeeds. The
-  seven-paper queue prefers cached, arXiv, repository, and open proceedings
-  sources among candidates that already passed the strict relevance gate.
-- The direction UI shows strict-related versus total deduplicated counts and
-  hides `D_IGNORE` candidates by default behind an explicit disclosure button.
+  dynamic download queue preserves relevance order and prefers cached, arXiv,
+  repository, and open proceedings sources for each selected paper.
+- PMC landing-page PDF links that return an HTML preparation screen are now
+  resolved through PMC's official versioned Cloud Service metadata and PDF
+  objects before falling back to page scraping.
+- The direction UI shows strict-related, attempted, successful, and total
+  deduplicated counts, and hides `D_IGNORE` candidates by default behind an
+  explicit disclosure button.
 
 Live acceptance progression for the same query
 `graph neural network multivariate time series anomaly detection`:
@@ -43,10 +65,13 @@ Live acceptance progression for the same query
 | Seven-paper source-aware queue | 146 raw candidates, 17 relevant, 7/7 downloaded, 223.2s | Full download target passed, but full-text probing happened too early. |
 | Final optimized live run | 254 raw candidates, 146 deduplicated, 46 strict-related, 7/7 downloaded, 134.1s | `SUCCESS`; all selected papers were validated and landed locally. |
 | Final browser acceptance | 114 deduplicated, 17 strict-related, 7/7 downloaded | `SUCCESS` even while Semantic Scholar was unavailable; OpenAlex supplementation and legal-source fallback carried the queue. |
+| Relevance-first dynamic acceptance | 204 deduplicated, 18 strict-related, 18 attempted, 12 downloaded | `DEGRADED` because six relevant papers remain unresolved; no lower-relevance paper was substituted. PMC Cloud recovery restored GTAD. |
 
 The final live run is a single-query acceptance, not a claim that every
-publisher or every research direction will achieve 7/7. ACM was Cloudflare-403
-from the automation environment, MDPI PDF/page requests were 403, and the tested
+publisher or every research direction will achieve a fixed count. A fresh ACM
+automation context still reached a security challenge; the authorized-session
+fallback has deterministic contract coverage but still needs a one-time user
+session capture for live ACM acceptance. MDPI PDF/page requests were 403, and the tested
 IEEE/Elsevier papers had no OA copy in OpenAlex, Semantic Scholar, or Europe PMC.
 The implementation therefore uses legal alternative copies and source-aware
 candidate selection rather than bypassing access controls.
@@ -82,9 +107,9 @@ Current verification:
 
 | Command / surface | Result | Classification |
 |---|---|---|
-| `.venv\Scripts\python.exe -m pytest -q` | `783 passed, 15 skipped` in 197.81s | Complete local backend/offline suite. |
+| `.venv\Scripts\python.exe -m pytest -q` | `789 passed, 15 skipped` in 178.01s | Complete local backend/offline suite. |
 | `.venv\Scripts\python.exe -m ruff check src tests` | Passed | Full backend and test lint. |
-| `.venv\Scripts\python.exe -m mypy` | No issues in 126 source files | Full backend type boundary. |
+| `.venv\Scripts\python.exe -m mypy` | No issues in 127 source files | Full backend type boundary. |
 | `npm test` | 15 files, 76 tests passed | Frontend unit/contract suite. |
 | `npm run typecheck` and `npm run build` | Passed; Vite transformed 94 modules | Frontend static and production build. |
 | `npm audit --registry=https://registry.npmjs.org` | 0 vulnerabilities | Full npm dependency tree, including dev dependencies. |

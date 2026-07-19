@@ -70,6 +70,13 @@ const fulltextProbeMetrics = computed(() => sourceMetrics.value.filter((metric) 
   String(metric.source || '').startsWith('landing_extractor:') || metric.source === 'unpaywall'
 )))
 const successfulFulltextProbes = computed(() => fulltextProbeMetrics.value.filter((metric) => metric.success).length)
+const sourceResolutionItems = computed<Array<Record<string, any>>>(() => (
+  Array.isArray(result.value?.source_resolution?.items) ? result.value.source_resolution.items : []
+))
+const downloadAttemptCount = computed(() => sourceResolutionItems.value.length)
+const downloadedPaperCount = computed(() => sourceResolutionItems.value.filter((item) => (
+  item.download_status === 'downloaded' && item.has_valid_deep_reading_source === true
+)).length)
 
 onMounted(() => {
   syncQueryFromRoute()
@@ -570,7 +577,12 @@ async function openDeepRead(paper: Record<string, any>) {
         <section v-if="result" class="codex-card status-card" data-testid="direction-status">
           <div class="status-line">
             <strong>{{ statusLabel(status) }}</strong>
-            <span>{{ relevantPapers.length }} 篇严格相关 · {{ allPapers.length }} 篇去重候选</span>
+            <span>
+              {{ relevantPapers.length }} 篇严格相关 ·
+              尝试全文 {{ downloadAttemptCount }} 篇 ·
+              成功 {{ downloadedPaperCount }} 篇 ·
+              {{ allPapers.length }} 篇去重候选
+            </span>
           </div>
           <p v-if="result.message">{{ directionMessage(result.message) }}</p>
           <div v-if="warnings.length" class="warning-list">

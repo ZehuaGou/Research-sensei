@@ -8,18 +8,18 @@ from typing import Any
 
 from researchsensei.acquisition import (
     ArxivAdapter,
-    FullTextResolver,
     OpenAlexAdapter,
     PaperSearchMcpAdapter,
     SemanticScholarAdapter,
     make_default_search_adapter,
 )
+from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import DEFAULT_SEARCH_MAX_RESULTS
 from researchsensei.canonical import MaterialNormalizer
 from researchsensei.query import QueryPlanner
 from researchsensei.query.planner import detect_venue_openalex_source_ids
 from researchsensei.ranking import PaperRanker, select_downloads
-from researchsensei.relevance import DeterministicRelevanceEvaluator
+from researchsensei.relevance import DeterministicRelevanceEvaluator, passes_strict_relevance_gate
 from researchsensei.schemas import (
     CandidatePaper,
     CanonicalizationResult,
@@ -61,7 +61,7 @@ class DirectionRunner:
         paper_ranker: PaperRanker | None = None,
         sources: list[str] | None = None,
         max_results_per_source: int = DEFAULT_SEARCH_MAX_RESULTS,
-        max_download_candidates: int = 10,
+        max_download_candidates: int | None = 0,
         max_canonicalize_candidates: int | None = None,
         relevance_evaluator: DeterministicRelevanceEvaluator | None = None,
     ) -> None:
@@ -106,12 +106,27 @@ class DirectionRunner:
         # Step 3: Verify candidates (BEFORE download)
         verified_candidates = self.verifier.verify_batch(deduplicated)
 
-        # Step 4: Resolve official/OA full-text URLs before download selection.
-        fulltext_enriched, fulltext_metrics = self.fulltext_resolver.resolve_many(
+        # Step 4: Apply the strict relevance gate before any DOI, landing-page,
+        # or browser-session work. Downloadability must not influence which
+        # papers qualify for acquisition.
+        relevance_screened = self.relevance_evaluator.evaluate_and_rank(
+            query_plan,
             verified_candidates,
+        )
+        fulltext_targets = [
+            candidate for candidate in relevance_screened
+            if passes_strict_relevance_gate(candidate)
+        ]
+        enriched_targets, fulltext_metrics = self.fulltext_resolver.resolve_many(
+            fulltext_targets,
             download_top_n=0,
             workspace=Path(run_dir) / "fulltext_candidates",
         )
+        enriched_by_id = {candidate.paper_id: candidate for candidate in enriched_targets}
+        fulltext_enriched = [
+            enriched_by_id.get(candidate.paper_id, candidate)
+            for candidate in relevance_screened
+        ]
         source_metrics = [*source_metrics, *fulltext_metrics]
 
         # Step 5: rerank PaperSearch candidates before selecting download attempts.

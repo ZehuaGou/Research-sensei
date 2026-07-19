@@ -22,7 +22,12 @@ from starlette.datastructures import Headers
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.concurrency import run_in_threadpool
 
-from researchsensei.acquisition import OpenAlexAdapter, PaperSearchMcpAdapter, SemanticScholarAdapter
+from researchsensei.acquisition import (
+    OpenAlexAdapter,
+    PaperSearchMcpAdapter,
+    SemanticScholarAdapter,
+)
+from researchsensei.browser_downloader import BrowserSessionDownloader
 from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import AppConfig, ConfigService
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
@@ -162,6 +167,13 @@ def create_app(
         command=_paper_search_command(runtime_config),
         timeout_seconds=float(runtime_config.search.timeout_seconds),
     )
+    browser_downloader = None
+    if runtime_config.search.browser_download_enabled and runtime_config.search.browser_session_state:
+        browser_downloader = BrowserSessionDownloader(
+            storage_state_path=runtime_config.search.browser_session_state,
+            headless=runtime_config.search.browser_headless,
+            timeout_seconds=float(runtime_config.search.timeout_seconds),
+        )
     resolved_direction_service = direction_service or DirectionExplorationService(
         adapters={"paper_search": configured_search_adapter},
         fallback_adapters={
@@ -175,12 +187,13 @@ def create_app(
             timeout_seconds=float(runtime_config.search.timeout_seconds),
             max_download_bytes=resolved_max_bytes,
             paper_library=paper_library,
+            browser_downloader=browser_downloader,
         ),
         fulltext_resolver=fulltext_resolver,
         source_download_dir=m1_source_dir,
         paper_library=paper_library,
         max_results_per_source=runtime_config.search.max_results,
-        max_download_candidates=7,
+        max_download_candidates=runtime_config.search.max_download_candidates,
         query_planner=QueryPlanner(resolved_llm_client) if resolved_llm_client is not None else None,
     )
     resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService(

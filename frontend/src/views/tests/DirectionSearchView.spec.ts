@@ -31,6 +31,16 @@ function directionResponse(overrides: Record<string, any> = {}) {
     method_families: [
       { name: 'Transformer/attention methods', role: 'TRANSFORMER_METHOD', paper_count: 1 },
     ],
+    source_resolution: {
+      query: 'time series anomaly detection',
+      items: [
+        {
+          paper_id: 'p1',
+          download_status: 'downloaded',
+          has_valid_deep_reading_source: true,
+        },
+      ],
+    },
     papers: [
       {
         paper_id: 'p1',
@@ -144,6 +154,7 @@ describe('DirectionSearchView', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('检索完成')
+    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('尝试全文 1 篇 · 成功 1 篇')
     expect(wrapper.get('[data-testid="query-plan"]').text()).toContain('time series anomaly detection')
     expect(wrapper.get('[data-testid="direction-overview"]').text()).toContain('保守的阅读地图')
     expect(wrapper.get('[data-testid="sub-directions"]').text()).toContain('reconstruction-based detection')

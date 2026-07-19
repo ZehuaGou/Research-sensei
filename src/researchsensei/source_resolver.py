@@ -8,6 +8,7 @@ import logging
 import re
 import shutil
 import tarfile
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,6 +17,7 @@ from urllib.parse import urlparse
 
 import httpx
 
+from researchsensei.browser_downloader import BrowserSessionDownloader
 from researchsensei.library import PaperLibraryRecord, PaperLibraryStore
 from researchsensei.schemas import (
     CandidatePaper,
@@ -33,6 +35,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_LOCAL_SUFFIXES = {".md", ".txt", ".pdf", ".tex"}
 PDF_BYTES = b"%PDF"
 GZIP_BYTES = b"\x1f\x8b"
+PMC_CLOUD_BASE_URL = "https://pmc-oa-opendata.s3.amazonaws.com"
 
 
 @dataclass(frozen=True)
@@ -60,6 +63,7 @@ class PaperSourceResolver:
         max_download_bytes: int = 80 * 1024 * 1024,
         external_resolver: Callable[[CandidatePaper], ResolvedPaperSource | None] | None = None,
         paper_library: PaperLibraryStore | None = None,
+        browser_downloader: BrowserSessionDownloader | None = None,
     ) -> None:
         self.network_enabled = network_enabled
         self.download_dir = Path(download_dir).resolve() if download_dir else None
@@ -72,6 +76,7 @@ class PaperSourceResolver:
         self.max_download_bytes = max_download_bytes
         self.external_resolver = external_resolver
         self.paper_library = paper_library
+        self.browser_downloader = browser_downloader
 
     def resolve_many(
         self,
@@ -153,6 +158,17 @@ class PaperSourceResolver:
                 if source_result is not None:
                     return source_result
 
+        pmcid = _paper_pmcid(paper)
+        if pmcid and self.network_enabled and (download_dir or self.download_dir):
+            pmc_result = self._download_pmc_cloud_pdf(
+                paper,
+                pmcid=pmcid,
+                landing_url=landing_url,
+                download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+            )
+            if pmc_result is not None:
+                return pmc_result
+
         if pdf_url:
             if self.network_enabled and (download_dir or self.download_dir):
                 failures: list[ResolvedPaperSource] = []
@@ -179,6 +195,14 @@ class PaperSourceResolver:
                         return attempt
                     failures.append(attempt)
                 last_failure = failures[-1]
+                browser_result = self._download_with_browser_session(
+                    paper,
+                    landing_url=landing_url,
+                    pdf_urls=pdf_urls,
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
+                if browser_result is not None:
+                    return browser_result
                 return last_failure.model_copy(
                     update={
                         "metadata": {
@@ -201,6 +225,15 @@ class PaperSourceResolver:
             )
 
         if landing_url:
+            if self.network_enabled and (download_dir or self.download_dir):
+                browser_result = self._download_with_browser_session(
+                    paper,
+                    landing_url=landing_url,
+                    pdf_urls=[],
+                    download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                )
+                if browser_result is not None:
+                    return browser_result
             return self._base_result(
                 paper,
                 status=PaperSourceStatus.RESOLVED_LANDING_ONLY,
@@ -222,6 +255,158 @@ class PaperSourceResolver:
             ],
             error_code="NO_SOURCE_FOUND",
             metadata={"resolution_strategy": "metadata_only"},
+        )
+
+    def _download_with_browser_session(
+        self,
+        paper: CandidatePaper,
+        *,
+        landing_url: str,
+        pdf_urls: list[str],
+        download_dir: Path,
+    ) -> ResolvedPaperSource | None:
+        downloader = self.browser_downloader
+        if downloader is None or not downloader.available:
+            return None
+        target = _paper_pdf_path(download_dir, paper)
+        result = downloader.download(
+            landing_url=landing_url,
+            pdf_urls=pdf_urls,
+            target_path=target,
+            expected_title=paper.title,
+        )
+        if not result.attempted:
+            return None
+        if not result.success:
+            return self._download_failed(
+                paper,
+                pdf_url=pdf_urls[0] if pdf_urls else "",
+                source_url=result.final_url or landing_url,
+                landing_url=landing_url,
+                source_type=PaperSourceType.PDF if pdf_urls else PaperSourceType.LANDING_PAGE,
+                code=result.error_code or "BROWSER_SESSION_FAILED",
+                message=result.error or "Authorized browser session did not yield a PDF.",
+            )
+        try:
+            content = target.read_bytes()
+        except OSError as exc:
+            return self._download_failed(
+                paper,
+                pdf_url=result.final_url or (pdf_urls[0] if pdf_urls else ""),
+                source_url=result.final_url or landing_url,
+                landing_url=landing_url,
+                source_type=PaperSourceType.PDF,
+                code="BROWSER_SESSION_FILE_MISSING",
+                message=str(exc)[:300],
+            )
+        if not content.startswith(PDF_BYTES) or len(content) > self.max_download_bytes:
+            target.unlink(missing_ok=True)
+            return self._download_failed(
+                paper,
+                pdf_url=result.final_url or (pdf_urls[0] if pdf_urls else ""),
+                source_url=result.final_url or landing_url,
+                landing_url=landing_url,
+                source_type=PaperSourceType.PDF,
+                code="BROWSER_SESSION_INVALID_PDF",
+                message="Browser-assisted response failed PDF signature or size validation.",
+                content_type=result.content_type,
+                file_size=len(content),
+            )
+        meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
+        return self._base_result(
+            paper,
+            status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
+            source_type=PaperSourceType.PDF,
+            source_url=result.final_url or landing_url,
+            pdf_url=result.final_url or (pdf_urls[0] if pdf_urls else ""),
+            landing_url=landing_url,
+            download_status="downloaded",
+            final_url=result.final_url,
+            content_type=result.content_type or "application/pdf",
+            file_size=len(content),
+            sha256=hashlib.sha256(content).hexdigest(),
+            local_path=str(target),
+            pdf_metadata_check=meta_check,
+            pdf_title_match=title_match,
+            pdf_metadata_warning=meta_warning,
+            metadata={"resolution_strategy": "authorized_browser_session"},
+        )
+
+    def _download_pmc_cloud_pdf(
+        self,
+        paper: CandidatePaper,
+        *,
+        pmcid: str,
+        landing_url: str,
+        download_dir: Path,
+    ) -> ResolvedPaperSource | None:
+        """Resolve a PMC article through the official versioned AWS dataset.
+
+        PMC article pages can return an HTML preparation screen to server-side
+        clients even when the article PDF is openly downloadable.  The current
+        PMC Cloud Service exposes versioned metadata and PDF objects without a
+        login, so use that machine-access route before scraping the landing page.
+        """
+
+        try:
+            listing = self.http_client.get(
+                f"{PMC_CLOUD_BASE_URL}/",
+                params={"list-type": "2", "prefix": f"metadata/{pmcid}."},
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+            )
+            listing.raise_for_status()
+            if len(listing.content) > 1024 * 1024:
+                return None
+            root = ET.fromstring(listing.content)
+            metadata_keys = [
+                str(node.text or "").strip()
+                for node in root.iter()
+                if node.tag.rsplit("}", 1)[-1] == "Key"
+                and re.fullmatch(rf"metadata/{re.escape(pmcid)}\.\d+\.json", str(node.text or ""))
+            ]
+            if not metadata_keys:
+                return None
+            metadata_key = max(metadata_keys, key=_pmc_metadata_version)
+            metadata_url = f"{PMC_CLOUD_BASE_URL}/{metadata_key}"
+            metadata_response = self.http_client.get(
+                metadata_url,
+                timeout=self.timeout_seconds,
+                follow_redirects=True,
+            )
+            metadata_response.raise_for_status()
+            if len(metadata_response.content) > 1024 * 1024:
+                return None
+            metadata = metadata_response.json()
+            if str(metadata.get("pmcid") or "").upper() != pmcid:
+                return None
+            if not (metadata.get("is_pmc_openaccess") or metadata.get("is_manuscript")):
+                return None
+            pdf_url = _s3_url_to_https(str(metadata.get("pdf_url") or ""))
+            if not pdf_url:
+                return None
+        except (ET.ParseError, ValueError, httpx.HTTPError, OSError):
+            return None
+
+        result = self._download_pdf(
+            paper,
+            pdf_url=pdf_url,
+            source_url=metadata_url,
+            landing_url=landing_url or f"https://pmc.ncbi.nlm.nih.gov/articles/{pmcid}/",
+            source_type=PaperSourceType.PDF,
+            download_dir=download_dir,
+        )
+        if result.status != PaperSourceStatus.RESOLVED_PDF_DOWNLOADED:
+            return None
+        return result.model_copy(
+            update={
+                "metadata": {
+                    **result.metadata,
+                    "resolution_strategy": "pmc_cloud_pdf",
+                    "pmcid": pmcid,
+                    "pmc_version": str(metadata.get("version") or _pmc_metadata_version(metadata_key)),
+                }
+            }
         )
 
     def _download_pdf(
@@ -1222,6 +1407,36 @@ def _ordered_pdf_urls(values: list[str]) -> list[str]:
         return 1
 
     return sorted(unique, key=reliability)
+
+
+def _paper_pmcid(paper: CandidatePaper) -> str:
+    values = [
+        paper.url,
+        paper.landing_url,
+        paper.pdf_url,
+        paper.selected_fulltext_url,
+        *paper.candidate_pdf_urls,
+        *paper.candidate_html_urls,
+        json.dumps(paper.raw_source_metadata, ensure_ascii=True, default=str),
+    ]
+    for value in values:
+        match = re.search(r"\bPMC\d+\b", str(value or ""), flags=re.IGNORECASE)
+        if match:
+            return match.group(0).upper()
+    return ""
+
+
+def _pmc_metadata_version(key: str) -> int:
+    match = re.search(r"\.(\d+)\.json$", key)
+    return int(match.group(1)) if match else 0
+
+
+def _s3_url_to_https(value: str) -> str:
+    match = re.fullmatch(r"s3://([^/]+)/(.+)", value.strip())
+    if not match:
+        return value if value.startswith(("http://", "https://")) else ""
+    bucket, key = match.groups()
+    return f"https://{bucket}.s3.amazonaws.com/{key}"
 
 
 def _unique_warnings(values: list[str]) -> list[str]:

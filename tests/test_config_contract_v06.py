@@ -15,6 +15,7 @@ def _write_config(
     sources: str = '"openalex", "semantic"',
     max_results: int = 17,
     timeout_seconds: int = 23,
+    max_download_candidates: int = 0,
     max_upload_mb: int = 12,
     workspace_dir: str = "configured-workspace",
 ) -> None:
@@ -48,6 +49,7 @@ sources = [{sources}]
 max_results = {max_results}
 timeout_seconds = {timeout_seconds}
 min_citation_count = 0
+max_download_candidates = {max_download_candidates}
 """.strip(),
         encoding="utf-8",
     )
@@ -61,6 +63,10 @@ def _clear_search_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "RESEARCHSENSEI_PAPER_SEARCH_SOURCES",
         "RESEARCHSENSEI_SEARCH_MAX_RESULTS",
         "RESEARCHSENSEI_SEARCH_TIMEOUT_SECONDS",
+        "RESEARCHSENSEI_SEARCH_MAX_DOWNLOAD_CANDIDATES",
+        "RESEARCHSENSEI_BROWSER_DOWNLOAD_ENABLED",
+        "RESEARCHSENSEI_BROWSER_SESSION_STATE",
+        "RESEARCHSENSEI_BROWSER_HEADLESS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -84,6 +90,7 @@ def test_toml_search_settings_reach_real_adapter_and_services(
     assert adapter.sources == ["openalex", "semantic"]
     assert adapter.timeout_seconds == 23
     assert deps.direction_service.max_results_per_source == 17
+    assert deps.direction_service.max_download_candidates == 0
     assert deps.seed_expansion_service.max_results_per_source == 17
     assert app.state.runtime_config.app.max_upload_mb == 12
     assert deps.runner.ingestion.__class__.__name__ == "LightweightIngestionService"
@@ -99,12 +106,14 @@ def test_environment_overrides_toml_search_settings(
     monkeypatch.setenv("RESEARCHSENSEI_PAPER_SEARCH_SOURCES", "arxiv,dblp")
     monkeypatch.setenv("RESEARCHSENSEI_SEARCH_MAX_RESULTS", "31")
     monkeypatch.setenv("RESEARCHSENSEI_SEARCH_TIMEOUT_SECONDS", "41")
+    monkeypatch.setenv("RESEARCHSENSEI_SEARCH_MAX_DOWNLOAD_CANDIDATES", "9")
 
     config = ConfigService(config_path=config_path, env_path=tmp_path / "missing.env").load()
 
     assert config.search.sources == ["arxiv", "dblp"]
     assert config.search.max_results == 31
     assert config.search.timeout_seconds == 41
+    assert config.search.max_download_candidates == 9
 
 
 @pytest.mark.parametrize(

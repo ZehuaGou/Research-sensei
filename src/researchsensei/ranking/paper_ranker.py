@@ -6,6 +6,7 @@ from datetime import date
 from typing import Any
 
 from researchsensei.library import PaperLibraryStore
+from researchsensei.relevance import passes_strict_relevance_gate
 from researchsensei.schemas import CandidatePaper
 
 DEFAULT_RERANKER_MODEL = "ms-marco-MiniLM-L-12-v2"
@@ -115,11 +116,15 @@ class PaperRanker:
 def select_downloads(
     candidates: Sequence[CandidatePaper],
     *,
-    max_download_candidates: int,
+    max_download_candidates: int | None,
     paper_library: PaperLibraryStore | None = None,
     require_relevance_gate: bool = False,
 ) -> list[CandidatePaper]:
-    limit = max(max_download_candidates, 0)
+    # Download volume is an output of the relevance gate, not a target. A
+    # missing/zero limit means "attempt every strictly relevant candidate".
+    # When the user configures a positive safety cap, retain relevance order;
+    # downloadability must never promote a weaker paper over a stronger one.
+    limit = max(int(max_download_candidates or 0), 0)
     candidate_list = list(candidates)
     cached_by_index = {
         index: paper_library.find_match(candidate) if paper_library is not None else None
@@ -130,24 +135,17 @@ def select_downloads(
         for index, candidate in enumerate(candidate_list)
         if (
             not require_relevance_gate
-            or (candidate.relevance_gate_evaluated and candidate.relevance_gate_passed)
+            or passes_strict_relevance_gate(candidate)
         )
     ]
-    eligible_indexes.sort(
-        key=lambda index: (
-            _downloadability_tier(candidate_list[index], cached=bool(cached_by_index[index])),
-            index,
-        )
-    )
-    selected_indexes = set(eligible_indexes[:limit])
+    selected_indexes = set(eligible_indexes if limit == 0 else eligible_indexes[:limit])
     selected: list[CandidatePaper] = []
     for zero_index, candidate in enumerate(candidate_list):
         index = zero_index + 1
         relevance_eligible = bool(
             not require_relevance_gate
             or (
-                candidate.relevance_gate_evaluated
-                and candidate.relevance_gate_passed
+                passes_strict_relevance_gate(candidate)
             )
         )
         is_selected = zero_index in selected_indexes
@@ -175,15 +173,16 @@ def select_downloads(
         elif is_selected:
             decision = "SELECTED_BY_RERANKER"
             reuse_note = " local library hit; reuse before network download." if cached is not None else ""
-            source_tier = _downloadability_tier(candidate, cached=cached is not None)
             reason = (
                 f"Selected from the relevance-cleared queue at reranked order #{download_rank}; "
-                f"source-readiness tier={source_tier}; "
                 f"venue='{venue}', CCF rank={venue_rank}.{reuse_note}"
             )
         else:
             decision = "SKIPPED_OVER_DOWNLOAD_LIMIT"
-            reason = f"Not attempted because it is beyond the top {limit} relevance-cleared reranked download candidates."
+            reason = (
+                f"Not attempted because it is beyond the explicitly configured top {limit} "
+                "relevance-cleared candidates."
+            )
         selected.append(
             candidate.model_copy(
                 update={

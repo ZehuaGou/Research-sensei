@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Protocol
 
 from researchsensei.acquisition import (
-    FullTextResolver,
     OpenAlexAdapter,
     SemanticScholarAdapter,
     make_default_search_adapter,
 )
+from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import DEFAULT_SEARCH_MAX_RESULTS
 from researchsensei.library import PaperLibraryStore
 from researchsensei.ranking import PaperRanker, select_downloads
@@ -21,6 +21,7 @@ from researchsensei.relevance import (
     MIN_DEEP_READ_RELEVANCE_SCORE,
     MIN_RELEVANCE_SCORE,
     DeterministicRelevanceEvaluator,
+    passes_strict_relevance_gate,
 )
 from researchsensei.schemas import (
     CanonicalQualityStatus,
@@ -67,7 +68,7 @@ class DirectionExplorationService:
         sources: list[str] | None = None,
         max_results_per_source: int = DEFAULT_SEARCH_MAX_RESULTS,
         max_verify_candidates: int = 12,
-        max_download_candidates: int = 10,
+        max_download_candidates: int | None = 0,
         max_search_queries: int = 12,
         source_download_dir: str | Path | None = None,
         paper_library: PaperLibraryStore | None = None,
@@ -136,7 +137,10 @@ class DirectionExplorationService:
         # contain 100+ candidates; only relevance-cleared papers need costly
         # full-text discovery for ranking and download selection.
         relevance_screened = self.relevance_evaluator.evaluate_and_rank(query_plan, verified)
-        fulltext_targets = [candidate for candidate in relevance_screened if candidate.relevance_gate_passed]
+        fulltext_targets = [
+            candidate for candidate in relevance_screened
+            if passes_strict_relevance_gate(candidate)
+        ]
         enriched_targets, fulltext_metrics = self.fulltext_resolver.resolve_many(fulltext_targets, download_top_n=0)
         enriched_by_id = {candidate.paper_id: candidate for candidate in enriched_targets}
         fulltext_enriched = [
@@ -1011,7 +1015,7 @@ def _discovery_supplement_reasons(
     relevant_oa_hint_count = 0
     if query_plan is not None and relevance_evaluator is not None:
         assessed = relevance_evaluator.evaluate_and_rank(query_plan, candidates)
-        relevant = [candidate for candidate in assessed if candidate.relevance_gate_passed]
+        relevant = [candidate for candidate in assessed if passes_strict_relevance_gate(candidate)]
         relevant_count = len(relevant)
         relevant_oa_hint_count = sum(
             1 for candidate in relevant if _candidate_has_open_fulltext_hint(candidate)
@@ -1034,9 +1038,9 @@ def _discovery_supplement_reasons(
         reasons.append(f"topic_matches={relevant_count}<{relevant_target}")
     # The user-facing download queue needs enough relevant *and* open papers;
     # unrelated arXiv hits must not suppress OA supplementation.
-    oa_target = min(7, expected)
-    if relevant_oa_hint_count < oa_target:
-        reasons.append(f"relevant_open_fulltext_hints={relevant_oa_hint_count}<{oa_target}")
+    unresolved_relevant_count = max(relevant_count - relevant_oa_hint_count, 0)
+    if unresolved_relevant_count:
+        reasons.append(f"relevant_without_open_fulltext_hint={unresolved_relevant_count}")
     return reasons
 
 

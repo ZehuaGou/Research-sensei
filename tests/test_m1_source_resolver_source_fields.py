@@ -4,10 +4,31 @@ from pathlib import Path
 
 import httpx
 
+from researchsensei.browser_downloader import BrowserDownloadResult
 from researchsensei.library import PaperLibraryStore
 from researchsensei.schemas import CandidatePaper, PaperSourceStatus, SourcePriority
 from researchsensei.schemas import PaperSourceType, ResolvedPaperSource
 from researchsensei.source_resolver import PaperSourceResolver
+
+
+class FakeBrowserDownloader:
+    available = True
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def download(self, **kwargs: object) -> BrowserDownloadResult:
+        self.calls.append(kwargs)
+        target = Path(str(kwargs["target_path"]))
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"%PDF-1.4\nbrowser session\n%%EOF")
+        return BrowserDownloadResult(
+            attempted=True,
+            success=True,
+            local_path=str(target),
+            final_url="https://dl.acm.org/doi/pdf/10.1145/example",
+            content_type="application/pdf",
+        )
 
 
 def test_downloaded_pdf_sets_source_aware_fields(tmp_path: Path) -> None:
@@ -194,3 +215,121 @@ def test_resolver_retries_alternative_pdf_urls_until_valid_pdf(tmp_path: Path) -
         "https://mirror.test/working.pdf",
     ]
     assert result.metadata["fallback_count"] == 1
+
+
+def test_resolver_uses_official_pmc_cloud_pdf_instead_of_html_download_screen(
+    tmp_path: Path,
+) -> None:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        calls.append(url)
+        if request.url.path == "/" and request.url.params.get("prefix") == "metadata/PMC10490803.":
+            return httpx.Response(
+                200,
+                content=(
+                    b'<?xml version="1.0" encoding="UTF-8"?>'
+                    b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+                    b"<Contents><Key>metadata/PMC10490803.1.json</Key></Contents>"
+                    b"</ListBucketResult>"
+                ),
+                request=request,
+            )
+        if request.url.path == "/metadata/PMC10490803.1.json":
+            return httpx.Response(
+                200,
+                json={
+                    "pmcid": "PMC10490803",
+                    "version": 1,
+                    "is_pmc_openaccess": True,
+                    "is_manuscript": False,
+                    "pdf_url": (
+                        "s3://pmc-oa-opendata/PMC10490803.1/"
+                        "PMC10490803.1.pdf?md5=0123456789abcdef"
+                    ),
+                },
+                request=request,
+            )
+        if request.url.path == "/PMC10490803.1/PMC10490803.1.pdf":
+            return httpx.Response(
+                200,
+                headers={"content-type": "binary/octet-stream"},
+                content=b"%PDF-1.4\nopen PMC cloud paper\n%%EOF",
+                request=request,
+            )
+        return httpx.Response(404, request=request)
+
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    paper = CandidatePaper(
+        paper_id="pmc-paper",
+        title="Masked Graph Neural Networks",
+        landing_url="https://pmc.ncbi.nlm.nih.gov/articles/PMC10490803/",
+        pdf_url=(
+            "https://pmc.ncbi.nlm.nih.gov/articles/PMC10490803/pdf/"
+            "sensors-23-07552.pdf"
+        ),
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.metadata["resolution_strategy"] == "pmc_cloud_pdf"
+    assert result.metadata["pmcid"] == "PMC10490803"
+    assert result.pdf_url.startswith(
+        "https://pmc-oa-opendata.s3.amazonaws.com/PMC10490803.1/"
+    )
+    assert Path(result.local_path).read_bytes().startswith(b"%PDF")
+    assert not any("pmc.ncbi.nlm.nih.gov/articles" in call for call in calls)
+
+
+def test_resolver_uses_authorized_browser_session_after_publisher_http_failure(
+    tmp_path: Path,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(403, request=request)
+
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    paper = CandidatePaper(
+        paper_id="acm-paper",
+        title="Relevant ACM Paper",
+        landing_url="https://dl.acm.org/doi/10.1145/example",
+        pdf_url="https://dl.acm.org/doi/pdf/10.1145/example",
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.metadata["resolution_strategy"] == "authorized_browser_session"
+    assert result.pdf_url == "https://dl.acm.org/doi/pdf/10.1145/example"
+    assert Path(result.local_path).read_bytes().startswith(b"%PDF")
+    assert len(browser.calls) == 1
+
+
+def test_resolver_can_discover_pdf_from_landing_with_authorized_browser_session(
+    tmp_path: Path,
+) -> None:
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    paper = CandidatePaper(
+        paper_id="landing-only",
+        title="Landing Only Relevant Paper",
+        landing_url="https://dl.acm.org/doi/10.1145/landing-only",
+    )
+
+    result = resolver.resolve_one(paper, download_dir=tmp_path)
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.metadata["resolution_strategy"] == "authorized_browser_session"
+    assert browser.calls[0]["pdf_urls"] == []

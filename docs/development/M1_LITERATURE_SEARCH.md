@@ -74,16 +74,20 @@ The default M1 product flow is:
 4. Apply deterministic task/concept relevance scoring and mismatch penalties.
    Candidates below the query gate remain visible for diagnostics but cannot
    become Top-1 or deep-read selections.
-5. Rerank the gated, deduplicated, full-text-enriched candidate pool with FlashRank
+5. Rerank the gated, deduplicated candidate pool with FlashRank
    (`ms-marco-MiniLM-L-12-v2` by default), while preserving the original
    external search rank as `search_rank`. The small in-repo quality guard only
    nudges candidates with usable legal full-text/source metadata, known CCF
    venue rank, and citation signal, while penalizing obviously weak metadata;
    it is not a hand-written relevance model.
-6. Select top reranked candidates for download attempts, defaulting to the top
-   10. Runtime fields use `download_selected`, `download_decision`, and
-   `download_reason`. CCF rank remains an annotation and quality hint, not a
-   hard download gate.
+6. Attempt every candidate that clears both the deterministic relevance gate
+   and the deep-read relevance threshold. The number attempted is therefore an
+   outcome (possibly 2, 7, 10, or 13), never a quota. A positive
+   `search.max_download_candidates` is an optional user safety cap; its default
+   `0` means unlimited, and a cap always preserves relevance order rather than
+   preferring an easier-to-download but weaker paper. Runtime fields use
+   `download_selected`, `download_decision`, and `download_reason`. CCF rank
+   remains an annotation and quality hint, not a hard download gate.
 7. Compare the selected candidates against the local paper library by DOI,
    arXiv ID, normalized title, and known URLs.
 8. Preserve queue order during reuse: if a selected paper already exists in the local
@@ -146,12 +150,20 @@ Reuse algorithm:
    discovery.
 4. Each selected candidate is matched against the library by DOI, arXiv ID,
    normalized title, and known source/PDF/landing URLs.
-5. Library hits are reused in their original selected position. New candidates
-   are attempted only when their position is inside the configured attempt
-   limit.
+5. Library hits are reused in their original relevance position. New candidates
+   are attempted when they pass the strict relevance threshold; a configured
+   positive safety cap may stop later candidates but never reorder them by
+   download convenience.
 6. `PaperSourceResolver` checks the library before any external resolver or
    HTTP PDF download. A hit returns a source-resolution item with
    `metadata.resolution_strategy = "library_reuse"`.
+
+PMC articles use the official machine-access route instead of treating the
+interactive article page as the download API. M1 lists the article's versioned
+metadata in the PMC Cloud Service, requires the record to be open access or an
+author manuscript, reads its declared `pdf_url`, and accepts the response only
+after the ordinary PDF validation gates pass. This avoids the HTML
+"preparing download" response returned by some direct PMC page links.
 
 This preserves external search quality and still avoids duplicate downloads.
 Failed downloads remain visible in `search_runs`. If too many selected papers
@@ -186,13 +198,14 @@ this order:
 1. arXiv source/e-print
 2. arXiv PDF
 3. OpenAlex/Semantic Scholar hidden arXiv crosslink
-4. PaperSearch/OpenAlex/Semantic Scholar candidate PDF URLs
-5. known OA venue landing extraction (AAAI OJS, ACL Anthology, CVF, PMLR, OpenReview, USENIX, JMLR, PVLDB, etc.)
-6. Unpaywall DOI lookup
-7. publisher/repository OA PDF
-8. legal HTML such as ar5iv when implemented
-9. user upload
-10. metadata-only
+4. official versioned PMC Cloud PDF for identified PMC articles
+5. PaperSearch/OpenAlex/Semantic Scholar candidate PDF URLs
+6. known OA venue landing extraction (AAAI OJS, ACL Anthology, CVF, PMLR, OpenReview, USENIX, JMLR, PVLDB, etc.)
+7. Unpaywall DOI lookup
+8. publisher/repository OA PDF
+9. legal HTML such as ar5iv when implemented
+10. user upload
+11. metadata-only
 
 Candidate output must preserve:
 
@@ -208,12 +221,45 @@ Candidate output must preserve:
 
 `can_deep_read=true` is allowed only for legal source/PDF/HTML-ready candidates.
 
+## Optional Authorized Browser Session
+
+Some publisher sites serve a PDF in a normal, verified Chrome session while
+rejecting backend HTTP clients or fresh automated contexts. ResearchSensei can
+use an explicit, dedicated Chrome storage-state file as a last download
+fallback for papers that already passed strict relevance. It does not inspect
+the user's normal Chrome profile and does not bypass CAPTCHA, subscription, or
+institutional-access controls.
+
+Create or refresh the dedicated session from the repository root:
+
+```powershell
+node frontend/scripts/browser_fulltext.mjs capture-session workspace/browser-session.json https://dl.acm.org/
+```
+
+Complete any legitimate login/security check in the opened Chrome window, then
+return to the terminal and press Enter. Enable the fallback in
+`config/local.toml`:
+
+```toml
+[search]
+browser_download_enabled = true
+browser_session_state = "workspace/browser-session.json"
+browser_headless = true
+max_download_candidates = 0
+```
+
+The state file lives under the ignored `workspace/` directory and must never be
+committed or shared. Normal legal OA URLs are still tried first. The browser is
+used only after ordinary HTTP candidates fail or a publisher landing page has
+no extractable PDF URL; the resulting file must still pass the same PDF magic,
+size, SHA-256, and metadata checks before M2 can use it.
+
 ## Adapter Status
 
 | Source/tool | Runtime role | Full-text capability | Notes |
 |---|---|---|---|
 | PaperSearch MCP | default broad discovery via external `paper-search-mcp` package | metadata + candidate URL/PDF/resource URLs | Default source set is `openalex,semantic,crossref,dblp,arxiv,core`. The adapter invokes the external `paper-search` CLI and normalizes returned rows into `CandidatePaper`. Configure sources with `RESEARCHSENSEI_PAPER_SEARCH_SOURCES`; install/update through the project `.venv`. |
-| PaperSearch `google_scholar` source | optional PaperSearch source only | metadata + candidate URL/PDF URL when PaperSearch can fetch it | Not enabled by default. If used, configure it through `RESEARCHSENSEI_PAPER_SEARCH_SOURCES` and a working proxy/session strategy rather than ResearchSensei's removed legacy adapter. |
+| PaperSearch `google_scholar` source | optional PaperSearch source only | metadata + candidate URL/PDF URL when PaperSearch can fetch it | Not enabled by default. If used, configure it through `RESEARCHSENSEI_PAPER_SEARCH_SOURCES`; publisher download can separately use the explicit authorized-browser fallback above. |
 | arXiv | full-text resolution when URL/arXiv ID is found | source_ready/pdf_ready | Source/e-print is preferred over PDF. Can arrive through PaperSearch MCP or explicit diagnostics. |
 | OpenAlex | PaperSearch source and OA metadata enrichment | OA URL/PDF metadata | Used through PaperSearch MCP by default. Existing in-repo adapter is legacy fallback/test support until the PaperSearch path is fully proven. |
 | Semantic Scholar | PaperSearch source and OA metadata enrichment | `openAccessPdf` | Used through PaperSearch MCP by default. A free `SEMANTIC_SCHOLAR_API_KEY` / `S2_API_KEY` improves rate-limit reliability. |

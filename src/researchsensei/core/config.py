@@ -82,6 +82,13 @@ class SearchConfig(ConfigModel):
     max_results: int = Field(default=DEFAULT_SEARCH_MAX_RESULTS, ge=1, le=500)
     timeout_seconds: int = Field(default=DEFAULT_SEARCH_TIMEOUT_SECONDS, gt=0, le=600)
     min_citation_count: int = Field(default=0, ge=0)
+    # 0 means no arbitrary count cap: every candidate that passes the strict
+    # relevance gate is attempted. Positive values are explicit user safety
+    # caps and preserve relevance order.
+    max_download_candidates: int = Field(default=0, ge=0, le=500)
+    browser_download_enabled: bool = False
+    browser_session_state: str = ""
+    browser_headless: bool = True
 
     @field_validator("command")
     @classmethod
@@ -266,6 +273,29 @@ def _apply_environment_overrides(data: dict[str, Any]) -> dict[str, Any]:
     _set_if_present(search, "max_results", "RESEARCHSENSEI_SEARCH_MAX_RESULTS", cast=int)
     _set_if_present(search, "timeout_seconds", "RESEARCHSENSEI_SEARCH_TIMEOUT_SECONDS", cast=int)
     _set_if_present(search, "min_citation_count", "RESEARCHSENSEI_SEARCH_MIN_CITATIONS", cast=int)
+    _set_if_present(
+        search,
+        "max_download_candidates",
+        "RESEARCHSENSEI_SEARCH_MAX_DOWNLOAD_CANDIDATES",
+        cast=int,
+    )
+    _set_if_present(
+        search,
+        "browser_download_enabled",
+        "RESEARCHSENSEI_BROWSER_DOWNLOAD_ENABLED",
+        cast=_as_bool,
+    )
+    _set_if_present(
+        search,
+        "browser_session_state",
+        "RESEARCHSENSEI_BROWSER_SESSION_STATE",
+    )
+    _set_if_present(
+        search,
+        "browser_headless",
+        "RESEARCHSENSEI_BROWSER_HEADLESS",
+        cast=_as_bool,
+    )
 
     merged["app"] = app
     merged["server"] = server

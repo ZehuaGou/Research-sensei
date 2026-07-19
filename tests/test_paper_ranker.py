@@ -73,7 +73,7 @@ def test_select_downloads_marks_primary_download_fields() -> None:
     assert selected[2].download_decision == "SKIPPED_OVER_DOWNLOAD_LIMIT"
 
 
-def test_select_downloads_prefers_reliable_open_source_within_relevance_queue() -> None:
+def test_select_downloads_never_promotes_easier_source_over_higher_relevance() -> None:
     ranked = [
         _paper(
             paper_id="closed-top",
@@ -95,8 +95,40 @@ def test_select_downloads_prefers_reliable_open_source_within_relevance_queue() 
 
     selected = select_downloads(ranked, max_download_candidates=1)
 
-    assert [paper.download_selected for paper in selected] == [False, True]
-    assert "source-readiness tier=1" in selected[1].download_reason
+    assert [paper.download_selected for paper in selected] == [True, False]
+    assert "reranked order #1" in selected[0].download_reason
+
+
+def test_select_downloads_zero_limit_attempts_every_relevance_cleared_candidate() -> None:
+    ranked = [
+        _paper(
+            paper_id="p1",
+            relevance_gate_evaluated=True,
+            relevance_gate_passed=True,
+            rule_relevance_score=0.91,
+        ),
+        _paper(
+            paper_id="p2",
+            relevance_gate_evaluated=True,
+            relevance_gate_passed=False,
+            rule_relevance_score=0.88,
+        ),
+        _paper(
+            paper_id="p3",
+            relevance_gate_evaluated=True,
+            relevance_gate_passed=True,
+            rule_relevance_score=0.82,
+        ),
+    ]
+
+    selected = select_downloads(
+        ranked,
+        max_download_candidates=0,
+        require_relevance_gate=True,
+    )
+
+    assert [paper.download_selected for paper in selected] == [True, False, True]
+    assert selected[1].download_decision == "SKIPPED_RELEVANCE_GATE"
 
 
 def test_paper_ranker_disabled_preserves_external_search_order() -> None:

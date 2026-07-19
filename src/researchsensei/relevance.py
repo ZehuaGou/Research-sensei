@@ -12,6 +12,16 @@ MIN_RELEVANCE_SCORE = 0.68
 MIN_DEEP_READ_RELEVANCE_SCORE = 0.72
 
 
+def passes_strict_relevance_gate(candidate: CandidatePaper) -> bool:
+    """Return whether a paper is strong enough for full-text acquisition."""
+
+    return bool(
+        candidate.relevance_gate_evaluated
+        and candidate.relevance_gate_passed
+        and candidate.rule_relevance_score >= MIN_DEEP_READ_RELEVANCE_SCORE
+    )
+
+
 @dataclass(frozen=True)
 class ConceptRule:
     name: str
