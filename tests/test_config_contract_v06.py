@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from researchsensei.browser_downloader import BrowserSessionDownloader
 from researchsensei.core.config import ConfigService
 from researchsensei.web.app import create_app
 
@@ -117,6 +118,32 @@ def test_environment_overrides_toml_search_settings(
     assert config.search.timeout_seconds == 41
     assert config.search.max_download_candidates == 9
     assert config.search.browser_headless is True
+
+
+def test_native_chrome_fallback_is_injected_into_production_m1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _clear_search_env(monkeypatch)
+    config_path = tmp_path / "local.toml"
+    _write_config(config_path)
+    state = tmp_path / "browser-session.json"
+    state.write_text('{"cookies": [], "origins": []}', encoding="utf-8")
+    (tmp_path / "browser-profile").mkdir()
+    monkeypatch.setenv("RESEARCHSENSEI_BROWSER_DOWNLOAD_ENABLED", "1")
+    monkeypatch.setenv("RESEARCHSENSEI_BROWSER_SESSION_STATE", str(state))
+    monkeypatch.setenv("RESEARCHSENSEI_BROWSER_HEADLESS", "0")
+
+    app = create_app(
+        workspace_root=tmp_path / "workspace",
+        config_service=ConfigService(config_path=config_path, env_path=tmp_path / "missing.env"),
+    )
+    downloader = app.state.dependencies.direction_service.source_resolver.browser_downloader
+
+    assert isinstance(downloader, BrowserSessionDownloader)
+    assert downloader.storage_state_path == state.resolve()
+    assert downloader.profile_path == (tmp_path / "browser-profile").resolve()
+    assert downloader.headless is False
+    app.state.dependencies.background_tasks.close()
 
 
 @pytest.mark.parametrize(

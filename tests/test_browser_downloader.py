@@ -30,6 +30,7 @@ def test_browser_session_downloader_uses_only_explicit_state_and_candidate_urls(
                 "success": True,
                 "finalUrl": "https://dl.acm.org/doi/pdf/10.1145/example",
                 "contentType": "application/pdf",
+                "browserMode": "native_chrome_cdp",
             }),
             stderr="",
         )
@@ -51,6 +52,7 @@ def test_browser_session_downloader_uses_only_explicit_state_and_candidate_urls(
 
     assert result.success is True
     assert result.local_path == str(target.resolve())
+    assert result.browser_mode == "native_chrome_cdp"
     assert captured["command"] == ["node", str(helper.resolve()), "download"]
     request = captured["request"]
     assert isinstance(request, dict)

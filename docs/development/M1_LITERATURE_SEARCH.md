@@ -266,6 +266,14 @@ only after ordinary HTTP candidates fail or a publisher landing page has no
 extractable PDF URL; the resulting file must still pass the same PDF magic,
 size, SHA-256, and metadata checks before M2 can use it.
 
+This is a publisher-agnostic fallback, not an ACM-specific branch. ACM, IEEE,
+Springer, Elsevier, or another site can use it when a legitimate user session
+can access the paper and the ordinary machine route fails. Conversely, arXiv,
+PMC Cloud, repository PDFs, and other direct OA responses never open Chrome
+when their normal download succeeds. The runtime records
+`resolution_strategy=authorized_browser_session` and
+`browser_mode=native_chrome_cdp` when this final fallback is actually used.
+
 ## Adapter Status
 
 | Source/tool | Runtime role | Full-text capability | Notes |

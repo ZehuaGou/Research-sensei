@@ -90,8 +90,8 @@ min_citation_count = 0
 # 0 downloads every strict-relevance candidate. Set a positive number only
 # when you explicitly want a storage/network safety cap.
 max_download_candidates = 0
-# Optional, explicit user-authorized Chrome session fallback for publisher
-# pages that reject backend HTTP requests. Create this state with the command
+# Optional, explicit user-authorized native-Chrome fallback for any publisher
+# page that rejects backend HTTP requests. Create this state with the command
 # documented in docs/development/M1_LITERATURE_SEARCH.md. Never commit it.
 browser_download_enabled = false
 browser_session_state = "workspace/browser-session.json"

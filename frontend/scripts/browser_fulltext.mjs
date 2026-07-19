@@ -299,7 +299,8 @@ try {
     const chunks = []
     for await (const chunk of process.stdin) chunks.push(chunk)
     const request = JSON.parse(chunks.join(''))
-    process.stdout.write(JSON.stringify(await downloadWithSession(request)))
+    const result = await downloadWithSession(request)
+    process.stdout.write(JSON.stringify({ ...result, browserMode: 'native_chrome_cdp' }))
   } else {
     throw new Error('Usage: browser_fulltext.mjs capture-session <state> <url> | download')
   }

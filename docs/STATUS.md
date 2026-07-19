@@ -36,8 +36,11 @@ promote an easier source over a more relevant paper. The current behavior is:
 - 2026-07-20 live ACM acceptance used the user-authorized dedicated session for
   OmniAnomaly (`10.1145/3292500.3330672`). The complete
   `PaperSourceResolver` path returned `RESOLVED_PDF_DOWNLOADED` with
-  `resolution_strategy=authorized_browser_session`, 6,701,685 validated bytes,
-  and a matching PDF title. This proves the tested session/path, not universal
+  `resolution_strategy=authorized_browser_session`,
+  `browser_mode=native_chrome_cdp`, 6,701,685 validated bytes, and a matching
+  PDF title. The fallback is publisher-agnostic and is injected into the
+  production M1 resolver, but it runs only after cache, official OA services,
+  and ordinary HTTP candidates fail. This proves the tested session/path, not universal
   access to every ACM item; subscription and institutional permissions remain
   unchanged.
 

@@ -22,12 +22,17 @@ class FakeBrowserDownloader:
         target = Path(str(kwargs["target_path"]))
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(b"%PDF-1.4\nbrowser session\n%%EOF")
+        pdf_urls = kwargs.get("pdf_urls")
+        final_url = str(kwargs.get("landing_url") or "")
+        if isinstance(pdf_urls, list) and pdf_urls:
+            final_url = str(pdf_urls[0])
         return BrowserDownloadResult(
             attempted=True,
             success=True,
             local_path=str(target),
-            final_url="https://dl.acm.org/doi/pdf/10.1145/example",
+            final_url=final_url,
             content_type="application/pdf",
+            browser_mode="native_chrome_cdp",
         )
 
 
@@ -59,6 +64,35 @@ def test_downloaded_pdf_sets_source_aware_fields(tmp_path: Path) -> None:
     assert result.local_path
     assert Path(result.local_path).exists()
     assert Path(result.local_path).name == "Downloaded PDF.pdf"
+
+
+def test_direct_open_pdf_does_not_launch_native_chrome(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/pdf"},
+            content=b"%PDF-1.4\ndirect open paper\n%%EOF",
+            request=request,
+        )
+
+    browser = FakeBrowserDownloader()
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        browser_downloader=browser,  # type: ignore[arg-type]
+    )
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="direct-open-paper",
+            title="Direct Open Paper",
+            pdf_url="https://repository.example.org/direct-open-paper.pdf",
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.metadata["resolution_strategy"] == "downloaded_validated_pdf"
+    assert browser.calls == []
 
 
 def test_resolve_many_writes_direction_manifest(tmp_path: Path) -> None:
@@ -286,7 +320,7 @@ def test_resolver_uses_official_pmc_cloud_pdf_instead_of_html_download_screen(
     assert not any("pmc.ncbi.nlm.nih.gov/articles" in call for call in calls)
 
 
-def test_resolver_uses_authorized_browser_session_after_publisher_http_failure(
+def test_resolver_uses_native_chrome_session_for_any_publisher_after_http_failure(
     tmp_path: Path,
 ) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
@@ -299,17 +333,18 @@ def test_resolver_uses_authorized_browser_session_after_publisher_http_failure(
         browser_downloader=browser,  # type: ignore[arg-type]
     )
     paper = CandidatePaper(
-        paper_id="acm-paper",
-        title="Relevant ACM Paper",
-        landing_url="https://dl.acm.org/doi/10.1145/example",
-        pdf_url="https://dl.acm.org/doi/pdf/10.1145/example",
+        paper_id="publisher-paper",
+        title="Relevant Publisher Paper",
+        landing_url="https://journals.example.org/article/relevant-paper",
+        pdf_url="https://journals.example.org/article/relevant-paper.pdf",
     )
 
     result = resolver.resolve_one(paper, download_dir=tmp_path)
 
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.metadata["resolution_strategy"] == "authorized_browser_session"
-    assert result.pdf_url == "https://dl.acm.org/doi/pdf/10.1145/example"
+    assert result.metadata["browser_mode"] == "native_chrome_cdp"
+    assert result.pdf_url == "https://journals.example.org/article/relevant-paper.pdf"
     assert Path(result.local_path).read_bytes().startswith(b"%PDF")
     assert len(browser.calls) == 1
 

@@ -14,24 +14,27 @@ class BrowserDownloadResult:
     local_path: str = ""
     final_url: str = ""
     content_type: str = ""
+    browser_mode: str = ""
     error_code: str = ""
     error: str = ""
 
 
 class BrowserSessionDownloader:
-    """Optional real-Chrome fallback for a user-authorized publisher session.
+    """Optional native-Chrome fallback for a user-authorized publisher session.
 
     The storage-state file is created explicitly by the user with the bundled
     browser helper. ResearchSensei never reads the user's normal Chrome profile
     or browser cookie database. The helper receives only the landing/PDF URLs
-    for the relevance-cleared paper currently being downloaded.
+    for the relevance-cleared paper currently being downloaded. Chrome is
+    launched natively; Playwright never launches the publisher-facing browser
+    and only connects over local CDP after Chrome is running.
     """
 
     def __init__(
         self,
         *,
         storage_state_path: str | Path,
-        headless: bool = True,
+        headless: bool = False,
         timeout_seconds: float = 90.0,
         node_command: str = "node",
         helper_script: str | Path | None = None,
@@ -108,6 +111,7 @@ class BrowserSessionDownloader:
             local_path=str(target) if success else "",
             final_url=str(payload.get("finalUrl") or ""),
             content_type=str(payload.get("contentType") or ""),
+            browser_mode=str(payload.get("browserMode") or ""),
             error_code=str(payload.get("errorCode") or ("" if success else "BROWSER_SESSION_FAILED")),
             error=str(payload.get("error") or completed.stderr or "")[:300],
         )

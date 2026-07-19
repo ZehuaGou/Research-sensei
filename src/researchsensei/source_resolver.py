@@ -329,7 +329,10 @@ class PaperSourceResolver:
             pdf_metadata_check=meta_check,
             pdf_title_match=title_match,
             pdf_metadata_warning=meta_warning,
-            metadata={"resolution_strategy": "authorized_browser_session"},
+            metadata={
+                "resolution_strategy": "authorized_browser_session",
+                "browser_mode": result.browser_mode or "native_chrome_cdp",
+            },
         )
 
     def _download_pmc_cloud_pdf(
