@@ -101,6 +101,7 @@ function mockFetch(data: Record<string, any>, ok = true) {
 describe('DirectionSearchView', () => {
   afterEach(() => {
     vi.restoreAllMocks()
+    window.localStorage.clear()
     routeState.query = {}
     routerPush.mockReset()
   })
@@ -161,6 +162,35 @@ describe('DirectionSearchView', () => {
     expect(wrapper.get('[data-testid="method-families"]').text()).toContain('Transformer/attention methods')
     expect(wrapper.get('[data-testid="reading-order"]').text()).toContain('快速浏览')
     expect(wrapper.get('[data-testid="seed-expansion-panel"]').text()).toContain('READY')
+  })
+
+  it('resumes a persisted direction task after the page reloads', async () => {
+    window.localStorage.setItem('researchsensei.directionSearch.activeTaskId', 'task-recover')
+    window.localStorage.setItem('researchsensei.directionSearch.activeQuery', '时间序列根因分析')
+    const fetchMock = mockFetch({
+      job_id: 'task-recover',
+      task_id: 'task-recover',
+      kind: 'direction_search',
+      status: 'SUCCEEDED',
+      stage: 'completed',
+      progress: 100,
+      result: directionResponse(),
+      error_type: '',
+      error: '',
+      cancel_requested: false,
+      created_at: '',
+      updated_at: '',
+    })
+
+    const wrapper = mount(DirectionSearchView)
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/directions/jobs/task-recover')
+    expect(wrapper.get('[data-testid="direction-status"]').text()).toContain('检索完成')
+    expect((wrapper.get('[data-testid="direction-query"]').element as HTMLTextAreaElement).value)
+      .toBe('时间序列根因分析')
+    expect(window.localStorage.getItem('researchsensei.directionSearch.activeTaskId')).toBeNull()
   })
 
   it('shows DEGRADED warnings from source failures', async () => {

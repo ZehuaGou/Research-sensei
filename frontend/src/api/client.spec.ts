@@ -74,7 +74,7 @@ describe('api client error contract', () => {
     const progress: string[] = []
 
     const pending = researchApi.searchDirectionsAsync('graph anomaly detection', task => progress.push(task.status))
-    await vi.advanceTimersByTimeAsync(300)
+    await vi.advanceTimersByTimeAsync(1_100)
 
     await expect(pending).resolves.toMatchObject({ status: 'SUCCESS' })
     expect(fetchMock.mock.calls.map(call => call[0])).toEqual([
@@ -82,6 +82,21 @@ describe('api client error contract', () => {
       '/api/v1/directions/jobs/task-1',
     ])
     expect(progress).toEqual(['PENDING', 'SUCCEEDED'])
+  })
+
+  it('resumes an existing persistent direction task without submitting a duplicate', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(200, {
+      job_id: 'task-existing', task_id: 'task-existing', kind: 'direction_search', status: 'SUCCEEDED',
+      stage: 'completed', progress: 100, result: { status: 'SUCCESS', papers: [{ title: 'Recovered' }] },
+      error_type: '', error: '', cancel_requested: false, created_at: '', updated_at: '',
+    })))
+
+    await expect(researchApi.resumeDirectionSearchTask('task-existing')).resolves.toMatchObject({
+      status: 'SUCCESS',
+      papers: [{ title: 'Recovered' }],
+    })
+    expect(fetch).toHaveBeenCalledOnce()
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe('/api/v1/directions/jobs/task-existing')
   })
 
   it('keeps machine-readable background task failures', async () => {

@@ -27,8 +27,8 @@ import type {
 } from '../types/workspace'
 
 const DEFAULT_TIMEOUT_MS = 20_000
-const DIRECTION_TASK_POLL_MS = 250
-const DIRECTION_TASK_TIMEOUT_MS = 180_000
+const DIRECTION_TASK_POLL_MS = 1_000
+const DIRECTION_TASK_TIMEOUT_MS = 30 * 60_000
 const DOCUMENT_TASK_POLL_MS = 750
 const DOCUMENT_TASK_TIMEOUT_MS = 15 * 60_000
 
@@ -352,6 +352,21 @@ export const researchApi = {
     const task = await this.createDirectionSearchJob(query, signal)
     if (!isDirectionTask(task)) return task as unknown as DirectionResponse
     return waitForTask(task, id => this.getDirectionJob<DirectionResponse>(id, signal), onProgress, signal)
+  },
+  async resumeDirectionSearchTask(
+    taskId: string,
+    onProgress?: (task: DirectionTask<DirectionResponse>) => void,
+    signal?: AbortSignal,
+  ) {
+    const task = await this.getDirectionJob<DirectionResponse>(taskId, signal)
+    return waitForTask(
+      task,
+      id => this.getDirectionJob<DirectionResponse>(id, signal),
+      onProgress,
+      signal,
+      DIRECTION_TASK_POLL_MS,
+      DIRECTION_TASK_TIMEOUT_MS,
+    )
   },
   expandSeed(seed: DirectionCandidate, signal?: AbortSignal) {
     return apiRequest<DirectionResponse>('/api/v1/directions/seed_expansion', {

@@ -6,7 +6,7 @@ import asyncio
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 from researchsensei.acquisition import (
     OpenAlexAdapter,
@@ -105,7 +105,12 @@ class DirectionExplorationService:
         self.query_planner = query_planner
         self.relevance_evaluator = relevance_evaluator or DeterministicRelevanceEvaluator()
 
-    def explore(self, user_query: str) -> DirectionBundle:
+    def explore(
+        self,
+        user_query: str,
+        *,
+        progress: Callable[[str, int], None] | None = None,
+    ) -> DirectionBundle:
         query = " ".join(user_query.split())
         if not query:
             return self._empty_bundle(
@@ -115,14 +120,18 @@ class DirectionExplorationService:
                 warnings=["EMPTY_QUERY"],
             )
 
+        report = progress or (lambda _stage, _value: None)
+        report("planning_query", 5)
         query_plan = self._build_query_plan(query)
         search_query = query_plan.english_query or query_plan.direction_en or query_plan.user_query
         acquisition_variants = _unique([query_plan.user_query, *query_plan.query_variants])
+        report("searching_sources", 12)
         candidates, warnings, search_log, source_metrics = self._acquire(
             search_query,
             query_variants=acquisition_variants,
             query_plan=query_plan,
         )
+        report("deduplicating", 30)
         raw_pool = self.selection_service.build_candidate_pool(
             query=search_query,
             candidates=candidates,
@@ -131,6 +140,7 @@ class DirectionExplorationService:
             source_metrics=source_metrics,
         )
         deduplicated = self.selection_service.deduplicate(candidates)
+        report("verifying_candidates", 38)
         verified = self._verify(deduplicated)
         # Apply the deterministic task/concept gate before issuing DOI,
         # repository, and landing-page requests. A large OA supplement can
@@ -141,6 +151,7 @@ class DirectionExplorationService:
             candidate for candidate in relevance_screened
             if passes_strict_relevance_gate(candidate)
         ]
+        report("discovering_fulltext", 48)
         enriched_targets, fulltext_metrics = self.fulltext_resolver.resolve_many(fulltext_targets, download_top_n=0)
         enriched_by_id = {candidate.paper_id: candidate for candidate in enriched_targets}
         fulltext_enriched = [
@@ -148,6 +159,7 @@ class DirectionExplorationService:
             for candidate in relevance_screened
         ]
         source_metrics = [*source_metrics, *fulltext_metrics]
+        report("ranking_candidates", 65)
         externally_ranked = self.paper_ranker.rank(search_query, fulltext_enriched)
         ranked_candidates = self.relevance_evaluator.evaluate_and_rank(query_plan, externally_ranked)
         download_queue = select_downloads(
@@ -158,11 +170,13 @@ class DirectionExplorationService:
         )
         download_candidates = [candidate for candidate in download_queue if candidate.download_selected]
         download_dir = _direction_download_dir(self.source_download_dir, query_plan)
+        report("downloading_fulltext", 75)
         source_resolution = self.source_resolver.resolve_many(
             search_query,
             download_candidates,
             download_dir=download_dir,
         )
+        report("assembling_results", 92)
         resolved = self._apply_source_resolution(download_queue, source_resolution)
         reading_plan = self.selection_service.build_reading_plan(query_plan, resolved, include_ignored=True)
         card_candidates = _candidate_cards_from_reading_plan(reading_plan)

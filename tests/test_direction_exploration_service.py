@@ -227,6 +227,27 @@ def test_direction_query_returns_structured_bundle() -> None:
     assert bundle.candidate_cards[0]["title"] == "Time Series Anomaly Detection with Transformers"
 
 
+def test_direction_exploration_reports_real_pipeline_stages() -> None:
+    service = _service({"arxiv": StaticAdapter([_candidate()])})
+    progress: list[tuple[str, int]] = []
+
+    service.explore(
+        "time series anomaly detection",
+        progress=lambda stage, value: progress.append((stage, value)),
+    )
+
+    assert progress == [
+        ("planning_query", 5),
+        ("searching_sources", 12),
+        ("deduplicating", 30),
+        ("verifying_candidates", 38),
+        ("discovering_fulltext", 48),
+        ("ranking_candidates", 65),
+        ("downloading_fulltext", 75),
+        ("assembling_results", 92),
+    ]
+
+
 def test_fulltext_discovery_runs_only_after_deterministic_relevance_gate() -> None:
     fulltext = RecordingFullTextResolver()
     relevant = _candidate(paper_id="relevant")

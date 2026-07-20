@@ -5,10 +5,14 @@ import SeedExpansionPanel from '../components/SeedExpansionPanel.vue'
 import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 import type { SearchRun, SearchRunPaper } from '../types/api'
 
+const ACTIVE_DIRECTION_TASK_KEY = 'researchsensei.directionSearch.activeTaskId'
+const ACTIVE_DIRECTION_QUERY_KEY = 'researchsensei.directionSearch.activeQuery'
+
 const router = useRouter()
 const route = useRoute()
 const query = ref('')
 const isLoading = ref(false)
+const taskId = ref('')
 const taskStage = ref('')
 const taskProgress = ref(0)
 const isHistoryLoading = ref(false)
@@ -47,6 +51,22 @@ const currentNextStep = computed(() => {
   if (result.value && hasEmptyResult.value) return '换一个更具体方向'
   return '输入方向'
 })
+const taskStageLabel = computed(() => {
+  const labels: Record<string, string> = {
+    queued: '等待开始',
+    starting: '正在启动',
+    planning_query: '正在规划检索词',
+    searching_sources: '正在检索论文来源',
+    deduplicating: '正在去重候选',
+    verifying_candidates: '正在验证论文信息',
+    discovering_fulltext: '正在解析全文来源',
+    ranking_candidates: '正在评估相关性',
+    downloading_fulltext: '正在下载并验证全文',
+    assembling_results: '正在整理结果',
+    completed: '已完成',
+  }
+  return labels[taskStage.value] || taskStage.value || '等待开始'
+})
 const panelNote = computed(() => {
   if (historyRun.value) return '历史方向只读取已有论文。只有点击“重新检索”或底部发送，才会重新搜索和下载。'
   if (result.value) return '候选论文会按来源、全文和 M2 门槛展示，能深读的论文会直接给出入口。'
@@ -79,6 +99,12 @@ const downloadedPaperCount = computed(() => sourceResolutionItems.value.filter((
 )).length)
 
 onMounted(() => {
+  const savedTaskId = window.localStorage.getItem(ACTIVE_DIRECTION_TASK_KEY)
+  const openingHistory = Boolean(route.query.run_id || route.query.history_q)
+  if (savedTaskId && !openingHistory) {
+    void resumeActiveDirectionTask(savedTaskId)
+    return
+  }
   syncQueryFromRoute()
 })
 
@@ -110,14 +136,70 @@ async function search() {
   selectedSeed.value = null
   taskStage.value = 'queued'
   taskProgress.value = 0
+  const submittedQuery = query.value.trim()
   try {
-    const data = await researchApi.searchDirectionsAsync(query.value.trim(), task => {
-      taskStage.value = task.stage
-      taskProgress.value = task.progress
-    })
+    const data = await researchApi.searchDirectionsAsync(submittedQuery, task => updateDirectionTask(task, submittedQuery))
+    clearActiveDirectionTask()
     result.value = data
   } catch (searchError) {
-    error.value = apiErrorMessage(searchError, '方向检索失败。')
+    if (isRecoverableDirectionTaskError(searchError)) {
+      error.value = '后台检索仍在继续，页面刷新后会自动恢复这个任务。'
+    } else {
+      clearActiveDirectionTask()
+      error.value = apiErrorMessage(searchError, '方向检索失败。')
+    }
+  } finally {
+    isLoading.value = false
+    taskStage.value = ''
+  }
+}
+
+function updateDirectionTask(task: { task_id: string; stage: string; progress: number }, submittedQuery = query.value.trim()) {
+  taskId.value = task.task_id
+  taskStage.value = task.stage
+  taskProgress.value = task.progress
+  window.localStorage.setItem(ACTIVE_DIRECTION_TASK_KEY, task.task_id)
+  window.localStorage.setItem(ACTIVE_DIRECTION_QUERY_KEY, submittedQuery)
+}
+
+function clearActiveDirectionTask() {
+  taskId.value = ''
+  taskStage.value = ''
+  taskProgress.value = 0
+  window.localStorage.removeItem(ACTIVE_DIRECTION_TASK_KEY)
+  window.localStorage.removeItem(ACTIVE_DIRECTION_QUERY_KEY)
+}
+
+function isRecoverableDirectionTaskError(value: unknown) {
+  return Boolean(
+    taskId.value
+    && value instanceof ApiClientError
+    && ['TIMEOUT', 'NETWORK_ERROR', 'CANCELLED'].includes(value.code),
+  )
+}
+
+async function resumeActiveDirectionTask(savedTaskId: string) {
+  if (isLoading.value) return
+  const savedQuery = window.localStorage.getItem(ACTIVE_DIRECTION_QUERY_KEY) || ''
+  if (savedQuery) query.value = savedQuery
+  isLoading.value = true
+  error.value = ''
+  historyError.value = ''
+  result.value = null
+  historyRun.value = null
+  taskId.value = savedTaskId
+  taskStage.value = 'starting'
+  try {
+    const data = await researchApi.resumeDirectionSearchTask(savedTaskId, task => updateDirectionTask(task, savedQuery))
+    clearActiveDirectionTask()
+    result.value = data
+  } catch (resumeError) {
+    if (isRecoverableDirectionTaskError(resumeError)) {
+      error.value = '后台检索仍在继续，连接恢复后会继续读取结果。'
+    } else {
+      clearActiveDirectionTask()
+      error.value = apiErrorMessage(resumeError, '之前的方向检索任务无法恢复，请重新提交。')
+    }
   } finally {
     isLoading.value = false
     taskStage.value = ''
@@ -529,7 +611,7 @@ async function openDeepRead(paper: Record<string, any>) {
         </article>
 
         <article v-if="isLoading" class="codex-card loading-card" role="status" data-testid="direction-task-progress">
-          后台任务：{{ taskStage || 'queued' }} · {{ taskProgress }}%
+          后台任务：{{ taskStageLabel }} · {{ taskProgress }}%
         </article>
 
         <div v-if="historyError" class="error-box">

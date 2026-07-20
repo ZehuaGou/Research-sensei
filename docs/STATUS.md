@@ -7,6 +7,29 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-20 Direction-search long-task recovery
+
+A real UI submission for `时间序列根因分析` exposed a frontend/backend lifetime
+mismatch. The frontend stopped polling after 180 seconds and displayed a red
+timeout with zero candidates, while the persistent backend task continued and
+successfully completed after about 293 seconds. The finished task retrieved 173
+records, deduplicated them to 169, passed four candidates through the strict
+relevance gate, and obtained verified deep-reading material for two of the four.
+
+The direction UI now polls once per second for up to 30 minutes, persists the
+active task ID and query in local browser storage, and resumes the same task
+after a refresh or temporary network interruption instead of submitting a
+duplicate search. The backend direction service reports actual pipeline stages
+from query planning through source search, verification, full-text discovery,
+ranking, downloading, and result assembly; the page renders those stages in
+Chinese instead of remaining at `searching · 15%` for the entire run.
+
+Verification after the correction: 799 backend tests passed with 15 skipped;
+79 frontend tests and six fixture-browser E2E tests passed; Ruff, Mypy, Vue type
+checking, and the production frontend build all passed. The completed live run
+was reopened from the UI and showed four recorded candidates, one newly
+downloaded source, one reused local source, and no browser console warnings.
+
 ## 2026-07-20 Complete M1 Revalidation
 
 The configured user-authorized native-Chrome session and the production M1

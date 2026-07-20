@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import threading
 import uuid
 from collections.abc import Callable
@@ -189,9 +190,13 @@ def create_directions_router(
         def operation(progress: Callable[[str, int], None], cancelled: threading.Event) -> dict[str, object]:
             if cancelled.is_set():
                 return {}
-            progress("searching", 15)
-            bundle = direction_service.explore(payload.query)
-            progress("ranking", 75)
+            explore_parameters = inspect.signature(direction_service.explore).parameters
+            if "progress" in explore_parameters:
+                bundle = direction_service.explore(payload.query, progress=progress)
+            else:
+                progress("searching_sources", 12)
+                bundle = direction_service.explore(payload.query)
+                progress("assembling_results", 92)
             response = bundle.model_dump(mode="json")
             response["papers"] = response.get("candidate_cards", [])
             return response
