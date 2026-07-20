@@ -46,6 +46,36 @@ test('uses persistent async direction jobs for search and deep-read handoff', as
   expect(taskState.synchronousCalls).toBe(0)
 })
 
+test('keeps direction navigation and composer reachable while results scroll', async ({ page }) => {
+  await mockDirectionTaskApi(page)
+  await page.setViewportSize({ width: 1440, height: 620 })
+  await page.goto('/directions/new')
+
+  await page.getByTestId('direction-query').fill('offline reliability fixture')
+  await page.getByRole('button', { name: '检索方向' }).click()
+  await expect(page.getByTestId('direction-status')).toContainText('检索完成')
+
+  const scrollRegion = page.getByTestId('direction-scroll-region')
+  const composer = page.locator('.codex-composer')
+  const researchPanel = page.locator('.research-panel')
+  await expect(scrollRegion).toBeVisible()
+  await expect(composer).toBeVisible()
+  await expect(researchPanel).toBeVisible()
+  await expectInsideViewport(composer, page)
+  await expectInsideViewport(researchPanel, page)
+
+  await scrollRegion.evaluate(element => { element.scrollTop = element.scrollHeight })
+  await expect.poll(() => scrollRegion.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+  await expectInsideViewport(composer, page)
+  await expectInsideViewport(researchPanel, page)
+
+  const pageScroll = await page.evaluate(() => ({
+    clientHeight: document.scrollingElement?.clientHeight || 0,
+    scrollHeight: document.scrollingElement?.scrollHeight || 0,
+  }))
+  expect(pageScroll.scrollHeight).toBeLessThanOrEqual(pageScroll.clientHeight + 1)
+})
+
 test('clamps migrated and dragged formula dock positions inside the viewport', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('researchsensei.learningWorkspace.formulaDock', JSON.stringify({ x: 90_000, y: 90_000, collapsed: false }))

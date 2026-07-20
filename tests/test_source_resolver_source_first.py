@@ -4,6 +4,8 @@ import io
 import tarfile
 from pathlib import Path
 
+import httpx
+
 from researchsensei.source_resolver import SourceResolver, select_latex_main_file
 
 
@@ -38,6 +40,16 @@ class FallbackHttpClient(SourceFirstHttpClient):
         return StubHttpResponse(self.pdf_content, content_type="application/pdf", url=url)
 
 
+class TransientSourceHttpClient(SourceFirstHttpClient):
+    def get(self, url: str, **kwargs) -> StubHttpResponse:
+        self.urls.append(url)
+        if len(self.urls) == 1:
+            raise httpx.ConnectError("transient TLS EOF")
+        if "/e-print/" in url:
+            return StubHttpResponse(self.source_content, content_type="application/x-gzip", url=url)
+        return StubHttpResponse(self.pdf_content, content_type="application/pdf", url=url)
+
+
 def test_arxiv_source_url_generation() -> None:
     assert SourceResolver.arxiv_to_source_url(arxiv_id="2401.00001") == "https://arxiv.org/e-print/2401.00001"
     assert SourceResolver.arxiv_to_source_url(arxiv_url="https://arxiv.org/abs/2401.00001v2") == "https://arxiv.org/e-print/2401.00001v2"
@@ -59,6 +71,21 @@ def test_arxiv_source_download_success_prefers_latex(tmp_path: Path) -> None:
     assert http_client.urls == ["https://arxiv.org/e-print/2401.00001"]
 
 
+def test_arxiv_source_transport_failure_retries_before_pdf_fallback(tmp_path: Path) -> None:
+    http_client = TransientSourceHttpClient(_tar_source({"main.tex": _latex_text()}))
+    resolver = SourceResolver(http_client=http_client)
+
+    status = resolver.resolve_arxiv_id("2401.00001", tmp_path)
+
+    assert status.status == "resolved"
+    assert status.source_type == "arxiv_source"
+    assert status.latex_source_available is True
+    assert http_client.urls == [
+        "https://arxiv.org/e-print/2401.00001",
+        "https://arxiv.org/e-print/2401.00001",
+    ]
+
+
 def test_arxiv_source_unavailable_falls_back_to_pdf(tmp_path: Path) -> None:
     http_client = FallbackHttpClient(b"", pdf_content=b"%PDF-1.4 fallback pdf")
     resolver = SourceResolver(http_client=http_client)
@@ -73,6 +100,7 @@ def test_arxiv_source_unavailable_falls_back_to_pdf(tmp_path: Path) -> None:
     assert status.warnings[:2] == ["ARXIV_SOURCE_UNAVAILABLE", "source_unavailable"]
     assert http_client.urls == [
         "https://arxiv.org/e-print/2401.00001",
+        "https://arxiv.org/src/2401.00001",
         "https://arxiv.org/pdf/2401.00001.pdf",
     ]
 
@@ -87,6 +115,38 @@ def test_select_latex_main_file_prefers_documentclass(tmp_path: Path) -> None:
 
     assert selected == main
     assert reason == "documentclass"
+
+
+def test_select_latex_main_file_rejects_nested_publisher_sample(tmp_path: Path) -> None:
+    (tmp_path / "latex").mkdir()
+    sample = tmp_path / "latex" / "vldb_sample.tex"
+    sample.write_text(
+        "\\documentclass{vldb}\n\\title{A Sample Proceedings Paper}\n"
+        "\\begin{document}\n" + ("sample text " * 2_000) + "\\end{document}",
+        encoding="utf-8",
+    )
+    paper = tmp_path / "explainit.tex"
+    paper.write_text(
+        "\\documentclass{acmart}\n\\title{ExplainIt!}\n\\begin{document}\n"
+        "\\input{intro.tex}\n\\input{method.tex}\n\\end{document}",
+        encoding="utf-8",
+    )
+
+    selected, reason = select_latex_main_file(tmp_path)
+
+    assert selected == paper
+    assert reason == "documentclass"
+
+
+def test_select_latex_main_file_ignores_commented_documentclass(tmp_path: Path) -> None:
+    commented = tmp_path / "notes.tex"
+    commented.write_text("% \\documentclass{article}\nnotes " * 1_000, encoding="utf-8")
+    main = tmp_path / "main.tex"
+    main.write_text("\\documentclass{article}\n\\begin{document}Main\\end{document}", encoding="utf-8")
+
+    selected, _ = select_latex_main_file(tmp_path)
+
+    assert selected == main
 
 
 def _tar_source(files: dict[str, str]) -> bytes:

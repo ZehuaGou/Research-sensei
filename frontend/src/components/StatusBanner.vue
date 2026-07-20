@@ -45,6 +45,11 @@ const message = computed(() => {
   if (props.status === 'FAILED') return '解析或理解流水线执行失败，请查看后端日志。'
   return ''
 })
+const missingPrefix = computed(() => (
+  props.blockingReason === 'FORMULA_DERIVATION_BLOCKED'
+    ? '受限：'
+    : '缺少：'
+))
 
 const compactRows = computed(() => {
   const details = props.paperWorkspaceStatus || {}
@@ -103,6 +108,10 @@ function valueText(value: unknown) {
   if (Array.isArray(value)) return value.map(readableKey).join('、')
   return readableKey(value)
 }
+
+function warningText(warning: { code: string; message: string }) {
+  return reasonText[warning.code] || warning.message
+}
 </script>
 
 <template>
@@ -117,7 +126,7 @@ function valueText(value: unknown) {
       </div>
 
       <div v-if="missingComponents?.length" class="rounded-[10px] px-3 py-2 text-sm" style="background: var(--bg-secondary); color: var(--text-secondary);">
-        缺少：{{ missingComponents.map(readableKey).join('、') }}
+        {{ missingPrefix }}{{ missingComponents.map(readableKey).join('、') }}
       </div>
     </div>
 
@@ -130,7 +139,7 @@ function valueText(value: unknown) {
 
     <div v-if="warnings?.length" class="mt-3 space-y-1 text-sm" style="color: var(--text-muted);">
       <div v-for="warning in warnings" :key="warning.code">
-        {{ warning.code }}：{{ warning.message }}
+        {{ readableKey(warning.code) }}：{{ warningText(warning) }}
       </div>
     </div>
   </section>

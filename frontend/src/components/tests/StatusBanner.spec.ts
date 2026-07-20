@@ -155,7 +155,7 @@ describe('StatusBanner', () => {
     })
 
     expect(wrapper.text()).toContain('结构不完整')
-    expect(wrapper.text()).toContain('缺少：公式卡片')
+    expect(wrapper.text()).toContain('受限：公式卡片')
     expect(wrapper.text()).toContain('公式推导被阻断')
     expect(wrapper.text()).toContain('公式来源')
     expect(wrapper.text()).toContain('原始公式文本')

@@ -27,6 +27,7 @@ class ScriptedM4LLM:
         self.claims = claims
         self.uncertainty = uncertainty
         self.messages = []
+        self.configs = []
 
     async def chat(self, messages, *, config=None):
         raise AssertionError("M4 ask must use structured chat_json")
@@ -34,6 +35,7 @@ class ScriptedM4LLM:
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         self.messages.append(messages)
+        self.configs.append(config)
         claims = self.claims or [
             {
                 "text": self.answer,
@@ -59,6 +61,34 @@ class FailingM4LLM:
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         raise RuntimeError("simulated llm outage")
+
+
+def test_m4_anthropic_provider_uses_full_reasoning_output_budget(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
+    llm = ScriptedM4LLM()
+    llm.provider = ModelProviderConfig(
+        name="cc_switch",
+        kind="anthropic_compatible",
+        base_url="http://127.0.0.1:15721/v1",
+        model="claude-sonnet-4-6",
+        auth_header="none",
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "这篇论文的方法是什么？"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    assert llm.calls == 1
+    assert llm.configs[0].max_tokens == 12_000
+    assert llm.configs[0].disable_thinking is True
 
 
 def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) -> None:
@@ -448,6 +478,75 @@ def test_m4_keeps_supported_claims_and_drops_unsupported_claims(tmp_path: Path) 
     assert "注意力结构" in data["answer"]
     assert "NASA" not in data["answer"]
     assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
+
+
+def test_m4_uses_audited_paper_card_as_cross_language_validation_bridge(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "cross_language_claim")
+    paper_card_path = artifact_dir / "paper_card.json"
+    paper_card = json.loads(paper_card_path.read_text(encoding="utf-8"))
+    paper_card["problem"] = {
+        "text": "稀疏的证据片段让检索过程不稳定。",
+        "evidence_ref": "paper:b001",
+    }
+    _write_json(paper_card_path, paper_card)
+    quote = "The attention architecture links sparse evidence passages to solve the retrieval problem."
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": (
+                "论文真正处理的是证据片段分散、导致 retrieval 检索过程脆弱的问题；"
+                "当相关信息没有自然聚集在同一处时，检索难以稳定找到足够依据，"
+                "因此论文把需要解决的核心障碍界定为如何连接这些稀疏证据片段。"
+                "这一问题定义强调的是证据组织和检索可靠性，而不是凭空增加新的外部信息。"
+            ),
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{"evidence_ref": "paper:b001", "quote": quote}],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "论文解决了什么问题？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "证据片段分散" in data["answer"]
+
+
+def test_m4_accepts_concise_problem_answer_after_claim_grounding(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "concise_problem")
+    quote = "The attention architecture links sparse evidence passages to solve the retrieval problem."
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": "论文解决稀疏证据片段让检索不稳定的问题，并用注意力结构连接相关片段，使检索能够聚合分散依据。",
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{"evidence_ref": "paper:b001", "quote": quote}],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "论文解决了什么问题？"})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
 
 
 def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -> None:

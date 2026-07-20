@@ -321,6 +321,7 @@ class M4InteractionService:
         elif self.llm_client is not None:
             code = str(llm_result.get("code") or "M4_LLM_FAILED")
             message = str(llm_result.get("message") or "LLM did not return a usable answer.")
+            detail = str(llm_result.get("detail") or "")
             return InteractiveAnswer(
                 status="DEGRADED",
                 answer=_llm_failure_answer(code=code, message=message),
@@ -336,7 +337,7 @@ class M4InteractionService:
                     evidence_count=len(llm_evidence_refs or evidence_refs),
                     selected_text_used=bool(selected_text),
                 ),
-                warnings=[*warnings, _warning(code, message)],
+                warnings=[*warnings, _warning(code, message, detail=detail)],
             )
 
         status = "SUCCESS" if evidence_refs and not grounding_degraded else "DEGRADED"
@@ -609,6 +610,7 @@ class M4InteractionService:
         if not evidence_rows:
             return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的可验证论文证据。")
         evidence_by_ref = _evidence_text_by_ref(evidence_rows)
+        support_text_by_ref = _claim_support_text_by_ref(evidence_rows)
         context = {
             "retrieved_evidence": evidence_rows,
             "recent_memory": self._memory_context(),
@@ -680,7 +682,7 @@ class M4InteractionService:
                     messages,
                     config=LLMConfig(
                         temperature=0.15,
-                        max_tokens=3200,
+                        max_tokens=_m4_output_token_budget(self.llm_client),
                         json_mode=True,
                         timeout=120,
                         max_retries=1,
@@ -716,6 +718,7 @@ class M4InteractionService:
                 raw_claim,
                 allowed=allowed,
                 evidence_by_ref=evidence_by_ref,
+                support_text_by_ref=support_text_by_ref,
             )
             if claim is None:
                 rejected_reasons.append(reason)
@@ -725,6 +728,7 @@ class M4InteractionService:
             return _llm_error_result(
                 "M4_CLAIM_UNSUPPORTED",
                 "LLM 给出了合法引用，但没有任何结论通过内容级证据校验。",
+                detail="; ".join(_unique(rejected_reasons)[:6]),
             )
 
         answer = _soften_mechanical_answer("\n\n".join(claim.text for claim in claims))
@@ -1482,8 +1486,8 @@ def _conversation_history(value: object) -> list[dict[str, str]]:
     return history
 
 
-def _llm_error_result(code: str, message: str) -> dict[str, object]:
-    return {"ok": False, "code": code, "message": message}
+def _llm_error_result(code: str, message: str, *, detail: str = "") -> dict[str, object]:
+    return {"ok": False, "code": code, "message": message, "detail": detail}
 
 
 def _evidence_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
@@ -1504,11 +1508,30 @@ def _evidence_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     return result
 
 
+def _claim_support_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
+    """Add audited paper-card wording as a bilingual claim-validation bridge.
+
+    Verbatim quotes are still checked only against ``_evidence_text_by_ref``,
+    which prefers the underlying passage/claim evidence. The paper card may
+    help match a Chinese explanation to English source evidence, but it cannot
+    replace the required source quote.
+    """
+
+    result = _evidence_text_by_ref(rows)
+    for row in rows:
+        ref = _clean(row.get("evidence_ref"))
+        text = _clean(row.get("text"))
+        if ref and text:
+            result[ref] = _unique([*result.get(ref, []), text])
+    return result
+
+
 def _validate_grounded_claim(
     value: object,
     *,
     allowed: set[str],
     evidence_by_ref: dict[str, list[str]],
+    support_text_by_ref: dict[str, list[str]] | None = None,
 ) -> tuple[GroundedClaim | None, str]:
     if not isinstance(value, dict):
         return None, "claim_not_object"
@@ -1544,7 +1567,8 @@ def _validate_grounded_claim(
     if quoted_refs != set(refs):
         return None, "supporting_quote_not_verbatim"
 
-    evidence_text = " ".join(text for ref in refs for text in evidence_by_ref[ref])
+    support_rows = support_text_by_ref or evidence_by_ref
+    evidence_text = " ".join(text for ref in refs for text in support_rows.get(ref, evidence_by_ref[ref]))
     supported, reason = _claim_content_supported(text, evidence_text=evidence_text, claim_type=claim_type)
     if not supported:
         return None, reason
@@ -1717,6 +1741,13 @@ def _run_async_llm(coro):
     if hasattr(coro, "close"):
         coro.close()
     raise RuntimeError("M4InteractionService cannot run async LLM calls inside an active event loop.")
+
+
+def _m4_output_token_budget(llm_client: object) -> int:
+    provider = getattr(llm_client, "provider", None)
+    if str(getattr(provider, "kind", "") or "").strip().lower() == "anthropic_compatible":
+        return 12_000
+    return 3_200
 
 
 def _claim_text(value: object) -> str:
@@ -2217,8 +2248,8 @@ def _advisor_terms(value: str) -> set[str]:
     return terms
 
 
-def _warning(code: str, message: str) -> WarningItem:
-    return WarningItem(code=code, message=message)
+def _warning(code: str, message: str, *, detail: str = "") -> WarningItem:
+    return WarningItem(code=code, message=message, detail=detail)
 
 
 def _as_dict(value: object) -> dict[str, object]:
@@ -2412,26 +2443,10 @@ def _is_problem_solution_question(question: str) -> bool:
 
 def _answer_too_abstract_for_problem(answer: str) -> bool:
     text = _clean(answer)
-    if len(text) < 120:
-        return True
-    concrete_markers = [
-        "时间序列",
-        "异常",
-        "傅里叶",
-        "FFT",
-        "谱",
-        "阈值",
-        "数据集",
-        "实验",
-        "指标",
-        "attention",
-        "retrieval",
-        "变量",
-        "公式",
-        "训练",
-        "模型",
-    ]
-    return not any(marker.lower() in text.lower() for marker in concrete_markers)
+    # Claims reaching this point already passed verbatim-quote and content-level
+    # evidence checks. A long, domain-specific keyword allow-list rejects valid
+    # concise answers for systems/database papers while adding no grounding.
+    return len(text) < 40
 
 
 def _looks_like_mojibake_answer(value: str) -> bool:

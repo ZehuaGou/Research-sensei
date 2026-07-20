@@ -241,6 +241,21 @@ describe('LearningWorkspaceView', () => {
                 evidence_refs: ['p:b2'],
               }],
             },
+            formula_cards: {
+              formula_cards: [{
+                formula_id: 'raw-1',
+                formula_raw: 'Y = X beta + epsilon',
+                formula_origin: 'raw_formula_text',
+                derivation_status: 'blocked',
+                coverage_status: 'BLOCKED_RAW_ONLY',
+              }, {
+                formula_id: 'raw-2',
+                formula_raw: 'R = X - beta Z',
+                formula_origin: 'raw_formula_text',
+                derivation_status: 'blocked',
+                coverage_status: 'BLOCKED_RAW_ONLY',
+              }],
+            },
           },
         }),
       })
@@ -251,13 +266,15 @@ describe('LearningWorkspaceView', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('结构不完整')
-    expect(wrapper.text()).toContain('缺少：公式卡片')
+    expect(wrapper.text()).toContain('受限：公式卡片')
     expect(wrapper.text()).toContain('公式推导被阻断')
+    expect(wrapper.text()).toContain('2 段受限')
     expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A grounded summary with blocked formulas.')
 
     await tab(wrapper, '公式拆解').trigger('click')
     expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('公式拆解暂时不可用')
     expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('raw_formula_text')
+    expect(wrapper.find('[data-testid="formula-degraded-message"]').text()).toContain('已隐藏 2 条不完整的原始公式残片')
 
     await tab(wrapper, '教学卡片').trigger('click')
     expect(wrapper.find('[data-testid="teaching-cards"]').text()).toContain('Teaching remains available.')

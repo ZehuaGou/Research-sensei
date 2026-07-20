@@ -9,13 +9,22 @@ const props = defineProps<{
   missingComponents: string[]
   paperCardCount: number
   formulaCount: number
+  detectedFormulaCount: number
   teachingCount: number
 }>()
 
 const status = computed(() => props.understandingStatus?.status || '')
 const metrics = computed(() => [
   { label: '论文卡片', value: props.paperCardCount ? '已生成' : '缺失', tone: props.paperCardCount ? 'ready' : 'muted' },
-  { label: '公式', value: String(props.formulaCount), tone: props.formulaCount ? 'ready' : 'muted' },
+  {
+    label: '公式',
+    value: props.formulaCount
+      ? `${props.formulaCount} 可推导`
+      : props.detectedFormulaCount
+        ? `${props.detectedFormulaCount} 段受限`
+        : '0',
+    tone: props.formulaCount ? 'ready' : 'muted',
+  },
   { label: '教学卡片', value: String(props.teachingCount), tone: props.teachingCount ? 'ready' : 'muted' },
 ])
 

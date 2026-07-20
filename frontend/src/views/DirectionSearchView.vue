@@ -589,6 +589,7 @@ async function openDeepRead(paper: Record<string, any>) {
   <main class="direction-page">
     <div class="direction-canvas">
       <section class="direction-thread" aria-label="方向工作流">
+        <div class="direction-thread-content" data-testid="direction-scroll-region">
         <article class="codex-message user-message">
           <div class="message-icon">R</div>
           <div class="message-body">
@@ -854,6 +855,7 @@ async function openDeepRead(paper: Record<string, any>) {
             :seed="selectedSeed"
           />
         </section>
+        </div>
 
         <form class="codex-composer" @submit.prevent="search">
           <textarea
@@ -906,7 +908,9 @@ async function openDeepRead(paper: Record<string, any>) {
 
 <style scoped>
 .direction-page {
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-primary);
 }
 
@@ -915,17 +919,31 @@ async function openDeepRead(paper: Record<string, any>) {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 260px);
   gap: 32px;
   width: min(1186px, calc(100% - 56px));
+  height: 100%;
   margin: 0 auto;
-  padding: 18px 0 36px;
+  padding: 18px 0;
+  overflow: hidden;
 }
 
 .direction-thread {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.direction-thread-content {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   align-content: start;
   gap: 16px;
-  min-width: 0;
-  min-height: calc(100vh - 104px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  scrollbar-gutter: stable;
 }
 
 .codex-message {
@@ -1414,8 +1432,7 @@ async function openDeepRead(paper: Record<string, any>) {
 }
 
 .codex-composer {
-  position: sticky;
-  bottom: 18px;
+  position: relative;
   z-index: 20;
   display: grid;
   width: 100%;
@@ -1490,11 +1507,12 @@ async function openDeepRead(paper: Record<string, any>) {
 }
 
 .research-panel {
-  position: sticky;
-  top: 18px;
   align-self: start;
   display: grid;
   gap: 16px;
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   padding: 16px;
@@ -1592,11 +1610,7 @@ async function openDeepRead(paper: Record<string, any>) {
   }
 
   .direction-thread {
-    min-height: calc(100vh - 75px);
-  }
-
-  .codex-composer {
-    bottom: 12px;
+    min-height: 0;
   }
 
   .codex-message,

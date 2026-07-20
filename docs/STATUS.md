@@ -7,6 +7,82 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-20 ExplainIt source, formula, and M4 live correction
+
+The live arXiv deep-read path was exercised with `1903.08132`, *ExplainIt! --
+A Declarative Root-cause Analysis Engine for Time Series Data*. This exposed
+two separate source problems: a transient TLS failure caused an immediate PDF
+fallback, and a successful source archive selected the larger bundled
+`latex/vldb_sample.tex` instead of the paper's `explainit.tex`. arXiv source
+downloads now retry transient failures and try both `/e-print/` and `/src/`.
+LaTeX main-file selection now scores active document structure, included
+sections, path depth, and sample/template filenames instead of choosing the
+largest file with a `documentclass` token.
+
+The same run exposed Anthropic-compatible output-budget failures. M4 previously
+ended with only a `thinking` block at `max_tokens=3200`, and formula generation
+could repeat the same failure per formula at 4500 tokens. Both paths now use a
+12,000-token output budget with thinking disabled. Formula generation uses
+bounded three-formula batches with three-way concurrency, retaining single-item
+split/compact retries when a batch is incomplete. M4 content validation still
+requires an allowed `evidence_ref` and a verbatim quote from the underlying
+paper evidence. An audited, evidence-bound paper-card phrase may additionally
+serve as a cross-language bridge when comparing a Chinese claim with English
+source text; it cannot replace the source quote. The post-validation quality
+check no longer requires 120 characters or a time-series-specific keyword for
+every research-problem answer.
+
+The clean live task `35449d4653604671` completed as job `db6223020399` in
+approximately 13 minutes 50 seconds. It selected `explainit.tex` from the arXiv
+source archive, reported `source_latex`/no OCR, produced 33 formula cards and two
+teaching cards, and finished with all five understanding components at
+`SUCCESS`, `quality_status=pass`, no structural degradation, and no top-level
+warnings. A real M4 question, `这篇论文真正解决了什么问题？`, returned `SUCCESS`
+in 40.6 seconds with two independently validated claims, three evidence refs,
+and no warnings. A real follow-up carrying the frontend's conversation-history
+payload set `continued_from_history=true` and `conversation=true`; one supported
+claim was shown and one insufficiently matched claim was removed, so that turn
+correctly remained `DEGRADED` rather than leaking the rejected text.
+
+Remaining performance risk: the deep-read task exposes the entire acquisition,
+parsing, paper-card, formula-card, and teaching-card sequence as the single
+`resolving_source` stage at 10%. The live result is correct, but a formula-heavy
+paper still took nearly 14 minutes and provided no useful intermediate progress.
+The next performance iteration should publish per-stage progress and make
+completed paper/formula subsets readable while later batches continue, without
+loosening formula provenance or evidence gates.
+
+Deterministic verification after these changes: 805 backend tests passed with
+15 skips; 79 frontend unit tests passed; mypy, Vue type checking, and the
+production build passed; and all seven fixture-browser E2E tests passed. Focused
+Ruff checks pass for every changed Python file. A repository-wide Ruff run still
+reports 46 pre-existing findings under unrelated legacy `scripts/` files.
+
+## 2026-07-20 Direction-workbench scrolling correction
+
+The direction page previously mixed document scrolling, a fixed left sidebar,
+a sticky right status card, and a composer placed at the end of the result
+thread. Once the candidate list became long, the document grew beyond the
+viewport and the composer was not actually sticky; users had to return to the
+end of the page before starting the next search.
+
+The shell and workbench frame are now constrained to the dynamic viewport. The
+direction result thread is the only long-content scroll region, while the left
+navigation has its existing independent history scroll, the right status card
+remains reachable, and the composer occupies a persistent row below the result
+thread. Overscroll is contained so a wheel gesture does not unexpectedly move
+the whole document.
+
+Current verification: 79 frontend unit tests passed; Vue type checking and the
+production build passed; seven fixture-browser E2E tests passed. The new browser
+regression uses a 1440 x 620 viewport, scrolls a completed direction result to
+the end, checks that the composer and right status card remain inside the
+viewport, and verifies that the document itself does not grow beyond one
+viewport. The same geometry was checked against the currently running local
+page: the document height remained 912 px, the result thread had 990 px of
+content in a 699 px scroll region, and the composer remained visible at the
+bottom of the 912 px viewport.
+
 ## 2026-07-20 Direction-search long-task recovery
 
 A real UI submission for `时间序列根因分析` exposed a frontend/backend lifetime

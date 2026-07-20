@@ -367,6 +367,8 @@ function formatCount(run: SearchRun) {
   display: grid;
   grid-template-columns: 292px minmax(0, 1fr);
   height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -611,8 +613,11 @@ function formatCount(run: SearchRun) {
 
 .workbench-frame {
   display: grid;
+  height: 100%;
   min-width: 0;
+  min-height: 0;
   grid-template-rows: 49px minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .workbench-topbar {
@@ -695,6 +700,7 @@ function formatCount(run: SearchRun) {
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--bg-primary);
 }
 

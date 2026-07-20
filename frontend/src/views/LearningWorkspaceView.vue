@@ -49,6 +49,7 @@ const formulaDock = useFormulaDock({
 })
 
 const formulaEntries = computed(() => createFormulaEntries(workspace.formulaCards.value))
+const formulaTabCount = computed(() => workspace.formulaCards.value.length || workspace.hiddenRawFormulaCount.value)
 const orderedFormulaEntries = computed<FormulaEntry[]>(() => {
   const byId = new Map(formulaEntries.value.map(entry => [entry.id, entry]))
   const ordered = formulaOrder.value.map(id => byId.get(id)).filter((entry): entry is FormulaEntry => Boolean(entry))
@@ -58,7 +59,7 @@ const orderedFormulaEntries = computed<FormulaEntry[]>(() => {
 const formulaTabDisabled = computed(() => !workspace.formulaCards.value.length && workspace.status.value !== 'DEGRADED_STRUCTURAL')
 const tabs = computed<WorkspaceTabItem[]>(() => [
   { key: 'paper', label: '论文概览', count: workspace.paperCard.value ? 1 : 0, disabled: !workspace.paperCard.value },
-  { key: 'formulas', label: '公式拆解', count: workspace.formulaCards.value.length, disabled: formulaTabDisabled.value },
+  { key: 'formulas', label: '公式拆解', count: formulaTabCount.value, disabled: formulaTabDisabled.value },
   { key: 'teaching', label: '教学卡片', count: workspace.teachingCards.value.length, disabled: !workspace.teachingCards.value.length },
 ])
 const workspaceTitle = computed(() => workspace.paperCard.value?.title || workspace.paperCard.value?.paper_title || '论文深读')
@@ -330,6 +331,7 @@ onBeforeUnmount(() => {
           :missing-components="workspace.missingComponents.value"
           :paper-card-count="workspace.paperCard.value ? 1 : 0"
           :formula-count="workspace.formulaCards.value.length"
+          :detected-formula-count="workspace.allFormulaCards.value.length"
           :teaching-count="workspace.teachingCards.value.length"
         />
 

@@ -1269,11 +1269,74 @@ class SourceResolver:
             self._last_arxiv_source_fallback = "source_unavailable"
             return None
         self._last_arxiv_source_fallback = ""
-        try:
-            response = self.http_client.get(source_url, timeout=self.timeout_seconds, follow_redirects=True)
-            response.raise_for_status()
-        except Exception as exc:
-            logger.info("arXiv source download failed for %s, falling back to PDF: %s", arxiv_id, exc)
+        response = None
+        last_error: Exception | None = None
+        clean_id = _clean_arxiv_id(arxiv_id)
+        candidate_urls = list(dict.fromkeys(filter(None, [
+            source_url,
+            f"https://arxiv.org/src/{clean_id}" if _is_valid_arxiv_id(clean_id) else "",
+        ])))
+        retry_delays = (1.0, 2.0)
+        for candidate_url in candidate_urls:
+            for attempt in range(len(retry_delays) + 1):
+                try:
+                    candidate_response = self.http_client.get(
+                        candidate_url,
+                        timeout=self.timeout_seconds,
+                        follow_redirects=True,
+                    )
+                    if (
+                        getattr(candidate_response, "status_code", 200) in {429, 502, 503, 504}
+                        and attempt < len(retry_delays)
+                    ):
+                        import time
+
+                        delay = retry_delays[attempt]
+                        logger.warning(
+                            "arXiv source %s got %s, retry %d/%d in %.1fs",
+                            candidate_url,
+                            candidate_response.status_code,
+                            attempt + 1,
+                            len(retry_delays) + 1,
+                            delay,
+                        )
+                        time.sleep(delay)
+                        continue
+                    candidate_response.raise_for_status()
+                    content_type = candidate_response.headers.get("content-type", "")
+                    if candidate_response.content and not (
+                        candidate_response.content.startswith(PDF_BYTES)
+                        or "pdf" in content_type.lower()
+                    ):
+                        response = candidate_response
+                        break
+                    last_error = ValueError("arXiv source endpoint returned PDF or empty content")
+                    break
+                except (httpx.TimeoutException, httpx.TransportError, OSError) as exc:
+                    last_error = exc
+                    if attempt < len(retry_delays):
+                        import time
+
+                        delay = retry_delays[attempt]
+                        logger.warning(
+                            "arXiv source %s transport error: %s; retry %d/%d in %.1fs",
+                            candidate_url,
+                            exc,
+                            attempt + 1,
+                            len(retry_delays) + 1,
+                            delay,
+                        )
+                        time.sleep(delay)
+                        continue
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    break
+            if response is not None:
+                break
+
+        if response is None:
+            logger.info("arXiv source download failed for %s, falling back to PDF: %s", arxiv_id, last_error)
             self._last_arxiv_source_fallback = "source_unavailable"
             return None
 
@@ -1284,11 +1347,6 @@ class SourceResolver:
             logger.warning("arXiv source %s exceeds configured size limit; falling back to PDF.", arxiv_id)
             self._last_arxiv_source_fallback = "source_unavailable"
             return None
-        if not content or content.startswith(PDF_BYTES) or "pdf" in content_type.lower():
-            logger.info("arXiv source endpoint for %s did not return LaTeX source; falling back to PDF.", arxiv_id)
-            self._last_arxiv_source_fallback = "source_unavailable"
-            return None
-
         source_dir = Path(run_dir) / "source"
         source_dir.mkdir(parents=True, exist_ok=True)
         raw_name = "source.tar.gz" if (content.startswith(GZIP_BYTES) or "gzip" in content_type.lower()) else "source.tex"
@@ -1301,6 +1359,7 @@ class SourceResolver:
         manifest = {
             "arxiv_id": arxiv_id,
             "source_url": source_url,
+            "download_url": str(response.url),
             "pdf_url": pdf_url,
             "raw_path": str(raw_path),
             "source_dir": str(source_dir),
@@ -1523,17 +1582,33 @@ def select_latex_main_file(source_dir: str | Path) -> tuple[Path | None, str]:
     if not tex_files:
         return None, "no_tex_files"
 
-    documentclass_matches: list[Path] = []
+    documentclass_matches: list[tuple[float, Path]] = []
     for path in tex_files:
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             continue
-        if "\\documentclass" in text:
-            documentclass_matches.append(path)
+        active_text = re.sub(r"(?m)(?<!\\)%.*$", "", text)
+        if re.search(r"(?m)^\s*\\documentclass(?:\[[^\]]*\])?\{", active_text):
+            relative = path.relative_to(root)
+            path_words = {part.lower() for part in relative.parts}
+            stem_words = set(re.split(r"[^a-z0-9]+", path.stem.lower()))
+            template_markers = {"sample", "template", "example", "demo", "test"}
+            template_penalty = 1_000 if path_words & template_markers or stem_words & template_markers else 0
+            include_count = len(re.findall(r"\\(?:input|include)\s*\{", active_text))
+            score = (
+                200
+                + (80 if "\\begin{document}" in active_text else 0)
+                + (60 if re.search(r"\\title\s*\{", active_text) else 0)
+                + min(include_count * 12, 120)
+                + min(path.stat().st_size / 1024, 50)
+                - max(len(relative.parts) - 1, 0) * 20
+                - template_penalty
+            )
+            documentclass_matches.append((score, path))
     if documentclass_matches:
-        documentclass_matches.sort(key=lambda path: path.stat().st_size, reverse=True)
-        return documentclass_matches[0], "documentclass"
+        documentclass_matches.sort(key=lambda item: (item[0], str(item[1]).lower()), reverse=True)
+        return documentclass_matches[0][1], "documentclass"
 
     tex_files.sort(key=lambda path: path.stat().st_size, reverse=True)
     return tex_files[0], "largest_tex"

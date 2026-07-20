@@ -71,7 +71,7 @@ async def build_formula_cards(
     ]
     formula_config = LLMConfig(
         temperature=0.15,
-        max_tokens=4500,
+        max_tokens=_formula_output_token_budget(llm_client, 4500),
         json_mode=True,
         timeout=card_timeout_seconds(90.0),
         max_retries=card_max_retries(0),
@@ -228,7 +228,7 @@ async def _compact_retry_formula_batch(
     refs = _refs_label(batch)
     retry_config = LLMConfig(
         temperature=0.0,
-        max_tokens=2600,
+        max_tokens=_formula_output_token_budget(llm_client, 2600),
         json_mode=True,
         timeout=card_timeout_seconds(90.0),
         max_retries=0,
@@ -255,8 +255,15 @@ async def _compact_retry_formula_batch(
 def _default_formula_card_batch_size(llm_client: LLMClient) -> int:
     provider = getattr(llm_client, "provider", None)
     if getattr(provider, "kind", "") == "anthropic_compatible":
-        return 1
+        return 3
     return DEFAULT_FORMULA_CARD_BATCH_SIZE
+
+
+def _formula_output_token_budget(llm_client: LLMClient, default: int) -> int:
+    provider = getattr(llm_client, "provider", None)
+    if getattr(provider, "kind", "") == "anthropic_compatible":
+        return 12_000
+    return default
 
 
 def _default_formula_card_concurrency(llm_client: LLMClient) -> int:

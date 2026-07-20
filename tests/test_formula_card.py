@@ -51,9 +51,11 @@ class BatchFormulaLLM:
     def __init__(self) -> None:
         self.calls = 0
         self.batch_sizes: list[int] = []
+        self.configs = []
 
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
+        self.configs.append(config)
         text = "\n".join(message.content for message in messages)
         refs = _allowed_refs(text)
         self.batch_sizes.append(len(refs))
@@ -442,7 +444,7 @@ def test_formula_cards_batch_ten_derivable_formulas_in_one_llm_call() -> None:
     assert not any("LLM_CARD_MISSING_FOR_FORMULA" in warning for warning in bundle.warnings)
 
 
-def test_anthropic_compatible_formula_cards_default_to_single_formula_batches(monkeypatch) -> None:
+def test_anthropic_compatible_formula_cards_use_bounded_reasoning_batches(monkeypatch) -> None:
     monkeypatch.delenv("RESEARCHSENSEI_FORMULA_CARD_BATCH_SIZE", raising=False)
     monkeypatch.delenv("RESEARCHSENSEI_FORMULA_CARD_CONCURRENCY", raising=False)
     client = AnthropicBatchFormulaLLM()
@@ -455,15 +457,17 @@ def test_anthropic_compatible_formula_cards_default_to_single_formula_batches(mo
                 evidence_ref=f"paper:eq{i:03d}",
                 formula_id=f"formula_{i:03d}",
             )
-            for i in range(1, 4)
+            for i in range(1, 8)
         ],
     )
 
     bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
 
     assert client.calls == 3
-    assert client.batch_sizes == [1, 1, 1]
-    assert len(bundle.formula_cards) == 3
+    assert client.batch_sizes == [3, 3, 1]
+    assert all(config.max_tokens == 12_000 for config in client.configs)
+    assert all(config.disable_thinking is True for config in client.configs)
+    assert len(bundle.formula_cards) == 7
     assert not any("LLM_CARD_MISSING_FOR_FORMULA" in warning for warning in bundle.warnings)
 
 
