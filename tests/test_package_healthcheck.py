@@ -52,11 +52,11 @@ def test_cli_healthcheck_succeeds_without_touching_workspace(tmp_path: Path) -> 
     assert not (tmp_path / "workspace").exists()
 
 
-def test_basic_fastapi_app_health_endpoint() -> None:
+def test_basic_fastapi_app_health_endpoint(tmp_path: Path) -> None:
     from researchsensei.web.app import create_app
 
-    client = TestClient(create_app())
-    response = client.get("/health")
+    with TestClient(create_app(workspace_root=tmp_path / "workspace")) as client:
+        response = client.get("/health")
 
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "researchsensei"}
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok", "service": "researchsensei"}

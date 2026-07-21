@@ -367,7 +367,19 @@ onBeforeUnmount(() => {
               @focus="openFormulaFocus"
               @toggle="toggleFormulaCollapsed"
             />
-            <div v-else class="empty-card" data-testid="formula-degraded-message">
+            <div
+              v-if="workspace.formulaCards.value.length && workspace.hiddenRawFormulaCount.value"
+              class="formula-partial-notice"
+              role="status"
+              data-testid="formula-partial-notice"
+            >
+              另有 {{ workspace.hiddenRawFormulaCount.value }} 条公式解释暂不可用，公式与证据仍已保留；可稍后重新解析或切换模型重试。
+            </div>
+            <div
+              v-if="!workspace.formulaCards.value.length"
+              class="empty-card"
+              data-testid="formula-degraded-message"
+            >
               <h2>公式拆解暂时不可用</h2>
               <p>
                 当前公式来源不足以生成可信推导。系统没有把它伪装成完整解释，
@@ -653,6 +665,18 @@ onBeforeUnmount(() => {
 
 .card-stack.formula-stack {
   max-width: min(1120px, 100%);
+}
+
+.formula-partial-notice {
+  max-width: 920px;
+  margin: 14px auto 0;
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  border-radius: 8px;
+  padding: 11px 14px;
+  background: rgba(217, 119, 6, 0.07);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
 }
 
 .teaching-list {

@@ -100,7 +100,15 @@ class PersistentTaskService:
         if cancel_event.is_set():
             self._update(task_id, status="CANCELLED", stage="cancelled", progress=0, cancel_requested=1)
             return
-        self._update(task_id, status="RUNNING", stage="starting", progress=1)
+        self._update(
+            task_id,
+            status="RUNNING",
+            stage="starting",
+            progress=1,
+            error_type="",
+            error="",
+            cancel_requested=0,
+        )
         progress_lock = threading.Lock()
         progress_high_watermark = 1
 
@@ -127,7 +135,16 @@ class PersistentTaskService:
                     cancel_requested=1,
                 )
             else:
-                self._update(task_id, status="SUCCEEDED", stage="completed", progress=100, result=result)
+                self._update(
+                    task_id,
+                    status="SUCCEEDED",
+                    stage="completed",
+                    progress=100,
+                    result=result,
+                    error_type="",
+                    error="",
+                    cancel_requested=0,
+                )
         except TaskExecutionError as error:
             self._update(
                 task_id,

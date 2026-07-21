@@ -4,9 +4,36 @@ import json
 from pathlib import Path
 
 from researchsensei.ingestion import SinglePaperIngestionRunner
+from researchsensei.ingestion.pipeline import _formula_llm_failure_warnings
 from researchsensei.jobs import JobStore
-from researchsensei.schemas import JobStatus
+from researchsensei.schemas import FormulaCard, FormulaCardBundle, JobStatus
 from researchsensei.workspace import WorkspaceStore
+
+
+def test_formula_llm_failures_are_reported_as_partial_without_hiding_successes() -> None:
+    bundle = FormulaCardBundle(
+        paper_id="paper",
+        formula_cards=[
+            FormulaCard(
+                formula_id="f1",
+                paper_id="paper",
+                coverage_status="SOURCE_COVERED",
+                derivation_status="derived",
+            ),
+            FormulaCard(
+                formula_id="f2",
+                paper_id="paper",
+                coverage_status="LLM_FAILED",
+                derivation_status="llm_failed",
+            ),
+        ],
+    )
+
+    warnings = _formula_llm_failure_warnings(bundle)
+
+    assert len(warnings) == 1
+    assert warnings[0].code == "FORMULA_CARDS_PARTIAL"
+    assert warnings[0].detail == "failed_formula_count=1"
 
 
 def test_single_paper_runner_writes_artifact_and_updates_job(tmp_path: Path) -> None:

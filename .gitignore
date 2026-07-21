@@ -5,6 +5,7 @@ frontend/node_modules/
 frontend/playwright-report/
 frontend/test-results/
 frontend/blob-report/
+.playwright-cli/
 dist/
 build/
 __pycache__/

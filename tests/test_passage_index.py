@@ -122,6 +122,30 @@ def test_formula_block_standalone_passage() -> None:
     assert formula_passages[0].text == "L = L_rec + lambda * L_reg"
 
 
+def test_formula_standalone_passage_includes_parser_local_context() -> None:
+    doc = _make_document([
+        DocumentBlock(
+            block_id="eq001",
+            type=BlockType.FORMULA,
+            text=r"L=\frac{1}{N}\sum_i e_i^2",
+            evidence_ref="t:eq001",
+            section="method",
+            formula_id="mineru_formula_001",
+            formula_origin="mineru_latex",
+            formula_context_before="The model minimizes its forecasting error.",
+            formula_context_after="This loss trains each forecasting network.",
+        ),
+    ])
+
+    index = build_passage_index(doc)
+
+    passage = index.passages[0]
+    assert "Formula: L=" in passage.text
+    assert "Context before: The model minimizes" in passage.text
+    assert "Context after: This loss trains" in passage.text
+    assert passage.formula_origins == ["mineru_latex"]
+
+
 def test_table_block_standalone_passage() -> None:
     doc = _make_document([
         DocumentBlock(block_id="h001", type=BlockType.HEADING, text="Results", evidence_ref="t:h001", section="experiments"),

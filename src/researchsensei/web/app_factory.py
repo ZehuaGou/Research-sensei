@@ -31,7 +31,11 @@ from researchsensei.browser_downloader import BrowserSessionDownloader
 from researchsensei.acquisition.fulltext_resolver import FullTextResolver
 from researchsensei.core.config import AppConfig, ConfigService
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
-from researchsensei.ingestion import LightweightIngestionService, SinglePaperIngestionRunner
+from researchsensei.ingestion import (
+    LightweightIngestionService,
+    MineruEnhancedIngestionService,
+    SinglePaperIngestionRunner,
+)
 from researchsensei.jobs import JobStore
 from researchsensei.library import PaperLibraryStore
 from researchsensei.llm.client import LLMClient
@@ -64,7 +68,9 @@ def _debug_enabled() -> bool:
     return os.getenv("SENSEI_DEBUG", "").lower() in {"1", "true", "yes"}
 
 
-def _ingestion_for_backend(parser_backend: str) -> LightweightIngestionService:
+def _ingestion_for_backend(parser_backend: str) -> LightweightIngestionService | MineruEnhancedIngestionService:
+    if parser_backend == "mineru":
+        return MineruEnhancedIngestionService()
     if parser_backend not in {"pymupdf", "lightweight"}:
         raise ValueError(f"Unsupported parser backend: {parser_backend}")
     return LightweightIngestionService()

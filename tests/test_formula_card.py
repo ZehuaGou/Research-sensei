@@ -320,7 +320,8 @@ def test_source_latex_missing_llm_card_keeps_explicit_failure_card_without_struc
     assert card.confidence == 0.0
     assert card.symbols == []
     assert card.terms == []
-    assert "LLM 没有返回" in card.purpose
+    assert card.purpose == "公式 source_latex_formula_threshold：解释暂不可用"
+    assert "模型服务暂未返回有效解释" in card.plain_summary
     assert any("NO_FORMULA_CARDS_FROM_LLM" in warning for warning in bundle.warnings)
     assert not any("STRUCTURE_DERIVED" in warning for warning in bundle.warnings)
 

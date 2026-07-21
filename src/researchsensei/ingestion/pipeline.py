@@ -15,6 +15,7 @@ from researchsensei.formula_card_baseline import build_formula_cards as build_fo
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
+from researchsensei.ingestion.mineru_enhanced import MineruEnhancedIngestionService
 from researchsensei.jobs import DuplicateSourceJobError, JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
@@ -76,7 +77,7 @@ class SinglePaperIngestionRunner:
         self,
         workspace: WorkspaceStore,
         jobs: JobStore,
-        ingestion: LightweightIngestionService | None = None,
+        ingestion: LightweightIngestionService | MineruEnhancedIngestionService | None = None,
         parser_adapter: ParserAdapter | None = None,
         llm_client: LLMClient | None = None,
         quality_auditor: QualityAuditor | None = None,
@@ -135,7 +136,11 @@ class SinglePaperIngestionRunner:
                 result = self.parser_adapter.parse(copied_source, paper_id=actual_job_id)
                 document = result.document
             else:
-                document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
+                document = self.ingestion.ingest_path(
+                    copied_source,
+                    paper_id=actual_job_id,
+                    progress=report,
+                )
             document = _apply_title_hint(document, title_hint)
             report("indexing_evidence", 32)
             passage_index = build_passage_index(document)
@@ -471,6 +476,7 @@ class SinglePaperIngestionRunner:
                 "teaching_cards": teaching_cards,
             }
             formula_warnings = _formula_derivation_warnings(formula_cards)
+            formula_llm_warnings = _formula_llm_failure_warnings(formula_cards)
             if formula_warnings:
                 understanding_status = _build_degraded_status(
                     paper_id,
@@ -480,6 +486,21 @@ class SinglePaperIngestionRunner:
                     blocking_reason="FORMULA_DERIVATION_BLOCKED",
                     formula_cards_status="FAILED",
                     teaching_cards_status="SUCCESS",
+                )
+            elif formula_llm_warnings:
+                understanding_status = _build_success_status(
+                    paper_id,
+                    formula_cards=formula_cards,
+                    evidence_pack_summary=evidence_pack_summary,
+                )
+                understanding_status = understanding_status.model_copy(
+                    update={
+                        "warnings": [*understanding_status.warnings, *formula_llm_warnings],
+                        "component_status": {
+                            **understanding_status.component_status,
+                            "formula_cards": "PARTIAL",
+                        },
+                    }
                 )
             else:
                 understanding_status = _build_success_status(
@@ -833,6 +854,24 @@ def _formula_derivation_warnings(formula_cards) -> list[WarningItem]:
             code="FORMULA_DERIVATION_BLOCKED",
             message="Formula derivation was blocked because formula provenance is raw or unknown.",
             detail=f"blocked_formula_count={len(blocked)}; formula_origins={','.join(origins)}",
+        )
+    ]
+
+
+def _formula_llm_failure_warnings(formula_cards) -> list[WarningItem]:
+    cards = getattr(formula_cards, "formula_cards", []) or []
+    failed = [
+        card for card in cards
+        if getattr(card, "coverage_status", "") == "LLM_FAILED"
+        or getattr(card, "derivation_status", "") == "llm_failed"
+    ]
+    if not failed:
+        return []
+    return [
+        WarningItem(
+            code="FORMULA_CARDS_PARTIAL",
+            message=f"{len(failed)} formula explanation(s) failed and remain available for retry.",
+            detail=f"failed_formula_count={len(failed)}",
         )
     ]
 

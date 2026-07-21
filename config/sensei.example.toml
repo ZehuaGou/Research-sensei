@@ -70,7 +70,9 @@ workspace_dir = "workspace"
 default_learning_mode = "reproducible_2h"
 max_upload_mb = 80
 # The maintained built-in parser path. PDF extraction uses PyMuPDF.
-parser_backend = "pymupdf"
+# mineru: GPU layout/formula parsing with fail-closed PyMuPDF fallback.
+# pymupdf: lightweight text-only parsing.
+parser_backend = "mineru"
 
 [server]
 host = "127.0.0.1"

@@ -14,6 +14,8 @@ const TASK_STAGE_LABELS: Record<string, string> = {
   validating_source: '正在验证原始文件',
   preparing_source: '正在准备论文文件',
   parsing_document: '正在解析论文结构',
+  detecting_formula_regions: '正在定位 PDF 公式区域',
+  loading_formula_parser: '正在加载 GPU 公式解析器',
   indexing_evidence: '正在建立证据索引',
   building_evidence_pack: '正在整理可引用证据',
   building_paper_card: '正在生成论文概览',
@@ -32,6 +34,11 @@ const TASK_STAGE_LABELS: Record<string, string> = {
 }
 
 export function formatTaskStage(stage: string) {
+  const parsingRegionsMatch = stage.match(/^parsing_formula_regions:(\d+)\/(\d+)$/)
+  if (parsingRegionsMatch) {
+    const [, completed, total] = parsingRegionsMatch
+    return `正在识别公式区域（${completed}/${total} 个）`
+  }
   const formulaMatch = stage.match(/^building_formula_cards:(\d+)\/(\d+)$/)
   if (formulaMatch) {
     const [, completed, total] = formulaMatch

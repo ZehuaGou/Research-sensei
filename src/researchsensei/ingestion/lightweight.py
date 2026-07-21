@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from researchsensei.schemas import BlockType, DocumentBlock, DocumentIngestion, WarningItem
@@ -51,7 +52,12 @@ LATEX_TOKEN_PATTERN = re.compile(
 
 
 class LightweightIngestionService:
-    def ingest_path(self, path: str | Path, paper_id: str | None = None) -> DocumentIngestion:
+    def ingest_path(
+        self,
+        path: str | Path,
+        paper_id: str | None = None,
+        progress: Callable[[str, int], None] | None = None,
+    ) -> DocumentIngestion:
         source = Path(path)
         actual_paper_id = paper_id or source.stem
         suffix = source.suffix.lower()

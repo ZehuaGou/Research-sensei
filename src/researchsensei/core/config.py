@@ -46,7 +46,7 @@ class AppRuntimeConfig(ConfigModel):
     workspace_dir: str = "workspace"
     default_learning_mode: str = "reproducible_2h"
     max_upload_mb: int = Field(default=80, gt=0, le=1024)
-    parser_backend: Literal["pymupdf", "lightweight"] = "pymupdf"
+    parser_backend: Literal["mineru", "pymupdf", "lightweight"] = "pymupdf"
 
     @field_validator("parser_backend", mode="before")
     @classmethod

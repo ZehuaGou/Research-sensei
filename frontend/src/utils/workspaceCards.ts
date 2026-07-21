@@ -26,6 +26,7 @@ export function isUsableFormulaCard(card: FormulaCard) {
   const origin = String(card.formula_origin || '').trim()
   const derivation = String(card.derivation_status || '').trim()
   const coverage = String(card.coverage_status || '').trim()
+  if (derivation === 'llm_failed' || coverage === 'LLM_FAILED') return false
   if (origin === 'raw_formula_text' && (derivation === 'blocked' || coverage === 'BLOCKED_RAW_ONLY')) return false
   return !(isNoisyFormulaText(card.purpose) && isNoisyFormulaText(card.plain_summary) && origin !== 'source_latex')
 }
@@ -57,15 +58,28 @@ export function formulaAnchor(formula: FormulaCard, index: number) {
 }
 
 export function formulaEntries(cards: FormulaCard[]): FormulaEntry[] {
-  return cards.map((formula, index) => {
-    const card = normalizeFormulaCard(formula, index)
+  const ordered = [...cards].sort(compareFormulaLocation)
+  return ordered.map((formula, index) => {
+    const equationIndex = Number.parseInt(String(formula.equation_number || ''), 10)
+    const displayIndex = Number.isFinite(equationIndex) ? equationIndex : index + 1
+    const card = normalizeFormulaCard(formula, displayIndex - 1)
     return {
       id: formulaAnchor(formula, index),
-      index: index + 1,
+      index: displayIndex,
       card,
       title: clipLabel(card.display_title || card.purpose || card.problem || `公式 ${index + 1}`, 72),
     }
   })
+}
+
+function compareFormulaLocation(left: FormulaCard, right: FormulaCard) {
+  const leftPage = Number(left.formula_page || Number.MAX_SAFE_INTEGER)
+  const rightPage = Number(right.formula_page || Number.MAX_SAFE_INTEGER)
+  if (leftPage !== rightPage) return leftPage - rightPage
+  const leftEquation = Number.parseFloat(String(left.equation_number || Number.MAX_SAFE_INTEGER))
+  const rightEquation = Number.parseFloat(String(right.equation_number || Number.MAX_SAFE_INTEGER))
+  if (leftEquation !== rightEquation) return leftEquation - rightEquation
+  return Number(left.group_order || 0) - Number(right.group_order || 0)
 }
 
 export function clipLabel(value: unknown, maxLength: number) {

@@ -7,6 +7,41 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-21 Formula-aware PDF recovery
+
+The Web ingestion route now combines complete PyMuPDF text extraction with a
+strict numbered-equation pre-screen and targeted MinerU2.5-Pro formula OCR.
+MinerU runs only on the detected equation crops, rather than every PDF page,
+and a crop is promoted to formula evidence only when MinerU returns LaTeX.
+Heuristic raw fragments remain blocked. Formula evidence retains its page,
+bounding box, equation number, surrounding source context, and `evidence_ref`.
+
+The real AAAI paper *Root Cause Analysis in Microservice Using Neural Granger
+Causal Discovery* was reparsed through the production task route. Task
+`4e17af254d724a99` completed as job `79f3eb8ca348`: six numbered equation
+regions were detected and all six were converted to trusted `mineru_latex`
+blocks and formula cards. Five explanations completed; equation (4) retained
+its evidence but was marked for retry after a transient upstream model HTTP
+502. The workspace therefore presents `5 可用 · 1 待重试`, sorts the usable
+cards by paper/equation order, and does not expose raw provider errors as a
+learner-facing formula card. New runs record this condition as
+`formula_cards=PARTIAL` while keeping the successful cards available.
+
+The targeted crop parse took approximately 131 seconds on the configured CUDA
+GPU. The complete production task took longer because of live LLM generation
+and retry waits; parser throughput and model-service latency are reported as
+separate concerns. A concurrent-test isolation defect discovered during this
+acceptance was also fixed: constructing a test app can no longer mark tasks in
+the real workspace as restarted, and a task owner clears stale interruption
+errors on start and successful completion.
+
+Verification after the correction: 813 backend tests passed with 15 skips; the
+final no-CPU-fallback guard then passed the focused nine-test MinerU/runner
+suite. In addition, 86 frontend unit tests and all seven fixed-browser E2E
+tests passed; Ruff, Mypy (128 source files), Vue type checking, and the
+production frontend build passed. The six-equation result above is a live
+local GPU/parser and live LLM acceptance, not a fixture result.
+
 ## 2026-07-21 Deep-read progress and recovery correction
 
 The direction and upload deep-read tasks no longer remain at

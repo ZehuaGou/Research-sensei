@@ -92,7 +92,7 @@ def build_passage_index(
 
     def flush_standalone(block: DocumentBlock) -> None:
         nonlocal passage_counter
-        text = block.text.strip()
+        text = _standalone_text(block)
         if not text:
             return
         section = _normalize_section(block.section) or "unknown"
@@ -198,6 +198,26 @@ def _make_passage(
 
 def _normalize_section(section: str) -> str:
     return section.strip().lower().replace(" ", "_") if section else ""
+
+
+def _standalone_text(block: DocumentBlock) -> str:
+    text = block.text.strip()
+    if block.type != BlockType.FORMULA:
+        return text
+    before = " ".join(block.formula_context_before.split()).strip()
+    after = " ".join(block.formula_context_after.split()).strip()
+    if not before and not after:
+        return text
+    formula_id = block.formula_id or block.block_id
+    origin = block.formula_origin or "unknown"
+    return "\n".join(
+        [
+            f"Formula {formula_id}. Origin: {origin}.",
+            f"Formula: {text}",
+            f"Context before: {before or 'unknown'}",
+            f"Context after: {after or 'unknown'}",
+        ]
+    )
 
 
 def _should_keep_short_passage(section: str, blocks: list[DocumentBlock], text: str) -> bool:

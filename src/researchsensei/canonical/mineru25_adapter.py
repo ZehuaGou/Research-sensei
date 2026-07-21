@@ -9,12 +9,26 @@ import importlib.util
 import logging
 import re
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from researchsensei.canonical.document_blocks import CanonicalDocumentBlock
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class FormulaRegionCandidate:
+    """A strict PyMuPDF pre-screened display-equation region."""
+
+    page: int
+    bbox: tuple[float, float, float, float]
+    equation_number: str = ""
+    section: str = "full_text"
+    context_before: str = ""
+    context_after: str = ""
 
 
 class MinerU25ProAdapter:
@@ -37,12 +51,16 @@ class MinerU25ProAdapter:
         device_mode: str = "auto",
         render_scale: float = 2.0,
         handle_equation_block: bool = True,
+        show_progress: bool = False,
+        allow_cpu_fallback: bool = True,
     ) -> None:
         self.model_path = model_path
         self.backend = backend
         self.device_mode = device_mode
         self.render_scale = render_scale
         self.handle_equation_block = handle_equation_block
+        self.show_progress = show_progress
+        self.allow_cpu_fallback = allow_cpu_fallback
         self.client: Any | None = None
         self.load_seconds: float = 0.0
         self.warnings: list[str] = []
@@ -121,9 +139,11 @@ class MinerU25ProAdapter:
                 self._load_gpu_transformers()
             except Exception as e:
                 load_error = str(e)
-                self.warnings.append(f"GPU loading failed: {e}. Falling back to CPU.")
                 self._device_stats["device_mode_actual"] = "cpu"
                 self._device_stats["fallback_reason"] = f"GPU load failed: {e}"
+                if not self.allow_cpu_fallback:
+                    raise RuntimeError(f"GPU loading failed and CPU fallback is disabled: {e}") from e
+                self.warnings.append(f"GPU loading failed: {e}. Falling back to CPU.")
                 actual_device = "cpu"
 
         if self.client is None:
@@ -131,7 +151,7 @@ class MinerU25ProAdapter:
             self.client = MinerUClient(
                 backend=self.backend,
                 model_path=self.model_path,
-                use_tqdm=True,
+                use_tqdm=self.show_progress,
                 handle_equation_block=self.handle_equation_block,
             )
 
@@ -154,23 +174,55 @@ class MinerU25ProAdapter:
         except ImportError as e:
             raise RuntimeError(f"Missing dependency for GPU loading: {e}") from e
 
-        logger.info("Loading MinerU2.5-Pro on GPU with device_map=auto...")
+        model_reference = self._cached_model_reference()
+        logger.info(
+            "Loading MinerU2.5-Pro on GPU with device_map=auto (source=%s)...",
+            self._device_stats.get("model_source", "configured_reference"),
+        )
         model = Qwen2VLForConditionalGeneration.from_pretrained(
-            self.model_path,
-            torch_dtype="auto",
+            model_reference,
+            dtype="auto",
             device_map="auto",
         )
-        processor = AutoProcessor.from_pretrained(self.model_path, use_fast=True)
+        processor = AutoProcessor.from_pretrained(model_reference, use_fast=True)
 
         self.client = MinerUClient(
             backend="transformers",
             model=model,
             processor=processor,
-            use_tqdm=True,
+            use_tqdm=self.show_progress,
             handle_equation_block=self.handle_equation_block,
         )
 
-    def parse_pdf(self, pdf_path: str | Path, *, output_dir: str | Path | None = None) -> tuple[list[CanonicalDocumentBlock], dict[str, Any]]:
+    def _cached_model_reference(self) -> str:
+        """Prefer an already downloaded snapshot without probing the network.
+
+        ``from_pretrained(repo_id)`` performs remote HEAD requests even when all
+        weights are cached. That makes every local deep-read vulnerable to a
+        network timeout. Resolve the cached snapshot first and only retain the
+        configured reference when no complete local snapshot is available.
+        """
+        configured = Path(self.model_path).expanduser()
+        if configured.exists():
+            self._device_stats["model_source"] = "local_path"
+            return str(configured)
+        try:
+            from huggingface_hub import snapshot_download
+
+            cached = snapshot_download(repo_id=self.model_path, local_files_only=True)
+        except Exception:
+            self._device_stats["model_source"] = "remote_or_uncached"
+            return self.model_path
+        self._device_stats["model_source"] = "local_cache"
+        return str(cached)
+
+    def parse_pdf(
+        self,
+        pdf_path: str | Path,
+        *,
+        output_dir: str | Path | None = None,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> tuple[list[CanonicalDocumentBlock], dict[str, Any]]:
         """Parse a PDF into canonical document blocks."""
         self.load()
         if self.client is None:  # pragma: no cover - defensive
@@ -201,6 +253,8 @@ class MinerU25ProAdapter:
 
                 raw_pages.append({"page": page_idx + 1, "blocks": list(raw_blocks)})
                 blocks.extend(self.normalize_page_result(raw_blocks, page=page_idx + 1, block_offset=len(blocks)))
+                if progress is not None:
+                    progress(page_idx + 1, page_count)
 
         elapsed = time.time() - start
         pages_per_second = page_count / elapsed if elapsed > 0 else 0
@@ -223,6 +277,7 @@ class MinerU25ProAdapter:
             "gpu_name": self._device_stats.get("gpu_name"),
             "gpu_memory_total_mb": self._device_stats.get("gpu_memory_total_mb"),
             "model_load_backend": self._device_stats.get("model_load_backend", self.backend),
+            "model_source": self._device_stats.get("model_source", "configured_reference"),
             "fallback_reason": self._device_stats.get("fallback_reason"),
             "warnings": list(self.warnings),
         }
@@ -236,6 +291,91 @@ class MinerU25ProAdapter:
             stats.setdefault("perf_warnings", []).append(f"total_parse_time={elapsed:.0f}s > 3600s threshold")
 
         return blocks, {"pages": raw_pages, "stats": stats}
+
+    def parse_formula_regions(
+        self,
+        pdf_path: str | Path,
+        regions: list[FormulaRegionCandidate],
+        *,
+        progress: Callable[[int, int], None] | None = None,
+        render_scale: float = 3.0,
+    ) -> tuple[list[CanonicalDocumentBlock], dict[str, Any]]:
+        """Parse only strict display-equation crops instead of every PDF page.
+
+        Full-page MinerU parsing is valuable for offline canonicalization but
+        too slow for an interactive deep read. PyMuPDF first identifies
+        numbered equation regions; MinerU then supplies trusted LaTeX for those
+        small crops. Returned bboxes remain in original PDF page coordinates.
+        """
+        self.load()
+        if self.client is None:  # pragma: no cover - defensive
+            raise RuntimeError("MinerU2.5-Pro client did not load")
+
+        import fitz
+        from PIL import Image
+
+        parsed: list[CanonicalDocumentBlock] = []
+        raw_regions: list[dict[str, Any]] = []
+        started = time.time()
+        with fitz.open(str(pdf_path)) as document:
+            for index, region in enumerate(regions, start=1):
+                page_index = region.page - 1
+                if page_index < 0 or page_index >= len(document):
+                    continue
+                page = document[page_index]
+                rect = fitz.Rect(*region.bbox) & page.rect
+                if rect.is_empty:
+                    continue
+                pix = page.get_pixmap(
+                    matrix=fitz.Matrix(render_scale, render_scale),
+                    clip=rect,
+                    alpha=False,
+                )
+                image = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                raw_blocks = list(self.client.two_step_extract(image))
+                normalized = self.normalize_page_result(
+                    raw_blocks,
+                    page=region.page,
+                    block_offset=len(parsed),
+                )
+                formulas = [block for block in normalized if block.block_type == "formula" and block.latex.strip()]
+                if formulas:
+                    best = max(formulas, key=lambda block: len(block.latex))
+                    best.block_id = f"mineru_eq_{index:03d}"
+                    best.bbox = list(region.bbox)
+                    best.reading_order = index
+                    best.section = region.section
+                    best.section_confidence = "high" if region.section != "full_text" else "medium"
+                    best.section_reason = "numbered_equation_region"
+                    best.raw_payload_ref = f"formula_region_{index:03d}"
+                    parsed.append(best)
+                raw_regions.append(
+                    {
+                        "region_index": index,
+                        "page": region.page,
+                        "bbox": list(region.bbox),
+                        "equation_number": region.equation_number,
+                        "raw_blocks": raw_blocks,
+                        "parsed": bool(formulas),
+                    }
+                )
+                if progress is not None:
+                    progress(index, len(regions))
+
+        elapsed = time.time() - started
+        return parsed, {
+            "regions": raw_regions,
+            "stats": {
+                "parser": self.NAME,
+                "mode": "formula_regions",
+                "candidate_regions": len(regions),
+                "parsed_formulas": len(parsed),
+                "elapsed_seconds": round(elapsed, 3),
+                "load_seconds": round(self.load_seconds, 3),
+                "device_mode_actual": self._device_stats.get("device_mode_actual", "unknown"),
+                "model_source": self._device_stats.get("model_source", "configured_reference"),
+            },
+        }
 
     def normalize_page_result(
         self,

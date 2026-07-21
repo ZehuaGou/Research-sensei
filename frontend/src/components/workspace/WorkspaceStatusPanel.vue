@@ -19,7 +19,9 @@ const metrics = computed(() => [
   {
     label: '公式',
     value: props.formulaCount
-      ? `${props.formulaCount} 可推导`
+      ? props.detectedFormulaCount > props.formulaCount
+        ? `${props.formulaCount} 可用 · ${props.detectedFormulaCount - props.formulaCount} 待重试`
+        : `${props.formulaCount} 可推导`
       : props.detectedFormulaCount
         ? `${props.detectedFormulaCount} 段受限`
         : '0',
@@ -97,6 +99,7 @@ function formatStatusValue(value: unknown) {
     verified: '已验证',
     success: '成功',
     SUCCESS: '成功',
+    PARTIAL: '部分可用',
     pass: '通过',
     blocked: '已阻断',
     failed: '失败',

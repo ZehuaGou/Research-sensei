@@ -451,6 +451,8 @@ def _convert_to_bundle(
     if _has_derivable_formula_items(evidence_pack) and not output_cards:
         warnings.append("NO_FORMULA_CARDS_FROM_LLM")
 
+    cards.sort(key=_formula_card_order)
+
     return FormulaCardBundle(
         paper_id=paper_id,
         formula_cards=cards,
@@ -466,6 +468,20 @@ def _formula_items(evidence_pack: EvidencePack) -> list[EvidencePackItem]:
         item for item in evidence_pack.items
         if item.claim_type == "FORMULA_CONTEXT" and item.evidence_ref
     ]
+
+
+def _formula_card_order(card: FormulaCard) -> tuple[int, tuple[int, ...], int, str]:
+    equation_parts = tuple(
+        int(part) for part in str(card.equation_number or "").split(".") if part.isdigit()
+    )
+    if not equation_parts:
+        equation_parts = (10**9,)
+    return (
+        int(card.formula_page or 10**9),
+        equation_parts,
+        int(card.group_order or 10**9),
+        card.formula_id,
+    )
 
 
 def _formula_origin_from_evidence(evidence: EvidencePackItem) -> str:
@@ -618,14 +634,14 @@ def _llm_failed_card(item: EvidencePackItem, paper_id: str, *, reason: str) -> F
         is_core_formula=False,
         derivation_status="llm_failed",
         location=_location(item),
-        purpose=f"LLM 没有返回这条公式的有效解释：{failure}",
+        purpose=f"公式 {item.equation_number or item.formula_id or '当前'}：解释暂不可用",
         symbols=[],
         terms=[],
         intuition="LLM_FAILED",
         numeric_example="LLM_FAILED",
         what_if_removed="LLM_FAILED",
         weight_sensitivity="LLM_FAILED",
-        plain_summary="这不是兜底解释；该公式保留为失败状态，需重新解析或更换模型后再生成。",
+        plain_summary="公式与证据已保留，但模型服务暂未返回有效解释；可稍后重试或切换模型。",
         evidence_ref=item.evidence_ref,
         evidence_status=EvidenceType.NEEDS_HUMAN_CHECK,
         confidence=0.0,

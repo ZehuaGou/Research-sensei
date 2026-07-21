@@ -119,6 +119,39 @@ def test_service_restart_marks_legacy_running_task_interrupted(tmp_path: Path) -
     restarted.close()
 
 
+def test_running_owner_clears_stale_restart_error_when_operation_finishes(tmp_path: Path) -> None:
+    db_path = tmp_path / "tasks.sqlite3"
+    owner = PersistentTaskService(db_path, max_workers=1)
+    started = threading.Event()
+    release = threading.Event()
+
+    def operation(_progress, _cancel):
+        started.set()
+        assert release.wait(timeout=2.0)
+        return {"completed": True}
+
+    task = owner.submit("deep_read", {}, operation)
+    assert started.wait(timeout=1.0)
+    observer = PersistentTaskService(db_path, max_workers=1)
+    assert observer.get(str(task["task_id"]))["status"] == "INTERRUPTED"
+    observer.close()
+
+    release.set()
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        finished = owner.get(str(task["task_id"]))
+        if finished["status"] == "SUCCEEDED":
+            break
+        time.sleep(0.01)
+    else:
+        raise AssertionError("task owner did not publish successful completion")
+
+    assert finished["error_type"] == ""
+    assert finished["error"] == ""
+    assert finished["result"] == {"completed": True}
+    owner.close()
+
+
 class StubDirectionService:
     def explore(self, query: str) -> DirectionBundle:
         return DirectionBundle(
