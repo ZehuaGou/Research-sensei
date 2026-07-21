@@ -549,6 +549,117 @@ def test_m4_accepts_concise_problem_answer_after_claim_grounding(tmp_path: Path)
     assert response.json()["status"] == "SUCCESS"
 
 
+def test_m4_accepts_server_source_quote_id_without_model_recopying_text(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "source_quote_id")
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": "论文解决稀疏证据片段让检索不稳定的问题，并用注意力结构连接相关片段，使检索能够聚合分散依据。",
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{
+                "evidence_ref": "paper:b001",
+                "quote_id": "source_quote_001",
+                "quote": "模型不再需要逐字复制这段英文原文。",
+            }],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "论文解决了什么问题？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "检索不稳定" in data["answer"]
+    prompt = json.loads(llm.messages[-1][1].content)
+    source_rows = [
+        row
+        for row in prompt["context"]["retrieved_evidence"]
+        if row.get("quote_id") == "source_quote_001"
+    ]
+    assert source_rows == [{
+        "source": "passage_index",
+        "evidence_ref": "paper:b001",
+        "text": "The attention architecture links sparse evidence passages to solve the retrieval problem.",
+        "quote_id": "source_quote_001",
+    }]
+
+
+def test_m4_resolves_model_quote_paraphrase_to_server_source(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "source_quote_resolution")
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": "论文解决稀疏证据片段让检索不稳定的问题，并用注意力结构连接相关片段，使检索能够聚合分散依据。",
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{
+                "evidence_ref": "paper:b001",
+                "quote": "The model uses attention to connect scattered evidence.",
+            }],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "论文解决了什么问题？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "检索不稳定" in data["answer"]
+
+
+def test_m4_does_not_trust_unknown_quote_id_for_unsupported_claim(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "unknown_source_quote_id")
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": "论文在 NASA 数据集上把 F1 提升了 12.5%。",
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{
+                "evidence_ref": "paper:b001",
+                "quote_id": "source_quote_999",
+                "quote": "这不是论文原文。",
+            }],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(f"/api/v1/jobs/{job_id}/ask", json={"question": "论文解决了什么问题？"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["claims"] == []
+    assert data["warnings"][0]["detail"] == "supporting_quote_not_verbatim"
+    assert "NASA" not in data["answer"]
+
+
 def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     llm = ScriptedM4LLM(

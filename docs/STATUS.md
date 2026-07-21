@@ -673,6 +673,26 @@ suite.
   suite `815 passed, 15 skipped`; Ruff and mypy passed; frontend StatusBanner
   tests `10 passed`; full frontend suite `89 passed`; production build passed.
 
+### M4 exact-quote selection regression (2026-07-21)
+
+- On GiA Roots job `941a6709af95`, M4 retrieved the correct `b002` source and
+  produced a supported Chinese answer to “这篇论文真正解决了什么问题？”, but
+  rejected the entire answer as `M4_CLAIM_UNSUPPORTED` when the model lightly
+  paraphrased the English `supporting_quote` instead of copying it verbatim.
+- Source evidence rows now receive server-generated `quote_id` values. The
+  model selects an ID and the server binds its own exact source text. For
+  providers that still omit the ID or paraphrase the quote, the server resolves
+  the exact source row only when that ref exists and the claim independently
+  passes the same content, number, dataset, formula, and threshold gates.
+- An invented quote ID does not establish support: the regression case using
+  an unsupported NASA/F1/12.5% claim remains rejected. Existing exact-quote
+  payloads remain compatible.
+- Live API and browser checks on the same GiA Roots question returned the
+  correct problem statement with one supported claim and evidence ref
+  `941a6709af95:b002`; the M4 panel displayed “1 条已验证证据” instead of deleting
+  the answer. Targeted M4/memory tests reported `40 passed`; full backend tests
+  reported `818 passed, 15 skipped`; Ruff and mypy passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not

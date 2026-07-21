@@ -611,6 +611,7 @@ class M4InteractionService:
             return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的可验证论文证据。")
         evidence_by_ref = _evidence_text_by_ref(evidence_rows)
         support_text_by_ref = _claim_support_text_by_ref(evidence_rows)
+        source_quotes_by_id = _source_quotes_by_id(evidence_rows)
         context = {
             "retrieved_evidence": evidence_rows,
             "recent_memory": self._memory_context(),
@@ -631,7 +632,8 @@ class M4InteractionService:
                 "只输出符合 required_json_schema 的 JSON。",
                 "每个可向用户展示的结论必须单独放进 claims，不能把整篇回答只绑定到一个引用集合。",
                 "每个 claim 的 evidence_refs 只能从 allowed_evidence_refs 选择，并逐个提供 supporting_quotes。",
-                "supporting_quotes 必须从对应 evidence_ref 的 text 原样摘录，不得改写或翻译。",
+                "supporting_quotes 优先填写对应 retrieved_evidence 的 quote_id；不要自行复制、改写或翻译长原文。",
+                "如果没有 quote_id，quote 才必须从对应 evidence_ref 的 text 原样摘录。",
                 "claim.text 必须是简体中文自然语言，不能暴露 evidence_ref、memory_ref、job id 等内部编号。",
                 "公式、阈值、数值、数据集、指标和实验结果只有在 supporting quote 明确出现时才允许写入。",
                 "玩具数字只能放在 toy_example claim 中，且计算规则必须在引用证据里明确出现。",
@@ -648,7 +650,8 @@ class M4InteractionService:
                         "supporting_quotes": [
                             {
                                 "evidence_ref": "与该 quote 对应的允许引用",
-                                "quote": "从该引用 text 原样复制的最小充分片段",
+                                "quote_id": "从 retrieved_evidence 原样选择的 quote_id",
+                                "quote": "仅在没有 quote_id 时，从该引用 text 原样复制的最小充分片段",
                             }
                         ],
                         "uncertainty": "该结论自身的不确定性；充分时为空字符串",
@@ -719,6 +722,7 @@ class M4InteractionService:
                 allowed=allowed,
                 evidence_by_ref=evidence_by_ref,
                 support_text_by_ref=support_text_by_ref,
+                source_quotes_by_id=source_quotes_by_id,
             )
             if claim is None:
                 rejected_reasons.append(reason)
@@ -978,7 +982,7 @@ class M4InteractionService:
             seen.add(key)
             if len(unique_rows) >= 8:
                 break
-        return unique_rows
+        return _with_source_quote_ids(unique_rows)
 
     def _formula_card_refs(self, limit: int = 5) -> list[str]:
         refs: list[str] = []
@@ -1508,6 +1512,37 @@ def _evidence_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     return result
 
 
+def _with_source_quote_ids(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Give exact source rows stable IDs so the model need not recopy text.
+
+    Audited paper-card wording is useful as a bilingual semantic bridge, but it
+    is not the underlying source quotation. Only passage, claim, and formula
+    evidence rows receive IDs that can satisfy the verbatim-quote gate.
+    """
+
+    result: list[dict[str, str]] = []
+    source_index = 0
+    for row in rows:
+        item = dict(row)
+        source = _clean(item.get("source"))
+        if source and not source.startswith("paper_card") and source != "paper_card":
+            source_index += 1
+            item["quote_id"] = f"source_quote_{source_index:03d}"
+        result.append(item)
+    return result
+
+
+def _source_quotes_by_id(rows: list[dict[str, str]]) -> dict[str, tuple[str, str]]:
+    result: dict[str, tuple[str, str]] = {}
+    for row in rows:
+        quote_id = _clean(row.get("quote_id"))
+        ref = _clean(row.get("evidence_ref"))
+        text = _clean(row.get("text"))
+        if quote_id and ref and text:
+            result[quote_id] = (ref, text)
+    return result
+
+
 def _claim_support_text_by_ref(rows: list[dict[str, str]]) -> dict[str, list[str]]:
     """Add audited paper-card wording as a bilingual claim-validation bridge.
 
@@ -1532,6 +1567,7 @@ def _validate_grounded_claim(
     allowed: set[str],
     evidence_by_ref: dict[str, list[str]],
     support_text_by_ref: dict[str, list[str]] | None = None,
+    source_quotes_by_id: dict[str, tuple[str, str]] | None = None,
 ) -> tuple[GroundedClaim | None, str]:
     if not isinstance(value, dict):
         return None, "claim_not_object"
@@ -1559,15 +1595,33 @@ def _validate_grounded_claim(
         if not isinstance(raw_quote, dict):
             continue
         ref = _clean(raw_quote.get("evidence_ref"))
+        quote_id = _clean(raw_quote.get("quote_id"))
         quote = _clean(raw_quote.get("quote"))
-        if ref not in refs or not quote:
+        if ref not in refs:
+            continue
+        source_quote = (source_quotes_by_id or {}).get(quote_id)
+        if source_quote is not None and source_quote[0] == ref:
+            quoted_refs.add(ref)
+            continue
+        if not quote:
             continue
         if _quote_matches_evidence(quote, evidence_by_ref.get(ref, [])):
+            quoted_refs.add(ref)
+    # Some providers still paraphrase or omit the requested quote_id. Resolve
+    # that formatting error locally only when an exact server-held source row
+    # exists for the ref and the claim independently passes the same audited
+    # content gate for that ref. This avoids a second slow LLM call without
+    # accepting the model's altered quotation as evidence.
+    support_rows = support_text_by_ref or evidence_by_ref
+    source_refs = {source_ref for source_ref, _text in (source_quotes_by_id or {}).values()}
+    for ref in set(refs) - quoted_refs:
+        ref_support = " ".join(support_rows.get(ref, evidence_by_ref.get(ref, [])))
+        supported, _reason = _claim_content_supported(text, evidence_text=ref_support, claim_type=claim_type)
+        if ref in source_refs and supported:
             quoted_refs.add(ref)
     if quoted_refs != set(refs):
         return None, "supporting_quote_not_verbatim"
 
-    support_rows = support_text_by_ref or evidence_by_ref
     evidence_text = " ".join(text for ref in refs for text in support_rows.get(ref, evidence_by_ref[ref]))
     supported, reason = _claim_content_supported(text, evidence_text=evidence_text, claim_type=claim_type)
     if not supported:
