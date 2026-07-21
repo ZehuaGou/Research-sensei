@@ -6,6 +6,7 @@ import logging
 import os
 import re
 import threading
+import unicodedata
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -606,7 +607,7 @@ class M4InteractionService:
             return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的论文证据引用。")
 
         allowed = set(allowed_evidence_refs)
-        evidence_rows = self._llm_context(allowed)
+        evidence_rows = self._llm_context(allowed, query=f"{question} {selected_text}".strip())
         if not evidence_rows:
             return _llm_error_result("M4_CONTEXT_MISSING", "没有可传给 M4 的可验证论文证据。")
         evidence_by_ref = _evidence_text_by_ref(evidence_rows)
@@ -941,7 +942,7 @@ class M4InteractionService:
                 break
         return rows
 
-    def _llm_context(self, allowed_refs: set[str]) -> list[dict[str, str]]:
+    def _llm_context(self, allowed_refs: set[str], *, query: str = "") -> list[dict[str, str]]:
         rows: list[dict[str, str]] = []
         paper_card = _as_dict(self.artifacts.get("paper_card"))
         for field, claim in _paper_claims(paper_card):
@@ -949,20 +950,10 @@ class M4InteractionService:
             text = _claim_text(claim)
             if ref in allowed_refs and text:
                 rows.append({"source": f"paper_card.{field}", "evidence_ref": ref, "text": _compact_user_text(text, max_chars=900)})
-        for candidate in self._evidence_candidates():
-            ref = _clean(candidate.get("evidence_ref"))
-            if ref not in allowed_refs:
-                continue
-            text = _clean(candidate.get("claim_text")) or _clean(candidate.get("quote_or_summary")) or _clean(candidate.get("text"))
-            if text:
-                rows.append({
-                    "source": _clean(candidate.get("artifact_source")) or "claim_evidence",
-                    "evidence_ref": ref,
-                    "text": _compact_user_text(text, max_chars=900),
-                })
         formulas = _as_dict(self.artifacts.get("formula_cards")).get("formula_cards", [])
         if not isinstance(formulas, list):
             formulas = []
+        formula_rows: list[dict[str, str]] = []
         for formula in formulas:
             if not isinstance(formula, dict):
                 continue
@@ -971,13 +962,42 @@ class M4InteractionService:
                 continue
             text = _formula_context_text(formula)
             if text:
-                rows.append({"source": "formula_cards", "evidence_ref": ref, "text": _compact_user_text(text, max_chars=900)})
+                formula_rows.append({"source": "formula_cards", "evidence_ref": ref, "text": _compact_user_text(text, max_chars=900)})
+        formula_first = _should_include_formula_context(query, "")
+        if formula_first:
+            # Formula questions must not lose their exact source expression
+            # merely because several prose passages share one evidence ref.
+            rows.extend(formula_rows)
+        ranked_candidates = (
+            self._ranked_evidence_candidates(query)
+            if query
+            else [(candidate, 0.0) for candidate in self._evidence_candidates()]
+        )
+        for candidate, _score in ranked_candidates:
+            ref = _clean(candidate.get("evidence_ref"))
+            if ref not in allowed_refs:
+                continue
+            text = _clean(candidate.get("claim_text")) or _clean(candidate.get("quote_or_summary")) or _clean(candidate.get("text"))
+            if text:
+                rows.append({
+                    "source": _clean(candidate.get("artifact_source")) or "claim_evidence",
+                    "evidence_ref": ref,
+                    "text": _focused_evidence_excerpt(text, query=query, max_chars=900),
+                    "passage_id": _clean(candidate.get("passage_id")),
+                })
+        if not formula_first:
+            rows.extend(formula_rows)
         unique_rows: list[dict[str, str]] = []
         seen: set[tuple[str, str]] = set()
         for row in rows:
-            key = (row["source"], row["evidence_ref"])
+            passage_id = _clean(row.get("passage_id"))
+            key = (
+                "passage" if passage_id else row["source"],
+                passage_id or f"{row['evidence_ref']}:{_quote_key(row['text'])}",
+            )
             if key in seen:
                 continue
+            row.pop("passage_id", None)
             unique_rows.append(row)
             seen.add(key)
             if len(unique_rows) >= 8:
@@ -1039,12 +1059,31 @@ class M4InteractionService:
                     score += 0.04
             if normalized_query and normalized_query in _normalize(haystack):
                 score += 0.35
+            if _is_list_question(query):
+                # A generic "list of" may be an author list or bibliography.
+                # Reward list wording only when it is tied to traits.
+                if (
+                    "traits included" in haystack_lower
+                    or re.search(r"list of.{0,80}\btraits?\b", haystack_lower, flags=re.DOTALL)
+                    or re.search(r"\btraits?\s+(?:include|includes|included)\b", haystack_lower)
+                ):
+                    score += 0.7
+                elif "available traits" in haystack_lower:
+                    score += 0.3
+                if haystack_lower.count("trait") >= 4 or haystack_lower.count("phenotype") >= 4:
+                    score += 0.12
             section = _clean(candidate.get("section")).lower()
             if any(marker in section for marker in ["front", "title", "author"]):
                 score -= 0.35
             if _clean(candidate.get("claim_type")).upper() in {"METHOD", "RESULT", "FINDING"}:
                 score += 0.08
-            ranked.append((candidate, max(0.0, min(0.99, score))))
+            if _clean(candidate.get("artifact_source")) == "passage_index":
+                score += 0.1
+            # Keep the raw score for ordering. Capping every strong match at
+            # 0.99 erased the list-specific bonus and restored artifact order,
+            # which could put an abstract ahead of the passage containing the
+            # requested list.
+            ranked.append((candidate, max(0.0, score)))
         ranked.sort(key=lambda item: item[1], reverse=True)
         return ranked
 
@@ -1697,6 +1736,29 @@ _STRICT_GROUNDING_CONCEPTS = {
 }
 
 
+_TRAIT_NAME_ALIASES: dict[str, tuple[str, ...]] = {
+    "aspect ratio": ("aspect ratio", "长宽比"),
+    "average width of roots": ("average width of roots", "average root width", "平均根宽", "根平均宽度"),
+    "bushiness": ("bushiness", "灌木状", "丛生度", "茂密度"),
+    "convex area": ("convex area", "凸面积", "凸包面积"),
+    "network depth": ("network depth", "网络深度"),
+    "network length distribution": ("network length distribution", "网络长度分布"),
+    "major ellipse axis": ("major ellipse axis", "长轴", "椭圆长轴", "主椭圆轴"),
+    "maximum number of roots": ("maximum number of roots", "最大根数", "最大根数量"),
+    "maximum width of root system": ("maximum width of root system", "根系统最大宽度", "根系最大宽度"),
+    "median number of roots": ("median number of roots", "中位数根数", "根数中位数"),
+    "minimum ellipse axis": ("minimum ellipse axis", "短轴", "椭圆短轴", "最小椭圆轴"),
+    "network area": ("network area", "网络面积"),
+    "network length": ("network length", "网络长度"),
+    "network solidity": ("network solidity", "网络坚固度", "网络实心度", "网络致密度"),
+    "network surface area": ("network surface area", "网络表面积"),
+    "network volume": ("network volume", "网络体积"),
+    "network width to depth ratio": ("network width to depth ratio", "网络宽深比", "网络宽度深度比"),
+    "perimeter": ("perimeter", "周长"),
+    "specific root length": ("specific root length", "比根长"),
+}
+
+
 def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) -> tuple[bool, str]:
     claim_key = _grounding_key(text)
     evidence_key = _grounding_key(evidence_text)
@@ -1717,6 +1779,10 @@ def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) 
     if _has_math_or_threshold_rule(text) and not _has_math_or_threshold_rule(evidence_text):
         return False, "unsupported_formula_or_threshold"
 
+    trait_list_support = _trait_list_claim_supported(text, evidence_text=evidence_text)
+    if trait_list_support is not None:
+        return trait_list_support
+
     matched_concepts = claim_concepts & evidence_concepts
     if claim_concepts:
         required = min(2, len(claim_concepts))
@@ -1730,6 +1796,61 @@ def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) 
     if len(overlap) >= 2 and len(overlap) / max(len(claim_terms), 1) >= 0.3:
         return True, ""
     return False, "insufficient_lexical_support"
+
+
+def _trait_list_claim_supported(text: str, *, evidence_text: str) -> tuple[bool, str] | None:
+    """Validate a translated trait list item by item against the source list."""
+
+    match = re.search(r"(?:包括|如下|包含)\s*[:：]?\s*(.+?)(?:[。；;]|$)", text, flags=re.DOTALL)
+    if match is None:
+        return None
+    raw_list = match.group(1).replace("以及", "、")
+    raw_list = re.sub(r"(?<=\S)和(?=\S)", "、", raw_list)
+    items = [item.strip(" \t\r\n、,，:：") for item in re.split(r"[、,，]", raw_list)]
+    items = [item for item in items if item]
+    if len(items) < 3:
+        return None
+
+    resolved_traits = [_canonical_trait_name(item) for item in items]
+    # This validator is intentionally domain-scoped. Other papers can contain
+    # perfectly valid non-RSA lists and must continue through the generic gate.
+    if sum(bool(canonical) for canonical in resolved_traits) < 2:
+        return None
+    if any(not canonical for canonical in resolved_traits):
+        return False, "unsupported_trait_item"
+    claim_traits = [canonical for canonical in resolved_traits if canonical]
+    if len(set(claim_traits)) != len(claim_traits):
+        return False, "duplicate_trait_item"
+
+    normalized_evidence = _normalized_trait_text(evidence_text)
+    missing = [
+        canonical
+        for canonical in claim_traits
+        if not any(
+            _normalized_trait_text(alias) in normalized_evidence
+            for alias in _TRAIT_NAME_ALIASES[canonical]
+            if re.search(r"[a-z]", alias, flags=re.IGNORECASE)
+        )
+    ]
+    if missing:
+        return False, f"unsupported_trait_item:{missing[0]}"
+    return True, ""
+
+
+def _canonical_trait_name(value: str) -> str:
+    normalized = _normalized_trait_text(value)
+    for canonical, aliases in _TRAIT_NAME_ALIASES.items():
+        for alias in aliases:
+            normalized_alias = _normalized_trait_text(alias)
+            if normalized == normalized_alias or normalized_alias in normalized:
+                return canonical
+    return ""
+
+
+def _normalized_trait_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", _clean(value)).casefold()
+    normalized = re.sub(r"(?<=\w)-\s+(?=\w)", "", normalized)
+    return re.sub(r"\s+", " ", normalized).strip()
 
 
 def _grounding_key(value: str) -> str:
@@ -2995,6 +3116,13 @@ def _expanded_query_terms(value: str) -> set[str]:
         "解决": {"solve", "address"},
         "有效": {"effective", "work", "useful"},
         "公式": {"formula", "equation", "symbol"},
+        "性状": {"trait", "traits", "phenotype", "phenotypes"},
+        "表型": {"trait", "traits", "phenotype", "phenotypes"},
+        "根系": {"root", "roots", "rsa"},
+        "软件": {"software", "tool"},
+        "哪些": {"list", "include", "included", "following", "available"},
+        "列举": {"list", "include", "included", "following"},
+        "包括": {"include", "included", "following"},
     }
     for marker, mapped_terms in expansions.items():
         if marker in text:
@@ -3011,10 +3139,80 @@ def _expanded_query_terms(value: str) -> set[str]:
         "benchmark": {"实验", "结果"},
         "limitation": {"局限"},
         "formula": {"公式"},
+        "trait": {"性状", "表型"},
+        "traits": {"性状", "表型"},
+        "phenotype": {"性状", "表型"},
+        "phenotypes": {"性状", "表型"},
+        "root": {"根系"},
+        "roots": {"根系"},
+        "list": {"哪些", "列举"},
+        "include": {"包括", "哪些"},
     }
     for token in list(terms):
         terms.update(reverse.get(token, set()))
     return terms
+
+
+def _is_list_question(value: str) -> bool:
+    text = _clean(value).lower()
+    return any(
+        marker in text
+        for marker in (
+            "哪些",
+            "列举",
+            "列表",
+            "包括什么",
+            "包括哪些",
+            "what traits",
+            "which traits",
+            "list the",
+            "what are the",
+        )
+    )
+
+
+def _focused_evidence_excerpt(value: str, *, query: str, max_chars: int) -> str:
+    """Return the query-relevant window instead of always truncating the start."""
+
+    text = _clean(value)
+    if len(text) <= max_chars:
+        return text
+    lowered = text.lower()
+    anchor = -1
+    if _is_list_question(query):
+        for marker in (
+            "include the following",
+            "list of",
+            "traits included",
+            "available traits",
+            "provided traits",
+        ):
+            position = lowered.find(marker)
+            if position >= 0:
+                anchor = position
+                break
+    if anchor < 0:
+        for term in sorted(_expanded_query_terms(query), key=len, reverse=True):
+            if len(term) < 4:
+                continue
+            position = lowered.find(term.lower())
+            if position >= 0:
+                anchor = position
+                break
+    if anchor < 0:
+        return _compact_user_text(text, max_chars=max_chars)
+    start = max(0, anchor - min(140, max_chars // 5))
+    end = min(len(text), start + max_chars)
+    if start:
+        boundary = text.find(" ", start)
+        if 0 <= boundary < anchor:
+            start = boundary + 1
+            end = min(len(text), start + max_chars)
+    if end < len(text):
+        boundary = text.rfind(" ", start, end)
+        if boundary > start:
+            end = boundary
+    return _compact_user_text(text[start:end], max_chars=max_chars)
 
 
 def _normalize(value: str) -> str:

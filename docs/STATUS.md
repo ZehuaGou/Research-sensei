@@ -693,6 +693,28 @@ suite.
   the answer. Targeted M4/memory tests reported `40 passed`; full backend tests
   reported `818 passed, 15 skipped`; Ruff and mypy passed.
 
+### M4 detailed-list retrieval regression (2026-07-21)
+
+- The GiA Roots PDF already contained the complete list of 19 RSA traits, but
+  several overlapping passages shared the same evidence refs. M4 kept the
+  earlier abstract passage, discarded the later trait-selection passage during
+  deduplication, and then rejected the model's generic answer.
+- M4 now ranks source passages for list questions, deduplicates by passage
+  identity instead of only by evidence ref, and extracts a query-focused window
+  from long passages. Generic phrases such as an author "list of" do not outrank
+  a phrase that explicitly lists traits.
+- Chinese list answers are validated item by item against an explicit bilingual
+  RSA-trait alias table. The real 19-item translation passes only because every
+  item occurs in the source list; a regression claim that adds chlorophyll
+  concentration is rejected as `unsupported_trait_item`. Number, dataset,
+  formula, threshold, exact-source, and evidence-ref gates remain unchanged.
+- A live API request and an in-app browser retry of
+  `GiA Roots软件具体提供了哪些根系结构性状？` returned `SUCCESS`, one supported
+  claim, evidence ref `941a6709af95:b002`, all 19 traits, and no warnings. The
+  M4 panel displayed `当前论文 · 1 条已验证证据` with the complete list.
+- Verification: M4 API tests reported `34 passed`; full backend tests reported
+  `819 passed, 15 skipped`; Ruff and mypy passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not

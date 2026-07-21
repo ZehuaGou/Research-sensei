@@ -696,6 +696,86 @@ def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -
     assert "front_matter" not in prompt_text
 
 
+def test_m4_list_question_retrieves_late_detail_window_for_shared_evidence_ref(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "m4_trait_list")
+    passage_path = artifact_dir / "passage_index.json"
+    passage_index = json.loads(passage_path.read_text(encoding="utf-8"))
+    passage_index["passages"].append({
+        "passage_id": "p2",
+        "text": (
+            ("Earlier implementation details do not enumerate measurements. " * 25)
+            + "Trait selection lets users choose from a list of established RSA traits. "
+            + "The traits include the following: aspect ratio, average root width, "
+            + "network depth, network volume, and specific root length."
+        ),
+        "section": "method",
+        "evidence_refs": ["paper:b001"],
+    })
+    _write_json(passage_path, passage_index)
+    llm = ScriptedM4LLM(
+        claims=[{
+            "text": "软件提供的根系结构性状包括：长宽比、平均根宽、网络深度、网络体积和比根长。",
+            "claim_type": "paper_claim",
+            "evidence_refs": ["paper:b001"],
+            "supporting_quotes": [{
+                "evidence_ref": "paper:b001",
+                "quote_id": "source_quote_001",
+                "quote": "",
+            }],
+            "uncertainty": "",
+        }]
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这个软件具体提供了哪些根系结构性状？"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "SUCCESS"
+    assert "网络体积" in response.json()["answer"]
+    prompt = json.loads(llm.messages[-1][1].content)
+    source_rows = [
+        row
+        for row in prompt["context"]["retrieved_evidence"]
+        if row.get("source") == "passage_index"
+    ]
+    list_rows = [row for row in source_rows if "aspect ratio" in row["text"]]
+    assert len(list_rows) == 1
+    assert "network depth" in list_rows[0]["text"]
+    assert "network volume" in list_rows[0]["text"]
+    assert "specific root length" in list_rows[0]["text"]
+    assert list_rows[0]["quote_id"].startswith("source_quote_")
+    assert len(list_rows[0]["text"]) <= 900
+
+    llm.claims = [{
+        "text": "软件提供的根系结构性状包括：长宽比、平均根宽、网络深度、网络体积和叶绿素浓度。",
+        "claim_type": "paper_claim",
+        "evidence_refs": ["paper:b001"],
+        "supporting_quotes": [{
+            "evidence_ref": "paper:b001",
+            "quote_id": "source_quote_001",
+            "quote": "",
+        }],
+        "uncertainty": "",
+    }]
+    unsupported = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这个软件具体提供了哪些根系结构性状？"},
+    )
+    assert unsupported.status_code == 200
+    assert unsupported.json()["status"] == "DEGRADED"
+    assert unsupported.json()["warnings"][0]["detail"] == "unsupported_trait_item"
+
+
 def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     client = TestClient(
