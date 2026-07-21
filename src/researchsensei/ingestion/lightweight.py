@@ -51,6 +51,28 @@ LATEX_TOKEN_PATTERN = re.compile(
 )
 
 
+def _is_plausible_raw_formula(candidate: str) -> bool:
+    """Reject prose assignments before they become formula evidence.
+
+    PDF text extraction frequently flattens table labels and sentences into
+    fragments such as ``lines = parent root`` or ``d = B)``. An equals sign is
+    not sufficient evidence of a formula. Conservative raw-text detection
+    requires mathematical structure and balanced delimiters; true visual
+    formulas are recovered by the formula-region parser instead.
+    """
+    text = " ".join(candidate.split()).strip()
+    if not text or len(text) > 240 or "=" not in text:
+        return False
+    _left, right = text.split("=", 1)
+    if not right.strip():
+        return False
+    for opening, closing in (("(", ")"), ("[", "]"), ("{", "}")):
+        if text.count(opening) != text.count(closing):
+            return False
+    math_symbols = "_+*/^<>≤≥∑Σ∫√\\()[]{}"
+    return any(char.isdigit() or char in math_symbols for char in right)
+
+
 class LightweightIngestionService:
     def ingest_path(
         self,
@@ -293,7 +315,7 @@ class LightweightIngestionService:
             if not paragraph:
                 return
             formula_match = FORMULA_PATTERN.search(paragraph)
-            if formula_match:
+            if formula_match and _is_plausible_raw_formula(formula_match.group("formula")):
                 formula_count += 1
                 block_id = f"eq{formula_count:03d}"
                 formula_text = formula_match.group("formula").strip()

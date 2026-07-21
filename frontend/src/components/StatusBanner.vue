@@ -38,7 +38,15 @@ const tone = computed(() => {
   return 'neutral'
 })
 const message = computed(() => {
-  if (props.status === 'SUCCESS') return '可以阅读论文卡片、解释公式，并继续向 M4 追问。'
+  if (props.status === 'SUCCESS') {
+    if (
+      props.componentStatus?.formula_cards === 'SKIPPED'
+      || props.paperWorkspaceStatus?.formula_origin === 'not_applicable'
+    ) {
+      return '可以阅读论文卡片并继续向 M4 追问；本文未检测到可验证公式，因此没有生成公式卡片。'
+    }
+    return '可以阅读论文卡片、解释公式，并继续向 M4 追问。'
+  }
   if (props.status === 'BASELINE_ONLY') return reasonText.NO_LLM_CLIENT
   if (props.status === 'BLOCKED_UNDERSTANDING') return reasonText[props.blockingReason || ''] || props.blockingReason || '当前结果不能展示给用户。'
   if (props.status === 'DEGRADED_STRUCTURAL') return reasonText[props.blockingReason || ''] || '部分组件缺失。'
@@ -95,6 +103,7 @@ function readableKey(value: unknown) {
     SKIPPED: '已跳过',
     BASELINE: '基础解析',
     not_available: '未提供',
+    not_applicable: '本文无可验证公式',
     not_required: '无需 OCR',
     source_latex: '论文 LaTeX',
     mineru_latex: 'MinerU LaTeX',

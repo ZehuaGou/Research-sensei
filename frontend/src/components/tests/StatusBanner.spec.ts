@@ -118,6 +118,20 @@ describe('StatusBanner', () => {
     expect(wrapper.text()).toContain('理解完成')
   })
 
+  it('explains successful formula skip without implying formulas exist', () => {
+    const wrapper = mount(StatusBanner, {
+      props: {
+        status: 'SUCCESS',
+        paperWorkspaceStatus: { formula_origin: 'not_applicable' },
+        componentStatus: { formula_cards: 'SKIPPED' },
+      },
+    })
+
+    expect(wrapper.text()).toContain('本文未检测到可验证公式')
+    expect(wrapper.text()).toContain('本文无可验证公式')
+    expect(wrapper.text()).not.toContain('解释公式')
+  })
+
   it('renders nothing for unknown status', () => {
     const wrapper = mount(StatusBanner, {
       props: { status: 'UNKNOWN' },

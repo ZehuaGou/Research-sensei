@@ -80,6 +80,20 @@ We minimize L = L_rec + lambda L_graph to model sensor dependencies.
     assert formula_items[0].formula_ocr_status == "not_available"
 
 
+def test_prose_assignments_are_not_promoted_to_formula_evidence(tmp_path: Path) -> None:
+    path = tmp_path / "root-toolbox.txt"
+    path.write_text(
+        "Topology labels define lines = parent root relationships.\n\n"
+        "A broken table fragment is rendered as d = B) in extracted text.",
+        encoding="utf-8",
+    )
+
+    doc = LightweightIngestionService().ingest_path(path, paper_id="root-toolbox")
+
+    assert not [block for block in doc.blocks if block.type == BlockType.FORMULA]
+    assert any(warning.code == "FORMULA_UNAVAILABLE" for warning in doc.warnings)
+
+
 def test_latex_source_preserves_sections_and_source_latex_formula_origin(tmp_path: Path) -> None:
     path = tmp_path / "paper.tex"
     path.write_text(

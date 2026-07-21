@@ -651,6 +651,28 @@ suite.
 | ccswitch full M1-to-M4 chain | `NOT_LIVE_VERIFIED` | Only the bounded provider connection was proven; no complete live acquisition, M2 card, and M4 answer chain was accepted. |
 | 12-query acquisition matrix | `LIVE_ATTEMPT_FAILED` | `.venv\Scripts\python scripts/run_main_chain_matrix.py --skip-llm --use-cache --query-timeout-seconds 90 --max-failures 0` completed 12 rows in 992.7s: 0 passed, 0 degraded, 0 blocked, 12 failed; cache hits were 0 because the six-hour cache TTL had expired. |
 
+### Root-system paper formula false-positive regression (2026-07-21)
+
+- The PDF text parser previously promoted prose/table fragments such as
+  `lines = parent root` and malformed `d = B)` into raw formula evidence. The
+  raw-text admission rule now requires balanced delimiters plus an actual
+  mathematical signal on the right-hand side of the assignment. Visual
+  numbered equations continue through the MinerU crop parser; the rule does not
+  replace trusted formula OCR with an LLM guess.
+- Direct ingestion of the 999,493-byte source PDF for *A Novel Image-Analysis
+  Toolbox Enabling Quantitative Analysis of Root System Architecture* returned
+  `pymupdf_formula_prescreen`, `degraded=false`, and zero formula blocks.
+- The first end-to-end reparse correctly skipped formula cards but the ccswitch
+  upstream returned a transient HTTP 502 while building the paper card. A
+  bounded live settings probe then returned `ok=true`, and reparse job
+  `bc2db4cfd0ce` completed with `understanding_status=SUCCESS`,
+  `paper_card=SUCCESS`, `formula_cards=SKIPPED`, `teaching_cards=SUCCESS`,
+  `llm=SUCCESS`, and zero formula cards. The frontend now explains this valid
+  no-formula state instead of saying that formulas can be explained.
+- Verification: targeted backend ingestion tests `16 passed`; full backend
+  suite `815 passed, 15 skipped`; Ruff and mypy passed; frontend StatusBanner
+  tests `10 passed`; full frontend suite `89 passed`; production build passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not
