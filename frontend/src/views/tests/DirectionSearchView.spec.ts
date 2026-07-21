@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import DirectionSearchView from '../DirectionSearchView.vue'
+import { researchApi } from '../../api/client'
 
 const routerPush = vi.hoisted(() => vi.fn())
 const routeState = vi.hoisted(() => ({ query: {} as Record<string, any> }))
@@ -324,6 +325,73 @@ describe('DirectionSearchView', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/directions/jobs/deep_read')
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).candidate.arxiv_id).toBe('2401.00001')
     expect(routerPush).toHaveBeenCalledWith('/learn/job-123')
+  })
+
+  it('shows formula batch progress while deep read is running', async () => {
+    mockFetch(directionResponse())
+    let finishDeepRead!: (value: { job_id: string }) => void
+    const deepReadResult = new Promise<{ job_id: string }>((resolve) => {
+      finishDeepRead = resolve
+    })
+    vi.spyOn(researchApi, 'deepReadAsync').mockImplementation(async (_candidate, onProgress) => {
+      onProgress?.({
+        job_id: 'task-deep',
+        task_id: 'task-deep',
+        kind: 'direction_deep_read',
+        status: 'RUNNING',
+        stage: 'building_formula_cards:3/11',
+        progress: 61,
+        result: { job_id: '' },
+        error_type: '',
+        error: '',
+        cancel_requested: false,
+        created_at: '',
+        updated_at: '',
+      })
+      return deepReadResult as any
+    })
+
+    const wrapper = mount(DirectionSearchView)
+    await wrapper.get('[data-testid="direction-query"]').setValue('time series anomaly detection')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    await wrapper.get('[data-testid="deep-read-button"]').trigger('click')
+    await flushPromises()
+
+    const progress = wrapper.get('[data-testid="deep-read-progress"]')
+    expect(progress.text()).toContain('正在生成公式卡片（3/11 批）')
+    expect(progress.text()).toContain('61%')
+    expect(window.localStorage.getItem('researchsensei.directionDeepRead.activeTaskId')).toBe('task-deep')
+
+    finishDeepRead({ job_id: 'job-progress' })
+    await flushPromises()
+    expect(routerPush).toHaveBeenCalledWith('/learn/job-progress')
+    expect(window.localStorage.getItem('researchsensei.directionDeepRead.activeTaskId')).toBeNull()
+  })
+
+  it('resumes a persisted deep-read task after reload', async () => {
+    window.localStorage.setItem('researchsensei.directionDeepRead.activeTaskId', 'task-deep-recover')
+    const fetchMock = mockFetch({
+      job_id: 'task-deep-recover',
+      task_id: 'task-deep-recover',
+      kind: 'direction_deep_read',
+      status: 'SUCCEEDED',
+      stage: 'completed',
+      progress: 100,
+      result: { job_id: 'paper-recovered' },
+      error_type: '',
+      error: '',
+      cancel_requested: false,
+      created_at: '',
+      updated_at: '',
+    })
+
+    mount(DirectionSearchView)
+    await flushPromises()
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/directions/jobs/task-deep-recover')
+    expect(routerPush).toHaveBeenCalledWith('/learn/paper-recovered')
+    expect(window.localStorage.getItem('researchsensei.directionDeepRead.activeTaskId')).toBeNull()
   })
 
   it('can hand off a DOI-only candidate without sending a non-arXiv landing URL as arxiv_url', async () => {

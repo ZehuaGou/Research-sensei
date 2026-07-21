@@ -20,6 +20,7 @@ import {
   normalizePaperCard,
   normalizePaperSkeleton,
 } from '../utils/workspaceCards'
+import { formatTaskStage } from '../utils/taskStage'
 
 const route = useRoute()
 const router = useRouter()
@@ -309,7 +310,7 @@ onBeforeUnmount(() => {
           </div>
           <div v-if="workspace.canShowCards.value" class="reader-actions">
             <button type="button" class="secondary-btn" :disabled="workspace.isReparsing.value" @click="reparseCurrentPaper">
-              {{ workspace.isReparsing.value ? `重新解析 ${workspace.reparseProgress.value}% ${workspace.reparseStage.value}` : '重新解析' }}
+              {{ workspace.isReparsing.value ? `重新解析 ${workspace.reparseProgress.value}% · ${formatTaskStage(workspace.reparseStage.value)}` : '重新解析' }}
             </button>
             <button
               v-if="!isAskPanelOpen"

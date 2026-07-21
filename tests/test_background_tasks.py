@@ -40,6 +40,29 @@ def test_persistent_task_records_progress_and_result(tmp_path: Path) -> None:
     service.close()
 
 
+def test_persistent_task_progress_never_moves_backwards(tmp_path: Path) -> None:
+    service = PersistentTaskService(tmp_path / "tasks.sqlite3", max_workers=1)
+    reported = threading.Event()
+    release = threading.Event()
+
+    def operation(progress, _cancel):
+        progress("formula_cards_ready", 84)
+        progress("paper_card_ready", 66)
+        reported.set()
+        assert release.wait(timeout=1.0)
+        return {}
+
+    task = service.submit("deep_read", {}, operation)
+    assert reported.wait(timeout=1.0)
+    running = service.get(str(task["task_id"]))
+    release.set()
+    _wait(service, str(task["task_id"]))
+
+    assert running["stage"] == "paper_card_ready"
+    assert running["progress"] == 84
+    service.close()
+
+
 def test_persistent_task_has_machine_readable_failure(tmp_path: Path) -> None:
     service = PersistentTaskService(tmp_path / "tasks.sqlite3", max_workers=1)
 

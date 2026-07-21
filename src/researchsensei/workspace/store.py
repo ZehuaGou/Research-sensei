@@ -27,10 +27,15 @@ class WorkspaceStore:
     def write_json(self, path: str | Path, value: object) -> Path:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            json.dumps(to_plain_data(value), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+        try:
+            temporary.write_text(
+                json.dumps(to_plain_data(value), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            temporary.replace(target)
+        finally:
+            temporary.unlink(missing_ok=True)
         return target
 
     def write_text(self, path: str | Path, value: str) -> Path:

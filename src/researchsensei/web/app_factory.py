@@ -283,8 +283,7 @@ def create_app(
         )
     )
 
-    @app.post("/api/v1/documents/parse")
-    async def parse_document(
+    async def _parse_document(
         file: UploadFile | None = File(None),
         title: str = Form(""),
         doi: str = Form(""),
@@ -293,7 +292,10 @@ def create_app(
         arxiv_id: str = Form(""),
         arxiv_url: str = Form(""),
         force: bool = Form(False),
+        progress: Callable[[str, int], None] | None = None,
     ) -> dict[str, object]:
+        report = progress or (lambda _stage, _value: None)
+        report("resolving_source", 5)
         job_id = uuid.uuid4().hex[:12]
         if file is not None and file.filename:
             upload_service = UploadService(
@@ -330,6 +332,7 @@ def create_app(
                     source_status=source_status,
                     source_identity=source_identity,
                     title_hint=title,
+                    progress=report,
                 )
                 return _job_parse_response(job)
             finally:
@@ -424,8 +427,31 @@ def create_app(
             source_status=source_status,
             source_identity=source_identity,
             title_hint=title,
+            progress=report,
         )
         return _job_parse_response(job)
+
+    @app.post("/api/v1/documents/parse")
+    async def parse_document(
+        file: UploadFile | None = File(None),
+        title: str = Form(""),
+        doi: str = Form(""),
+        local_path: str = Form(""),
+        pdf_url: str = Form(""),
+        arxiv_id: str = Form(""),
+        arxiv_url: str = Form(""),
+        force: bool = Form(False),
+    ) -> dict[str, object]:
+        return await _parse_document(
+            file=file,
+            title=title,
+            doi=doi,
+            local_path=local_path,
+            pdf_url=pdf_url,
+            arxiv_id=arxiv_id,
+            arxiv_url=arxiv_url,
+            force=force,
+        )
 
     @app.post("/api/v1/documents/jobs/parse", status_code=202)
     async def create_document_parse_job(
@@ -460,7 +486,6 @@ def create_app(
             if cancelled.is_set():
                 upload_service.cleanup(saved_upload)
                 return {}
-            progress("resolving_source", 10)
             background_upload: UploadFile | None = None
             upload_handle = None
             try:
@@ -472,7 +497,7 @@ def create_app(
                         headers=Headers({"content-type": saved_upload.content_type}),
                     )
                 result = asyncio.run(
-                    parse_document(
+                    _parse_document(
                         file=background_upload,
                         title=title,
                         doi=doi,
@@ -481,9 +506,9 @@ def create_app(
                         arxiv_id=arxiv_id,
                         arxiv_url=arxiv_url,
                         force=force,
+                        progress=progress,
                     )
                 )
-                progress("building_understanding", 90)
                 return result
             except HTTPException as error:
                 detail = error.detail
@@ -519,8 +544,12 @@ def create_app(
             upload_service.cleanup(saved_upload)
             raise
 
-    @app.post("/api/v1/jobs/{job_id}/reparse")
-    async def reparse_job(job_id: str) -> dict[str, object]:
+    async def _reparse_job(
+        job_id: str,
+        progress: Callable[[str, int], None] | None = None,
+    ) -> dict[str, object]:
+        report = progress or (lambda _stage, _value: None)
+        report("validating_source", 5)
         original = _get_job_or_404(jobs, job_id)
         source_path = Path(original.source_path)
         if not source_path.exists() or source_path.is_dir():
@@ -548,6 +577,7 @@ def create_app(
             source_status=source_status,
             source_identity=source_identity,
             title_hint=_job_title_hint(original),
+            progress=report,
         )
         return {
             **_job_parse_response(job),
@@ -555,6 +585,10 @@ def create_app(
             "handoff_status": "JOB_CREATED",
             "source_job_id": job_id,
         }
+
+    @app.post("/api/v1/jobs/{job_id}/reparse")
+    async def reparse_job(job_id: str) -> dict[str, object]:
+        return await _reparse_job(job_id)
 
     @app.post("/api/v1/documents/jobs/{job_id}/reparse", status_code=202)
     def create_document_reparse_job(job_id: str) -> dict[str, object]:
@@ -566,9 +600,8 @@ def create_app(
         ) -> dict[str, object]:
             if cancelled.is_set():
                 return {}
-            progress("validating_source", 10)
             try:
-                result = asyncio.run(reparse_job(job_id))
+                result = asyncio.run(_reparse_job(job_id, progress=progress))
             except HTTPException as error:
                 detail = error.detail
                 if isinstance(detail, dict):
@@ -582,7 +615,6 @@ def create_app(
                     error_type = f"HTTP_{error.status_code}"
                     message = str(detail)
                 raise TaskExecutionError(error_type, message) from error
-            progress("building_understanding", 90)
             return result
 
         return background_tasks.submit(

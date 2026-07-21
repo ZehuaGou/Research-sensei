@@ -39,6 +39,8 @@ test('uses persistent async direction jobs for search and deep-read handoff', as
   expect(taskState.synchronousCalls).toBe(0)
 
   await page.getByTestId('deep-read-button').click()
+  await expect(page.getByTestId('deep-read-progress')).toContainText('正在生成公式卡片（3/11 批）')
+  await expect(page.getByTestId('deep-read-progress')).toContainText('61%')
   await expect(page).toHaveURL(/\/learn\/fixture-deep-read$/)
   await expect(page.getByTestId('status-banner')).toContainText('仅基础解析')
   expect(taskState.deepReadCreates).toBe(1)

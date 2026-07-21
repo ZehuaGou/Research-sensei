@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import Callable
 
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.prompt_builder import PromptBuilder
@@ -42,6 +43,7 @@ async def build_formula_cards(
     evidence_pack: EvidencePack,
     skeleton: PaperSkeleton,
     llm_client: LLMClient,
+    progress: Callable[[int, int], None] | None = None,
 ) -> FormulaCardBundle:
     """Build formula cards using an evidence-constrained LLM path.
 
@@ -51,6 +53,8 @@ async def build_formula_cards(
     prompt_builder = PromptBuilder()
     formula_items = _formula_items(evidence_pack)
     if not formula_items:
+        if progress is not None:
+            progress(0, 0)
         return FormulaCardBundle(
             paper_id=skeleton.paper_id,
             formula_cards=[],
@@ -83,17 +87,29 @@ async def build_formula_cards(
         max(1, len(batches)),
     )
     semaphore = asyncio.Semaphore(concurrency)
+    completed_batches = 0
+    progress_lock = asyncio.Lock()
+
+    if progress is not None:
+        progress(0, len(batches))
 
     async def run_batch(batch: list[EvidencePackItem]) -> tuple[list[FormulaCardLLMOutput], list[str]]:
+        nonlocal completed_batches
         async with semaphore:
-            return await _build_formula_cards_batch(
-                llm_client,
-                prompt_builder,
-                skeleton,
-                evidence_pack.paper_id,
-                batch,
-                formula_config,
-            )
+            try:
+                return await _build_formula_cards_batch(
+                    llm_client,
+                    prompt_builder,
+                    skeleton,
+                    evidence_pack.paper_id,
+                    batch,
+                    formula_config,
+                )
+            finally:
+                async with progress_lock:
+                    completed_batches += 1
+                    if progress is not None:
+                        progress(completed_batches, len(batches))
 
     results = await asyncio.gather(*(run_batch(batch) for batch in batches))
     llm_cards: list[FormulaCardLLMOutput] = []

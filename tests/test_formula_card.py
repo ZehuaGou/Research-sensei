@@ -461,13 +461,22 @@ def test_anthropic_compatible_formula_cards_use_bounded_reasoning_batches(monkey
         ],
     )
 
-    bundle = asyncio.run(build_formula_cards(pack, _skeleton(), client))
+    progress: list[tuple[int, int]] = []
+    bundle = asyncio.run(
+        build_formula_cards(
+            pack,
+            _skeleton(),
+            client,
+            progress=lambda completed, total: progress.append((completed, total)),
+        )
+    )
 
     assert client.calls == 3
     assert client.batch_sizes == [3, 3, 1]
     assert all(config.max_tokens == 12_000 for config in client.configs)
     assert all(config.disable_thinking is True for config in client.configs)
     assert len(bundle.formula_cards) == 7
+    assert progress == [(0, 3), (1, 3), (2, 3), (3, 3)]
     assert not any("LLM_CARD_MISSING_FOR_FORMULA" in warning for warning in bundle.warnings)
 
 

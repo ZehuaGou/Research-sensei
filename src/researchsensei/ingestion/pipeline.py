@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 
 from researchsensei.audit.quality_auditor import QualityAuditor
@@ -48,6 +49,8 @@ from researchsensei.workspace import WorkspaceStore
 
 logger = logging.getLogger(__name__)
 
+ProgressCallback = Callable[[str, int], None]
+
 
 def _run_async_builder(coro):
     """Execute an async card builder from a sync context.
@@ -92,10 +95,13 @@ class SinglePaperIngestionRunner:
         source_status: SourceStatus | None = None,
         source_identity: str = "",
         title_hint: str = "",
+        progress: ProgressCallback | None = None,
     ) -> JobRecord:
+        report = progress or (lambda _stage, _value: None)
         source = Path(source_path)
         actual_job_id = job_id or source.stem
         run_dir = self.workspace.new_run_dir(actual_job_id)
+        report("preparing_source", 14)
         copied_source = run_dir / f"source{source.suffix.lower()}"
         if source.resolve() != copied_source.resolve():
             shutil.copy2(source, copied_source)
@@ -114,6 +120,12 @@ class SinglePaperIngestionRunner:
             return error.job
 
         try:
+            self.jobs.update(
+                actual_job_id,
+                status=JobStatus.RUNNING,
+                current_step="parsing_document",
+            )
+            report("parsing_document", 20)
             # Common preprocessing
             if self.parser_adapter is not None:
                 if not self.parser_adapter.supports(copied_source):
@@ -125,17 +137,36 @@ class SinglePaperIngestionRunner:
             else:
                 document = self.ingestion.ingest_path(copied_source, paper_id=actual_job_id)
             document = _apply_title_hint(document, title_hint)
+            report("indexing_evidence", 32)
             passage_index = build_passage_index(document)
             claim_evidence = build_claim_evidence(document, passage_index)
             evidence_index = build_evidence_index(document)
             paper_skeleton = build_paper_skeleton(document, evidence_index)
             evidence_pack: EvidencePack | None = None
             formula_evidence_pack: EvidencePack | None = None
+            structural_artifacts = self._write_structural_artifacts(
+                run_dir,
+                resolved_source_status,
+                document,
+                passage_index,
+                claim_evidence,
+                evidence_index,
+                paper_skeleton,
+            )
+            self.jobs.update(
+                actual_job_id,
+                current_step="evidence_ready",
+                artifacts=structural_artifacts,
+            )
 
             if self.llm_client is None:
                 # Baseline path
+                report("building_paper_card", 50)
                 paper_card = build_paper_card_baseline(paper_skeleton, evidence_index)
+                report("building_formula_cards", 58)
                 formula_cards = build_formula_cards_baseline(document, evidence_index, paper_skeleton)
+                report("formula_cards_ready", 84)
+                report("building_teaching_cards", 88)
                 teaching_cards = build_teaching_cards_baseline(paper_card, formula_cards, paper_skeleton, evidence_index)
                 understanding_status = _build_baseline_understanding_status(actual_job_id)
                 card_artifacts = {
@@ -145,6 +176,7 @@ class SinglePaperIngestionRunner:
                 }
             else:
                 # LLM card path
+                report("building_evidence_pack", 42)
                 evidence_pack = build_evidence_pack(claim_evidence, passage_index, EvidenceRetriever())
                 formula_claim_count = sum(
                     1 for claim in claim_evidence.claims
@@ -160,6 +192,22 @@ class SinglePaperIngestionRunner:
                     max_passage_chars=1600,
                 )
                 evidence_pack_summary = _build_evidence_pack_summary(evidence_pack, claim_evidence)
+                structural_artifacts = self._write_structural_artifacts(
+                    run_dir,
+                    resolved_source_status,
+                    document,
+                    passage_index,
+                    claim_evidence,
+                    evidence_index,
+                    paper_skeleton,
+                    evidence_pack=evidence_pack,
+                    formula_evidence_pack=formula_evidence_pack,
+                )
+                self.jobs.update(
+                    actual_job_id,
+                    current_step="evidence_ready",
+                    artifacts=structural_artifacts,
+                )
 
                 if not evidence_pack.items:
                     understanding_status = _build_blocked_status(
@@ -194,6 +242,7 @@ class SinglePaperIngestionRunner:
                         passage_index,
                         paper_skeleton,
                         evidence_pack_summary,
+                        progress=report,
                     )
 
         except Exception as exc:
@@ -207,6 +256,7 @@ class SinglePaperIngestionRunner:
             )
 
         # Audit: construct candidate ArtifactBundle and run QualityAuditor
+        report("auditing_understanding", 95)
         quality_report, understanding_status, card_artifacts = self._run_audit(
             actual_job_id,
             understanding_status,
@@ -218,6 +268,7 @@ class SinglePaperIngestionRunner:
         )
 
         # Write artifacts
+        report("writing_artifacts", 98)
         return self._write_artifacts(
             actual_job_id,
             run_dir,
@@ -310,6 +361,7 @@ class SinglePaperIngestionRunner:
         passage_index,
         paper_skeleton,
         evidence_pack_summary: EvidencePackSummary,
+        progress: ProgressCallback | None = None,
     ) -> tuple[dict, UnderstandingStatus]:
         """Execute LLM card builders and return card artifacts + status.
 
@@ -319,14 +371,28 @@ class SinglePaperIngestionRunner:
         """
         llm_client = self.llm_client
         assert llm_client is not None
+        report = progress or (lambda _stage, _value: None)
+
+        def formula_progress(completed: int, total: int) -> None:
+            if total <= 0:
+                report("building_formula_cards:0/0", 84)
+                return
+            value = 52 + round((completed / total) * 32)
+            report(f"building_formula_cards:{completed}/{total}", value)
 
         async def _run_all() -> tuple[dict, UnderstandingStatus]:
             # paper_card and formula_cards are independent — run in parallel
+            report("building_paper_card", 50)
             paper_task = asyncio.create_task(
                 build_paper_card(evidence_pack, paper_skeleton, llm_client)
             )
             formula_task = asyncio.create_task(
-                build_formula_cards(formula_evidence_pack, paper_skeleton, llm_client)
+                build_formula_cards(
+                    formula_evidence_pack,
+                    paper_skeleton,
+                    llm_client,
+                    progress=formula_progress,
+                )
             )
 
             paper_card: PaperCard | None = None
@@ -336,12 +402,14 @@ class SinglePaperIngestionRunner:
 
             try:
                 paper_card = await paper_task
+                report("paper_card_ready", 66)
             except Exception as exc:
                 paper_error = exc
                 logger.warning("paper_card failed: %s", exc)
 
             try:
                 formula_cards = await formula_task
+                report("formula_cards_ready", 84)
             except Exception as exc:
                 formula_error = exc
                 logger.warning("formula_cards failed: %s", exc)
@@ -377,7 +445,9 @@ class SinglePaperIngestionRunner:
 
             # Both succeeded — run teaching_cards
             try:
+                report("building_teaching_cards", 88)
                 teaching_cards = await build_teaching_cards(evidence_pack, paper_card, paper_skeleton, llm_client)  # type: ignore[arg-type]
+                report("teaching_cards_ready", 92)
             except Exception as exc:
                 logger.warning("teaching_cards failed: %s", exc)
                 return {}, _build_blocked_status(
@@ -420,6 +490,40 @@ class SinglePaperIngestionRunner:
             return card_artifacts, understanding_status
 
         return _run_async_builder(_run_all())
+
+    def _write_structural_artifacts(
+        self,
+        run_dir: Path,
+        resolved_source_status,
+        document,
+        passage_index,
+        claim_evidence,
+        evidence_index,
+        paper_skeleton,
+        *,
+        evidence_pack: EvidencePack | None = None,
+        formula_evidence_pack: EvidencePack | None = None,
+    ) -> list[WorkspaceArtifact]:
+        """Persist evidence artifacts before slow LLM work without exposing unaudited cards."""
+        values = [
+            ("source_status", "source_status.json", resolved_source_status),
+            ("ingestion", "parsed_document.json", document),
+            ("passage_index", "passage_index.json", passage_index),
+            ("claim_evidence", "claim_evidence.json", claim_evidence),
+            ("evidence_index", "evidence_index.json", evidence_index),
+            ("paper_skeleton", "paper_skeleton.json", paper_skeleton),
+        ]
+        if evidence_pack is not None:
+            values.append(("evidence_pack", "evidence_pack.json", evidence_pack))
+        if formula_evidence_pack is not None:
+            values.append(("formula_evidence_pack", "formula_evidence_pack.json", formula_evidence_pack))
+
+        artifacts: list[WorkspaceArtifact] = []
+        for artifact_type, filename, value in values:
+            path = run_dir / filename
+            self.workspace.write_json(path, value)
+            artifacts.append(WorkspaceArtifact(artifact_type=artifact_type, path=str(path)))
+        return artifacts
 
     def _write_artifacts(
         self,

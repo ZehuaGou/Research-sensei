@@ -4,9 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import SeedExpansionPanel from '../components/SeedExpansionPanel.vue'
 import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 import type { SearchRun, SearchRunPaper } from '../types/api'
+import { formatTaskStage } from '../utils/taskStage'
 
 const ACTIVE_DIRECTION_TASK_KEY = 'researchsensei.directionSearch.activeTaskId'
 const ACTIVE_DIRECTION_QUERY_KEY = 'researchsensei.directionSearch.activeQuery'
+const ACTIVE_DEEP_READ_TASK_KEY = 'researchsensei.directionDeepRead.activeTaskId'
 
 const router = useRouter()
 const route = useRoute()
@@ -21,7 +23,15 @@ const historyError = ref('')
 const result = ref<Record<string, any> | null>(null)
 const historyRun = ref<SearchRun | null>(null)
 const openingHistoryKey = ref('')
-const handoffStates = ref<Record<string, { loading?: boolean; error?: string }>>({})
+interface HandoffState {
+  loading?: boolean
+  error?: string
+  stage?: string
+  progress?: number
+  taskId?: string
+}
+
+const handoffStates = ref<Record<string, HandoffState>>({})
 const selectedSeed = ref<Record<string, any> | null>(null)
 const showFilteredCandidates = ref(false)
 
@@ -52,20 +62,7 @@ const currentNextStep = computed(() => {
   return '输入方向'
 })
 const taskStageLabel = computed(() => {
-  const labels: Record<string, string> = {
-    queued: '等待开始',
-    starting: '正在启动',
-    planning_query: '正在规划检索词',
-    searching_sources: '正在检索论文来源',
-    deduplicating: '正在去重候选',
-    verifying_candidates: '正在验证论文信息',
-    discovering_fulltext: '正在解析全文来源',
-    ranking_candidates: '正在评估相关性',
-    downloading_fulltext: '正在下载并验证全文',
-    assembling_results: '正在整理结果',
-    completed: '已完成',
-  }
-  return labels[taskStage.value] || taskStage.value || '等待开始'
+  return formatTaskStage(taskStage.value)
 })
 const panelNote = computed(() => {
   if (historyRun.value) return '历史方向只读取已有论文。只有点击“重新检索”或底部发送，才会重新搜索和下载。'
@@ -99,6 +96,11 @@ const downloadedPaperCount = computed(() => sourceResolutionItems.value.filter((
 )).length)
 
 onMounted(() => {
+  const savedDeepReadTaskId = window.localStorage.getItem(ACTIVE_DEEP_READ_TASK_KEY)
+  if (savedDeepReadTaskId) {
+    void resumeActiveDeepReadTask(savedDeepReadTaskId)
+    return
+  }
   const savedTaskId = window.localStorage.getItem(ACTIVE_DIRECTION_TASK_KEY)
   const openingHistory = Boolean(route.query.run_id || route.query.history_q)
   if (savedTaskId && !openingHistory) {
@@ -107,6 +109,36 @@ onMounted(() => {
   }
   syncQueryFromRoute()
 })
+
+async function resumeActiveDeepReadTask(savedTaskId: string) {
+  isLoading.value = true
+  error.value = ''
+  taskId.value = savedTaskId
+  taskStage.value = 'starting'
+  try {
+    const data = await researchApi.resumeDirectionDeepReadTask(savedTaskId, task => {
+      taskId.value = task.task_id
+      taskStage.value = task.stage
+      taskProgress.value = task.progress
+    })
+    clearActiveDeepReadTask()
+    await router.push(`/learn/${data.job_id}`)
+  } catch (resumeError) {
+    if (isRecoverableDirectionTaskError(resumeError)) {
+      error.value = '论文深读仍在后台继续，连接恢复后会继续读取进度。'
+    } else {
+      clearActiveDeepReadTask()
+      error.value = apiErrorMessage(resumeError, '之前的论文深读任务无法恢复，请重新提交。')
+    }
+  } finally {
+    isLoading.value = false
+    taskStage.value = ''
+  }
+}
+
+function clearActiveDeepReadTask() {
+  window.localStorage.removeItem(ACTIVE_DEEP_READ_TASK_KEY)
+}
 
 watch(() => [route.query.q, route.query.run_id, route.query.history_q], () => {
   syncQueryFromRoute()
@@ -423,7 +455,7 @@ function handoffState(paper: Record<string, any>) {
   return handoffStates.value[candidateKey(paper)] || {}
 }
 
-function setHandoffState(paper: Record<string, any>, state: { loading?: boolean; error?: string }) {
+function setHandoffState(paper: Record<string, any>, state: HandoffState) {
   handoffStates.value = {
     ...handoffStates.value,
     [candidateKey(paper)]: state,
@@ -460,7 +492,8 @@ function hasDeepReadSource(paper: Record<string, any>) {
 function deepReadLabel(paper: Record<string, any>) {
   if (deepReadJobId(paper)) return '进入深读'
   if (!hasDeepReadSource(paper)) return '来源不可用'
-  return handoffState(paper).loading ? '正在准备...' : '深读这篇'
+  const state = handoffState(paper)
+  return state.loading ? `正在准备 ${state.progress || 0}%` : '深读这篇'
 }
 
 function deepReadDisabled(paper: Record<string, any>) {
@@ -569,7 +602,20 @@ async function openDeepRead(paper: Record<string, any>) {
       deep_read_relevance_passed: paper.deep_read_relevance_passed,
       rule_relevance_score: paper.rule_relevance_score,
       relevance_reason: paper.relevance_reason,
+    }, task => {
+      window.localStorage.setItem(ACTIVE_DEEP_READ_TASK_KEY, task.task_id)
+      taskId.value = task.task_id
+      taskStage.value = task.stage
+      taskProgress.value = task.progress
+      setHandoffState(paper, {
+        loading: true,
+        error: '',
+        stage: task.stage,
+        progress: task.progress,
+        taskId: task.task_id,
+      })
     })
+    clearActiveDeepReadTask()
     await router.push(`/learn/${data.job_id}`)
   } catch (handoffError) {
     const code = handoffError instanceof ApiClientError
@@ -612,7 +658,8 @@ async function openDeepRead(paper: Record<string, any>) {
         </article>
 
         <article v-if="isLoading" class="codex-card loading-card" role="status" data-testid="direction-task-progress">
-          后台任务：{{ taskStageLabel }} · {{ taskProgress }}%
+          <span>后台任务：{{ taskStageLabel }} · {{ taskProgress }}%</span>
+          <progress :value="taskProgress" max="100" />
         </article>
 
         <div v-if="historyError" class="error-box">
@@ -830,6 +877,18 @@ async function openDeepRead(paper: Record<string, any>) {
               <p v-if="handoffState(paper).error" class="note danger" data-testid="handoff-error">
                 {{ handoffState(paper).error }}
               </p>
+              <div
+                v-if="handoffState(paper).loading"
+                class="handoff-progress"
+                role="status"
+                data-testid="deep-read-progress"
+              >
+                <div>
+                  <span>{{ formatTaskStage(handoffState(paper).stage || '') }}</span>
+                  <strong>{{ handoffState(paper).progress || 0 }}%</strong>
+                </div>
+                <progress :value="handoffState(paper).progress || 0" max="100" />
+              </div>
             </article>
           </div>
         </section>
@@ -1054,8 +1113,38 @@ async function openDeepRead(paper: Record<string, any>) {
 }
 
 .loading-card {
+  display: grid;
+  gap: 8px;
   color: var(--text-secondary);
   font-size: 14px;
+}
+
+.loading-card progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--text-primary);
+}
+
+.handoff-progress {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.handoff-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.handoff-progress progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--text-primary);
 }
 
 .history-panel {

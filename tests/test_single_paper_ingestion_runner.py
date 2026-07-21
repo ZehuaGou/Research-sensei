@@ -76,3 +76,34 @@ def test_single_paper_runner_records_degraded_pdf_warnings(tmp_path: Path) -> No
     assert job.status == JobStatus.SUCCEEDED
     assert job.current_step == "ingestion_degraded"
     assert any(warning.code == "PDF_PARSE_FAILED" for warning in job.warnings)
+
+
+def test_single_paper_runner_reports_real_pipeline_stages(tmp_path: Path) -> None:
+    source = tmp_path / "paper.md"
+    source.write_text(
+        "# Paper\n## Abstract\nWe study anomaly detection.\n\n## Method\nWe minimize L = x + y.",
+        encoding="utf-8",
+    )
+    workspace = WorkspaceStore(tmp_path / "workspace")
+    jobs = JobStore(tmp_path / "jobs.sqlite3")
+    updates: list[tuple[str, int]] = []
+
+    job = SinglePaperIngestionRunner(workspace=workspace, jobs=jobs).run(
+        source,
+        job_id="job-progress",
+        progress=lambda stage, value: updates.append((stage, value)),
+    )
+
+    assert job.status == JobStatus.SUCCEEDED
+    assert [stage for stage, _ in updates] == [
+        "preparing_source",
+        "parsing_document",
+        "indexing_evidence",
+        "building_paper_card",
+        "building_formula_cards",
+        "formula_cards_ready",
+        "building_teaching_cards",
+        "auditing_understanding",
+        "writing_artifacts",
+    ]
+    assert [value for _, value in updates] == sorted(value for _, value in updates)

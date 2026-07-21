@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
+import { formatTaskStage } from '../utils/taskStage'
 
 type SourceMode = 'file' | 'pdf_url' | 'arxiv_id' | 'arxiv_url' | 'doi' | 'm2_artifact_dir'
 
@@ -27,6 +28,7 @@ interface SourceStatus {
 }
 
 const sourceStatus = ref<SourceStatus | null>(null)
+const taskStageLabel = computed(() => formatTaskStage(taskStage.value))
 
 const sourceOptions: Array<{ key: SourceMode; label: string; hint: string }> = [
   { key: 'file', label: '本地文件', hint: 'PDF / LaTeX / 文本' },
@@ -261,7 +263,8 @@ onMounted(() => {
 
         <section v-if="isUploading && taskId" class="source-status" data-testid="document-task-progress">
           <strong>后台深读 {{ taskProgress }}%</strong>
-          <span>阶段：{{ taskStage || 'queued' }}</span>
+          <span>阶段：{{ taskStageLabel }}</span>
+          <progress :value="taskProgress" max="100" />
           <span>任务：{{ taskId }}</span>
           <button type="button" class="secondary-btn" @click="cancelActiveTask">取消任务</button>
         </section>
@@ -448,6 +451,12 @@ onMounted(() => {
 
 .source-status strong {
   color: var(--text-primary);
+}
+
+.source-status progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--text-primary);
 }
 
 .error-box {

@@ -393,6 +393,19 @@ export const researchApi = {
     if (!isDirectionTask(task)) return task as unknown as DocumentParseResponse
     return waitForTask(task, id => this.getDirectionJob<DocumentParseResponse>(id, signal), onProgress, signal)
   },
+  async resumeDirectionDeepReadTask(
+    taskId: string,
+    onProgress?: (task: DirectionTask<DocumentParseResponse>) => void,
+    signal?: AbortSignal,
+  ) {
+    const task = await this.getDirectionJob<DocumentParseResponse>(taskId, signal)
+    return waitForTask(
+      task,
+      id => this.getDirectionJob<DocumentParseResponse>(id, signal),
+      onProgress,
+      signal,
+    )
+  },
   getSettings(signal?: AbortSignal) {
     return apiRequest<SettingsPayload>('/api/v1/settings', { signal })
   },

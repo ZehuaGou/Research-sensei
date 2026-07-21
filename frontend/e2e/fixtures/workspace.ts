@@ -303,7 +303,7 @@ export async function mockDirectionTaskApi(page: Page): Promise<DirectionMockSta
     if (pathname === '/api/v1/directions/jobs/fixture-deep-read-task' && method === 'GET') {
       state.deepReadPolls += 1
       await json(route, state.deepReadPolls === 1
-        ? task('fixture-deep-read-task', 'direction_deep_read', 'RUNNING', 'canonicalizing', 70)
+        ? task('fixture-deep-read-task', 'direction_deep_read', 'RUNNING', 'building_formula_cards:3/11', 61)
         : task('fixture-deep-read-task', 'direction_deep_read', 'SUCCEEDED', 'completed', 100, { job_id: 'fixture-deep-read' }))
       return
     }

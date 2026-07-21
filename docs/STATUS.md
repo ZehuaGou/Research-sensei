@@ -1,11 +1,52 @@
 # ResearchSensei v0.6 Reliability Baseline Status
 
-Last updated: 2026-07-20 (Asia/Shanghai).
+Last updated: 2026-07-21 (Asia/Shanghai).
 
 This is the authoritative implementation and verification ledger for
 ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
+
+## 2026-07-21 Deep-read progress and recovery correction
+
+The direction and upload deep-read tasks no longer remain at
+`resolving_source · 10%` while the complete M2/LLM chain runs. Progress now
+comes from the actual ingestion pipeline and identifies source preparation,
+document parsing, evidence indexing, evidence-pack construction, paper-card
+generation, formula-card batches, teaching-card generation, quality audit, and
+artifact persistence. Formula work reports `completed/total` batch counts. The
+persistent task service keeps a progress high-water mark so parallel paper and
+formula builders cannot make the displayed percentage move backwards.
+
+Direction candidate cards show the current Chinese stage, percentage, and a
+progress bar. The task ID is stored in browser local storage and the page
+reattaches to the same deep-read task after a refresh or temporary connection
+loss. Upload and reparse surfaces use the same translated stages. Before slow
+LLM work begins, parsed structure and evidence artifacts are persisted and the
+paper job moves to `evidence_ready`; card artifacts remain hidden until the
+existing quality audit has completed. JSON artifact replacement is atomic, so
+an interrupted write does not leave a partially written artifact.
+
+The evidence contract is unchanged: QualityAuditor still runs before cards are
+published, formula provenance and `evidence_ref` checks remain strict, and the
+blocked `/cards` path remains fail-closed.
+
+Verification for this correction:
+
+| Check | Result | Classification |
+|---|---|---|
+| `.venv\Scripts\python -m pytest -q` | `807 passed, 15 skipped` in 267.56s. | Full deterministic backend regression. |
+| `cd frontend; npm test` | `16` files, `83` tests passed. | Full frontend unit regression, including stage formatting, visible formula-batch progress, and deep-read resume. |
+| `cd frontend; npm run build` | Passed; Vite transformed 95 modules. | Type check and production bundle. |
+| `cd frontend; npm run test:e2e` | `7 passed` in 18.0s. | Fixed-browser fixture E2E, including visible `3/11` formula-batch progress before handoff. |
+| changed-file Ruff and repository Mypy | Passed; Mypy found no issues in 127 source files. | Static verification. |
+| headed Playwright inspection | Candidate card showed `正在生成公式卡片（3/11 批） · 61%`; reload reattached to the same stage. | Browser UI check with a controlled running-task response, not a live LLM run. |
+
+The earlier successful ExplainIt live run remains the evidence for real
+source/LLM/card correctness. This correction did not repeat the approximately
+14-minute paid/live run, so it does not claim a new live duration or throughput
+improvement; it fixes truthful observability, reload recovery, and safe
+intermediate persistence.
 
 ## 2026-07-20 ExplainIt source, formula, and M4 live correction
 
@@ -44,13 +85,11 @@ payload set `continued_from_history=true` and `conversation=true`; one supported
 claim was shown and one insufficiently matched claim was removed, so that turn
 correctly remained `DEGRADED` rather than leaking the rejected text.
 
-Remaining performance risk: the deep-read task exposes the entire acquisition,
-parsing, paper-card, formula-card, and teaching-card sequence as the single
-`resolving_source` stage at 10%. The live result is correct, but a formula-heavy
-paper still took nearly 14 minutes and provided no useful intermediate progress.
-The next performance iteration should publish per-stage progress and make
-completed paper/formula subsets readable while later batches continue, without
-loosening formula provenance or evidence gates.
+The single-stage progress defect observed in this run was corrected on
+2026-07-21; see the section above. The measured live duration remains a real
+performance baseline, while the new staged progress and recovery behavior has
+deterministic and browser-fixture verification rather than a repeated live LLM
+timing claim.
 
 Deterministic verification after these changes: 805 backend tests passed with
 15 skips; 79 frontend unit tests passed; mypy, Vue type checking, and the

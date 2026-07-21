@@ -101,10 +101,19 @@ class PersistentTaskService:
             self._update(task_id, status="CANCELLED", stage="cancelled", progress=0, cancel_requested=1)
             return
         self._update(task_id, status="RUNNING", stage="starting", progress=1)
+        progress_lock = threading.Lock()
+        progress_high_watermark = 1
 
         def progress(stage: str, value: int) -> None:
+            nonlocal progress_high_watermark
             bounded = max(0, min(int(value), 99))
-            self._update(task_id, stage=stage[:120], progress=bounded)
+            with progress_lock:
+                progress_high_watermark = max(progress_high_watermark, bounded)
+                self._update(
+                    task_id,
+                    stage=stage[:120],
+                    progress=progress_high_watermark,
+                )
 
         try:
             result = operation(progress, cancel_event)

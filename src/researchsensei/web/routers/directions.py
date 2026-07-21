@@ -63,8 +63,11 @@ def create_directions_router(
         response["papers"] = response.get("candidate_cards", [])
         return response
 
-    @router.post("/deep_read")
-    async def deep_read(payload: DirectionDeepReadRequest) -> dict[str, object]:
+    async def _deep_read(
+        payload: DirectionDeepReadRequest,
+        progress: Callable[[str, int], None] | None = None,
+    ) -> dict[str, object]:
+        report = progress or (lambda _stage, _value: None)
         request_payload = payload.model_dump(mode="json", exclude_none=True)
         candidate = ops.candidate_payload(request_payload)
         force = payload.force
@@ -87,6 +90,7 @@ def create_directions_router(
                     },
                 )
         title, doi, pdf_url, arxiv_id, arxiv_url = ops.handoff_inputs(candidate)
+        report("resolving_source", 5)
         identity = ops.request_identity(doi=doi, pdf_url=pdf_url, arxiv_id=arxiv_id, arxiv_url=arxiv_url)
         if identity and not force:
             existing = jobs.find_by_source_identity(identity)
@@ -146,6 +150,7 @@ def create_directions_router(
         if force:
             identity = f"{identity}:force:{job_id}"
 
+        report("source_resolved", 12)
         job = await run_in_threadpool(
             runner.run,
             source_status.resolved_path,
@@ -153,6 +158,7 @@ def create_directions_router(
             source_status=source_status,
             source_identity=identity,
             title_hint=title,
+            progress=report,
         )
         if job.status == JobStatus.FAILED:
             raise HTTPException(
@@ -178,6 +184,10 @@ def create_directions_router(
             response["paper_workspace_status"] = ops.workspace_status(job, understanding)
             response["final_status"] = understanding.get("status", "")
         return response
+
+    @router.post("/deep_read")
+    async def deep_read(payload: DirectionDeepReadRequest) -> dict[str, object]:
+        return await _deep_read(payload)
 
     @router.post("/seed_expansion")
     def seed_expansion(payload: SeedExpansionRequest) -> dict[str, object]:
@@ -208,9 +218,8 @@ def create_directions_router(
         def operation(progress: Callable[[str, int], None], cancelled: threading.Event) -> dict[str, object]:
             if cancelled.is_set():
                 return {}
-            progress("resolving_source", 10)
             try:
-                result = asyncio.run(deep_read(payload))
+                result = asyncio.run(_deep_read(payload, progress=progress))
             except HTTPException as error:
                 detail = error.detail
                 if isinstance(detail, dict):
@@ -220,7 +229,6 @@ def create_directions_router(
                     error_type = f"HTTP_{error.status_code}"
                     message = str(detail)
                 raise TaskExecutionError(error_type, message) from error
-            progress("building_understanding", 90)
             return result
 
         return tasks.submit(
