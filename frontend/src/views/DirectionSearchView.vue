@@ -9,6 +9,7 @@ import { formatTaskStage } from '../utils/taskStage'
 const ACTIVE_DIRECTION_TASK_KEY = 'researchsensei.directionSearch.activeTaskId'
 const ACTIVE_DIRECTION_QUERY_KEY = 'researchsensei.directionSearch.activeQuery'
 const ACTIVE_DEEP_READ_TASK_KEY = 'researchsensei.directionDeepRead.activeTaskId'
+const ACTIVE_HISTORY_PARSE_TASK_KEY = 'researchsensei.historyParse.activeTaskId'
 
 const router = useRouter()
 const route = useRoute()
@@ -96,6 +97,11 @@ const downloadedPaperCount = computed(() => sourceResolutionItems.value.filter((
 )).length)
 
 onMounted(() => {
+  const savedHistoryParseTaskId = window.localStorage.getItem(ACTIVE_HISTORY_PARSE_TASK_KEY)
+  if (savedHistoryParseTaskId) {
+    void resumeActiveHistoryParseTask(savedHistoryParseTaskId)
+    return
+  }
   const savedDeepReadTaskId = window.localStorage.getItem(ACTIVE_DEEP_READ_TASK_KEY)
   if (savedDeepReadTaskId) {
     void resumeActiveDeepReadTask(savedDeepReadTaskId)
@@ -137,7 +143,46 @@ async function resumeActiveDeepReadTask(savedTaskId: string) {
 }
 
 function clearActiveDeepReadTask() {
+  taskId.value = ''
+  taskStage.value = ''
+  taskProgress.value = 0
   window.localStorage.removeItem(ACTIVE_DEEP_READ_TASK_KEY)
+}
+
+function updateHistoryParseTask(task: { task_id: string; stage: string; progress: number }) {
+  taskId.value = task.task_id
+  taskStage.value = task.stage
+  taskProgress.value = task.progress
+  window.localStorage.setItem(ACTIVE_HISTORY_PARSE_TASK_KEY, task.task_id)
+}
+
+function clearActiveHistoryParseTask() {
+  taskId.value = ''
+  taskStage.value = ''
+  taskProgress.value = 0
+  window.localStorage.removeItem(ACTIVE_HISTORY_PARSE_TASK_KEY)
+}
+
+async function resumeActiveHistoryParseTask(savedTaskId: string) {
+  isLoading.value = true
+  error.value = ''
+  historyError.value = ''
+  taskId.value = savedTaskId
+  taskStage.value = 'starting'
+  try {
+    const data = await researchApi.resumeDocumentParseTask(savedTaskId, updateHistoryParseTask)
+    clearActiveHistoryParseTask()
+    await router.push(`/learn/${data.job_id}`)
+  } catch (resumeError) {
+    if (isRecoverableDirectionTaskError(resumeError)) {
+      historyError.value = '论文仍在后台解析；连接恢复或刷新页面后会继续读取进度。'
+    } else {
+      clearActiveHistoryParseTask()
+      historyError.value = apiErrorMessage(resumeError, '之前的历史论文解析任务无法恢复，请重新提交。')
+    }
+  } finally {
+    isLoading.value = false
+  }
 }
 
 watch(() => [route.query.q, route.query.run_id, route.query.history_q], () => {
@@ -562,17 +607,27 @@ async function openHistoryPaper(paper: SearchRunPaper) {
   const key = historyPaperKey(paper)
   if (!paper.local_path || openingHistoryKey.value) return
   openingHistoryKey.value = key
+  isLoading.value = true
   historyError.value = ''
+  taskStage.value = 'queued'
+  taskProgress.value = 0
   try {
     const form = new FormData()
     form.append('local_path', paper.local_path)
     form.append('title', paper.title || '')
-    const data = await researchApi.parseDocument(form)
+    const data = await researchApi.parseDocumentAsync(form, updateHistoryParseTask)
+    clearActiveHistoryParseTask()
     await router.push(`/learn/${data.job_id}`)
   } catch (openError) {
-    historyError.value = apiErrorMessage(openError, '网络请求失败，暂时不能打开这篇历史论文。')
+    if (isRecoverableDirectionTaskError(openError)) {
+      historyError.value = '论文仍在后台解析；连接恢复或刷新页面后会继续读取进度。'
+    } else {
+      clearActiveHistoryParseTask()
+      historyError.value = apiErrorMessage(openError, '网络请求失败，暂时不能打开这篇历史论文。')
+    }
   } finally {
     openingHistoryKey.value = ''
+    isLoading.value = false
   }
 }
 

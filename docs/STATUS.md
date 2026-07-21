@@ -7,6 +7,34 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-21 Historical-paper deep-read timeout correction
+
+Downloaded papers opened from a saved direction were still using the legacy
+synchronous `/api/v1/documents/parse` route. The browser stopped waiting after
+120 seconds even though parsing and card generation continued on the server.
+The real paper *A Novel Image-Analysis Toolbox Enabling Quantitative Analysis
+of Root System Architecture* reproduced this defect: the page reported a
+request timeout, while job `7825710bf2c3` completed successfully about 30
+seconds later.
+
+The history-paper action now uses the persistent document-task route, displays
+real parsing progress, stores the active task id, and resumes that same task
+after a refresh or temporary connection loss. A live browser click reopened
+the already completed job through async task `ee153015a0b3427a` without a
+timeout. The downloaded file was also checked independently: it is an 11-page,
+approximately 1 MB full PDF with extractable text on every page, not an
+abstract or publisher error page.
+
+The first completed card had separately fallen back after a transient LLM
+timeout. A live provider probe then passed and reparse task
+`b54a0a7436634088` completed as job `e545a1660677`. The resulting workspace has
+a real Chinese summary, research problem, core idea, method explanation, and
+two teaching cards. Formula cards remain strictly blocked because the only
+detected formula-like fragments have raw-text provenance; that evidence gate
+was not weakened. Verification: 88 frontend unit tests, seven fixed-browser
+E2E tests, Vue type checking, the production build, and the live browser flow
+all passed.
+
 ## 2026-07-21 Formula-aware PDF recovery
 
 The Web ingestion route now combines complete PyMuPDF text extraction with a

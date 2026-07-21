@@ -146,6 +146,78 @@ describe('DirectionSearchView', () => {
     expect(wrapper.get('[data-testid="history-deep-read"]').text()).toContain('深读')
   })
 
+  it('opens a downloaded historical paper through a recoverable document task', async () => {
+    routeState.query = { run_id: 'run-history-parse' }
+    const fetchMock = mockFetch({
+      search_runs: [{
+        run_id: 'run-history-parse',
+        query: 'root system analysis',
+        candidate_count: 1,
+        downloaded_count: 1,
+        reused_count: 0,
+        created_at: '2026-07-21T00:00:00Z',
+        papers: [{
+          paper_id: 'root-toolbox',
+          title: 'A Novel Image-Analysis Toolbox',
+          search_rank: 1,
+          action: 'downloaded',
+          local_path: 'D:\\workspace\\root-toolbox.pdf',
+        }],
+      }],
+    })
+    let finishParse!: (value: { job_id: string }) => void
+    const parseResult = new Promise<{ job_id: string }>((resolve) => {
+      finishParse = resolve
+    })
+    const parseSpy = vi.spyOn(researchApi, 'parseDocumentAsync').mockImplementation(async (form, onProgress) => {
+      expect(form.get('local_path')).toBe('D:\\workspace\\root-toolbox.pdf')
+      onProgress?.({
+        job_id: 'task-history-parse',
+        task_id: 'task-history-parse',
+        kind: 'document_parse',
+        status: 'RUNNING',
+        stage: 'parsing_document',
+        progress: 20,
+        result: { job_id: '' },
+        error_type: '',
+        error: '',
+        cancel_requested: false,
+        created_at: '',
+        updated_at: '',
+      })
+      return parseResult as any
+    })
+
+    const wrapper = mount(DirectionSearchView)
+    await flushPromises()
+    await wrapper.get('[data-testid="history-deep-read"]').trigger('click')
+    await flushPromises()
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(parseSpy).toHaveBeenCalledTimes(1)
+    expect(window.localStorage.getItem('researchsensei.historyParse.activeTaskId')).toBe('task-history-parse')
+    expect(wrapper.get('[data-testid="direction-task-progress"]').text()).toContain('20%')
+
+    finishParse({ job_id: 'root-toolbox-job' })
+    await flushPromises()
+    expect(routerPush).toHaveBeenCalledWith('/learn/root-toolbox-job')
+    expect(window.localStorage.getItem('researchsensei.historyParse.activeTaskId')).toBeNull()
+  })
+
+  it('resumes a persisted historical document task after reload', async () => {
+    window.localStorage.setItem('researchsensei.historyParse.activeTaskId', 'task-history-recover')
+    const resumeSpy = vi.spyOn(researchApi, 'resumeDocumentParseTask').mockResolvedValue({
+      job_id: 'root-toolbox-recovered',
+    } as any)
+
+    mount(DirectionSearchView)
+    await flushPromises()
+
+    expect(resumeSpy).toHaveBeenCalledWith('task-history-recover', expect.any(Function))
+    expect(routerPush).toHaveBeenCalledWith('/learn/root-toolbox-recovered')
+    expect(window.localStorage.getItem('researchsensei.historyParse.activeTaskId')).toBeNull()
+  })
+
   it('submits a query and renders the direction bundle', async () => {
     const fetchMock = mockFetch(directionResponse())
 
