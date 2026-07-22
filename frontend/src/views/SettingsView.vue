@@ -39,6 +39,24 @@ const requestModeLabel = computed(() => (
     : 'OpenAI chat completions'
 ))
 
+const isOpenCodeGo = computed(() => settings.value.active_provider === 'opencode_go')
+
+const settingsTitle = computed(() => (
+  isOpenCodeGo.value ? 'OpenCode Go 模型接入' : `${providerLabel.value} 模型接入`
+))
+
+const settingsDescription = computed(() => (
+  isOpenCodeGo.value
+    ? 'Research Sensei 直连 OpenCode Go。模型列表由 OpenCode Go 接口自动获取，保存后立即用于后续 M2/M4 请求，无需重启项目。'
+    : '这里保存的是随请求发送的 model 字段；实际请求通道由当前提供方配置决定。'
+))
+
+const modelHelp = computed(() => (
+  isOpenCodeGo.value
+    ? '优先显示 OpenCode Go 接口实时返回的模型；接口暂时不可用时使用内置候选列表。'
+    : '优先显示当前配置和提供方接口中识别到的模型。'
+))
+
 onMounted(async () => {
   try {
     settings.value = await researchApi.getSettings()
@@ -83,8 +101,8 @@ async function testConnection() {
   <main class="settings-page">
     <section class="settings-head">
       <p>模型设置</p>
-      <h1>ccswitch 模型接入</h1>
-      <span>Research Sensei 连接本地 ccswitch 代理。这里保存的是随请求发送的 model 字段；实际使用哪条上游 API，由 ccswitch 当前 Claude provider 配置决定。</span>
+      <h1>{{ settingsTitle }}</h1>
+      <span>{{ settingsDescription }}</span>
     </section>
 
     <section class="settings-grid">
@@ -118,7 +136,7 @@ async function testConnection() {
               {{ isSaving ? '保存中...' : '保存' }}
             </button>
           </div>
-          <small>优先显示当前配置和 ccswitch 当前 provider 中识别到的模型；保存后写入 {{ settings.model_env || 'RESEARCHSENSEI_LLM_MODEL' }}。</small>
+          <small>{{ modelHelp }}保存后写入 {{ settings.model_env || 'RESEARCHSENSEI_LLM_MODEL' }}，并立即生效。</small>
           <small v-if="saveResult" class="save-result">{{ saveResult }}</small>
         </div>
 

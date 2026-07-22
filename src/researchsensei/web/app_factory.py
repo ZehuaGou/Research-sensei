@@ -7,6 +7,7 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
 from collections.abc import Mapping
@@ -1230,23 +1231,123 @@ def _model_options_for_provider(provider: object) -> list[dict[str, str]]:
         })
 
     add(current_model, source="当前配置")
-    if _public_provider_name(str(getattr(provider, "name", "") or "")) == "ccswitch":
+    provider_name = _public_provider_name(str(getattr(provider, "name", "") or ""))
+    if provider_name == "ccswitch":
         for model in _ccswitch_current_provider_models():
             add(model, source="ccswitch 当前 provider")
         for live_model in _ccswitch_live_models(str(getattr(provider, "base_url", "") or "")):
             add(live_model.get("id"), label=live_model.get("label"), source="ccswitch 接口")
+    elif provider_name == "opencode_go":
+        live_models = _opencode_go_live_models(provider)
+        if live_models:
+            for live_model in live_models:
+                add(live_model.get("id"), label=live_model.get("label"), source="OpenCode Go 接口")
+        else:
+            for model in _OPENCODE_GO_FALLBACK_MODELS:
+                add(model, source="OpenCode Go 默认列表")
     return options[:24]
 
 
 def _ccswitch_live_models(base_url: str) -> list[dict[str, str]]:
+    return _openai_compatible_live_models(base_url, api_key="", timeout=1.2)
+
+
+_OPENCODE_GO_FALLBACK_MODELS = (
+    "deepseek-v4-flash",
+    "deepseek-v4-pro",
+    "minimax-m3",
+    "minimax-m2.7",
+    "minimax-m2.5",
+    "kimi-k3",
+    "kimi-k2.7-code",
+    "kimi-k2.6",
+    "kimi-k2.5",
+    "glm-5.2",
+    "glm-5.1",
+    "glm-5",
+    "qwen3.7-max",
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "qwen3.5-plus",
+    "mimo-v2-pro",
+    "mimo-v2-omni",
+    "mimo-v2.5-pro",
+    "mimo-v2.5",
+    "hy3-preview",
+    "grok-4.5",
+)
+
+_MODEL_CATALOG_CACHE_TTL_SECONDS = 300.0
+_MODEL_CATALOG_FAILURE_TTL_SECONDS = 60.0
+_MODEL_CATALOG_CACHE: dict[tuple[str, bool], tuple[float, list[dict[str, str]]]] = {}
+_MODEL_CATALOG_IN_FLIGHT: set[tuple[str, bool]] = set()
+_MODEL_CATALOG_CACHE_LOCK = threading.Lock()
+
+
+def _opencode_go_live_models(provider: object) -> list[dict[str, str]]:
+    base_url = str(getattr(provider, "base_url", "") or "").rstrip("/")
+    api_key = resolve_ccswitch_api_key(provider)
+    if not base_url or not api_key:
+        return []
+    cache_key = (base_url, True)
+    cached = _cached_model_catalog(cache_key)
+    if cached is not None:
+        return cached
+
+    with _MODEL_CATALOG_CACHE_LOCK:
+        if cache_key in _MODEL_CATALOG_IN_FLIGHT:
+            return []
+        _MODEL_CATALOG_IN_FLIGHT.add(cache_key)
+
+    def refresh() -> None:
+        try:
+            _openai_compatible_live_models(base_url, api_key=api_key, timeout=15.0)
+        finally:
+            with _MODEL_CATALOG_CACHE_LOCK:
+                _MODEL_CATALOG_IN_FLIGHT.discard(cache_key)
+
+    threading.Thread(
+        target=refresh,
+        name="opencode-go-model-catalog",
+        daemon=True,
+    ).start()
+    return []
+
+
+def _cached_model_catalog(cache_key: tuple[str, bool]) -> list[dict[str, str]] | None:
+    now = time.monotonic()
+    with _MODEL_CATALOG_CACHE_LOCK:
+        cached = _MODEL_CATALOG_CACHE.get(cache_key)
+        if cached is None:
+            return None
+        ttl = _MODEL_CATALOG_CACHE_TTL_SECONDS if cached[1] else _MODEL_CATALOG_FAILURE_TTL_SECONDS
+        if now - cached[0] >= ttl:
+            return None
+        return [dict(item) for item in cached[1]]
+
+
+def _openai_compatible_live_models(
+    base_url: str,
+    *,
+    api_key: str,
+    timeout: float = 5.0,
+) -> list[dict[str, str]]:
     if not base_url:
         return []
+    normalized_base_url = base_url.rstrip("/")
+    cache_key = (normalized_base_url, bool(api_key))
+    cached = _cached_model_catalog(cache_key)
+    if cached is not None:
+        return cached
+    headers = {"authorization": f"Bearer {api_key}"} if api_key else {}
     try:
-        with httpx.Client(timeout=1.2) as client:
-            response = client.get(f"{base_url.rstrip('/')}/models")
+        with httpx.Client(timeout=timeout) as client:
+            response = client.get(f"{normalized_base_url}/models", headers=headers)
             response.raise_for_status()
             payload = response.json()
     except Exception:
+        with _MODEL_CATALOG_CACHE_LOCK:
+            _MODEL_CATALOG_CACHE[cache_key] = (time.monotonic(), [])
         return []
     raw_items = payload.get("models") or payload.get("data") or []
     if not isinstance(raw_items, list):
@@ -1262,6 +1363,8 @@ def _ccswitch_live_models(base_url: str) -> list[dict[str, str]]:
                     "id": str(model_id),
                     "label": str(item.get("display_name") or item.get("label") or item.get("name") or model_id),
                 })
+    with _MODEL_CATALOG_CACHE_LOCK:
+        _MODEL_CATALOG_CACHE[cache_key] = (time.monotonic(), [dict(item) for item in models])
     return models
 
 

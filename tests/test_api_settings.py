@@ -7,6 +7,7 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ConfigService
 from researchsensei.web.app import create_app
+from researchsensei.web.app_factory import _openai_compatible_live_models
 
 
 def test_settings_endpoint_returns_active_provider_without_secret(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -92,6 +93,76 @@ def test_settings_endpoint_presents_ccswitch_name_and_keeps_config_key(tmp_path:
     assert data["model_options"][0]["id"] == "claude-sonnet-4-6"
 
 
+def test_settings_endpoint_lists_live_opencode_go_models(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "local.toml"
+    _write_config(config_path, active_provider="opencode_go")
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "secret-value")
+    monkeypatch.setenv("RESEARCHSENSEI_LLM_MODEL", "deepseek-v4-flash")
+    monkeypatch.setattr(
+        "researchsensei.web.app_factory._opencode_go_live_models",
+        lambda provider: [
+            {"id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro"},
+            {"id": "kimi-k3", "label": "Kimi K3"},
+        ],
+    )
+
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        config_service=ConfigService(config_path=config_path, env_path=tmp_path / "missing.env"),
+    ))
+
+    response = client.get("/api/v1/settings")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["active_provider"] == "opencode_go"
+    assert [item["id"] for item in data["model_options"][:3]] == [
+        "deepseek-v4-flash",
+        "deepseek-v4-pro",
+        "kimi-k3",
+    ]
+    assert data["model_options"][1]["source"] == "OpenCode Go 接口"
+    assert "secret-value" not in response.text
+
+
+def test_live_model_catalog_uses_bearer_key_without_returning_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, object] = {}
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"data": [{"id": "deepseek-v4-pro"}]}
+
+    class FakeClient:
+        def __init__(self, *, timeout: float) -> None:
+            captured["timeout"] = timeout
+
+        def __enter__(self) -> "FakeClient":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def get(self, url: str, *, headers: dict[str, str]) -> FakeResponse:
+            captured["url"] = url
+            captured["headers"] = headers
+            return FakeResponse()
+
+    monkeypatch.setattr("researchsensei.web.app_factory.httpx.Client", FakeClient)
+
+    models = _openai_compatible_live_models(
+        "https://models.example/v1",
+        api_key="secret-value",
+    )
+
+    assert models == [{"id": "deepseek-v4-pro", "label": "deepseek-v4-pro"}]
+    assert captured["url"] == "https://models.example/v1/models"
+    assert captured["headers"] == {"authorization": "Bearer secret-value"}
+    assert "secret-value" not in repr(models)
+
+
 def test_settings_test_reports_disabled_llm(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "local.toml"
     _write_config(config_path, active_provider="mimo")
@@ -123,6 +194,13 @@ api_key_env = "MIMO_API_KEY"
 model = "mimo-v2.5-pro"
 auth_header = "api-key"
 timeout_seconds = 60
+
+[providers.opencode_go]
+kind = "openai_compatible"
+base_url = "https://opencode.ai/zen/go/v1"
+api_key_env = "OPENCODE_GO_API_KEY"
+model = "deepseek-v4-flash"
+timeout_seconds = 120
 
 [providers.cc_switch]
 kind = "anthropic_compatible"

@@ -101,6 +101,41 @@ describe('SettingsView', () => {
     expect(wrapper.text()).toContain('模型已保存')
   })
 
+  it('shows OpenCode Go models and explains that switching applies immediately', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        active_provider: 'opencode_go',
+        provider_display_name: 'OpenCode Go',
+        provider_kind: 'openai_compatible',
+        base_url: 'https://opencode.ai/zen/go/v1',
+        request_endpoint: 'https://opencode.ai/zen/go/v1/chat/completions',
+        api_key_env: 'OPENCODE_GO_API_KEY',
+        model: 'deepseek-v4-flash',
+        model_options: [
+          { id: 'deepseek-v4-flash', label: 'deepseek-v4-flash', source: '当前配置' },
+          { id: 'deepseek-v4-pro', label: 'DeepSeek V4 Pro', source: 'OpenCode Go 接口' },
+          { id: 'kimi-k3', label: 'Kimi K3', source: 'OpenCode Go 接口' },
+        ],
+        model_env: 'RESEARCHSENSEI_LLM_MODEL',
+        enable_env: 'RESEARCHSENSEI_ENABLE_API_LLM',
+        llm_enabled: true,
+        api_key_configured: true,
+        provider_known: true,
+      }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('OpenCode Go 模型接入')
+    expect(wrapper.text()).toContain('保存后立即用于后续 M2/M4 请求')
+    expect(wrapper.text()).toContain('并立即生效')
+    expect(wrapper.get('[data-testid="model-select"]').findAll('option')).toHaveLength(3)
+    expect(wrapper.get('[data-testid="model-select"]').text()).toContain('DeepSeek V4 Pro · OpenCode Go 接口')
+  })
+
   it('tests provider readiness through the backend settings endpoint', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce({
