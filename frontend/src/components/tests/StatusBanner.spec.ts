@@ -127,9 +127,26 @@ describe('StatusBanner', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('本文未检测到可验证公式')
+    expect(wrapper.text()).toContain('当前没有可生成卡片的公式')
     expect(wrapper.text()).toContain('本文无可验证公式')
     expect(wrapper.text()).not.toContain('解释公式')
+  })
+
+  it('distinguishes a completed PDF scan from formula extraction failure', () => {
+    const wrapper = mount(StatusBanner, {
+      props: {
+        status: 'SUCCESS',
+        paperWorkspaceStatus: {
+          formula_origin: 'not_applicable',
+          formula_detection_status: 'scanned_no_candidates',
+        },
+        componentStatus: { formula_cards: 'SKIPPED' },
+      },
+    })
+
+    expect(wrapper.text()).toContain('PDF 已完成公式区域扫描')
+    expect(wrapper.text()).toContain('已扫描，未发现独立公式')
+    expect(wrapper.text()).not.toContain('解析失败')
   })
 
   it('renders nothing for unknown status', () => {

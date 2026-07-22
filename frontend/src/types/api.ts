@@ -43,16 +43,19 @@ export interface AskRequest {
   question: string
   selected_text?: string
   context_scope: 'selection' | 'paper'
-  answer_mode?: 'evidence_only' | 'enhanced'
+  answer_mode?: 'full_paper' | 'evidence_only' | 'enhanced'
   conversation_history?: ConversationMessageRequest[]
 }
 
 export interface M4ContextTrace {
   scope: 'selection' | 'paper'
+  context_mode?: 'full_paper' | 'evidence'
   continued_from_history: boolean
   focus_question: string
   evidence_count: number
   selected_text_used: boolean
+  full_text_chars?: number
+  full_text_complete?: boolean
 }
 
 export interface AskResponse {

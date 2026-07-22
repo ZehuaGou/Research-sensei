@@ -35,10 +35,13 @@ function mockM4Fetch() {
         follow_up_suggestions: ['为什么这种机制能连接稀疏证据？'],
         context_trace: {
           scope: bodyHasSelection(init) ? 'selection' : 'paper',
+          context_mode: 'full_paper',
           continued_from_history: false,
           focus_question: 'How does it work?',
           evidence_count: 1,
           selected_text_used: bodyHasSelection(init),
+          full_text_chars: 47572,
+          full_text_complete: true,
         },
       })
     }
@@ -92,7 +95,7 @@ describe('AskPanel', () => {
     vi.restoreAllMocks()
   })
 
-  it('loads memory and sends evidence-bound questions with selected text', async () => {
+  it('loads memory and sends full-paper questions with selected text', async () => {
     const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)
     const { store, wrapper } = mountPanel()
@@ -100,7 +103,7 @@ describe('AskPanel', () => {
     await flushPromises()
 
     expect(wrapper.get('[data-testid="selected-context"]').text()).toContain('attention architecture')
-    expect(wrapper.text()).toContain('选中文本已加入上下文')
+    expect(wrapper.text()).toContain('整篇论文 + 选中文本')
     expect(wrapper.text()).not.toContain('已记住')
 
     await wrapper.get('[data-testid="ask-input"]').setValue('How does it work?')
@@ -114,43 +117,64 @@ describe('AskPanel', () => {
       question: 'How does it work?',
       selected_text: 'attention architecture',
       context_scope: 'selection',
+      answer_mode: 'full_paper',
     })
     expect(wrapper.text()).toContain('模型不是平均看所有证据')
     expect(wrapper.find('.answer-bubble').exists()).toBe(true)
-    expect(wrapper.find('.answer-block.tone-lead').text()).toContain('重点')
+    expect(wrapper.find('.answer-block.tone-lead').text()).toContain('回答')
     expect(wrapper.find('.answer-block.tone-concept').text()).toContain('关键机制')
     expect(wrapper.find('.answer-block.tone-evidence').text()).toContain('证据')
     expect(wrapper.findAll('.answer-keyword').map(node => node.text())).toContain('证据')
-    expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('1 条已验证证据')
+    expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('4.8 万字全文')
     expect(wrapper.text()).toContain('为什么这种机制能连接稀疏证据？')
     expect(wrapper.text()).not.toContain('paper:b001')
     expect(wrapper.text()).not.toContain('m4_memory_2')
   })
 
-  it('shows verified evidence before the model enhancement finishes', async () => {
-    let resolveEnhanced: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = init?.body ? JSON.parse(String(init.body)) : {}
-      if (body.answer_mode === 'evidence_only') {
+  it('restores real recent answers so a refreshed page can continue the conversation', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) {
         return jsonResponse({
-          status: 'SUCCESS',
-          answer: '先显示的论文证据答案：这个方法通过证据片段完成核心机制。',
-          evidence_refs: ['paper:b001'],
-          context_trace: {
-            scope: 'paper',
-            continued_from_history: false,
-            focus_question: '怎么实现的？',
-            evidence_count: 1,
-            selected_text_used: false,
-          },
+          records: [{
+            memory_type: 'interactive_answer',
+            question: '它为什么扩大搜索圆弧？',
+            answer: '为了覆盖急剧弯曲的根，同时用直径相似性降低追错风险。',
+            evidence_refs: ['paper:b004'],
+            created_at: '2026-07-22T12:00:00Z',
+            metadata: {
+              status: 'SUCCESS',
+              context_mode: 'full_paper',
+              full_text_chars: 47572,
+              full_text_complete: true,
+            },
+          }],
         })
       }
-      if (body.answer_mode === 'enhanced') {
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('它为什么扩大搜索圆弧？')
+    expect(wrapper.text()).toContain('为了覆盖急剧弯曲的根')
+    expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('4.8 万字全文')
+    expect(wrapper.text()).not.toContain('已恢复这篇论文的上一轮问题')
+  })
+
+  it('uses one full-paper request without the old evidence-preview round trip', async () => {
+    let resolveFullPaper: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) return jsonResponse({ records: [] })
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (url.endsWith('/ask') && body.answer_mode === 'full_paper') {
         return await new Promise<ReturnType<typeof jsonResponse>>(resolve => {
-          resolveEnhanced = resolve
+          resolveFullPaper = resolve
         })
       }
-      return jsonResponse({ records: [] })
+      throw new Error(`Unexpected fetch: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
@@ -160,98 +184,82 @@ describe('AskPanel', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('先显示的论文证据答案')
-    expect(wrapper.text()).toContain('正在读证据并组织回答')
-    expect(resolveEnhanced).toBeTypeOf('function')
+    expect(wrapper.text()).toContain('正在阅读整篇论文并组织回答')
+    expect(fetchMock.mock.calls.filter(call => String(call[0]).endsWith('/ask'))).toHaveLength(1)
+    expect(resolveFullPaper).toBeTypeOf('function')
 
-    resolveEnhanced?.(jsonResponse({
+    resolveFullPaper?.(jsonResponse({
       status: 'SUCCESS',
-      answer: '模型增强后的证据答案：先解释是什么，再解释实现机制。',
+      answer: '完整回答：先解释它是什么，再按实际执行顺序讲清楚实现机制和实验结果。',
       evidence_refs: ['paper:b001'],
       context_trace: {
         scope: 'paper',
+        context_mode: 'full_paper',
         continued_from_history: false,
         focus_question: '怎么实现的？',
         evidence_count: 1,
         selected_text_used: false,
+        full_text_chars: 47572,
+        full_text_complete: true,
       },
     }))
     await flushPromises()
 
-    expect(wrapper.text()).toContain('模型增强后的证据答案')
-    expect(wrapper.text()).not.toContain('先显示的论文证据答案')
+    expect(wrapper.text()).toContain('完整回答')
+    expect(wrapper.text()).not.toContain('正在阅读整篇论文并组织回答')
   })
 
-  it('does not replace verified evidence with an unsupported model failure', async () => {
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = init?.body ? JSON.parse(String(init.body)) : {}
-      if (body.answer_mode === 'evidence_only') {
+  it('renders model markdown as clean reader text', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) return jsonResponse({ records: [] })
+      if (url.endsWith('/ask')) {
         return jsonResponse({
           status: 'SUCCESS',
-          answer: '已经通过论文证据验证的本地答案。',
-          evidence_refs: ['paper:b001'],
-        })
-      }
-      if (body.answer_mode === 'enhanced') {
-        return jsonResponse({
-          status: 'DEGRADED',
-          answer: 'M4 这次没有拿到可用的大模型解释。',
+          answer: '### 核心方法\n\n**第一步**：读取图像。\n\n---\n\n- 继续追踪根节点。',
           evidence_refs: [],
-          warnings: [{ code: 'M4_CLAIM_UNSUPPORTED', message: '模型结论未通过证据审计。' }],
+          context_trace: {
+            scope: 'paper',
+            context_mode: 'full_paper',
+            full_text_chars: 47572,
+            full_text_complete: true,
+            evidence_count: 0,
+          },
         })
       }
-      return jsonResponse({ records: [] })
+      throw new Error(`Unexpected fetch: ${url}`)
     })
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    await wrapper.get('[data-testid="ask-input"]').setValue('这个方法怎么实现？')
+    await wrapper.get('[data-testid="ask-input"]').setValue('请解释方法')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('已经通过论文证据验证的本地答案')
-    expect(wrapper.text()).toContain('模型增强暂时没有完成')
-    expect(wrapper.text()).not.toContain('没有拿到可用的大模型解释')
+    expect(wrapper.text()).toContain('核心方法')
+    expect(wrapper.text()).toContain('第一步：读取图像。')
+    expect(wrapper.text()).toContain('• 继续追踪根节点。')
+    expect(wrapper.text()).not.toContain('###')
+    expect(wrapper.text()).not.toContain('**')
+    expect(wrapper.text()).not.toContain('---')
   })
 
-  it('does not flash an ungrounded degraded preview while enhancement is running', async () => {
-    let resolveEnhanced: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
-    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = init?.body ? JSON.parse(String(init.body)) : {}
-      if (body.answer_mode === 'evidence_only') {
-        return jsonResponse({
-          status: 'DEGRADED',
-          answer: '证据不足，暂不展开。',
-          evidence_refs: [],
-        })
-      }
-      if (body.answer_mode === 'enhanced') {
-        return await new Promise<ReturnType<typeof jsonResponse>>(resolve => {
-          resolveEnhanced = resolve
-        })
-      }
-      return jsonResponse({ records: [] })
-    })
+  it('keeps strict lookup only when the user explicitly chooses 找证据', async () => {
+    const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    await wrapper.get('[data-testid="ask-input"]').setValue('这篇论文真正解决了什么问题？')
+    await wrapper.get('#m4-mode-evidence').trigger('click')
+    await wrapper.get('[data-testid="ask-input"]').setValue('这条结论对应哪段正文？')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).not.toContain('证据不足，暂不展开')
-    expect(wrapper.text()).toContain('正在读证据并组织回答')
-
-    resolveEnhanced?.(jsonResponse({
-      status: 'SUCCESS',
-      answer: '论文解决了人工追踪根系既耗时又容易出错的问题。',
-      evidence_refs: ['paper:b001'],
-    }))
-    await flushPromises()
-
-    expect(wrapper.text()).toContain('人工追踪根系既耗时又容易出错')
+    const askCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/ask'))
+    expect(JSON.parse(String((askCall![1] as RequestInit).body))).toMatchObject({
+      answer_mode: 'evidence_only',
+    })
   })
 
   it('answers a custom user question before creating a focused advisor question', async () => {

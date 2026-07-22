@@ -32,6 +32,7 @@ export interface PaperWorkspaceStatus {
   degradation_reason?: string
   formula_origin?: string
   formula_ocr_status?: string
+  formula_detection_status?: string
   evidence_status?: string
   quality_status?: string
   [key: string]: unknown

@@ -968,6 +968,8 @@ def _m4_service_for_job(
 def _m4_artifacts(job: JobRecord) -> dict[str, object]:
     allowed_types = {
         "understanding_status",
+        "ingestion",
+        "parsed_document",
         "paper_card",
         "formula_cards",
         "teaching_cards",
@@ -1668,6 +1670,7 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     claim_evidence = _artifact_content_dict(job, "claim_evidence")
     passage_index = _artifact_content_dict(job, "passage_index")
     quality_report = _artifact_content_dict(job, "quality_report")
+    parsed_document = _artifact_content_dict(job, "parsed_document") or _artifact_content_dict(job, "ingestion")
     formula_origin, formula_ocr_status = _formula_status_summary(
         claim_evidence=claim_evidence,
         passage_index=passage_index,
@@ -1705,11 +1708,33 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
         ),
         "formula_origin": formula_origin,
         "formula_ocr_status": formula_ocr_status,
+        "formula_detection_status": _formula_detection_status(parsed_document),
         "evidence_status": _evidence_status(status_content, claim_evidence),
         "quality_status": _quality_status(quality_report),
         "component_status": component_status if isinstance(component_status, dict) else {},
         "allowed_downstream": status_content.get("allowed_downstream", {}),
     }
+
+
+def _formula_detection_status(parsed_document: dict[str, object]) -> str:
+    """Describe what the parser actually did instead of treating zero formulas as failure."""
+    blocks = parsed_document.get("blocks", [])
+    if isinstance(blocks, list):
+        formulas = [
+            block for block in blocks
+            if isinstance(block, dict) and str(block.get("type") or "").lower() == "formula"
+        ]
+        if formulas:
+            return "detected"
+
+    parser_name = str(parsed_document.get("parser_name") or "").lower()
+    if "formula_prescreen" in parser_name:
+        return "scanned_no_candidates"
+    if "latex" in parser_name:
+        return "source_scanned_no_candidates"
+    if parser_name:
+        return "text_only_scan"
+    return "not_available"
 
 
 def _artifact_content_dict(job: JobRecord, artifact_type: str) -> dict[str, object]:

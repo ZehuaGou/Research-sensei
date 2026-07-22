@@ -49,7 +49,9 @@ class M4AskRequest(StrictRequest):
     user_question: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1200)] = ""
     selected_text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ""
     context_scope: Literal["paper", "selection"] = "paper"
-    answer_mode: Literal["evidence_only", "enhanced"] = "enhanced"
+    # Browser clients explicitly request ``full_paper``. Keep the legacy API
+    # default for older integrations that still depend on strict claim JSON.
+    answer_mode: Literal["full_paper", "evidence_only", "enhanced"] = "enhanced"
     conversation_history: list[ConversationTurn] = Field(default_factory=list, max_length=20)
 
 

@@ -385,11 +385,18 @@ onBeforeUnmount(() => {
               class="empty-card"
               data-testid="formula-degraded-message"
             >
-              <h2>公式拆解暂时不可用</h2>
-              <p>
-                当前公式来源不足以生成可信推导。系统没有把它伪装成完整解释，
-                原因是 {{ workspace.paperWorkspaceStatus.value.degradation_reason || 'FORMULA_DERIVATION_BLOCKED' }}。
-              </p>
+              <template v-if="workspace.paperWorkspaceStatus.value.formula_detection_status === 'scanned_no_candidates'">
+                <h2>本篇未发现独立公式</h2>
+                <p>系统已扫描 PDF 的正文与编号公式区域，没有发现适合单独拆解的方程。这不代表论文解析失败；本篇更偏方法与软件说明。</p>
+                <p>你仍然可以在 M4 中直接询问文中的指标、算法步骤或数学含义，M4 会结合整篇论文回答。</p>
+              </template>
+              <template v-else>
+                <h2>公式拆解暂时不可用</h2>
+                <p>
+                  当前公式来源不足以生成可信推导。系统没有把它伪装成完整解释，
+                  原因是 {{ workspace.paperWorkspaceStatus.value.degradation_reason || 'FORMULA_EXTRACTION_UNAVAILABLE' }}。
+                </p>
+              </template>
               <p v-if="workspace.hiddenRawFormulaCount.value">已隐藏 {{ workspace.hiddenRawFormulaCount.value }} 条不完整的原始公式残片。</p>
               <span v-if="workspace.paperWorkspaceStatus.value.formula_origin">公式来源：{{ workspace.paperWorkspaceStatus.value.formula_origin }}</span>
             </div>

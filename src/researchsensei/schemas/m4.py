@@ -56,10 +56,13 @@ class M4ContextTrace(SenseiModel):
     """User-safe description of how M4 interpreted the current turn."""
 
     scope: Literal["paper", "selection"] = "paper"
+    context_mode: Literal["full_paper", "evidence"] = "evidence"
     continued_from_history: bool = False
     focus_question: str = ""
     evidence_count: int = 0
     selected_text_used: bool = False
+    full_text_chars: int = 0
+    full_text_complete: bool = False
 
 
 class InteractiveAnswer(SenseiModel):

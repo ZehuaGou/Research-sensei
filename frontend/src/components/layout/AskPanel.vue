@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useLearningStore } from '../../stores/learning'
+import { useLearningStore, type ChatMessage } from '../../stores/learning'
 import { apiErrorMessage, workspaceApi } from '../../api/client'
 import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest, AskResponse } from '../../types/api'
 
@@ -26,7 +26,7 @@ const modeOptions: Array<{ key: AskMode; label: string; hint: string }> = [
 ]
 
 const modePrompts: Record<AskMode, string> = {
-  paper: '请像助教一样自然地讲清楚这篇论文的核心方法：先讲它想解决什么困惑，再讲方法怎么起作用，最后补一句主要证据。',
+  paper: '请像一位耐心的论文助教一样，结合整篇论文自然地讲清楚核心方法。根据内容决定详略，不要只给一句概括。',
   evidence: '这条结论对应哪条证据？',
   advisor: '',
 }
@@ -72,12 +72,12 @@ type AnswerSegment = {
 }
 
 const answerToneLabels: Record<AnswerTone, string> = {
-  lead: '重点',
-  concept: '解释',
-  evidence: '证据',
-  caution: '提醒',
-  followup: '追问',
-  plain: '说明',
+  lead: '回答',
+  concept: '',
+  evidence: '依据',
+  caution: '注意',
+  followup: '继续',
+  plain: '',
 }
 
 const answerHighlightTerms = [
@@ -144,14 +144,20 @@ function normalizeMessageText(value: string) {
 function splitAnswerText(content: string) {
   return content
     .replace(/\r\n/g, '\n')
-    .split(/\n\s*\n|\n(?=\s*(?:\d+[.、]|[-*]\s|[（(]?\d+[）)]))/)
+    .replace(/^\s{0,3}[-*_]{3,}\s*$/gm, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}[-*+]\s+/gm, '• ')
+    .split(/\n\s*\n|\n(?=\s*(?:\d+[.、]|[-*•]\s|[（(]?\d+[）)]))/)
     .map(part => part.replace(/\s*\n\s*/g, ' ').trim())
     .filter(Boolean)
 }
 
 function answerTone(text: string, index: number): AnswerTone {
   const compact = text.replace(/\s+/g, '')
-  if (/证据不足|没有足够|没有给出|无法|不能硬编|不确定|暂时|缺少|不足以|失败/.test(compact)) return 'caution'
+  if (/^(?:注意|提醒|限制|局限|不确定|证据不足|没有足够|没有给出|无法|不能硬编|暂时|缺少|不足以|失败)/.test(compact)) return 'caution'
   if (/组会追问|下一问|追问|你可以|继续问|可以继续|直接问|直接回我|试着回答|补一句/.test(compact)) return 'followup'
   if (index === 0) return 'lead'
   if (/能追到|证据是|依据是|正文|实验|结果|消融|评估|对比|支撑|显示|表明|观察到/.test(compact)) return 'evidence'
@@ -233,60 +239,20 @@ function assistantMessage(data: AskResponse) {
   }
 }
 
-function markEnhancementUnavailable(messageIndex: number) {
-  const current = store.chatHistory[messageIndex]
-  if (!current || current.role !== 'assistant') return
-  store.replaceMessage(messageIndex, {
-    ...current,
-    status: 'DEGRADED',
-    uncertainty: '模型增强暂时没有完成；上方答案仍来自当前论文的已验证证据。',
+async function askPaper(request: AskRequest, answerMode: 'full_paper' | 'evidence_only' = 'full_paper') {
+  const response = await workspaceApi.ask(store.currentJobId, {
+    ...request,
+    answer_mode: answerMode,
   })
+  store.addMessage(assistantMessage(response))
+  await scrollToBottom()
+  return response
 }
 
-async function askEvidenceFirst(request: AskRequest) {
-  const preview = await workspaceApi.ask(store.currentJobId, {
-    ...request,
-    answer_mode: 'evidence_only',
-  })
-  const previewRefs = stringList(preview.evidence_refs)
-  const previewIsGrounded = preview.status !== 'DEGRADED' || previewRefs.length > 0
-  let messageIndex = -1
-  if (previewIsGrounded) {
-    messageIndex = store.chatHistory.length
-    store.addMessage(assistantMessage(preview))
-    await scrollToBottom()
-  }
-
-  try {
-    const enhanced = await workspaceApi.ask(store.currentJobId, {
-      ...request,
-      answer_mode: 'enhanced',
-    })
-    if (
-      enhanced.status === 'DEGRADED'
-      && stringList(enhanced.evidence_refs).length === 0
-      && previewRefs.length > 0
-      && messageIndex >= 0
-    ) {
-      markEnhancementUnavailable(messageIndex)
-      return preview
-    }
-    if (messageIndex >= 0) {
-      store.replaceMessage(messageIndex, assistantMessage(enhanced))
-    } else {
-      store.addMessage(assistantMessage(enhanced))
-      await scrollToBottom()
-    }
-    return enhanced
-  } catch {
-    if (messageIndex >= 0) {
-      markEnhancementUnavailable(messageIndex)
-    } else {
-      store.addMessage(assistantMessage(preview))
-      await scrollToBottom()
-    }
-    return preview
-  }
+function contextSizeLabel(chars = 0) {
+  if (chars >= 10000) return `${(chars / 10000).toFixed(chars >= 100000 ? 0 : 1)} 万字全文`
+  if (chars > 0) return `${chars} 字全文`
+  return '整篇论文'
 }
 
 function useSuggestion(suggestion: string) {
@@ -324,27 +290,39 @@ async function loadMemory() {
           && typeof record === 'object'
           && (record as Record<string, unknown>).memory_type === 'interactive_answer'
         ))
-      const latest = records.at(-1)
-      const question = typeof latest?.question === 'string' ? normalizeMessageText(latest.question) : ''
-      if (latest && question) {
-        const evidenceRefs = stringList(latest.evidence_refs)
-        const timestamp = typeof latest.created_at === 'string' ? Date.parse(latest.created_at) : Date.now()
-        store.replaceChat([
-          { role: 'user', content: question, timestamp },
+      const restored = records.slice(-5).flatMap<ChatMessage>((record, index) => {
+        const question = typeof record.question === 'string' ? normalizeMessageText(record.question) : ''
+        const answer = typeof record.answer === 'string' ? normalizeMessageText(record.answer) : ''
+        if (!question || !answer) return []
+        const evidenceRefs = stringList(record.evidence_refs)
+        const metadata = record.metadata && typeof record.metadata === 'object'
+          ? record.metadata as Record<string, unknown>
+          : {}
+        const parsedTimestamp = typeof record.created_at === 'string' ? Date.parse(record.created_at) : Number.NaN
+        const timestamp = Number.isFinite(parsedTimestamp) ? parsedTimestamp : Date.now() + index * 2
+        return [
+          { role: 'user' as const, content: question, timestamp },
           {
-            role: 'assistant',
-            content: '已恢复这篇论文的上一轮问题。你可以直接继续追问；M4 会重新检索并验证当前证据，不回放旧版本答案。',
+            role: 'assistant' as const,
+            content: answer,
             timestamp: timestamp + 1,
             evidenceRefs,
+            status: typeof metadata.status === 'string' ? metadata.status : 'SUCCESS',
             contextTrace: {
-              scope: 'paper',
-              continued_from_history: true,
+              scope: metadata.selected_text ? 'selection' : 'paper',
+              context_mode: metadata.context_mode === 'full_paper' ? 'full_paper' : 'evidence',
+              continued_from_history: index > 0,
               focus_question: question,
               evidence_count: evidenceRefs.length,
-              selected_text_used: false,
+              selected_text_used: Boolean(metadata.selected_text),
+              full_text_chars: typeof metadata.full_text_chars === 'number' ? metadata.full_text_chars : 0,
+              full_text_complete: metadata.full_text_complete !== false,
             },
           },
-        ])
+        ]
+      })
+      if (restored.length) {
+        store.replaceChat(restored)
       }
     }
   } catch {
@@ -369,7 +347,7 @@ async function send() {
       context_scope: selectedText ? 'selection' : 'paper',
       conversation_history: conversationHistory,
     }
-    await askEvidenceFirst(request)
+    await askPaper(request, mode.value === 'evidence' ? 'evidence_only' : 'full_paper')
     await loadMemory()
   } catch (error) {
     const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
@@ -393,14 +371,13 @@ async function requestAdvisorQuestion() {
   isLoading.value = true
   try {
     if (focusQuestion) {
-      const answerData = await askEvidenceFirst({
+      const answerData = await askPaper({
         question: focusQuestion,
         selected_text: selectedText,
         context_scope: selectedText ? 'selection' : 'paper',
         conversation_history: conversationHistory,
-      })
+      }, 'full_paper')
       const answerEvidenceRefs = stringList(answerData.evidence_refs)
-      store.addMessage(assistantMessage(answerData))
       if (answerData.status === 'DEGRADED' && answerEvidenceRefs.length === 0) {
         await loadMemory()
         return
@@ -556,7 +533,7 @@ watch(fontSize, (value) => {
       <div>
         <h2>M4 论文助教</h2>
         <strong v-if="props.paperTitle" class="paper-focus" :title="props.paperTitle">{{ props.paperTitle }}</strong>
-        <p>{{ store.selectedText ? '当前论文 · 选中文本已加入上下文' : '当前论文证据已锁定 · 支持连续追问' }}</p>
+        <p>{{ store.selectedText ? '整篇论文 + 选中文本 · 支持连续追问' : '整篇论文已加入上下文 · 支持连续追问' }}</p>
       </div>
       <div class="header-actions">
         <div class="font-controls" aria-label="M4 字体大小">
@@ -604,7 +581,7 @@ watch(fontSize, (value) => {
       aria-live="polite"
     >
       <div v-if="!store.chatHistory.length && !isLoading" class="empty">
-        <span class="scope-badge">仅当前论文</span>
+        <span class="scope-badge">整篇论文对话</span>
         <h3>从理解论文开始</h3>
         <p>先问一个具体问题，之后可以直接用“它”“为什么”“展开讲”连续追问。</p>
         <div class="starter-prompts">
@@ -625,7 +602,10 @@ watch(fontSize, (value) => {
         <div v-if="msg.role === 'assistant'" class="message-body">
           <div class="context-trace" v-if="msg.contextTrace" data-testid="context-trace">
             <span>{{ msg.contextTrace.continued_from_history ? '承接上一问' : msg.contextTrace.scope === 'selection' ? '选中文本' : '当前论文' }}</span>
-            <span>{{ msg.contextTrace.evidence_count }} 条已验证证据</span>
+            <span v-if="msg.contextTrace.context_mode === 'full_paper'">
+              {{ contextSizeLabel(msg.contextTrace.full_text_chars) }}{{ msg.contextTrace.full_text_complete === false ? ' · 已压缩' : '' }}
+            </span>
+            <span v-else>{{ msg.contextTrace.evidence_count }} 条出处</span>
           </div>
           <div class="bubble answer-bubble">
             <p
@@ -634,7 +614,7 @@ watch(fontSize, (value) => {
               class="answer-block"
               :class="`tone-${block.tone}`"
             >
-              <span class="answer-label">{{ block.label }}</span>
+              <span v-if="block.label" class="answer-label">{{ block.label }}</span>
               <span class="answer-text">
                 <template
                   v-for="(segment, segmentIndex) in highlightSegments(block.text)"
@@ -663,7 +643,7 @@ watch(fontSize, (value) => {
 
       <div v-if="isLoading" class="message assistant">
         <div class="avatar">M4</div>
-        <div class="bubble loading">正在读证据并组织回答...</div>
+        <div class="bubble loading">正在阅读整篇论文并组织回答...</div>
       </div>
     </div>
 

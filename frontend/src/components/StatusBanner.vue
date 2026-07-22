@@ -43,7 +43,9 @@ const message = computed(() => {
       props.componentStatus?.formula_cards === 'SKIPPED'
       || props.paperWorkspaceStatus?.formula_origin === 'not_applicable'
     ) {
-      return '可以阅读论文卡片并继续向 M4 追问；本文未检测到可验证公式，因此没有生成公式卡片。'
+      return props.paperWorkspaceStatus?.formula_detection_status === 'scanned_no_candidates'
+        ? '可以阅读论文并继续向 M4 追问；PDF 已完成公式区域扫描，本篇未发现可生成卡片的独立方程。'
+        : '可以阅读论文并继续向 M4 追问；当前没有可生成卡片的公式。'
     }
     return '可以阅读论文卡片、解释公式，并继续向 M4 追问。'
   }
@@ -67,6 +69,7 @@ const compactRows = computed(() => {
     ['证据', details.evidence_status],
     ['质量', details.quality_status],
     ['公式来源', details.formula_origin],
+    ['公式检测', details.formula_detection_status],
     ['公式 OCR', details.formula_ocr_status],
     ['阻断原因', props.blockingReason || details.degradation_reason],
   ]
@@ -108,6 +111,10 @@ function readableKey(value: unknown) {
     source_latex: '论文 LaTeX',
     mineru_latex: 'MinerU LaTeX',
     raw_formula_text: '原始公式文本',
+    detected: '已发现公式',
+    scanned_no_candidates: '已扫描，未发现独立公式',
+    source_scanned_no_candidates: '已扫描 LaTeX，未发现独立公式',
+    text_only_scan: '仅完成文本公式扫描',
   }
   return labels[text] || text
 }

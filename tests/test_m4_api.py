@@ -7,6 +7,7 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ModelProviderConfig
 from researchsensei.llm.client import LLMClient
+from researchsensei.llm.types import ChatResponse
 from researchsensei.m4.service import _claim_content_supported, _teach_phrase
 from researchsensei.web.app import create_app
 
@@ -100,6 +101,112 @@ class TimeoutM4LLM(FailingM4LLM):
     async def chat_json(self, messages, *, config=None):
         self.calls += 1
         raise RuntimeError("simulated llm request timed out")
+
+
+class FullPaperM4LLM:
+    def __init__(self, answer: str = "这篇论文先定义问题，再按三个步骤实现方法，并通过实验比较说明效果。") -> None:
+        self.answer = answer
+        self.calls = 0
+        self.messages = []
+        self.configs = []
+        self.provider = ModelProviderConfig(
+            name="opencode_go",
+            kind="openai_compatible",
+            base_url="https://opencode.ai/zen/go/v1",
+            model="deepseek-v4-pro",
+            api_key_env="OPENCODE_GO_API_KEY",
+        )
+
+    async def chat(self, messages, *, config=None):
+        self.calls += 1
+        self.messages.append(messages)
+        self.configs.append(config)
+        return ChatResponse(content=self.answer, model=self.provider.model)
+
+    async def chat_json(self, messages, *, config=None):
+        raise AssertionError("full-paper mode must use natural-language chat")
+
+
+def test_m4_full_paper_mode_uses_complete_text_and_natural_answer(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "full_paper")
+    llm = FullPaperM4LLM(
+        answer=(
+            "这篇论文要解决的是稀疏证据难以连接的问题。\n\n"
+            "方法上，它先定位相关片段，再用注意力结构聚合上下文，最后完成检索判断。\n\n"
+            "实验用于比较这种连接机制是否比孤立处理片段更稳定。"
+        )
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "请详细解释这篇论文的方法。",
+            "answer_mode": "full_paper",
+            "conversation_history": [
+                {"role": "user", "content": "它解决什么问题？"},
+                {"role": "assistant", "content": "它处理稀疏证据检索问题。"},
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert "先定位相关片段" in data["answer"]
+    assert data["claims"] == []
+    assert data["context_trace"]["context_mode"] == "full_paper"
+    assert data["context_trace"]["full_text_complete"] is True
+    assert data["context_trace"]["full_text_chars"] > 80
+    assert data["used_context"]["full_paper"] is True
+    assert data["used_context"]["llm"] is True
+    assert llm.calls == 1
+    assert llm.configs[0].json_mode is False
+    assert llm.configs[0].max_tokens == 6_000
+    assert llm.configs[0].timeout == 180.0
+    prompt_text = "\n".join(message.content for message in llm.messages[0])
+    assert "The attention architecture links sparse evidence passages" in prompt_text
+    assert "它解决什么问题" in prompt_text
+    assert "required_json_schema" not in prompt_text
+    assert "allowed_evidence_refs" not in prompt_text
+
+
+def test_m4_full_paper_mode_includes_selected_text_without_requiring_a_ref(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "full_paper_selection")
+    llm = FullPaperM4LLM("这段话的意思是：注意力结构负责把分散片段组合成统一上下文。")
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "这句话具体是什么意思？",
+            "selected_text": "attention connects scattered passages",
+            "context_scope": "selection",
+            "answer_mode": "full_paper",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert data["context_trace"]["selected_text_used"] is True
+    assert data["context_trace"]["scope"] == "selection"
+    prompt_text = "\n".join(message.content for message in llm.messages[0])
+    assert "attention connects scattered passages" in prompt_text
 
 
 def test_m4_anthropic_provider_uses_full_reasoning_output_budget(tmp_path: Path) -> None:
