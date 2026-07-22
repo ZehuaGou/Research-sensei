@@ -807,7 +807,7 @@ def test_m4_ask_fallback_answers_chinese_focus_with_relevant_evidence(tmp_path: 
     assert "贴着你的问题看，可以追到这些依据" in data["answer"]
     assert "用注意力架构连接分散的证据片段" in data["answer"]
     assert "证据片段太分散" in data["answer"]
-    assert "它不是空泛地说" in data["answer"]
+    assert "它不是只重复论文目标" in data["answer"]
     assert "重点：" not in data["answer"]
     assert "核心机制：" not in data["answer"]
     assert "attention architecture links sparse evidence passages" not in data["answer"]

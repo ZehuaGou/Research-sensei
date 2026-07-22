@@ -2140,7 +2140,7 @@ def _structured_paper_answer(
     why_items = []
     if problem and method:
         why_items.append(
-            f"它不是空泛地说“提升检索”，而是把“{_strip_terminal_punctuation(method)}”作为具体步骤，"
+            f"它不是只重复论文目标，而是把“{_strip_terminal_punctuation(method)}”作为具体步骤，"
             f"用来回应“{_strip_terminal_punctuation(problem)}”这个困难"
         )
     elif method:
