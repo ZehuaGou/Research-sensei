@@ -742,6 +742,36 @@ suite.
   `12 passed`, and the full frontend suite reported `90 passed`. Ruff, mypy,
   frontend typecheck, and the production build passed.
 
+### M4 evidence-first answer regression (2026-07-22)
+
+- The timeout fallback above was still too narrow. Paper-card actions such as
+  `用中文讲透这篇论文` intentionally ignore their generated Chinese summary as
+  raw source evidence, but the timeout fallback required a non-ignored text
+  selection. In addition, a model response rejected as
+  `M4_CLAIM_UNSUPPORTED` could replace an already available artifact answer
+  with the generic failure card.
+- M4 questions now use two phases. `evidence_only` returns the deterministic,
+  evidence-bound paper-card answer without calling the model or persisting a
+  duplicate memory record. The frontend displays that result immediately and
+  then requests `enhanced` output in the background. A successful audited model
+  result replaces the preview; an empty, timed-out, invalid, or unsupported
+  model result cannot replace a preview that already has verified evidence.
+- The backend also preserves any locally verified artifact answer when the
+  model transport times out or fails. Unsupported model claims remain rejected;
+  the change retains the independent artifact answer rather than admitting the
+  rejected model text. Questions with no traceable evidence still fail closed.
+- On GiA Roots job `941a6709af95`, the exact screenshot question returned a
+  1,679-character evidence answer with refs `b001` and `b002` in 222 ms without
+  calling the model. The enhancement request then timed out after 80.7 seconds
+  and retained the same answer. A separate in-app browser run exercised
+  `M4_CLAIM_UNSUPPORTED`: the page showed the evidence answer immediately,
+  removed the loading state after model validation, kept the answer, and added
+  only the controlled enhancement notice.
+- Verification: M4 API tests reported `37 passed`; the full backend suite
+  reported `823 passed, 15 skipped`. Targeted frontend tests reported
+  `14 passed`, and the full frontend suite reported `92 passed`. Ruff, mypy,
+  frontend typecheck, and the production build passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not

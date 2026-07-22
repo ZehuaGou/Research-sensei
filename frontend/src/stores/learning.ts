@@ -44,6 +44,12 @@ export const useLearningStore = defineStore('learning', () => {
     if (currentJobId.value) chatByJob.value[currentJobId.value] = [...messages]
   }
 
+  function replaceMessage(index: number, msg: ChatMessage) {
+    if (index < 0 || index >= chatHistory.value.length) return
+    chatHistory.value.splice(index, 1, msg)
+    if (currentJobId.value) chatByJob.value[currentJobId.value] = [...chatHistory.value]
+  }
+
   function setCurrentJob(jobId: string) {
     const nextJobId = jobId.trim()
     if (nextJobId === currentJobId.value) return
@@ -67,6 +73,7 @@ export const useLearningStore = defineStore('learning', () => {
     addMessage,
     clearChat,
     replaceChat,
+    replaceMessage,
     setCurrentJob,
     setSelectedText,
   }

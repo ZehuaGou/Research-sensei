@@ -233,6 +233,46 @@ function assistantMessage(data: AskResponse) {
   }
 }
 
+function markEnhancementUnavailable(messageIndex: number) {
+  const current = store.chatHistory[messageIndex]
+  if (!current || current.role !== 'assistant') return
+  store.replaceMessage(messageIndex, {
+    ...current,
+    status: 'DEGRADED',
+    uncertainty: '模型增强暂时没有完成；上方答案仍来自当前论文的已验证证据。',
+  })
+}
+
+async function askEvidenceFirst(request: AskRequest) {
+  const preview = await workspaceApi.ask(store.currentJobId, {
+    ...request,
+    answer_mode: 'evidence_only',
+  })
+  const messageIndex = store.chatHistory.length
+  store.addMessage(assistantMessage(preview))
+  await scrollToBottom()
+
+  try {
+    const enhanced = await workspaceApi.ask(store.currentJobId, {
+      ...request,
+      answer_mode: 'enhanced',
+    })
+    if (
+      enhanced.status === 'DEGRADED'
+      && stringList(enhanced.evidence_refs).length === 0
+      && stringList(preview.evidence_refs).length > 0
+    ) {
+      markEnhancementUnavailable(messageIndex)
+      return preview
+    }
+    store.replaceMessage(messageIndex, assistantMessage(enhanced))
+    return enhanced
+  } catch {
+    markEnhancementUnavailable(messageIndex)
+    return preview
+  }
+}
+
 function useSuggestion(suggestion: string) {
   input.value = suggestion
 }
@@ -313,8 +353,7 @@ async function send() {
       context_scope: selectedText ? 'selection' : 'paper',
       conversation_history: conversationHistory,
     }
-    const data = await workspaceApi.ask(store.currentJobId, request)
-    store.addMessage(assistantMessage(data))
+    await askEvidenceFirst(request)
     await loadMemory()
   } catch (error) {
     const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
@@ -338,7 +377,7 @@ async function requestAdvisorQuestion() {
   isLoading.value = true
   try {
     if (focusQuestion) {
-      const answerData = await workspaceApi.ask(store.currentJobId, {
+      const answerData = await askEvidenceFirst({
         question: focusQuestion,
         selected_text: selectedText,
         context_scope: selectedText ? 'selection' : 'paper',

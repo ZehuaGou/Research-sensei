@@ -43,6 +43,7 @@ export interface AskRequest {
   question: string
   selected_text?: string
   context_scope: 'selection' | 'paper'
+  answer_mode?: 'evidence_only' | 'enhanced'
   conversation_history?: ConversationMessageRequest[]
 }
 

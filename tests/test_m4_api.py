@@ -1045,7 +1045,7 @@ def test_m4_user_facing_fallbacks_do_not_contain_mojibake(tmp_path: Path) -> Non
         _assert_no_mojibake(response.json())
 
 
-def test_m4_ask_reports_llm_request_failure_without_local_fallback(tmp_path: Path) -> None:
+def test_m4_ask_keeps_verified_artifact_answer_when_llm_request_fails(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     llm = FailingM4LLM()
     client = TestClient(
@@ -1065,11 +1065,78 @@ def test_m4_ask_reports_llm_request_failure_without_local_fallback(tmp_path: Pat
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "DEGRADED"
-    assert "没有拿到可用的大模型解释" in data["answer"]
-    assert "没有改用本地卡片兜底" in data["answer"]
-    assert data["evidence_refs"] == []
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+    assert data["evidence_refs"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
+    assert "没有使用未经验证的模型输出" in data["uncertainty"]
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
-    assert data["warnings"][0]["code"] == "M4_LLM_REQUEST_FAILED"
+    assert data["warnings"][-1]["code"] == "M4_LLM_REQUEST_FAILED"
+    assert llm.calls == 1
+
+
+def test_m4_evidence_only_returns_before_llm_and_does_not_persist_preview(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "evidence_first")
+    llm = TimeoutM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "说得再详细一些，这到底是什么、怎么实现的？",
+            "selected_text": "用中文讲透这篇论文：本文提出一种连接稀疏证据的方法。",
+            "context_scope": "selection",
+            "answer_mode": "evidence_only",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"]
+    assert data["evidence_refs"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
+    assert data["context_trace"]["selected_text_used"] is True
+    assert llm.calls == 0
+    assert client.get(f"/api/v1/jobs/{job_id}/memory").json()["records"] == []
+
+
+def test_m4_paper_card_context_timeout_keeps_verified_answer(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "paper_card_timeout")
+    llm = TimeoutM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "说得再详细一些，这到底是什么、怎么实现的？",
+            "selected_text": "用中文讲透这篇论文：本文提出一种连接稀疏证据的方法。",
+            "context_scope": "selection",
+            "answer_mode": "enhanced",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["answer"]
+    assert data["evidence_refs"]
+    assert data["warnings"][-1]["code"] == "M4_LLM_TIMEOUT"
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+    assert "没有使用未经验证的模型输出" in data["uncertainty"]
     assert llm.calls == 1
 
 

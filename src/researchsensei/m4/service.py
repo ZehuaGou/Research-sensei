@@ -170,6 +170,7 @@ class M4InteractionService:
     def answer_question(self, payload: dict[str, object]) -> InteractiveAnswer:
         question = _compact_user_text(payload.get("question") or payload.get("user_question"), max_chars=1200)
         selected_text = _compact_user_text(payload.get("selected_text"), max_chars=2000)
+        answer_mode = _clean(payload.get("answer_mode")) or "enhanced"
         conversation_history = _conversation_history(payload.get("conversation_history"))
         if not question and selected_text:
             question = f"请解释这段内容：{selected_text}"
@@ -282,6 +283,29 @@ class M4InteractionService:
         )
         llm_uncertainty = ""
 
+        if answer_mode == "evidence_only":
+            return InteractiveAnswer(
+                status="SUCCESS" if evidence_refs and not grounding_degraded else "DEGRADED",
+                answer=answer,
+                evidence_refs=evidence_refs,
+                claims=grounded_claims,
+                uncertainty=(
+                    "当前先显示论文证据能够直接支持的内容；模型增强仍可继续补充。"
+                    if evidence_refs
+                    else "当前论文卡片没有找到能直接支持这个问题的证据。"
+                ),
+                follow_up_suggestions=_follow_ups(),
+                used_context={"memory": False, "artifacts": True, "llm": False},
+                context_trace=M4ContextTrace(
+                    scope="selection" if selected_text else "paper",
+                    continued_from_history=continued_from_history,
+                    focus_question=effective_question,
+                    evidence_count=len(evidence_refs),
+                    selected_text_used=bool(selected_text),
+                ),
+                warnings=warnings,
+            )
+
         llm_evidence_refs = self._expanded_question_evidence_refs(
             question=effective_question,
             selected_text=selected_text,
@@ -325,14 +349,12 @@ class M4InteractionService:
             code = str(llm_result.get("code") or "M4_LLM_FAILED")
             message = str(llm_result.get("message") or "LLM did not return a usable answer.")
             detail = str(llm_result.get("detail") or "")
-            can_use_verified_selection = bool(
-                selected_text
-                and not ignore_selection
-                and evidence_refs
+            can_use_verified_artifacts = bool(
+                evidence_refs
                 and grounded_claims
                 and code in {"M4_LLM_TIMEOUT", "M4_LLM_REQUEST_FAILED"}
             )
-            if can_use_verified_selection:
+            if can_use_verified_artifacts:
                 grounding_degraded = True
                 llm_uncertainty = (
                     "大模型增强解释未在时限内完成；当前内容来自已定位的论文证据，"
@@ -341,7 +363,7 @@ class M4InteractionService:
                 warnings.append(
                     _warning(
                         code,
-                        "大模型增强解释未完成，已保留经证据校验的选中文本解释。",
+                        "大模型增强解释未完成，已保留经证据校验的论文卡片答案。",
                         detail=detail,
                     )
                 )

@@ -127,6 +127,94 @@ describe('AskPanel', () => {
     expect(wrapper.text()).not.toContain('m4_memory_2')
   })
 
+  it('shows verified evidence before the model enhancement finishes', async () => {
+    let resolveEnhanced: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (body.answer_mode === 'evidence_only') {
+        return jsonResponse({
+          status: 'SUCCESS',
+          answer: '先显示的论文证据答案：这个方法通过证据片段完成核心机制。',
+          evidence_refs: ['paper:b001'],
+          context_trace: {
+            scope: 'paper',
+            continued_from_history: false,
+            focus_question: '怎么实现的？',
+            evidence_count: 1,
+            selected_text_used: false,
+          },
+        })
+      }
+      if (body.answer_mode === 'enhanced') {
+        return await new Promise<ReturnType<typeof jsonResponse>>(resolve => {
+          resolveEnhanced = resolve
+        })
+      }
+      return jsonResponse({ records: [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('说得再详细一些，这到底是什么、怎么实现的？')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('先显示的论文证据答案')
+    expect(wrapper.text()).toContain('正在读证据并组织回答')
+    expect(resolveEnhanced).toBeTypeOf('function')
+
+    resolveEnhanced?.(jsonResponse({
+      status: 'SUCCESS',
+      answer: '模型增强后的证据答案：先解释是什么，再解释实现机制。',
+      evidence_refs: ['paper:b001'],
+      context_trace: {
+        scope: 'paper',
+        continued_from_history: false,
+        focus_question: '怎么实现的？',
+        evidence_count: 1,
+        selected_text_used: false,
+      },
+    }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('模型增强后的证据答案')
+    expect(wrapper.text()).not.toContain('先显示的论文证据答案')
+  })
+
+  it('does not replace verified evidence with an unsupported model failure', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (body.answer_mode === 'evidence_only') {
+        return jsonResponse({
+          status: 'SUCCESS',
+          answer: '已经通过论文证据验证的本地答案。',
+          evidence_refs: ['paper:b001'],
+        })
+      }
+      if (body.answer_mode === 'enhanced') {
+        return jsonResponse({
+          status: 'DEGRADED',
+          answer: 'M4 这次没有拿到可用的大模型解释。',
+          evidence_refs: [],
+          warnings: [{ code: 'M4_CLAIM_UNSUPPORTED', message: '模型结论未通过证据审计。' }],
+        })
+      }
+      return jsonResponse({ records: [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('这个方法怎么实现？')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('已经通过论文证据验证的本地答案')
+    expect(wrapper.text()).toContain('模型增强暂时没有完成')
+    expect(wrapper.text()).not.toContain('没有拿到可用的大模型解释')
+  })
+
   it('answers a custom user question before creating a focused advisor question', async () => {
     const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)
