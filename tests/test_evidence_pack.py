@@ -214,3 +214,20 @@ def test_evidence_pack_retains_method_claim_before_formula_budget() -> None:
 
     assert pack.items[0].claim_type == "METHOD"
     assert any(item.claim_type == "METHOD" for item in pack.items)
+
+
+def test_evidence_pack_keeps_enough_prose_for_card_generation_by_default() -> None:
+    passage_text = "We present a semiautomated root analysis toolbox. " + ("Detailed method context. " * 45)
+    claim_bundle = ClaimEvidenceBundle(
+        paper_id="paper",
+        claims=[_method_claim(1, "We present a semiautomated root analysis toolbox.")],
+    )
+    passage_index = PassageIndex(
+        paper_id="paper",
+        passages=[_method_passage(1, passage_text)],
+    )
+
+    pack = build_evidence_pack(claim_bundle, passage_index)
+
+    assert len(pack.items[0].passage_text) > 500
+    assert len(pack.items[0].passage_text) <= 1200

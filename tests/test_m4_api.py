@@ -7,7 +7,7 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ModelProviderConfig
 from researchsensei.llm.client import LLMClient
-from researchsensei.m4.service import _claim_content_supported
+from researchsensei.m4.service import _claim_content_supported, _teach_phrase
 from researchsensei.web.app import create_app
 
 
@@ -34,6 +34,13 @@ def test_m4_grounding_rejects_unmentioned_root_software_mechanism() -> None:
 
     assert supported is False
     assert reason.startswith("unsupported_specific_concept:")
+
+
+def test_m4_teaching_translation_does_not_leave_plural_suffixes() -> None:
+    translated = _teach_phrase("These methods compare evidence passages.")
+
+    assert "方法s" not in translated
+    assert "证据片段s" not in translated
 
 
 class ScriptedM4LLM:
@@ -581,6 +588,112 @@ def test_m4_accepts_concise_problem_answer_after_claim_grounding(tmp_path: Path)
 
     assert response.status_code == 200
     assert response.json()["status"] == "SUCCESS"
+
+
+def test_m4_placeholder_card_is_not_presented_as_grounded_evidence(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "placeholder_card")
+    _write_json(
+        artifact_dir / "paper_card.json",
+        {
+            "paper_id": "paper",
+            "title": "Placeholder Card",
+            "one_sentence_summary": "UNKNOWN",
+            "evidence_refs": ["paper:b001"],
+            "problem": {"text": "证据不足，暂不展开。", "evidence_ref": "paper:b001"},
+            "core_idea": {"text": "核心想法围绕 Image-Analysis 形成方法改进。", "evidence_ref": "paper:b001"},
+            "method_overview": {"text": "证据不足，暂不展开。", "evidence_ref": "paper:b001"},
+        },
+    )
+    client = TestClient(
+        create_app(workspace_root=tmp_path / "workspace", allowed_local_roots=[tmp_path])
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这篇论文真正解决了什么问题？", "answer_mode": "evidence_only"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == []
+    assert "证据不足，暂不展开" not in data["answer"]
+    assert "M4_CONTEXT_MISSING" in {warning["code"] for warning in data["warnings"]}
+
+
+def test_m4_problem_question_rejects_method_only_answer(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "method_only_problem_answer")
+    llm = ScriptedM4LLM(
+        answer="论文采用注意力结构连接分散的证据片段，并聚合相关上下文来完成检索流程。",
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这篇论文真正解决了什么问题？"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert "M4_LLM_LOW_QUALITY" in {warning["code"] for warning in data["warnings"]}
+    assert data["evidence_refs"] == []
+    assert "采用注意力结构连接分散的证据片段" not in data["answer"]
+
+
+def test_m4_excludes_blocked_raw_formula_from_grounded_prompt(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "blocked_raw_formula")
+    passage_index = json.loads((artifact_dir / "passage_index.json").read_text(encoding="utf-8"))
+    passage_index["passages"].append({
+        "passage_id": "p2",
+        "text": "lines = parent root",
+        "section": "full_text",
+        "evidence_refs": ["paper:b002"],
+        "formula_origins": ["raw_formula_text"],
+        "risk_flags": ["RAW_FORMULA_TEXT"],
+    })
+    _write_json(artifact_dir / "passage_index.json", passage_index)
+    _write_json(
+        artifact_dir / "formula_cards.json",
+        {
+            "paper_id": "paper",
+            "formula_cards": [{
+                "formula_id": "bad-formula",
+                "plain_summary": "lines = parent root",
+                "formula_origin": "raw_formula_text",
+                "coverage_status": "BLOCKED_RAW_ONLY",
+                "warnings": ["RAW_FORMULA_TEXT"],
+                "evidence_ref": "paper:b002",
+            }],
+        },
+    )
+    llm = ScriptedM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={"question": "这篇论文的方法和公式是什么？"},
+    )
+
+    assert response.status_code == 200
+    prompt = json.loads(llm.messages[0][-1].content)
+    assert "paper:b002" not in prompt["context"]["allowed_evidence_refs"]
+    assert "lines = parent root" not in json.dumps(prompt, ensure_ascii=False)
 
 
 def test_m4_accepts_server_source_quote_id_without_model_recopying_text(tmp_path: Path) -> None:

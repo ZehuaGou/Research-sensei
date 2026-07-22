@@ -248,9 +248,14 @@ async function askEvidenceFirst(request: AskRequest) {
     ...request,
     answer_mode: 'evidence_only',
   })
-  const messageIndex = store.chatHistory.length
-  store.addMessage(assistantMessage(preview))
-  await scrollToBottom()
+  const previewRefs = stringList(preview.evidence_refs)
+  const previewIsGrounded = preview.status !== 'DEGRADED' || previewRefs.length > 0
+  let messageIndex = -1
+  if (previewIsGrounded) {
+    messageIndex = store.chatHistory.length
+    store.addMessage(assistantMessage(preview))
+    await scrollToBottom()
+  }
 
   try {
     const enhanced = await workspaceApi.ask(store.currentJobId, {
@@ -260,15 +265,26 @@ async function askEvidenceFirst(request: AskRequest) {
     if (
       enhanced.status === 'DEGRADED'
       && stringList(enhanced.evidence_refs).length === 0
-      && stringList(preview.evidence_refs).length > 0
+      && previewRefs.length > 0
+      && messageIndex >= 0
     ) {
       markEnhancementUnavailable(messageIndex)
       return preview
     }
-    store.replaceMessage(messageIndex, assistantMessage(enhanced))
+    if (messageIndex >= 0) {
+      store.replaceMessage(messageIndex, assistantMessage(enhanced))
+    } else {
+      store.addMessage(assistantMessage(enhanced))
+      await scrollToBottom()
+    }
     return enhanced
   } catch {
-    markEnhancementUnavailable(messageIndex)
+    if (messageIndex >= 0) {
+      markEnhancementUnavailable(messageIndex)
+    } else {
+      store.addMessage(assistantMessage(preview))
+      await scrollToBottom()
+    }
     return preview
   }
 }

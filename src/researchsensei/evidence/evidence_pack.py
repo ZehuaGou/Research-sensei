@@ -31,7 +31,7 @@ def build_evidence_pack(
     max_total_tokens: int = 4000,
     max_items_per_type: int = 3,
     max_formula_items: int = 5,
-    max_passage_chars: int = 500,
+    max_passage_chars: int = 1200,
 ) -> EvidencePack:
     paper_id = claim_bundle.paper_id
     warnings: list[WarningItem] = []

@@ -132,7 +132,10 @@ def build_passage_index(
             buffer_section = block_section
         if block_section:
             sections_found.add(block_section)
-            if not buffer_section:
+            # A title/heading can leave a section label behind even though it
+            # contributes no buffered text. The first real paragraph owns its
+            # declared section and must not inherit that stale label.
+            if not buffer_blocks:
                 buffer_section = block_section
 
         buffer_blocks.append(block)

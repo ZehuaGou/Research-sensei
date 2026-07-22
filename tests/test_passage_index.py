@@ -90,6 +90,30 @@ def test_heading_becomes_section_boundary() -> None:
     assert "b001" in index.passages[0].block_ids
 
 
+def test_paragraph_section_replaces_stale_title_section() -> None:
+    doc = _make_document([
+        DocumentBlock(
+            block_id="title-meta",
+            type=BlockType.TITLE,
+            text="Paper title",
+            evidence_ref="t:title-meta",
+            section="title",
+        ),
+        DocumentBlock(
+            block_id="b001",
+            type=BlockType.PARAGRAPH,
+            text="We present a semiautomated image-analysis tool for complex root systems.",
+            evidence_ref="t:b001",
+            section="full_text",
+        ),
+    ])
+
+    index = build_passage_index(doc)
+
+    assert len(index.passages) == 1
+    assert index.passages[0].section == "full_text"
+
+
 def test_same_section_paragraphs_merge() -> None:
     doc = _make_document([
         DocumentBlock(block_id="h001", type=BlockType.HEADING, text="Method", evidence_ref="t:h001", section="method"),

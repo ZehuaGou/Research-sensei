@@ -616,7 +616,8 @@ class M4InteractionService:
         seed_refs: list[str],
         limit: int = 8,
     ) -> list[str]:
-        refs = _unique(seed_refs)
+        blocked_formula_refs = self._blocked_formula_evidence_refs()
+        refs = [ref for ref in _unique(seed_refs) if ref not in blocked_formula_refs]
         if _should_include_formula_context(question, selected_text):
             for ref in self._formula_card_refs(limit=5):
                 if ref not in refs:
@@ -626,7 +627,7 @@ class M4InteractionService:
         query = f"{question} {selected_text}".strip()
         for candidate, score in self._ranked_evidence_candidates(query):
             ref = _clean(candidate.get("evidence_ref"))
-            if not ref or ref in refs:
+            if not ref or ref in refs or ref in blocked_formula_refs:
                 continue
             if score < 0.08 and refs:
                 continue
@@ -707,6 +708,11 @@ class M4InteractionService:
                 "follow_up_suggestions": ["基于现有论文证据可以继续追问的问题"],
             },
         }
+        if _is_problem_solution_question(question):
+            prompt["output_rules"].append(
+                "当前问题询问论文真正面对的研究问题或痛点；至少一条 claim 必须明确说明现有做法的困难、"
+                "限制或未满足需求，不能只复述新方法的步骤、模块或功能。"
+            )
         messages = [
             ChatMessage(
                 role="system",
@@ -891,7 +897,9 @@ class M4InteractionService:
                     )
                     refs = _primary_paper_card_refs(paper_card) or _list_of_one(ref)
                     return answer or f"关于“{label}”：{text}", refs, 0.82 if refs else 0.4, []
-        summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
+        summary = _usable_card_text(paper_card.get("one_sentence_summary")) or _usable_card_text(
+            paper_card.get("thirty_second")
+        )
         refs = _primary_paper_card_refs(paper_card) or self._paper_card_refs()
         if summary:
             return (
@@ -1057,12 +1065,27 @@ class M4InteractionService:
         for formula in formulas:
             if not isinstance(formula, dict):
                 continue
+            if not _formula_card_is_usable(formula):
+                continue
             ref = _clean(formula.get("evidence_ref"))
             if ref:
                 refs.append(ref)
             if len(_unique(refs)) >= limit:
                 break
         return _unique(refs)[:limit]
+
+    def _blocked_formula_evidence_refs(self) -> set[str]:
+        refs: set[str] = set()
+        formulas = _as_dict(self.artifacts.get("formula_cards")).get("formula_cards", [])
+        if not isinstance(formulas, list):
+            return refs
+        for formula in formulas:
+            if not isinstance(formula, dict) or _formula_card_is_usable(formula):
+                continue
+            ref = _clean(formula.get("evidence_ref"))
+            if ref:
+                refs.add(ref)
+        return refs
 
     def _best_evidence(self, text: str) -> dict[str, object]:
         candidates = self._evidence_candidates()
@@ -1094,6 +1117,8 @@ class M4InteractionService:
         normalized_query = _normalize(query)
         ranked: list[tuple[dict[str, object], float]] = []
         for candidate in candidates:
+            if _is_unreliable_evidence_candidate(candidate):
+                continue
             haystack = _candidate_text(candidate)
             haystack_terms = _expanded_query_terms(haystack)
             overlap = len(query_terms & haystack_terms)
@@ -1124,6 +1149,20 @@ class M4InteractionService:
                 score += 0.08
             if _clean(candidate.get("artifact_source")) == "passage_index":
                 score += 0.1
+            if _is_problem_solution_question(query):
+                problem_markers = (
+                    "we present in this paper",
+                    "in this study, we introduce",
+                    "need for",
+                    "time consuming",
+                    "time-consuming",
+                    "errors",
+                    "root overlap",
+                    "hampered",
+                    "challenge",
+                    "problem",
+                )
+                score += 0.12 * sum(marker in haystack_lower for marker in problem_markers)
             # Keep the raw score for ordering. Capping every strong match at
             # 0.99 erased the list-specific bonus and restored artifact order,
             # which could put an abstract ahead of the passage containing the
@@ -1146,6 +1185,9 @@ class M4InteractionService:
                     "passage_id": passage_id,
                     "text": _clean(passage.get("text")) or _clean(passage.get("normalized_text")),
                     "section": _clean(passage.get("section")),
+                    "source_block_types": passage.get("source_block_types", []),
+                    "formula_origins": passage.get("formula_origins", []),
+                    "risk_flags": passage.get("risk_flags", []),
                 })
         for claim in self._claims():
             passage_id = _clean(claim.get("passage_id"))
@@ -1160,6 +1202,9 @@ class M4InteractionService:
                 "source_sentence": _clean(claim.get("source_sentence")),
                 "section": _clean(claim.get("section")) or _clean(passage.get("section")),
                 "text": _clean(passage.get("text")) or _clean(passage.get("normalized_text")),
+                "source_block_types": passage.get("source_block_types", []),
+                "formula_origins": passage.get("formula_origins", []),
+                "risk_flags": claim.get("risk_flags", []) or passage.get("risk_flags", []),
             })
         for field, paper_claim in _paper_claims(_as_dict(self.artifacts.get("paper_card"))):
             ref = _claim_ref(paper_claim)
@@ -1180,10 +1225,12 @@ class M4InteractionService:
         for formula in formulas:
             if not isinstance(formula, dict):
                 continue
+            if not _formula_card_is_usable(formula):
+                continue
             if formula_id and _clean(formula.get("formula_id")) == formula_id:
                 return formula
         for formula in formulas:
-            if isinstance(formula, dict):
+            if isinstance(formula, dict) and _formula_card_is_usable(formula):
                 return formula
         return None
 
@@ -2009,8 +2056,59 @@ def _m4_output_token_budget(llm_client: object) -> int:
 
 def _claim_text(value: object) -> str:
     if isinstance(value, dict):
-        return _clean(value.get("text") or value.get("plain"))
-    return _clean(value)
+        return _usable_card_text(value.get("text") or value.get("plain"))
+    return _usable_card_text(value)
+
+
+def _usable_card_text(value: object) -> str:
+    text = _clean(value)
+    if not text:
+        return ""
+    compact = re.sub(r"[\s，。！？,.!?；;：:]+", "", text).lower()
+    exact_placeholders = {
+        "unknown",
+        "insufficientevidence",
+        "证据不足",
+        "证据不足暂不展开",
+        "暂无足够证据",
+        "暂无证据",
+        "未提供",
+        "未知",
+    }
+    if compact in exact_placeholders:
+        return ""
+    fallback_patterns = (
+        r"^论文把.+概括为主要研究问题[。.]?$",
+        r"^核心想法围绕.+形成方法改进[。.]?$",
+        r"^方法围绕.+展开建模流程[。.]?$",
+        r"^实验摘要保留.+相关证据信号[。.]?$",
+    )
+    if any(re.match(pattern, text, flags=re.IGNORECASE) for pattern in fallback_patterns):
+        return ""
+    return text
+
+
+def _formula_card_is_usable(formula: dict[str, object]) -> bool:
+    origin = _clean(formula.get("origin") or formula.get("formula_origin")).lower()
+    coverage = _clean(formula.get("coverage_status")).upper()
+    derivation = _clean(formula.get("derivation_status")).upper()
+    evidence_status = _clean(formula.get("evidence_status") or formula.get("status")).upper()
+    warnings = " ".join(_string_list(formula.get("warnings"))).upper()
+    if origin == "raw_formula_text":
+        return False
+    if coverage.startswith("BLOCKED") or derivation.startswith("BLOCKED"):
+        return False
+    if evidence_status in {"INSUFFICIENT_EVIDENCE", "BLOCKED", "REJECTED"}:
+        return False
+    if "RAW_FORMULA_TEXT" in warnings:
+        return False
+    return bool(_clean(formula.get("evidence_ref")))
+
+
+def _is_unreliable_evidence_candidate(candidate: dict[str, object]) -> bool:
+    origins = {item.lower() for item in _string_list(candidate.get("formula_origins"))}
+    risks = {item.upper() for item in _string_list(candidate.get("risk_flags"))}
+    return "raw_formula_text" in origins or "RAW_FORMULA_TEXT" in risks
 
 
 def _claim_ref(value: object) -> str:
@@ -2145,7 +2243,9 @@ def _structured_paper_answer(
 ) -> str:
     rows = _paper_card_claim_rows(paper_card)
     if not rows:
-        summary = _clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second"))
+        summary = _usable_card_text(paper_card.get("one_sentence_summary")) or _usable_card_text(
+            paper_card.get("thirty_second")
+        )
         return f"我先按论文整体来讲：{_teach_phrase(summary)}" if summary else ""
     by_label = {label: text for label, text, _ref in rows}
     problem = _teach_phrase(by_label.get("研究问题", ""))
@@ -2153,7 +2253,10 @@ def _structured_paper_answer(
     method = _teach_phrase(by_label.get("方法机制", ""))
     experiment = _teach_phrase(by_label.get("实验结论", ""))
     limitations = _teach_phrase(by_label.get("局限", ""))
-    summary = _teach_phrase(_clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second")))
+    summary = _teach_phrase(
+        _usable_card_text(paper_card.get("one_sentence_summary"))
+        or _usable_card_text(paper_card.get("thirty_second"))
+    )
 
     focus_text = method or idea or summary or problem
     if focus == "实验结论" and experiment:
@@ -2217,7 +2320,10 @@ def _problem_solution_answer(
     idea = _teach_phrase(_claim_text(paper_card.get("core_idea")))
     method = _teach_phrase(_claim_text(paper_card.get("method_overview")))
     experiment = _teach_phrase(_claim_text(paper_card.get("experiment_summary")))
-    summary = _teach_phrase(_clean(paper_card.get("one_sentence_summary")) or _clean(paper_card.get("thirty_second")))
+    summary = _teach_phrase(
+        _usable_card_text(paper_card.get("one_sentence_summary"))
+        or _usable_card_text(paper_card.get("thirty_second"))
+    )
     if not any([problem, idea, method, summary]):
         return ""
 
@@ -2624,6 +2730,8 @@ def _should_reject_llm_answer_for_question(
         return True
     if _is_problem_solution_question(question) and _answer_too_abstract_for_problem(answer):
         return True
+    if _requires_explicit_problem_statement(question) and not _answer_addresses_research_problem(answer):
+        return True
     return False
 
 
@@ -2704,6 +2812,44 @@ def _answer_too_abstract_for_problem(answer: str) -> bool:
     # evidence checks. A long, domain-specific keyword allow-list rejects valid
     # concise answers for systems/database papers while adding no grounding.
     return len(text) < 40
+
+
+def _answer_addresses_research_problem(answer: str) -> bool:
+    text = _clean(answer).lower()
+    markers = (
+        "问题",
+        "困难",
+        "痛点",
+        "挑战",
+        "不足",
+        "局限",
+        "难以",
+        "无法",
+        "耗时",
+        "误差",
+        "错误",
+        "重叠",
+        "缺少",
+        "需要",
+        "瓶颈",
+        "problem",
+        "challenge",
+        "limitation",
+        "difficulty",
+        "time-consuming",
+        "time consuming",
+        "error",
+        "overlap",
+        "hamper",
+        "need for",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _requires_explicit_problem_statement(question: str) -> bool:
+    text = _clean(question).lower()
+    compact = re.sub(r"\s+", "", text)
+    return "真正" in compact or "什么问题" in compact or "痛点" in compact or "research problem" in text
 
 
 def _looks_like_mojibake_answer(value: str) -> bool:
@@ -3162,11 +3308,13 @@ def _teach_phrase(value: str, *, max_chars: int = 260) -> str:
         ("links", "连接"),
         ("connect", "连接"),
         ("evaluated on", "在...上评估"),
+        ("methods", "方法"),
         ("method", "方法"),
     ]
     taught = text
     for source, target in replacements:
-        taught = re.sub(re.escape(source), target, taught, flags=re.IGNORECASE)
+        pattern = rf"\b{re.escape(source)}\b" if source.isascii() else re.escape(source)
+        taught = re.sub(pattern, target, taught, flags=re.IGNORECASE)
     return _compact_user_text(taught, max_chars=max_chars)
 
 
@@ -3205,6 +3353,10 @@ def _expanded_query_terms(value: str) -> set[str]:
         "哪些": {"list", "include", "included", "following", "available"},
         "列举": {"list", "include", "included", "following"},
         "包括": {"include", "included", "following"},
+        "问题": {"problem", "challenge", "need", "limitation", "difficulty", "error"},
+        "真正": {"problem", "challenge", "need", "limitation"},
+        "困难": {"difficulty", "challenge", "problem", "hamper"},
+        "痛点": {"problem", "challenge", "limitation", "need"},
     }
     for marker, mapped_terms in expansions.items():
         if marker in text:
@@ -3229,6 +3381,11 @@ def _expanded_query_terms(value: str) -> set[str]:
         "roots": {"根系"},
         "list": {"哪些", "列举"},
         "include": {"包括", "哪些"},
+        "problem": {"问题", "困难", "痛点"},
+        "challenge": {"问题", "困难", "挑战"},
+        "need": {"问题", "需要", "痛点"},
+        "difficulty": {"问题", "困难"},
+        "error": {"问题", "误差", "错误"},
     }
     for token in list(terms):
         terms.update(reverse.get(token, set()))
@@ -3261,6 +3418,23 @@ def _focused_evidence_excerpt(value: str, *, query: str, max_chars: int) -> str:
         return text
     lowered = text.lower()
     anchor = -1
+    if _is_problem_solution_question(query):
+        for marker in (
+            "we present in this paper",
+            "in this study, we introduce",
+            "need for",
+            "time-consuming",
+            "time consuming",
+            "errors",
+            "root overlap",
+            "hampered",
+            "challenge",
+            "problem",
+        ):
+            position = lowered.find(marker)
+            if position >= 0:
+                anchor = position
+                break
     if _is_list_question(query):
         for marker in (
             "include the following",

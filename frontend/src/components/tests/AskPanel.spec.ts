@@ -215,6 +215,45 @@ describe('AskPanel', () => {
     expect(wrapper.text()).not.toContain('没有拿到可用的大模型解释')
   })
 
+  it('does not flash an ungrounded degraded preview while enhancement is running', async () => {
+    let resolveEnhanced: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : {}
+      if (body.answer_mode === 'evidence_only') {
+        return jsonResponse({
+          status: 'DEGRADED',
+          answer: '证据不足，暂不展开。',
+          evidence_refs: [],
+        })
+      }
+      if (body.answer_mode === 'enhanced') {
+        return await new Promise<ReturnType<typeof jsonResponse>>(resolve => {
+          resolveEnhanced = resolve
+        })
+      }
+      return jsonResponse({ records: [] })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('这篇论文真正解决了什么问题？')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('证据不足，暂不展开')
+    expect(wrapper.text()).toContain('正在读证据并组织回答')
+
+    resolveEnhanced?.(jsonResponse({
+      status: 'SUCCESS',
+      answer: '论文解决了人工追踪根系既耗时又容易出错的问题。',
+      evidence_refs: ['paper:b001'],
+    }))
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('人工追踪根系既耗时又容易出错')
+  })
+
   it('answers a custom user question before creating a focused advisor question', async () => {
     const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)

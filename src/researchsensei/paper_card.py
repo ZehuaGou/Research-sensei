@@ -202,11 +202,12 @@ def _fallback_claim(
     skeleton: PaperSkeleton,
 ) -> CardClaim:
     summary = _fallback_summary_text(field, text, skeleton) if ref else "证据不足，暂不展开。"
+    supported = bool(ref and not _looks_insufficient(text) and not _looks_insufficient(summary))
     return CardClaim(
         text=summary,
-        evidence_ref=ref,
-        evidence_type=EvidenceType.SUPPORTED_BY_TEXT if ref else EvidenceType.INSUFFICIENT_EVIDENCE,
-        confidence=_avg_confidence(evidence_pack) if ref else 0.0,
+        evidence_ref=ref if supported else "",
+        evidence_type=EvidenceType.SUPPORTED_BY_TEXT if supported else EvidenceType.INSUFFICIENT_EVIDENCE,
+        confidence=_avg_confidence(evidence_pack) if supported else 0.0,
     )
 
 

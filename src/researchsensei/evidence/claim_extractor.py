@@ -39,19 +39,22 @@ CONTRIBUTION_KEYWORDS = re.compile(
     r"\b(propose|present|introduce|develop|contribut)\w*\b", re.IGNORECASE
 )
 PROBLEM_KEYWORDS = re.compile(
-    r"\b(problem|challenge|issue|difficult|limitation)\b", re.IGNORECASE
+    r"\b(problem|challenge|issue|difficult|limitation|need|error|hamper|"
+    r"time[- ]consuming|overlap|constraint|bottleneck)\w*\b",
+    re.IGNORECASE,
 )
 DEFINITION_KEYWORDS = re.compile(
     r"\b(defined\s+as|definition|refers?\s+to|we\s+define)\b", re.IGNORECASE
 )
 METHOD_KEYWORDS = [
     "propose", "present", "introduce", "method", "model", "framework",
-    "approach", "architecture", "design", "mechanism",
+    "approach", "architecture", "design", "mechanism", "algorithm", "tracing",
 ]
 RESULT_KEYWORDS = [
     "achieve", "outperform", "improve", "result", "performance",
-    "accuracy", "f1", "benchmark", "evaluate", "demonstrate",
+    "accuracy", "f1", "benchmark", "evaluate", "demonstrate", "validate",
 ]
+UNSTRUCTURED_SECTIONS = {"", "unknown", "full_text"}
 
 
 def build_claim_evidence(
@@ -133,6 +136,43 @@ def build_claim_evidence(
                 source_sentence=passage.text[:300],
             ))
             continue
+
+        # PDF text extraction often recovers the full paper accurately but
+        # cannot recover every visual heading. Do not throw that evidence away:
+        # extract conservative sentence-level claims from unstructured prose.
+        if section in UNSTRUCTURED_SECTIONS:
+            unstructured_claims = (
+                ("CONTRIBUTION", _find_sentence_with_regex(passage.text, CONTRIBUTION_KEYWORDS)),
+                ("PROBLEM", _find_sentence_with_regex(passage.text, PROBLEM_KEYWORDS)),
+                ("RESULT", _find_sentence_with_keywords(passage.text, RESULT_KEYWORDS)),
+                ("METHOD", _find_sentence_with_keywords(passage.text, METHOD_KEYWORDS)),
+            )
+            emitted_sentences: set[str] = set()
+            for claim_type, sentence in unstructured_claims:
+                sentence_key = " ".join((sentence or "").lower().split())
+                if sentence_key in emitted_sentences and claim_type == "METHOD":
+                    sentence = _find_sentence_with_keywords_excluding(
+                        passage.text,
+                        METHOD_KEYWORDS,
+                        excluded=emitted_sentences,
+                    )
+                    sentence_key = " ".join((sentence or "").lower().split())
+                if not sentence or sentence_key in emitted_sentences:
+                    continue
+                counter += 1
+                claims.append(_make_claim(
+                    paper_id,
+                    counter,
+                    passage,
+                    blocks_by_id=blocks_by_id,
+                    claim_text=sentence,
+                    claim_type=claim_type,
+                    semantic_support="DIRECT_QUOTE",
+                    source_sentence=sentence,
+                ))
+                emitted_sentences.add(sentence_key)
+            if emitted_sentences:
+                continue
 
         # Abstract / introduction with contribution keywords
         if section in ("abstract", "introduction", "intro"):
@@ -269,6 +309,23 @@ def _find_sentence_with_keywords(text: str, keywords: list[str]) -> str | None:
         lower = sentence.lower()
         if any(kw.lower() in lower for kw in keywords):
             return sentence.strip()
+    return None
+
+
+def _find_sentence_with_keywords_excluding(
+    text: str,
+    keywords: list[str],
+    *,
+    excluded: set[str],
+) -> str | None:
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    for sentence in sentences:
+        stripped = sentence.strip()
+        key = " ".join(stripped.lower().split())
+        if key in excluded:
+            continue
+        if any(keyword.lower() in stripped.lower() for keyword in keywords):
+            return stripped
     return None
 
 

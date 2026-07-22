@@ -297,6 +297,25 @@ def test_no_claims_warning() -> None:
         assert any(w.code == "NO_CLAIMS" for w in bundle.warnings)
 
 
+def test_unstructured_full_text_yields_problem_contribution_and_method_claims() -> None:
+    passage = _make_passage(
+        "p001",
+        "full_text",
+        (
+            "Manual analysis is highly time-consuming and overlap increases errors. "
+            "We present a semiautomated toolbox for complex root systems. "
+            "The tracing algorithm follows each root from its base to its tip."
+        ),
+    )
+    index = PassageIndex(paper_id="test", passages=[passage])
+
+    bundle = build_claim_evidence(_make_document(), index)
+
+    claim_types = {claim.claim_type for claim in bundle.claims}
+    assert {"PROBLEM", "CONTRIBUTION", "METHOD"} <= claim_types
+    assert all(claim.semantic_support == "DIRECT_QUOTE" for claim in bundle.claims)
+
+
 def test_generated_by_is_rule() -> None:
     passage = _make_passage("p001", "method", "We propose a new model for anomaly detection.")
     index = PassageIndex(paper_id="test", passages=[passage])

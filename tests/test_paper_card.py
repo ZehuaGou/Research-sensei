@@ -26,6 +26,11 @@ class RawCopyPaperCardLLM:
         }
 
 
+class FailingPaperCardLLM:
+    async def chat_json(self, messages, *, config=None):
+        raise TimeoutError("provider timed out")
+
+
 def test_paper_card_summarizes_llm_raw_copy_fields() -> None:
     pack, skeleton, passage = _raw_copy_fixture()
 
@@ -86,6 +91,17 @@ def test_pipeline_summarizes_raw_copy_before_quality_audit() -> None:
     assert "PAPER_CARD_FIELD_SUMMARIZED_FROM_RAW_COPY: method_overview" in updated["paper_card"].warnings
     report = QualityAuditor().audit(_audit_bundle(updated["paper_card"], skeleton, passage))
     assert not [finding for finding in report.findings if finding.code == "F-8" and finding.effect == "BLOCK"]
+
+
+def test_fallback_does_not_attach_valid_ref_to_insufficient_placeholder() -> None:
+    pack, skeleton, _passage = _raw_copy_fixture()
+    skeleton = skeleton.model_copy(update={"problem": "INSUFFICIENT_EVIDENCE"})
+
+    card = asyncio.run(build_paper_card(pack, skeleton, FailingPaperCardLLM()))
+
+    assert card.problem.text == "证据不足，暂不展开。"
+    assert card.problem.evidence_ref == ""
+    assert card.problem.evidence_type.value == "INSUFFICIENT_EVIDENCE"
 
 
 def _raw_copy_fixture() -> tuple[EvidencePack, PaperSkeleton, str]:
