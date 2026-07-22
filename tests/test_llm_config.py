@@ -9,7 +9,7 @@ from researchsensei.core.config import (
     redact_secret,
 )
 from researchsensei.llm.client import LLMClient
-from researchsensei.llm.types import ChatMessage, LLMConfig
+from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
 
 
 def test_model_provider_config_defaults() -> None:
@@ -180,6 +180,29 @@ async def test_llm_client_retries_empty_content(monkeypatch: pytest.MonkeyPatch)
 
     assert response.content == '{"ok": true}'
     assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_structured_repair_uses_a_bounded_timeout() -> None:
+    configs: list[LLMConfig] = []
+
+    class RepairCapturingClient(LLMClient):
+        async def chat(self, messages, *, config=None):
+            configs.append(config)
+            content = "not json" if len(configs) == 1 else '{"ok": true}'
+            return ChatResponse(content=content)
+
+    provider = ModelProviderConfig(name="switch", auth_header="none")
+    client = RepairCapturingClient(provider)
+
+    result = await client.chat_json_with_repair(
+        [ChatMessage(role="user", content="Return JSON.")],
+        config=LLMConfig(timeout=80, max_retries=0),
+    )
+
+    assert result == {"ok": True}
+    assert [config.timeout for config in configs] == [80, 25.0]
+    assert configs[1].max_retries == 0
 
 
 def test_redact_secret_removes_key() -> None:

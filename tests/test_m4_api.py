@@ -63,6 +63,12 @@ class FailingM4LLM:
         raise RuntimeError("simulated llm outage")
 
 
+class TimeoutM4LLM(FailingM4LLM):
+    async def chat_json(self, messages, *, config=None):
+        self.calls += 1
+        raise RuntimeError("simulated llm request timed out")
+
+
 def test_m4_anthropic_provider_uses_full_reasoning_output_budget(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "m2_success")
     llm = ScriptedM4LLM()
@@ -89,6 +95,8 @@ def test_m4_anthropic_provider_uses_full_reasoning_output_budget(tmp_path: Path)
     assert llm.calls == 1
     assert llm.configs[0].max_tokens == 12_000
     assert llm.configs[0].disable_thinking is True
+    assert llm.configs[0].timeout == 80.0
+    assert llm.configs[0].max_retries == 0
 
 
 def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) -> None:
@@ -1062,6 +1070,41 @@ def test_m4_ask_reports_llm_request_failure_without_local_fallback(tmp_path: Pat
     assert data["evidence_refs"] == []
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert data["warnings"][0]["code"] == "M4_LLM_REQUEST_FAILED"
+    assert llm.calls == 1
+
+
+def test_m4_selection_timeout_keeps_verified_artifact_explanation(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "selection_timeout")
+    llm = TimeoutM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "请解释这段话。",
+            "selected_text": "The attention architecture links sparse evidence passages.",
+            "context_scope": "selection",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
+    assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
+    assert data["context_trace"]["scope"] == "selection"
+    assert data["context_trace"]["evidence_count"] == 1
+    assert data["warnings"][-1]["code"] == "M4_LLM_TIMEOUT"
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+    assert "没有使用未经验证的模型输出" in data["uncertainty"]
     assert llm.calls == 1
 
 

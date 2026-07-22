@@ -32,6 +32,8 @@ M4_MEMORY_SCHEMA_VERSION = "m4_memory.v2"
 M4_MEMORY_MAX_RECORDS = 200
 M4_MEMORY_MAX_BYTES = 1_048_576
 M4_MEMORY_MAX_WARNINGS = 16
+M4_LLM_TIMEOUT_SECONDS = 80.0
+M4_LLM_MAX_RETRIES = 0
 
 logger = logging.getLogger(__name__)
 
@@ -323,23 +325,44 @@ class M4InteractionService:
             code = str(llm_result.get("code") or "M4_LLM_FAILED")
             message = str(llm_result.get("message") or "LLM did not return a usable answer.")
             detail = str(llm_result.get("detail") or "")
-            return InteractiveAnswer(
-                status="DEGRADED",
-                answer=_llm_failure_answer(code=code, message=message),
-                evidence_refs=[],
-                claims=[],
-                uncertainty="M4 已经拿到论文上下文，但 LLM 没有返回可用解释；本次没有改用本地兜底答案。",
-                follow_up_suggestions=_follow_ups(),
-                used_context={"memory": False, "artifacts": bool(llm_evidence_refs or evidence_refs), "llm": False},
-                context_trace=M4ContextTrace(
-                    scope="selection" if selected_text else "paper",
-                    continued_from_history=continued_from_history,
-                    focus_question=effective_question,
-                    evidence_count=len(llm_evidence_refs or evidence_refs),
-                    selected_text_used=bool(selected_text),
-                ),
-                warnings=[*warnings, _warning(code, message, detail=detail)],
+            can_use_verified_selection = bool(
+                selected_text
+                and not ignore_selection
+                and evidence_refs
+                and grounded_claims
+                and code in {"M4_LLM_TIMEOUT", "M4_LLM_REQUEST_FAILED"}
             )
+            if can_use_verified_selection:
+                grounding_degraded = True
+                llm_uncertainty = (
+                    "大模型增强解释未在时限内完成；当前内容来自已定位的论文证据，"
+                    "没有使用未经验证的模型输出。"
+                )
+                warnings.append(
+                    _warning(
+                        code,
+                        "大模型增强解释未完成，已保留经证据校验的选中文本解释。",
+                        detail=detail,
+                    )
+                )
+            else:
+                return InteractiveAnswer(
+                    status="DEGRADED",
+                    answer=_llm_failure_answer(code=code, message=message),
+                    evidence_refs=[],
+                    claims=[],
+                    uncertainty="M4 已经拿到论文上下文，但 LLM 没有返回可用解释；本次没有改用本地兜底答案。",
+                    follow_up_suggestions=_follow_ups(),
+                    used_context={"memory": False, "artifacts": bool(llm_evidence_refs or evidence_refs), "llm": False},
+                    context_trace=M4ContextTrace(
+                        scope="selection" if selected_text else "paper",
+                        continued_from_history=continued_from_history,
+                        focus_question=effective_question,
+                        evidence_count=len(llm_evidence_refs or evidence_refs),
+                        selected_text_used=bool(selected_text),
+                    ),
+                    warnings=[*warnings, _warning(code, message, detail=detail)],
+                )
 
         status = "SUCCESS" if evidence_refs and not grounding_degraded else "DEGRADED"
         if llm_uncertainty:
@@ -688,8 +711,8 @@ class M4InteractionService:
                         temperature=0.15,
                         max_tokens=_m4_output_token_budget(self.llm_client),
                         json_mode=True,
-                        timeout=120,
-                        max_retries=1,
+                        timeout=M4_LLM_TIMEOUT_SECONDS,
+                        max_retries=M4_LLM_MAX_RETRIES,
                         retry_delay=1.0,
                         disable_thinking=True,
                     ),

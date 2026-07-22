@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiClientError, apiRequest, researchApi } from './client'
+import { ApiClientError, apiRequest, researchApi, workspaceApi } from './client'
 
 function response(status: number, payload: unknown): Response {
   return {
@@ -55,6 +55,30 @@ describe('api client error contract', () => {
     const cancelAssertion = expect(cancelled).rejects.toMatchObject({ code: 'CANCELLED' })
     controller.abort()
     await cancelAssertion
+  })
+
+  it('keeps M4 requests alive beyond the backend model deadline', async () => {
+    vi.useFakeTimers()
+    let requestAborted = false
+    vi.stubGlobal('fetch', vi.fn((_path: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => {
+        requestAborted = true
+        reject(new DOMException('aborted', 'AbortError'))
+      })
+    })))
+
+    const pending = workspaceApi.ask('paper-1', {
+      question: 'Explain this evidence.',
+      selected_text: 'Evidence text.',
+      context_scope: 'selection',
+    })
+    await vi.advanceTimersByTimeAsync(100_000)
+    expect(requestAborted).toBe(false)
+
+    const timeoutAssertion = expect(pending).rejects.toMatchObject({ code: 'TIMEOUT' })
+    await vi.advanceTimersByTimeAsync(20_001)
+    await timeoutAssertion
+    expect(requestAborted).toBe(true)
   })
 
   it('uses the persistent direction job API and returns its terminal result', async () => {

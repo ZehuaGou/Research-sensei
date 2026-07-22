@@ -715,6 +715,33 @@ suite.
 - Verification: M4 API tests reported `34 passed`; full backend tests reported
   `819 passed, 15 skipped`; Ruff and mypy passed.
 
+### M4 interactive timeout-budget regression (2026-07-22)
+
+- The frontend previously aborted M4 calls after 95 seconds while the backend
+  allowed a single model attempt to run for 120 seconds and could retry it.
+  The browser therefore displayed a generic request-timeout error while the
+  backend was still working, even when verified selected-text evidence was
+  already available.
+- Interactive M4 model calls are now bounded to 80 seconds with no transport
+  retry, and the optional structured-JSON repair pass is independently capped
+  at 25 seconds. The frontend M4 request budget is 120 seconds, so it remains
+  alive long enough to receive either the validated model result or the
+  backend's controlled response.
+- When a selected-text request times out or the model transport fails, M4 keeps
+  only the artifact-derived explanation whose evidence refs and claims have
+  already passed validation. It explicitly says that model enhancement did not
+  finish and that no unverified model output was used. Generic paper questions
+  still fail closed instead of receiving a fabricated local answer.
+- A live API request on GiA Roots job `941a6709af95` returned in 63.04 seconds
+  with evidence refs `b001` and `b002`. A separate in-app browser retry of the
+  original selected-text question exercised the 80-second model timeout and
+  displayed the verified `b001` explanation plus the controlled degradation
+  notice instead of `请求超时`.
+- Verification: targeted backend tests reported `50 passed`; the full backend
+  suite reported `821 passed, 15 skipped`; targeted frontend tests reported
+  `12 passed`, and the full frontend suite reported `90 passed`. Ruff, mypy,
+  frontend typecheck, and the production build passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not

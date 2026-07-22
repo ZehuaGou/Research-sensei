@@ -14,6 +14,7 @@ from researchsensei.core.config import ModelProviderConfig, redact_secret
 from researchsensei.llm.types import ChatMessage, ChatResponse, LLMConfig
 
 logger = logging.getLogger(__name__)
+JSON_REPAIR_TIMEOUT_SECONDS = 25.0
 
 
 class LLMClientError(Exception):
@@ -234,6 +235,7 @@ class LLMClient:
                 update={
                     "temperature": 0.0,
                     "json_mode": True,
+                    "timeout": min(cfg.timeout, JSON_REPAIR_TIMEOUT_SECONDS),
                     "max_retries": 0,
                 }
             )
