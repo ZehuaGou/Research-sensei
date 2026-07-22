@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sqlite3
 
 from starlette.testclient import TestClient
 
@@ -106,6 +107,19 @@ def test_reparse_job_creates_new_job_from_existing_source(tmp_path: Path) -> Non
     assert reparsed_data["status"] == "JOB_CREATED"
     assert reparsed_data["source_job_id"] == first_data["job_id"]
     assert reparsed_data["job_id"] != first_data["job_id"]
+
+    old_status = client.get(f"/api/v1/jobs/{first_data['job_id']}/understanding_status")
+    assert old_status.status_code == 200
+    assert old_status.json()["job_id"] == reparsed_data["job_id"]
+
+    # Simulate a database created before successor links were persisted.
+    db_path = workspace / "sensei.sqlite3"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("delete from job_successors")
+    restarted = TestClient(create_app(workspace_root=workspace))
+    recovered = restarted.get(f"/api/v1/jobs/{first_data['job_id']}/understanding_status")
+    assert recovered.status_code == 200
+    assert recovered.json()["job_id"] == reparsed_data["job_id"]
 
 
 def test_parse_upload_markdown_generates_phase6_artifacts(tmp_path: Path) -> None:

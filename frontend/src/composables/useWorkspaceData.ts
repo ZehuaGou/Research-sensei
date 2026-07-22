@@ -11,6 +11,7 @@ import type { ReparseResponse } from '../types/workspace'
 import { isUsableFormulaCard } from '../utils/workspaceCards'
 
 export function useWorkspaceData(jobId: string) {
+  const activeJobId = ref(jobId)
   const understandingStatus = ref<UnderstandingStatus | null>(null)
   const paperWorkspaceStatus = ref<PaperWorkspaceStatus>({})
   const cards = ref<WorkspaceCards | null>(null)
@@ -48,15 +49,17 @@ export function useWorkspaceData(jobId: string) {
     degraded.value = false
     missingComponents.value = []
     try {
-      const statusData = await workspaceApi.getUnderstandingStatus(jobId, controller.signal)
+      const statusData = await workspaceApi.getUnderstandingStatus(activeJobId.value, controller.signal)
       if (controller.signal.aborted) return
+      if (statusData.job_id) activeJobId.value = statusData.job_id
       understandingStatus.value = statusData.understanding_status
       paperWorkspaceStatus.value = statusData.paper_workspace_status || {}
       if (!canShowCards.value) return
 
       try {
-        const cardsData = await workspaceApi.getCards(jobId, controller.signal)
+        const cardsData = await workspaceApi.getCards(activeJobId.value, controller.signal)
         if (controller.signal.aborted) return
+        if (cardsData.job_id) activeJobId.value = cardsData.job_id
         cards.value = cardsData.cards
         paperWorkspaceStatus.value = {
           ...paperWorkspaceStatus.value,
@@ -99,7 +102,7 @@ export function useWorkspaceData(jobId: string) {
     isReparsing.value = true
     error.value = ''
     try {
-      const result = await workspaceApi.reparse(jobId, controller.signal, task => {
+      const result = await workspaceApi.reparse(activeJobId.value, controller.signal, task => {
         reparseProgress.value = task.progress
         reparseStage.value = task.stage
         window.localStorage.setItem(reparseTaskKey, task.task_id)
@@ -151,6 +154,7 @@ export function useWorkspaceData(jobId: string) {
   })
 
   return {
+    activeJobId,
     understandingStatus,
     paperWorkspaceStatus,
     cards,

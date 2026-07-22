@@ -245,6 +245,11 @@ onMounted(async () => {
   topbarTargetReady.value = Boolean(document.getElementById('workbench-topbar-center'))
   document.addEventListener('keydown', handleDialogKeys)
   await workspace.loadWorkspace()
+  const resolvedJobId = workspace.activeJobId.value
+  if (resolvedJobId && resolvedJobId !== jobId) {
+    store.setCurrentJob(resolvedJobId)
+    window.history.replaceState(window.history.state, '', `/learn/${encodeURIComponent(resolvedJobId)}`)
+  }
   const resumedJobId = await workspace.resumeReparseTask()
   if (resumedJobId) {
     window.location.assign(`/learn/${encodeURIComponent(resumedJobId)}`)

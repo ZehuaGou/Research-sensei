@@ -116,11 +116,13 @@ export interface WorkspaceCards {
 }
 
 export interface UnderstandingStatusResponse {
+  job_id?: string
   understanding_status: UnderstandingStatus
   paper_workspace_status?: PaperWorkspaceStatus
 }
 
 export interface CardsResponse {
+  job_id?: string
   status: UnderstandingStatusCode
   cards: WorkspaceCards
   degraded?: boolean

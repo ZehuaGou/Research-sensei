@@ -65,6 +65,68 @@ class JobStore:
             raise JobNotFoundError(f"Job not found: {job_id}")
         return self._from_row(row)
 
+    def resolve_latest_job_id(self, job_id: str) -> str:
+        """Follow successful reparse links without hiding the original record."""
+
+        current = job_id
+        visited: set[str] = set()
+        with self._connect() as conn:
+            while current not in visited:
+                visited.add(current)
+                row = conn.execute(
+                    "select successor_job_id from job_successors where source_job_id = ?",
+                    (current,),
+                ).fetchone()
+                if row is None:
+                    break
+                current = str(row["successor_job_id"])
+        return current
+
+    def get_latest(self, job_id: str) -> JobRecord:
+        return self.get(self.resolve_latest_job_id(job_id))
+
+    def link_successor(self, source_job_id: str, successor_job_id: str) -> None:
+        if source_job_id == successor_job_id:
+            return
+        with self._connect() as conn:
+            conn.execute("begin immediate")
+            known = {
+                str(row["job_id"])
+                for row in conn.execute(
+                    "select job_id from jobs where job_id in (?, ?)",
+                    (source_job_id, successor_job_id),
+                ).fetchall()
+            }
+            if source_job_id not in known:
+                raise JobNotFoundError(f"Job not found: {source_job_id}")
+            if successor_job_id not in known:
+                raise JobNotFoundError(f"Job not found: {successor_job_id}")
+
+            current = successor_job_id
+            visited = {source_job_id}
+            while current not in visited:
+                visited.add(current)
+                row = conn.execute(
+                    "select successor_job_id from job_successors where source_job_id = ?",
+                    (current,),
+                ).fetchone()
+                if row is None:
+                    break
+                current = str(row["successor_job_id"])
+            if current == source_job_id:
+                raise ValueError("Reparse successor link would create a cycle.")
+
+            conn.execute(
+                """
+                insert into job_successors(source_job_id, successor_job_id, created_at)
+                values(?, ?, ?)
+                on conflict(source_job_id) do update set
+                    successor_job_id=excluded.successor_job_id,
+                    created_at=excluded.created_at
+                """,
+                (source_job_id, successor_job_id, datetime.now(timezone.utc).isoformat()),
+            )
+
     def delete(self, job_id: str) -> None:
         with self._connect() as conn:
             cursor = conn.execute("delete from jobs where job_id = ?", (job_id,))
@@ -193,10 +255,19 @@ class JobStore:
                 )
                 """
                 )
+                conn.execute(
+                    """
+                    create table if not exists job_successors(
+                        source_job_id text primary key references jobs(job_id) on delete cascade,
+                        successor_job_id text not null references jobs(job_id) on delete cascade,
+                        created_at text not null
+                    )
+                    """
+                )
                 self._migrate(conn)
                 conn.execute(
                     """
-                    insert into schema_meta(component, version, updated_at) values('jobs', 2, ?)
+                    insert into schema_meta(component, version, updated_at) values('jobs', 3, ?)
                     on conflict(component) do update set version=excluded.version, updated_at=excluded.updated_at
                     """,
                     (datetime.now(timezone.utc).isoformat(),),

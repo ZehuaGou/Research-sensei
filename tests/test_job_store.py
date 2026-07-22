@@ -64,6 +64,29 @@ def test_job_store_missing_job_raises_clear_error(tmp_path: Path) -> None:
         store.get("missing")
 
 
+def test_job_store_resolves_latest_successor_across_reparse_chain(tmp_path: Path) -> None:
+    store = JobStore(tmp_path / "jobs.sqlite3")
+    for job_id in ["original", "reparse-1", "reparse-2"]:
+        store.create(_job(job_id))
+
+    store.link_successor("original", "reparse-1")
+    store.link_successor("reparse-1", "reparse-2")
+
+    assert store.resolve_latest_job_id("original") == "reparse-2"
+    assert store.get_latest("original").job_id == "reparse-2"
+    assert store.get("original").job_id == "original"
+
+
+def test_job_store_rejects_cyclic_successor_link(tmp_path: Path) -> None:
+    store = JobStore(tmp_path / "jobs.sqlite3")
+    store.create(_job("original"))
+    store.create(_job("reparse"))
+    store.link_successor("original", "reparse")
+
+    with pytest.raises(ValueError, match="cycle"):
+        store.link_successor("reparse", "original")
+
+
 def test_job_store_lists_recent_jobs_sorted_by_created_time(tmp_path: Path) -> None:
     store = JobStore(tmp_path / "jobs.sqlite3")
     store.create(_job("old", created_at="2026-06-01T00:00:00+00:00"))
@@ -152,7 +175,7 @@ def test_job_store_enables_wal_busy_timeout_schema_version_and_backup(tmp_path: 
         version = conn.execute("select version from schema_meta where component='jobs'").fetchone()[0]
     backup = store.backup()
 
-    assert version == 2
+    assert version == 3
     assert backup.exists()
     with sqlite3.connect(backup) as conn:
         assert conn.execute("select count(*) from jobs").fetchone()[0] == 1

@@ -71,6 +71,15 @@ class M4InteractionService:
                 answer="没有收到选中的文本，M4 不能做基于证据的解释。",
                 warnings=[_warning("MISSING_SELECTION", "解释选中文本需要 selected_text。")],
             )
+        if _is_placeholder_selection(selected_text):
+            return SelectionExplanation(
+                status="DEGRADED",
+                answer=(
+                    "这段内容是旧版本生成的占位概括，不是可以解释的论文原文。"
+                    "请重新进入这篇论文的最新深读结果，再选中具体的正文或卡片内容。"
+                ),
+                warnings=[_warning("STALE_SELECTION_PLACEHOLDER", "旧版本占位文本不能作为论文证据。")],
+            )
 
         evidence = self._best_evidence(selected_text)
         warnings: list[WarningItem] = []
@@ -180,6 +189,23 @@ class M4InteractionService:
                 answer="还没有收到问题。",
                 uncertainty="M4 需要一个问题，或者需要你先选中一段论文内容。",
                 warnings=[_warning("QUESTION_MISSING", "缺少 question。")],
+            )
+        if selected_text and _is_placeholder_selection(selected_text):
+            return InteractiveAnswer(
+                status="DEGRADED",
+                answer=(
+                    "你选中的内容是旧版本生成的占位概括，并不是论文原文，所以 M4 不会继续解释或猜测。"
+                    "系统会优先打开这篇论文最新的重解析结果；请从新的论文卡片或正文中重新选择。"
+                ),
+                evidence_refs=[],
+                uncertainty="占位文本没有可验证的论文证据。",
+                follow_up_suggestions=[
+                    "这篇论文真正解决了什么问题？",
+                    "SmartRoot 的核心方法是什么？",
+                    "请解释 SmartRoot 如何减少人工分析耗时。",
+                ],
+                used_context={"memory": False, "artifacts": False, "llm": False},
+                warnings=[_warning("STALE_SELECTION_PLACEHOLDER", "旧版本占位文本不能作为论文证据。")],
             )
         conversation_focus = self._conversation_focus(
             question=question,
@@ -349,21 +375,42 @@ class M4InteractionService:
             code = str(llm_result.get("code") or "M4_LLM_FAILED")
             message = str(llm_result.get("message") or "LLM did not return a usable answer.")
             detail = str(llm_result.get("detail") or "")
+            unsafe_artifact_warning_codes = {
+                "LOW_SELECTION_MATCH",
+                "NO_TRACEABLE_EVIDENCE",
+                "STALE_SELECTION_PLACEHOLDER",
+            }
             can_use_verified_artifacts = bool(
                 evidence_refs
                 and grounded_claims
-                and code in {"M4_LLM_TIMEOUT", "M4_LLM_REQUEST_FAILED"}
+                and not any(warning.code in unsafe_artifact_warning_codes for warning in warnings)
+                and code
+                in {
+                    "M4_LLM_TIMEOUT",
+                    "M4_LLM_REQUEST_FAILED",
+                    "M4_CLAIM_UNSUPPORTED",
+                    "M4_LLM_LOW_QUALITY",
+                    "M4_LLM_INVALID_JSON",
+                    "M4_LLM_INVALID_STRUCTURE",
+                    "M4_LLM_EMPTY",
+                }
             )
             if can_use_verified_artifacts:
                 grounding_degraded = True
-                llm_uncertainty = (
-                    "大模型增强解释未在时限内完成；当前内容来自已定位的论文证据，"
-                    "没有使用未经验证的模型输出。"
-                )
+                if code in {"M4_LLM_TIMEOUT", "M4_LLM_REQUEST_FAILED"}:
+                    llm_uncertainty = (
+                        "大模型增强解释未在时限内完成；当前内容来自已定位的论文证据，"
+                        "没有使用未经验证的模型输出。"
+                    )
+                else:
+                    llm_uncertainty = (
+                        "模型增强内容没有通过逐条证据校验；当前保留的是本地已定位的论文证据答案，"
+                        "未展示被拒绝的模型内容。"
+                    )
                 warnings.append(
                     _warning(
                         code,
-                        "大模型增强解释未完成，已保留经证据校验的论文卡片答案。",
+                        "模型增强未通过或未完成，已保留经证据校验的本地答案。",
                         detail=detail,
                     )
                 )
@@ -713,6 +760,11 @@ class M4InteractionService:
                 "当前问题询问论文真正面对的研究问题或痛点；至少一条 claim 必须明确说明现有做法的困难、"
                 "限制或未满足需求，不能只复述新方法的步骤、模块或功能。"
             )
+        if selected_text:
+            prompt["output_rules"].append(
+                "当前问题包含选中文本；第一条 claim 必须直接解释 selected_text 的含义和它在论文中的作用，"
+                "不能改答相邻段落、泛化到整篇论文，或只罗列无关方法细节。"
+            )
         messages = [
             ChatMessage(
                 role="system",
@@ -796,6 +848,8 @@ class M4InteractionService:
             return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 返回的回答过于空泛。")
         if _should_reject_llm_answer_for_question(question, answer, context=context):
             return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 回答没有满足当前问题的证据约束或具体性要求。")
+        if selected_text and not _answer_aligned_with_selection(answer, selected_text):
+            return _llm_error_result("M4_LLM_LOW_QUALITY", "LLM 回答没有直接解释用户选中的内容。")
 
         warnings: list[WarningItem] = []
         if rejected_reasons:
@@ -1088,7 +1142,11 @@ class M4InteractionService:
         return refs
 
     def _best_evidence(self, text: str) -> dict[str, object]:
-        candidates = self._evidence_candidates()
+        candidates = [
+            candidate
+            for candidate in self._evidence_candidates()
+            if _candidate_text(candidate) and not _is_unreliable_evidence_candidate(candidate)
+        ]
         if not candidates:
             return {"score": 0.0}
         text_tokens = set(_tokens(text))
@@ -2088,6 +2146,11 @@ def _usable_card_text(value: object) -> str:
     return text
 
 
+def _is_placeholder_selection(value: object) -> bool:
+    text = _clean(value)
+    return bool(text) and not _usable_card_text(text)
+
+
 def _formula_card_is_usable(formula: dict[str, object]) -> bool:
     origin = _clean(formula.get("origin") or formula.get("formula_origin")).lower()
     coverage = _clean(formula.get("coverage_status")).upper()
@@ -2844,6 +2907,48 @@ def _answer_addresses_research_problem(answer: str) -> bool:
         "need for",
     )
     return any(marker in text for marker in markers)
+
+
+def _answer_aligned_with_selection(answer: str, selected_text: str) -> bool:
+    selected = _usable_card_text(selected_text)
+    if not selected:
+        return False
+    answer_lower = _clean(answer).lower()
+    selected_lower = selected.lower()
+    if _normalize(selected) and _normalize(selected) in _normalize(answer):
+        return True
+
+    latin_anchors = {
+        token
+        for token in re.findall(r"[a-z][a-z0-9_-]{3,}", selected_lower)
+        if token not in {"this", "that", "with", "from", "method", "image", "analysis"}
+    }
+    if any(anchor in answer_lower for anchor in latin_anchors):
+        return True
+
+    concept_groups = (
+        (("image-analysis", "image analysis"), ("图像分析",)),
+        (("attention architecture",), ("注意力架构", "注意力结构")),
+        (("root system", "root architecture"), ("根系", "根结构")),
+        (("smartroot",), ("smartroot",)),
+    )
+    for source_terms, answer_terms in concept_groups:
+        if any(term in selected_lower for term in source_terms) and any(term in answer_lower for term in answer_terms):
+            return True
+
+    selected_cjk = "".join(re.findall(r"[\u4e00-\u9fff]", selected))
+    ignored = {"核心", "想法", "方法", "形成", "改进", "这段", "内容", "论文"}
+    anchors = {
+        selected_cjk[index : index + 2]
+        for index in range(max(0, len(selected_cjk) - 1))
+        if selected_cjk[index : index + 2] not in ignored
+    }
+    if anchors and any(anchor in answer for anchor in anchors):
+        return True
+
+    # Very short or generic selections do not provide a stable lexical anchor;
+    # their grounding is enforced by the selected evidence reference instead.
+    return len(_normalize(selected)) < 8 or not (latin_anchors or anchors)
 
 
 def _requires_explicit_problem_statement(question: str) -> bool:

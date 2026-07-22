@@ -252,6 +252,67 @@ def test_m4_interactions_use_registered_m2_artifacts_and_memory(tmp_path: Path) 
     assert cleared_memory_response.json()["records"] == []
 
 
+def test_m4_rejects_stale_placeholder_selection_without_calling_llm(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "stale_selection")
+    llm = ScriptedM4LLM()
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "请解释这段话：核心想法围绕 Image-Analysis 形成方法改进。",
+            "selected_text": "核心想法围绕 Image-Analysis 形成方法改进。",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == []
+    assert data["used_context"] == {"memory": False, "artifacts": False, "llm": False}
+    assert "占位概括" in data["answer"]
+    assert "STALE_SELECTION_PLACEHOLDER" in {warning["code"] for warning in data["warnings"]}
+    assert llm.calls == 0
+
+
+def test_m4_selected_text_rejects_adjacent_but_misaligned_llm_answer(tmp_path: Path) -> None:
+    artifact_dir = _write_m4_artifact_run(tmp_path / "misaligned_selection")
+    llm = ScriptedM4LLM(
+        answer="论文面对的是稀疏证据片段让检索过程不稳定的问题，需要聚合相关上下文。",
+    )
+    client = TestClient(
+        create_app(
+            workspace_root=tmp_path / "workspace",
+            allowed_local_roots=[tmp_path],
+            llm_client=llm,
+        )
+    )
+    job_id = _register_artifact_job(client, artifact_dir)
+
+    response = client.post(
+        f"/api/v1/jobs/{job_id}/ask",
+        json={
+            "question": "请解释这段方法具体是什么意思。",
+            "selected_text": "The attention architecture links sparse evidence passages.",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "DEGRADED"
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert "注意力架构" in data["answer"]
+    assert "M4_LLM_LOW_QUALITY" in {warning["code"] for warning in data["warnings"]}
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+
+
 def test_m4_rejects_non_user_facing_understanding_status(tmp_path: Path) -> None:
     artifact_dir = _write_m4_artifact_run(tmp_path / "baseline", user_display=False, status="BASELINE_ONLY")
     client = TestClient(
@@ -471,8 +532,8 @@ def test_m4_rejects_legal_ref_when_evidence_does_not_support_claim(tmp_path: Pat
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "DEGRADED"
-    assert data["evidence_refs"] == []
-    assert data["claims"] == []
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
     assert "NASA" not in data["answer"]
     assert "12.5" not in data["answer"]
     assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
@@ -645,7 +706,7 @@ def test_m4_problem_question_rejects_method_only_answer(tmp_path: Path) -> None:
     data = response.json()
     assert data["status"] == "DEGRADED"
     assert "M4_LLM_LOW_QUALITY" in {warning["code"] for warning in data["warnings"]}
-    assert data["evidence_refs"] == []
+    assert data["evidence_refs"] == ["paper:b001"]
     assert "采用注意力结构连接分散的证据片段" not in data["answer"]
 
 
@@ -802,9 +863,10 @@ def test_m4_does_not_trust_unknown_quote_id_for_unsupported_claim(tmp_path: Path
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "DEGRADED"
-    assert data["claims"] == []
-    assert data["warnings"][0]["detail"] == "supporting_quote_not_verbatim"
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
+    assert any(warning["detail"] == "supporting_quote_not_verbatim" for warning in data["warnings"])
     assert "NASA" not in data["answer"]
+    assert "12.5" not in data["answer"]
 
 
 def test_m4_ask_expands_llm_context_for_chinese_focus_question(tmp_path: Path) -> None:
@@ -1339,8 +1401,9 @@ def test_m4_ask_rejects_english_heavy_llm_answer(tmp_path: Path) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "DEGRADED"
-    assert "没有拿到可用的大模型解释" in data["answer"]
-    assert data["evidence_refs"] == []
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
     assert llm.calls == 1
@@ -1366,7 +1429,9 @@ def test_m4_example_question_rejects_abstract_llm_answer(tmp_path: Path) -> None
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "DEGRADED"
-    assert "没有拿到可用的大模型解释" in data["answer"]
+    assert "没有拿到可用的大模型解释" not in data["answer"]
+    assert data["evidence_refs"] == ["paper:b001"]
+    assert data["claims"][0]["support_status"] == "ARTIFACT_DERIVED"
     assert data["used_context"] == {"memory": False, "artifacts": True, "llm": False}
     assert "M4_CLAIM_UNSUPPORTED" in {warning["code"] for warning in data["warnings"]}
     assert llm.calls == 1

@@ -195,6 +195,46 @@ describe('LearningWorkspaceView', () => {
     expect(wrapper.get('[data-testid="teaching-cards"]').text()).toContain('p:b2')
   })
 
+  it('switches old deep-read routes to the latest reparsed job', async () => {
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          job_id: 'job-latest',
+          understanding_status: {
+            status: 'SUCCESS',
+            warnings: [],
+            component_status: { paper_card: 'SUCCESS', formula_cards: 'SUCCESS', teaching_cards: 'SUCCESS' },
+            allowed_downstream: { reading_display: true, advisor_questions: true },
+          },
+          paper_workspace_status: { source_type: 'reparse', evidence_status: 'SUCCESS' },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          job_id: 'job-latest',
+          status: 'SUCCESS',
+          cards: {
+            paper_card: { one_sentence_summary: 'Latest grounded summary.' },
+            formula_cards: { formula_cards: [] },
+            teaching_cards: { teaching_cards: [] },
+          },
+        }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mountView()
+    await flushPromises()
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('/jobs/job-123/understanding_status')
+    expect(String(fetchMock.mock.calls[1][0])).toContain('/jobs/job-latest/cards')
+    expect(replaceState).toHaveBeenCalledWith(window.history.state, '', '/learn/job-latest')
+    expect(wrapper.text()).toContain('Latest grounded summary.')
+  })
+
   it('renders available components for structural formula degradation', async () => {
     const fetchMock = vi
       .fn()

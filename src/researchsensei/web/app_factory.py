@@ -142,6 +142,7 @@ def create_app(
     workspace = WorkspaceStore(resolved_workspace_root)
     db_path = Path(job_db_path or (workspace.root / "sensei.sqlite3"))
     jobs = JobStore(db_path)
+    _backfill_reparse_successors(jobs)
     job_service = JobService(jobs, workspace.root)
     paper_library = PaperLibraryStore(db_path, managed_roots=[workspace.root])
     background_tasks = PersistentTaskService(db_path)
@@ -587,11 +588,15 @@ def create_app(
             title_hint=_job_title_hint(original),
             progress=report,
         )
+        jobs.link_successor(original.job_id, new_job_id)
+        if job_id != original.job_id:
+            jobs.link_successor(job_id, new_job_id)
         return {
             **_job_parse_response(job),
             "status": "JOB_CREATED",
             "handoff_status": "JOB_CREATED",
             "source_job_id": job_id,
+            "resolved_source_job_id": original.job_id,
         }
 
     @app.post("/api/v1/jobs/{job_id}/reparse")
@@ -658,10 +663,7 @@ def create_app(
                 status_code=403,
                 detail={"message": "Raw artifacts are debug-only. Use /understanding_status or /cards."},
             )
-        try:
-            job = jobs.get(job_id)
-        except KeyError as error:
-            raise HTTPException(status_code=404, detail="Job not found.") from error
+        job = _get_job_or_404(jobs, job_id)
         return {
             "job_id": job.job_id,
             "artifacts": [_artifact_response(job, artifact.path, artifact.artifact_type) for artifact in job.artifacts],
@@ -669,10 +671,7 @@ def create_app(
 
     @app.get("/api/v1/jobs/{job_id}/understanding_status")
     def get_understanding_status(job_id: str) -> dict[str, object]:
-        try:
-            job = jobs.get(job_id)
-        except KeyError as error:
-            raise HTTPException(status_code=404, detail="Job not found.") from error
+        job = _get_job_or_404(jobs, job_id)
 
         artifact = _find_artifact(job, "understanding_status")
         if artifact is None:
@@ -687,10 +686,7 @@ def create_app(
 
     @app.get("/api/v1/jobs/{job_id}/cards")
     def get_cards(job_id: str) -> dict[str, object]:
-        try:
-            job = jobs.get(job_id)
-        except KeyError as error:
-            raise HTTPException(status_code=404, detail="Job not found.") from error
+        job = _get_job_or_404(jobs, job_id)
 
         # Read understanding_status
         us_artifact = _find_artifact(job, "understanding_status")
@@ -902,9 +898,33 @@ def _read_json_file(path: Path) -> dict[str, object]:
 
 def _get_job_or_404(jobs: JobStore, job_id: str) -> JobRecord:
     try:
-        return jobs.get(job_id)
+        return jobs.get_latest(job_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail="Job not found.") from error
+
+
+def _backfill_reparse_successors(jobs: JobStore) -> None:
+    """Recover lineage for reparses created before persistent links existed."""
+
+    recent = jobs.list_recent(limit=200)
+    by_source_path = {
+        str(Path(job.source_path).resolve(strict=False)).lower(): job
+        for job in recent
+        if job.source_path
+    }
+    for candidate in sorted(recent, key=lambda item: item.created_at):
+        if candidate.status != JobStatus.SUCCEEDED:
+            continue
+        source_status = _read_json_file(Path(candidate.run_dir) / "source_status.json")
+        if str(source_status.get("source_type") or "").lower() != "reparse":
+            continue
+        original_input = str(source_status.get("original_input") or "").strip()
+        if not original_input:
+            continue
+        source = by_source_path.get(str(Path(original_input).resolve(strict=False)).lower())
+        if source is None or source.job_id == candidate.job_id:
+            continue
+        jobs.link_successor(source.job_id, candidate.job_id)
 
 
 def _m4_service_for_job(
