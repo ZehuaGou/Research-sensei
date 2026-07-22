@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -54,8 +55,10 @@ def _clear_api_llm_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "MIMO_API_KEY",
         "OPENCODE_GO_API_KEY",
         "DEEPSEEK_API_KEY",
+        "RESEARCHSENSEI_CCSWITCH_DB_PATH",
     ):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE", "0")
 
 
 def test_env_file_enable_flag_is_loaded_before_api_llm_check(
@@ -84,6 +87,54 @@ def test_env_file_enable_flag_is_loaded_before_api_llm_check(
     assert client.provider.api_key_env == "OPENCODE_GO_API_KEY"
     assert client.config.max_retries == 2
     assert client.config.retry_delay == 1.0
+
+
+def test_opencode_go_can_use_matching_ccswitch_credential_bridge(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _clear_api_llm_env(monkeypatch)
+    monkeypatch.setenv("RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE", "1")
+    config_path = tmp_path / "local.toml"
+    env_path = tmp_path / ".env"
+    db_path = tmp_path / "cc-switch.db"
+    _write_config(config_path, active_provider="opencode_go")
+    env_path.write_text("RESEARCHSENSEI_ENABLE_API_LLM=1\n", encoding="utf-8")
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE providers (
+                app_type TEXT,
+                is_current INTEGER,
+                created_at TEXT,
+                settings_config TEXT,
+                meta TEXT
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO providers VALUES (?, ?, ?, ?, ?)",
+            (
+                "claude",
+                1,
+                "2026-07-22T00:00:00Z",
+                '{"env":{"ANTHROPIC_BASE_URL":"https://opencode.ai/zen/go","ANTHROPIC_AUTH_TOKEN":"bridge-key"}}',
+                '{"apiFormat":"openai_chat"}',
+            ),
+        )
+    monkeypatch.setenv("RESEARCHSENSEI_CCSWITCH_DB_PATH", str(db_path))
+
+    client = _configured_llm_client(
+        enable_configured_llm=None,
+        provider_name="",
+        llm_config=None,
+        config_service=ConfigService(config_path=config_path, env_path=env_path),
+    )
+
+    assert client is not None
+    assert client.provider.name == "opencode_go"
+    assert client.config.disable_thinking is True
+    assert client._headers()["authorization"] == "Bearer bridge-key"
 
 
 def test_env_file_provider_override_selects_mimo(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import httpx
 
 import pytest
 
@@ -76,6 +77,23 @@ def test_llm_client_anthropic_payload_can_disable_thinking() -> None:
     client = LLMClient(cfg)
 
     payload = client._anthropic_payload(
+        [ChatMessage(role="user", content="Return JSON.")],
+        config=LLMConfig(max_tokens=512, temperature=0, disable_thinking=True),
+    )
+
+    assert payload["thinking"] == {"type": "disabled"}
+
+
+def test_llm_client_openai_payload_can_disable_thinking() -> None:
+    cfg = ModelProviderConfig(
+        name="opencode_go",
+        kind="openai_compatible",
+        base_url="https://opencode.ai/zen/go/v1",
+        model="deepseek-v4-flash",
+    )
+    client = LLMClient(cfg)
+
+    payload = client._chat_payload(
         [ChatMessage(role="user", content="Return JSON.")],
         config=LLMConfig(max_tokens=512, temperature=0, disable_thinking=True),
     )
@@ -203,6 +221,56 @@ async def test_structured_repair_uses_a_bounded_timeout() -> None:
     assert result == {"ok": True}
     assert [config.timeout for config in configs] == [80, 25.0]
     assert configs[1].max_retries == 0
+
+
+@pytest.mark.asyncio
+async def test_connect_error_gets_one_fast_retry_when_request_retries_are_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    class FakeResponse:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict:
+            return {
+                "choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}],
+            }
+
+    class FakeAsyncClient:
+        def __init__(self, *, timeout: float) -> None:
+            self.timeout = timeout
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb) -> None:
+            return None
+
+        async def post(self, url: str, *, headers: dict, json: dict) -> FakeResponse:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise httpx.ConnectError("temporary proxy connection failure")
+            return FakeResponse()
+
+    monkeypatch.setattr("researchsensei.llm.client.httpx.AsyncClient", FakeAsyncClient)
+    provider = ModelProviderConfig(
+        name="opencode_go",
+        base_url="https://opencode.ai/zen/go/v1",
+        model="deepseek-v4-flash",
+        auth_header="none",
+    )
+    client = LLMClient(
+        provider,
+        config=LLMConfig(max_retries=0, connect_retries=1, retry_delay=0),
+    )
+
+    response = await client.chat([ChatMessage(role="user", content="Reply OK.")])
+
+    assert response.content == "OK"
+    assert calls == 2
 
 
 def test_redact_secret_removes_key() -> None:

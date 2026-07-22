@@ -1754,6 +1754,27 @@ _GROUNDING_CONCEPTS: dict[str, tuple[str, ...]] = {
     "convolution": ("convolution", "convolutional", "cnn", "卷积"),
     "transformer": ("transformer", "变换器"),
     "recurrent": ("lstm", "gru", "rnn", "recurrent", "循环神经"),
+    "root_system": ("root system", "root architecture", "rsa", "根系", "根系结构"),
+    "image_analysis": ("image", "imaging", "图像", "成像"),
+    "segmentation": ("segment", "segmentation", "separate roots", "分割", "分离"),
+    "phenotype_trait": ("trait", "phenotype", "性状", "表型"),
+    "software_tool": ("software", "software tool", "软件", "工具"),
+    "pipeline": ("pipeline", "workflow", "流水线", "工作流"),
+    "reproducibility": ("reproduc", "可重复", "复现"),
+    "user_interface": (
+        "graphical user interface",
+        "command line interface",
+        "command-line interface",
+        "gui",
+        "图形用户界面",
+        "命令行接口",
+    ),
+    "extensibility": ("extensible", "extend", "extension", "可扩展", "扩展"),
+    "reconstruction_3d": ("3d reconstruction", "three-dimensional reconstruction", "3d重建", "三维重建"),
+    "genotype": ("genotype", "基因型"),
+    "rice": ("rice", "水稻"),
+    "genetic": ("genetic", "heritable", "heritability", "遗传"),
+    "growth_analysis": ("growth analysis", "time-lapse", "生长分析", "生长过程"),
     "dataset": ("dataset", "data set", "数据集"),
     "benchmark": ("benchmark", "基准"),
     "metric": ("metric", "f1", "auroc", "auc", "precision", "recall", "rmse", "mae", "mse", "指标", "准确率", "精确率", "召回率"),
@@ -1774,6 +1795,20 @@ _STRICT_GROUNDING_CONCEPTS = {
     "convolution",
     "transformer",
     "recurrent",
+    "root_system",
+    "image_analysis",
+    "segmentation",
+    "phenotype_trait",
+    "software_tool",
+    "pipeline",
+    "reproducibility",
+    "user_interface",
+    "extensibility",
+    "reconstruction_3d",
+    "genotype",
+    "rice",
+    "genetic",
+    "growth_analysis",
     "dataset",
     "benchmark",
     "metric",
@@ -1807,6 +1842,12 @@ _TRAIT_NAME_ALIASES: dict[str, tuple[str, ...]] = {
 def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) -> tuple[bool, str]:
     claim_key = _grounding_key(text)
     evidence_key = _grounding_key(evidence_text)
+    # Trait-list claims have a stricter domain-specific validator that checks
+    # every named trait against bilingual aliases in the cited evidence. Run
+    # it before generic wrapper concepts such as "software" or "root system".
+    trait_list_support = _trait_list_claim_supported(text, evidence_text=evidence_text)
+    if trait_list_support is not None:
+        return trait_list_support
     claim_concepts = _grounding_concepts(claim_key)
     evidence_concepts = _grounding_concepts(evidence_key)
     missing_strict = (claim_concepts & _STRICT_GROUNDING_CONCEPTS) - evidence_concepts
@@ -1823,10 +1864,6 @@ def _claim_content_supported(text: str, *, evidence_text: str, claim_type: str) 
         return False, "unsupported_dataset_or_metric"
     if _has_math_or_threshold_rule(text) and not _has_math_or_threshold_rule(evidence_text):
         return False, "unsupported_formula_or_threshold"
-
-    trait_list_support = _trait_list_claim_supported(text, evidence_text=evidence_text)
-    if trait_list_support is not None:
-        return trait_list_support
 
     matched_concepts = claim_concepts & evidence_concepts
     if claim_concepts:

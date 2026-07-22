@@ -772,6 +772,34 @@ suite.
   `14 passed`, and the full frontend suite reported `92 passed`. Ruff, mypy,
   frontend typecheck, and the production build passed.
 
+### M4 model-service latency root cause and direct OpenCode Go route (2026-07-22)
+
+- The fast settings probe was not representative of M4: it used 128 output
+  tokens and a trivial prompt. A real GiA Roots M4 request contained about
+  2,535 input tokens. Through CC Switch's Anthropic-to-OpenAI conversion,
+  `thinking: disabled` was dropped and `deepseek-v4-pro` spent all 2,400 output
+  tokens on a thinking block in 39.98 seconds, returning no text. Historical
+  local proxy records showed similar non-streaming requests taking 62-78
+  seconds with roughly 4,900-5,600 output tokens.
+- A direct probe of the same configured OpenCode Go upstream proved that its
+  native OpenAI request field `thinking: {"type":"disabled"}` works: a bounded
+  response returned text in 2.32 seconds with zero reasoning content. The
+  problem was therefore the protocol transform, not basic provider
+  connectivity and not an unavoidable model-service delay.
+- ResearchSensei's `opencode_go` provider now sends the native thinking control.
+  When its API key environment variable is absent, a narrow read-only bridge
+  may resolve the credential from the active matching CC Switch Claude
+  provider. It refuses non-HTTPS or mismatched upstreams, keeps the credential
+  in memory, and can be disabled with
+  `RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE=0`.
+- On GiA Roots job `941a6709af95`, the real follow-up `说得再详细一些，这到底是什
+  么，怎么实现的？` completed in 10.97 seconds with `used_context.llm=true`,
+  seven accepted evidence-bound claims, and evidence ref `b002`. One additional
+  unsupported claim was removed and reported as a warning; the evidence gate
+  remained fail-closed.
+- Verification: focused provider/M4 tests reported `65 passed`; the full backend
+  suite reported `831 passed, 15 skipped`. Ruff and mypy passed.
+
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
 `RESEARCHSENSEI_LIVE_EVAL`. Missing keys, rate limits, network errors, or an
 unavailable ccswitch endpoint must remain explicit blockers; they are not

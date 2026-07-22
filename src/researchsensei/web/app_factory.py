@@ -39,6 +39,7 @@ from researchsensei.ingestion import (
 from researchsensei.jobs import JobStore
 from researchsensei.library import PaperLibraryStore
 from researchsensei.llm.client import LLMClient
+from researchsensei.llm.ccswitch_bridge import resolve_ccswitch_api_key
 from researchsensei.llm.types import LLMConfig
 from researchsensei.m4.service import M4InteractionService
 from researchsensei.query import QueryPlanner
@@ -1118,7 +1119,8 @@ def _configured_llm_client(
         raise RuntimeError(f"Unknown LLM provider for API: {actual_provider}")
 
     provider = config.providers[actual_provider]
-    if provider.api_key_env and not os.getenv(provider.api_key_env, ""):
+    api_key = resolve_ccswitch_api_key(provider)
+    if provider.api_key_env and not api_key:
         raise RuntimeError(provider.missing_api_key_message())
 
     provider_timeout = float(provider.timeout_seconds or 60)
@@ -1129,9 +1131,12 @@ def _configured_llm_client(
         timeout=max(provider_timeout, 300.0) if provider.kind == "anthropic_compatible" else provider_timeout,
         max_retries=2,
         retry_delay=1.0,
-        disable_thinking=provider.kind == "anthropic_compatible",
+        disable_thinking=(
+            provider.kind == "anthropic_compatible"
+            or provider.name == "opencode_go"
+        ),
     )
-    return LLMClient(provider, config=runtime_config)
+    return LLMClient(provider, config=runtime_config, api_key_override=api_key)
 
 
 def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[str, object]:
@@ -1175,7 +1180,7 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
         "model_env": "RESEARCHSENSEI_LLM_MODEL",
         "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
         "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
-        "api_key_configured": bool(os.getenv(provider.api_key_env, "")) if provider.api_key_env else True,
+        "api_key_configured": bool(resolve_ccswitch_api_key(provider)) if provider.api_key_env else True,
         "provider_known": True,
     }
 

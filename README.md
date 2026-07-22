@@ -28,6 +28,14 @@ Live LLM runs default to ccswitch (`cc_switch` config key). ResearchSensei calls
 the local ccswitch endpoint; the request model can be selected from the settings
 page.
 
+When the active CC Switch Claude provider itself forwards to an OpenAI-format
+OpenCode Go endpoint, use the checked-in `opencode_go` provider for low-latency
+M4 chat. If `OPENCODE_GO_API_KEY` is not set, ResearchSensei can read the key
+from the active matching CC Switch provider in read-only mode. The configured
+HTTPS upstream must match exactly; the key stays in memory and is never copied
+to project files or settings responses. Set
+`RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE=0` to disable this local bridge.
+
 ## Setup
 
 Backend:
@@ -50,7 +58,7 @@ not commit `.env`.
 
 ```text
 RESEARCHSENSEI_ENABLE_API_LLM=1
-RESEARCHSENSEI_LLM_PROVIDER=cc_switch
+RESEARCHSENSEI_LLM_PROVIDER=opencode_go
 
 UNPAYWALL_EMAIL=you@example.com
 RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
@@ -58,11 +66,13 @@ SEMANTIC_SCHOLAR_API_KEY=...
 S2_API_KEY=...
 ```
 
-`config/sensei.example.toml` uses `active_provider = "cc_switch"` and points to
-`http://127.0.0.1:15721/v1`. Local overrides belong in ignored
-`config/local.toml`. For ccswitch, ResearchSensei uses the Anthropic-compatible
-`/v1/messages` route; the OpenAI-compatible `/chat/completions` route is not the
-local ccswitch path for this project.
+`config/sensei.example.toml` defines both `cc_switch` and `opencode_go`. Local
+overrides belong in ignored `config/local.toml`. The `cc_switch` provider uses
+the Anthropic-compatible `/v1/messages` route. The `opencode_go` provider uses
+the upstream OpenAI-compatible `/chat/completions` route and explicitly disables
+model thinking for interactive M4 requests; this avoids a CC Switch transform
+that can drop the upstream's `thinking: disabled` control and spend the entire
+output budget on hidden reasoning.
 
 Configuration precedence is: explicit constructor/app-factory override,
 environment variable, ignored `config/local.toml`, checked-in

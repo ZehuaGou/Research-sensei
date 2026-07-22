@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 
 from researchsensei.core.config import AppConfig, ConfigService, redact_secret
 from researchsensei.llm.client import LLMClient, LLMTimeoutError
+from researchsensei.llm.ccswitch_bridge import resolve_ccswitch_api_key
 from researchsensei.llm.types import ChatMessage, LLMConfig
 from researchsensei.web.request_models import SettingsUpdate, SettingsValidationRequest
 
@@ -81,6 +82,7 @@ def create_settings_router(
 
         provider_key = request.app.state.runtime_config.active_provider
         provider = request.app.state.runtime_config.providers[provider_key]
+        api_key = resolve_ccswitch_api_key(provider)
         probe = LLMClient(
             provider,
             config=LLMConfig(
@@ -89,8 +91,12 @@ def create_settings_router(
                 json_mode=False,
                 timeout=body.timeout_seconds,
                 max_retries=0,
-                disable_thinking=provider.kind == "anthropic_compatible",
+                disable_thinking=(
+                    provider.kind == "anthropic_compatible"
+                    or provider.name == "opencode_go"
+                ),
             ),
+            api_key_override=api_key,
         )
         try:
             response = await probe.chat([ChatMessage(role="user", content="Reply with OK.")])

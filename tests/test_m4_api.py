@@ -7,7 +7,33 @@ from starlette.testclient import TestClient
 
 from researchsensei.core.config import ModelProviderConfig
 from researchsensei.llm.client import LLMClient
+from researchsensei.m4.service import _claim_content_supported
 from researchsensei.web.app import create_app
+
+
+def test_m4_grounding_accepts_bilingual_root_software_claim() -> None:
+    supported, reason = _claim_content_supported(
+        "GiA Roots 通过图像分割提取根系表型性状，并提供可扩展的软件工作流。",
+        evidence_text=(
+            "GiA Roots is extensible software for root system architecture image segmentation, "
+            "phenotype trait extraction, and reproducible workflows."
+        ),
+        claim_type="paper_claim",
+    )
+
+    assert supported is True
+    assert reason == ""
+
+
+def test_m4_grounding_rejects_unmentioned_root_software_mechanism() -> None:
+    supported, reason = _claim_content_supported(
+        "GiA Roots 使用三维重建和命令行接口完成根系分析。",
+        evidence_text="GiA Roots is software for two-dimensional root image segmentation.",
+        claim_type="paper_claim",
+    )
+
+    assert supported is False
+    assert reason.startswith("unsupported_specific_concept:")
 
 
 class ScriptedM4LLM:

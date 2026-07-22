@@ -28,5 +28,6 @@ class LLMConfig(SenseiModel):
     stream: bool = False
     timeout: float = Field(default=120.0, gt=0)
     max_retries: int = Field(default=3, ge=0)
+    connect_retries: int = Field(default=1, ge=0)
     retry_delay: float = Field(default=1.0, ge=0)
     disable_thinking: bool = False

@@ -37,12 +37,14 @@ class LLMClient:
         provider: ModelProviderConfig,
         *,
         config: LLMConfig | None = None,
+        api_key_override: str = "",
     ) -> None:
         self.provider = provider
         self.config = config or LLMConfig()
+        self._api_key_override = api_key_override.strip()
 
     def _headers(self) -> dict[str, str]:
-        api_key = os.getenv(self.provider.api_key_env, "")
+        api_key = self._api_key()
         headers: dict[str, str] = {"content-type": "application/json"}
         if self.provider.kind == "anthropic_compatible":
             headers["anthropic-version"] = "2023-06-01"
@@ -57,7 +59,7 @@ class LLMClient:
         return headers
 
     def _api_key(self) -> str:
-        return os.getenv(self.provider.api_key_env, "")
+        return self._api_key_override or os.getenv(self.provider.api_key_env, "")
 
     def _redact(self, message: str) -> str:
         return redact_secret(message, self._api_key())
@@ -78,6 +80,8 @@ class LLMClient:
         }
         if cfg.json_mode:
             payload["response_format"] = {"type": "json_object"}
+        if cfg.disable_thinking:
+            payload["thinking"] = {"type": "disabled"}
         if stream:
             payload["stream"] = True
         return payload
@@ -95,7 +99,9 @@ class LLMClient:
         url = self.provider.chat_completions_url()
         payload = self._chat_payload(messages, config=cfg)
 
-        for attempt in range(cfg.max_retries + 1):
+        retry_failures = 0
+        connect_failures = 0
+        while True:
             try:
                 async with httpx.AsyncClient(timeout=cfg.timeout) as client:
                     response = await client.post(
@@ -105,11 +111,12 @@ class LLMClient:
                     data = response.json()
                     return self._parse_response(data)
             except httpx.TimeoutException as exc:
-                if attempt < cfg.max_retries:
-                    delay = cfg.retry_delay * (2**attempt)
+                if retry_failures < cfg.max_retries:
+                    delay = cfg.retry_delay * (2**retry_failures)
+                    retry_failures += 1
                     logger.warning(
                         "LLM request timed out (attempt %d/%d), retrying in %.1fs",
-                        attempt + 1,
+                        retry_failures,
                         cfg.max_retries + 1,
                         delay,
                     )
@@ -119,17 +126,34 @@ class LLMClient:
                     f"LLM request timed out after {cfg.max_retries + 1} attempts: "
                     f"{self._redact(str(exc))}"
                 ) from exc
+            except httpx.ConnectError as exc:
+                if connect_failures < cfg.connect_retries:
+                    delay = cfg.retry_delay * (2**connect_failures)
+                    connect_failures += 1
+                    logger.warning(
+                        "LLM connection failed (retry %d/%d), retrying in %.1fs",
+                        connect_failures,
+                        cfg.connect_retries,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise LLMResponseError(
+                    "LLM connection failed after "
+                    f"{connect_failures + 1} attempts: {self._redact(str(exc))}"
+                ) from exc
             except httpx.HTTPStatusError as exc:
                 raise LLMResponseError(
                     f"LLM HTTP error {exc.response.status_code}: "
                     f"{self._redact(str(exc))}"
                 ) from exc
             except Exception as exc:
-                if attempt < cfg.max_retries:
-                    delay = cfg.retry_delay * (2**attempt)
+                if retry_failures < cfg.max_retries:
+                    delay = cfg.retry_delay * (2**retry_failures)
+                    retry_failures += 1
                     logger.warning(
                         "LLM request failed (attempt %d/%d), retrying in %.1fs: %s",
-                        attempt + 1,
+                        retry_failures,
                         cfg.max_retries + 1,
                         delay,
                         self._redact(str(exc)),
@@ -139,8 +163,6 @@ class LLMClient:
                 raise LLMResponseError(
                     f"LLM request failed: {self._redact(str(exc))}"
                 ) from exc
-
-        raise LLMResponseError("LLM request failed after all retries")
 
     async def _chat_anthropic(
         self,
@@ -151,7 +173,9 @@ class LLMClient:
         url = self.provider.messages_url()
         payload = self._anthropic_payload(messages, config=config)
 
-        for attempt in range(config.max_retries + 1):
+        retry_failures = 0
+        connect_failures = 0
+        while True:
             try:
                 async with httpx.AsyncClient(timeout=config.timeout) as client:
                     response = await client.post(
@@ -161,11 +185,12 @@ class LLMClient:
                     data = response.json()
                     return self._parse_anthropic_response(data)
             except httpx.TimeoutException as exc:
-                if attempt < config.max_retries:
-                    delay = config.retry_delay * (2**attempt)
+                if retry_failures < config.max_retries:
+                    delay = config.retry_delay * (2**retry_failures)
+                    retry_failures += 1
                     logger.warning(
                         "LLM request timed out (attempt %d/%d), retrying in %.1fs",
-                        attempt + 1,
+                        retry_failures,
                         config.max_retries + 1,
                         delay,
                     )
@@ -175,17 +200,34 @@ class LLMClient:
                     f"LLM request timed out after {config.max_retries + 1} attempts: "
                     f"{self._redact(str(exc))}"
                 ) from exc
+            except httpx.ConnectError as exc:
+                if connect_failures < config.connect_retries:
+                    delay = config.retry_delay * (2**connect_failures)
+                    connect_failures += 1
+                    logger.warning(
+                        "LLM connection failed (retry %d/%d), retrying in %.1fs",
+                        connect_failures,
+                        config.connect_retries,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                raise LLMResponseError(
+                    "LLM connection failed after "
+                    f"{connect_failures + 1} attempts: {self._redact(str(exc))}"
+                ) from exc
             except httpx.HTTPStatusError as exc:
                 raise LLMResponseError(
                     f"LLM HTTP error {exc.response.status_code}: "
                     f"{self._redact(str(exc))}"
                 ) from exc
             except Exception as exc:
-                if attempt < config.max_retries:
-                    delay = config.retry_delay * (2**attempt)
+                if retry_failures < config.max_retries:
+                    delay = config.retry_delay * (2**retry_failures)
+                    retry_failures += 1
                     logger.warning(
                         "LLM request failed (attempt %d/%d), retrying in %.1fs: %s",
-                        attempt + 1,
+                        retry_failures,
                         config.max_retries + 1,
                         delay,
                         self._redact(str(exc)),
@@ -195,8 +237,6 @@ class LLMClient:
                 raise LLMResponseError(
                     f"LLM request failed: {self._redact(str(exc))}"
                 ) from exc
-
-        raise LLMResponseError("LLM request failed after all retries")
 
     async def chat_json(
         self,
