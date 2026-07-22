@@ -17,4 +17,10 @@ describe('formatTaskStage', () => {
     expect(formatTaskStage('loading_formula_parser')).toBe('正在加载 GPU 公式解析器')
     expect(formatTaskStage('parsing_formula_regions:4/6')).toBe('正在识别公式区域（4/6 个）')
   })
+
+  it('renders OpenCode page-analysis progress', () => {
+    expect(formatTaskStage('opencode_preparing_pages')).toBe('正在为 OpenCode 准备 PDF 页面')
+    expect(formatTaskStage('opencode_reading_pages:5-8')).toBe('OpenCode 正在阅读 PDF 第 5–8 页')
+    expect(formatTaskStage('opencode_building_paper')).toBe('正在整理 OpenCode 逐页解析结果')
+  })
 })

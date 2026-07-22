@@ -46,6 +46,24 @@ def create_settings_router(
         )
         if llm_client is not None:
             llm_client.provider = llm_client.provider.model_copy(update={"model": model})
+        if payload.paper_model:
+            paper_model = payload.paper_model
+            env_writer(
+                str(config_service.env_path),
+                "RESEARCHSENSEI_OPENCODE_MODEL",
+                paper_model,
+            )
+            os.environ["RESEARCHSENSEI_OPENCODE_MODEL"] = paper_model
+            opencode_config = request.app.state.runtime_config.opencode.model_copy(
+                update={"model": paper_model}
+            )
+            request.app.state.runtime_config = request.app.state.runtime_config.model_copy(
+                update={"opencode": opencode_config}
+            )
+            paper_agent = getattr(request.app.state, "paper_agent", None)
+            if paper_agent is not None:
+                paper_agent.config = opencode_config
+                paper_agent.client.config = opencode_config
         return settings_payload(request.app.state.runtime_config)
 
     async def validate(request: Request, body: SettingsValidationRequest) -> dict[str, object]:

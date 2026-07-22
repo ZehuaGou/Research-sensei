@@ -73,6 +73,35 @@ class ServerConfig(ConfigModel):
     reload: bool = False
 
 
+class OpenCodeConfig(ConfigModel):
+    """Local OpenCode Server used as the paper-aware PDF agent.
+
+    This is deliberately separate from ``providers.opencode_go``.  The latter
+    is a plain text chat-completions endpoint; this service owns file parts,
+    model capability discovery, rendered PDF pages, and persistent sessions.
+    """
+
+    enabled: bool = False
+    base_url: str = "http://127.0.0.1:4096"
+    auto_start: bool = True
+    command: str = "opencode"
+    provider_id: str = "opencode-go"
+    model: str = "qwen3.7-plus"
+    timeout_seconds: int = Field(default=600, gt=0, le=1800)
+    startup_timeout_seconds: int = Field(default=20, gt=0, le=120)
+    page_batch_size: int = Field(default=4, ge=1, le=8)
+    max_pages: int = Field(default=120, ge=1, le=500)
+    render_scale: float = Field(default=1.7, ge=1.0, le=3.0)
+
+    @field_validator("base_url", "command", "provider_id", "model")
+    @classmethod
+    def opencode_value_must_not_be_empty(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("OpenCode configuration values must not be empty")
+        return cleaned
+
+
 class SearchConfig(ConfigModel):
     execution: Literal["auto", "direct", "uvx"] = "auto"
     command: str = "paper-search"
@@ -153,6 +182,7 @@ class AppConfig(ConfigModel):
     providers: dict[str, ModelProviderConfig] = Field(default_factory=dict)
     app: AppRuntimeConfig = Field(default_factory=AppRuntimeConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
+    opencode: OpenCodeConfig = Field(default_factory=OpenCodeConfig)
     search: SearchConfig = Field(default_factory=SearchConfig)
 
     @model_validator(mode="after")
@@ -195,6 +225,7 @@ class ConfigService:
             providers=providers,
             app=AppRuntimeConfig(**(data.get("app") or {})),
             server=ServerConfig(**(data.get("server") or {})),
+            opencode=OpenCodeConfig(**(data.get("opencode") or {})),
             search=SearchConfig(**(data.get("search") or {})),
         )
 
@@ -256,6 +287,7 @@ def _apply_environment_overrides(data: dict[str, Any]) -> dict[str, Any]:
     merged = _deep_merge({}, data)
     app = dict(merged.get("app") or {})
     server = dict(merged.get("server") or {})
+    opencode = dict(merged.get("opencode") or {})
     search = dict(merged.get("search") or {})
 
     _set_if_present(app, "workspace_dir", "RESEARCHSENSEI_WORKSPACE_DIR")
@@ -264,6 +296,15 @@ def _apply_environment_overrides(data: dict[str, Any]) -> dict[str, Any]:
     _set_if_present(server, "host", "RESEARCHSENSEI_SERVER_HOST")
     _set_if_present(server, "port", "RESEARCHSENSEI_SERVER_PORT", cast=int)
     _set_if_present(server, "reload", "RESEARCHSENSEI_SERVER_RELOAD", cast=_as_bool)
+    _set_if_present(opencode, "enabled", "RESEARCHSENSEI_OPENCODE_ENABLED", cast=_as_bool)
+    _set_if_present(opencode, "base_url", "RESEARCHSENSEI_OPENCODE_BASE_URL")
+    _set_if_present(opencode, "auto_start", "RESEARCHSENSEI_OPENCODE_AUTO_START", cast=_as_bool)
+    _set_if_present(opencode, "command", "RESEARCHSENSEI_OPENCODE_COMMAND")
+    _set_if_present(opencode, "provider_id", "RESEARCHSENSEI_OPENCODE_PROVIDER")
+    _set_if_present(opencode, "model", "RESEARCHSENSEI_OPENCODE_MODEL")
+    _set_if_present(opencode, "timeout_seconds", "RESEARCHSENSEI_OPENCODE_TIMEOUT_SECONDS", cast=int)
+    _set_if_present(opencode, "page_batch_size", "RESEARCHSENSEI_OPENCODE_PAGE_BATCH_SIZE", cast=int)
+    _set_if_present(opencode, "max_pages", "RESEARCHSENSEI_OPENCODE_MAX_PAGES", cast=int)
     _set_if_present(search, "execution", "RESEARCHSENSEI_PAPER_SEARCH_EXECUTION")
     _set_if_present(search, "command", "RESEARCHSENSEI_PAPER_SEARCH_COMMAND")
     _set_if_present(
@@ -301,6 +342,7 @@ def _apply_environment_overrides(data: dict[str, Any]) -> dict[str, Any]:
 
     merged["app"] = app
     merged["server"] = server
+    merged["opencode"] = opencode
     merged["search"] = search
     return merged
 

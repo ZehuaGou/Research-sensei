@@ -18,6 +18,7 @@ const saveResult = ref('')
 const isTesting = ref(false)
 const isSaving = ref(false)
 const modelDraft = ref('')
+const paperModelDraft = ref('')
 
 const providerLabel = computed(() => {
   if (settings.value.provider_display_name) return settings.value.provider_display_name
@@ -32,6 +33,10 @@ const modelOptions = computed(() => {
 })
 
 const modelDirty = computed(() => modelDraft.value.trim() !== settings.value.model)
+const paperModelDirty = computed(() => (
+  paperModelDraft.value.trim() !== (settings.value.paper_agent_model || '')
+))
+const paperModelOptions = computed(() => settings.value.paper_agent_model_options || [])
 
 const requestModeLabel = computed(() => (
   settings.value.provider_kind === 'anthropic_compatible'
@@ -61,6 +66,7 @@ onMounted(async () => {
   try {
     settings.value = await researchApi.getSettings()
     modelDraft.value = settings.value.model
+    paperModelDraft.value = settings.value.paper_agent_model || ''
   } catch {}
 })
 
@@ -76,6 +82,26 @@ async function saveModel() {
     saveResult.value = `模型已保存。后续请求会把这个 model 字段发送给 ${providerLabel.value}。`
   } catch (saveError) {
     saveResult.value = apiErrorMessage(saveError, '保存请求失败，请确认后端服务正在运行。')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function savePaperModel() {
+  const paperModel = paperModelDraft.value.trim()
+  if (!paperModel || isSaving.value) return
+  isSaving.value = true
+  saveResult.value = ''
+  try {
+    const data = await researchApi.updateSettings({
+      model: modelDraft.value.trim() || settings.value.model,
+      paper_model: paperModel,
+    })
+    settings.value = data
+    paperModelDraft.value = data.paper_agent_model || paperModel
+    saveResult.value = 'PDF 视觉解析模型已保存，后续重新解析论文时生效。'
+  } catch (saveError) {
+    saveResult.value = apiErrorMessage(saveError, '保存 PDF 视觉解析模型失败。')
   } finally {
     isSaving.value = false
   }
@@ -138,6 +164,34 @@ async function testConnection() {
           </div>
           <small>{{ modelHelp }}保存后写入 {{ settings.model_env || 'RESEARCHSENSEI_LLM_MODEL' }}，并立即生效。</small>
           <small v-if="saveResult" class="save-result">{{ saveResult }}</small>
+        </div>
+
+        <div v-if="settings.paper_agent_enabled" class="setting-row paper-agent-row">
+          <label>PDF 视觉解析模型</label>
+          <div class="model-editor">
+            <select
+              v-model="paperModelDraft"
+              data-testid="paper-model-select"
+              :disabled="!paperModelOptions.length"
+            >
+              <option v-for="option in paperModelOptions" :key="option.id" :value="option.id">
+                {{ option.label || option.id }}{{ option.source ? ` · ${option.source}` : '' }}
+              </option>
+            </select>
+            <button
+              data-testid="save-paper-model"
+              class="secondary-btn"
+              :disabled="!paperModelDraft.trim() || !paperModelDirty || isSaving"
+              @click="savePaperModel"
+            >
+              {{ isSaving ? '保存中...' : '保存' }}
+            </button>
+          </div>
+          <small>
+            M2 会把 PDF 按页渲染后交给这个支持图像附件的 OpenCode 模型，识别章节、公式和图表；
+            聊天模型仍由上方单独选择。
+          </small>
+          <small>{{ settings.paper_agent_base_url }}</small>
         </div>
 
         <button

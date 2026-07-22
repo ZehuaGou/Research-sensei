@@ -14,6 +14,8 @@ const TASK_STAGE_LABELS: Record<string, string> = {
   validating_source: '正在验证原始文件',
   preparing_source: '正在准备论文文件',
   parsing_document: '正在解析论文结构',
+  opencode_preparing_pages: '正在为 OpenCode 准备 PDF 页面',
+  opencode_building_paper: '正在整理 OpenCode 逐页解析结果',
   detecting_formula_regions: '正在定位 PDF 公式区域',
   loading_formula_parser: '正在加载 GPU 公式解析器',
   indexing_evidence: '正在建立证据索引',
@@ -34,6 +36,11 @@ const TASK_STAGE_LABELS: Record<string, string> = {
 }
 
 export function formatTaskStage(stage: string) {
+  const openCodePagesMatch = stage.match(/^opencode_reading_pages:(\d+)-(\d+)$/)
+  if (openCodePagesMatch) {
+    const [, first, last] = openCodePagesMatch
+    return `OpenCode 正在阅读 PDF 第 ${first}–${last} 页`
+  }
   const parsingRegionsMatch = stage.match(/^parsing_formula_regions:(\d+)\/(\d+)$/)
   if (parsingRegionsMatch) {
     const [, completed, total] = parsingRegionsMatch

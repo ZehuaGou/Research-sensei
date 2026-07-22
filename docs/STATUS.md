@@ -1,11 +1,53 @@
 # ResearchSensei v0.6 Reliability Baseline Status
 
-Last updated: 2026-07-21 (Asia/Shanghai).
+Last updated: 2026-07-22 (Asia/Shanghai).
 
 This is the authoritative implementation and verification ledger for
 ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
+
+## 2026-07-22 OpenCode PDF paper agent and persistent M4 session
+
+M2 now has an optional OpenCode Server paper-agent path that is distinct from
+the text-only OpenCode Go `/chat/completions` provider. PyMuPDF deterministically
+preserves complete page text and PDF page numbers. OpenCode receives rendered
+page images in bounded batches and supplies visual semantics: section headings,
+displayed formulas, equation numbers, figures, tables, and printed page labels.
+The resulting run stores `paper.md`, `paper_index.json`,
+`opencode_analysis.json`, and the rendered pages. Existing passage/evidence,
+formula-provenance, card, and QualityAuditor gates still run; visual formula
+transcriptions are marked `ocr_latex` and are not promoted to source LaTeX.
+
+Model capabilities are checked from the running OpenCode Server catalogue.
+The configured `deepseek-v4-flash` rejected a raw `application/pdf` attachment
+because that model supports neither PDF nor image input. The new PDF-agent
+setting therefore defaults to the attachment-capable `qwen3.7-plus`; the web
+settings page exposes chat and PDF-vision models separately. The app can start
+a localhost-only `opencode serve` sidecar on demand and stops only the process
+it started. If OpenCode is unavailable, M2 preserves page text with the
+maintained parser and records an explicit degraded warning.
+
+Live acceptance used the 11-page, 999,493-byte SmartRoot paper. All 11 pages
+were visually analyzed in 129.7 seconds with no warnings, producing 96 blocks,
+16 figure records, three table records, and zero displayed equations. The zero
+count is a page-vision result, not the old raw-text formula heuristic. Continuing
+the same OpenCode session answered a detailed segmentation/trait-extraction
+question in about 27 seconds with the actual arc search, adaptive internode
+distance, subpixel border detection, junction thresholds, SQL export, and a
+clear separation between paper statements and explanatory synthesis.
+
+A separate live formula regression rendered the formula-dense methodology page
+of *Root Cause Analysis in Microservice Using Neural Granger Causal Discovery*.
+It recovered five displayed formulas with their equation numbers and surrounding
+contexts, including the contrastive loss, forecasting equation, MSE objective,
+and thresholded causal graph. A final first-page probe recovered the complete
+SmartRoot paper title rather than the running page header.
+
+Verification: `849 passed, 15 skipped` backend tests; `98 passed` frontend unit
+tests; changed-source Ruff; Vue type checking; and the production build all
+passed. Live provider/PDF results above are separate from the deterministic
+test totals.
 
 ## 2026-07-21 Historical-paper deep-read timeout correction
 

@@ -16,6 +16,7 @@ from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
 from researchsensei.ingestion.mineru_enhanced import MineruEnhancedIngestionService
+from researchsensei.ingestion.opencode_agent import OpenCodePaperAgent
 from researchsensei.jobs import DuplicateSourceJobError, JobStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.paper_card_baseline import build_paper_card as build_paper_card_baseline
@@ -80,6 +81,7 @@ class SinglePaperIngestionRunner:
         ingestion: LightweightIngestionService | MineruEnhancedIngestionService | None = None,
         parser_adapter: ParserAdapter | None = None,
         llm_client: LLMClient | None = None,
+        paper_agent: OpenCodePaperAgent | None = None,
         quality_auditor: QualityAuditor | None = None,
     ) -> None:
         self.workspace = workspace
@@ -87,6 +89,7 @@ class SinglePaperIngestionRunner:
         self.ingestion = ingestion or LightweightIngestionService()
         self.parser_adapter = parser_adapter
         self.llm_client = llm_client
+        self.paper_agent = paper_agent
         self.quality_auditor = quality_auditor or QualityAuditor()
 
     def run(
@@ -127,8 +130,31 @@ class SinglePaperIngestionRunner:
                 current_step="parsing_document",
             )
             report("parsing_document", 20)
-            # Common preprocessing
-            if self.parser_adapter is not None:
+            # OpenCode owns the primary PDF semantic path. PyMuPDF still
+            # preserves complete page text and remains the safe fallback when
+            # the local server or a visual model is unavailable.
+            paper_agent_error: Exception | None = None
+            if self.paper_agent is not None and copied_source.suffix.lower() == ".pdf":
+                try:
+                    document = self.paper_agent.ingest_path(
+                        copied_source,
+                        paper_id=actual_job_id,
+                        progress=report,
+                    )
+                except Exception as exc:
+                    paper_agent_error = exc
+                    logger.warning(
+                        "OpenCode PDF ingestion failed for %s; using maintained parser fallback: %s",
+                        actual_job_id,
+                        exc,
+                        exc_info=True,
+                    )
+                    document = self.ingestion.ingest_path(
+                        copied_source,
+                        paper_id=actual_job_id,
+                        progress=report,
+                    )
+            elif self.parser_adapter is not None:
                 if not self.parser_adapter.supports(copied_source):
                     raise ValueError(
                         f"Parser adapter does not support source type: {copied_source.suffix}"
@@ -140,6 +166,23 @@ class SinglePaperIngestionRunner:
                     copied_source,
                     paper_id=actual_job_id,
                     progress=report,
+                )
+            if paper_agent_error is not None:
+                document = document.model_copy(
+                    update={
+                        "degraded": True,
+                        "warnings": [
+                            *document.warnings,
+                            WarningItem(
+                                code="OPENCODE_PDF_AGENT_FAILED",
+                                message=(
+                                    "OpenCode PDF agent was unavailable; page text was preserved by "
+                                    f"the fallback parser. {type(paper_agent_error).__name__}: "
+                                    f"{str(paper_agent_error)[:300]}"
+                                ),
+                            ),
+                        ],
+                    }
                 )
             document = _apply_title_hint(document, title_hint)
             report("indexing_evidence", 32)
@@ -544,6 +587,7 @@ class SinglePaperIngestionRunner:
             path = run_dir / filename
             self.workspace.write_json(path, value)
             artifacts.append(WorkspaceArtifact(artifact_type=artifact_type, path=str(path)))
+        artifacts.extend(_opencode_artifacts(run_dir))
         return artifacts
 
     def _write_artifacts(
@@ -618,6 +662,7 @@ class SinglePaperIngestionRunner:
 
         artifacts.append(WorkspaceArtifact(artifact_type="understanding_status", path=str(understanding_status_path)))
         artifacts.append(WorkspaceArtifact(artifact_type="quality_report", path=str(quality_report_path)))
+        artifacts.extend(_opencode_artifacts(run_dir))
 
         current_step = "ingestion_degraded" if document.degraded else "ingestion_completed"
         return self.jobs.update(
@@ -664,6 +709,19 @@ class SinglePaperIngestionRunner:
             ".pdf": "application/pdf",
             ".tex": "text/x-tex",
         }.get(path.suffix.lower(), "")
+
+
+def _opencode_artifacts(run_dir: Path) -> list[WorkspaceArtifact]:
+    artifacts: list[WorkspaceArtifact] = []
+    for artifact_type, filename in (
+        ("opencode_analysis", "opencode_analysis.json"),
+        ("paper_index", "paper_index.json"),
+        ("paper_markdown", "paper.md"),
+    ):
+        path = run_dir / filename
+        if path.exists():
+            artifacts.append(WorkspaceArtifact(artifact_type=artifact_type, path=str(path)))
+    return artifacts
 
 
 def _apply_title_hint(document: DocumentIngestion, title_hint: str) -> DocumentIngestion:

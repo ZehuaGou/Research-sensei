@@ -70,10 +70,12 @@ returns `library_reuse` and records the current search run without redownloading
 ## ingestion
 
 Input: canonical bundle, arXiv source, PDF, or resolved source directory.
-Output: parsed document, passage index, claim evidence, evidence pack,
+Output: page-preserving parsed document, optional OpenCode page-vision analysis
+and persistent session, passage index, claim evidence, evidence pack,
 understanding status, and artifact manifest.
 Boundary: malformed input or missing evidence must degrade/block rather than
-creating fake evidence.
+creating fake evidence. OpenCode visual formula transcriptions use OCR
+provenance and cannot impersonate source LaTeX.
 
 ## grounding
 
@@ -138,13 +140,15 @@ mode, and existing user-facing M2 artifacts.
 Output: selected-text explanations, formula/symbol explanations, claim-level
 evidence-bound answers, advisor questions/evaluations, and schema-versioned
 `m4_memory.json`.
-Boundary: each material claim must bind to allowed refs whose text supports that
-claim. A legal ref does not legalize unrelated prose, and all allowed refs must
-not be attached wholesale. Formulae, thresholds, numbers, datasets, metrics,
-and results use stricter support checks. Memory writes are locked, atomic, and
-bounded; corruption is quarantined with a warning. No raw PDF access, no
-free-form answer without evidence/degraded status, and no direction-level chat
-yet.
+Boundary: strict evidence mode still requires each material claim to bind to
+allowed refs whose text supports that claim. A legal ref does not legalize
+unrelated prose, and all allowed refs must not be attached wholesale. Formulae,
+thresholds, numbers, datasets, metrics, and results use stricter support checks.
+Full-paper mode may continue the paper-scoped OpenCode session created during
+M2, which contains rendered pages and page-preserving text; it must remain
+inside that paper and report unavailable details instead of inventing them.
+Memory writes are locked, atomic, and bounded; corruption is quarantined with a
+warning. There is no direction-level chat yet.
 
 ## context
 

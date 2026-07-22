@@ -236,6 +236,10 @@ export interface SettingsPayload {
   auth_header?: string
   model: string
   model_options?: Array<{ id: string; label?: string; source?: string }>
+  paper_agent_enabled?: boolean
+  paper_agent_model?: string
+  paper_agent_model_options?: Array<{ id: string; label?: string; source?: string }>
+  paper_agent_base_url?: string
   model_env?: string
   route_note?: string
   enable_env?: string

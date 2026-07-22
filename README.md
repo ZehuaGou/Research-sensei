@@ -16,13 +16,15 @@ the exact final commit, commands, pass/fail counts, and live-verification state.
 
 - M1: literature acquisition, direction exploration, seed expansion, legal
   full-text discovery, and deep-read handoff.
-- M2: passage/claim evidence, formula provenance, paper/formula/teaching card
+- M2: page-preserving PDF ingestion, optional OpenCode visual paper analysis,
+  passage/claim evidence, formula provenance, paper/formula/teaching card
   generation, quality audit, and fail-closed understanding status.
 - M3: typed Chinese Vue workspace for streamed upload, asynchronous direction
   jobs, seed expansion, four-layer status gating, cards, and settings.
-- M4 v1: claim-level evidence-bound PaperWorkspace interactions: selected text
-  explanation, formula explanation, single-paper Q&A, advisor
-  questions/evaluation, and atomic bounded `m4_memory.json`.
+- M4 v1: claim-level evidence-bound interactions plus full-paper tutoring that
+  can continue the persistent OpenCode paper session; selected-text and formula
+  explanation, single-paper Q&A, advisor questions/evaluation, and atomic
+  bounded `m4_memory.json` remain available.
 
 Live LLM runs default to ccswitch (`cc_switch` config key). ResearchSensei calls
 the local ccswitch endpoint; the request model can be selected from the settings
@@ -35,6 +37,14 @@ from the active matching CC Switch provider in read-only mode. The configured
 HTTPS upstream must match exactly; the key stays in memory and is never copied
 to project files or settings responses. Set
 `RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE=0` to disable this local bridge.
+
+For PDF-aware M2, install the OpenCode CLI and enable `[opencode]` in the local
+configuration. This is a separate Server/Agent integration, not the text-only
+OpenCode Go provider. The project starts `opencode serve` on localhost when
+needed, renders the PDF page by page, and uses an attachment-capable model such
+as `qwen3.7-plus`. Chat and PDF-vision models can be selected independently on
+the settings page. `deepseek-v4-flash` remains suitable for text chat but does
+not currently accept PDF or image input.
 
 ## Setup
 

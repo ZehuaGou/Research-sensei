@@ -11,6 +11,9 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
+
+from researchsensei.ingestion.opencode_agent import OpenCodeAgentError, OpenCodePaperAgent
 from researchsensei.llm.client import LLMClient, LLMClientError
 from researchsensei.llm.types import ChatMessage, LLMConfig
 from researchsensei.schemas.common import WarningItem
@@ -53,11 +56,13 @@ class M4InteractionService:
         run_dir: Path,
         artifacts: dict[str, object],
         llm_client: LLMClient | None = None,
+        paper_agent: OpenCodePaperAgent | None = None,
     ) -> None:
         self.job_id = job_id
         self.run_dir = Path(run_dir)
         self.artifacts = artifacts
         self.llm_client = llm_client
+        self.paper_agent = paper_agent
         self._memory_lock = _memory_lock_for(self.memory_path)
 
     @property
@@ -526,6 +531,71 @@ class M4InteractionService:
                 context_trace=trace,
                 warnings=[_warning("M4_FULL_TEXT_MISSING", "整篇论文正文不可用。")],
             )
+        agent_warning: WarningItem | None = None
+        opencode_context = _as_dict(self.artifacts.get("opencode_analysis"))
+        session_id = _clean(opencode_context.get("session_id"))
+        if self.paper_agent is not None and session_id:
+            try:
+                answer = _normalize_answer_text(
+                    self.paper_agent.answer(
+                        session_id=session_id,
+                        question=focus_question,
+                        selected_text=selected_text,
+                        provider_id=_clean(opencode_context.get("provider_id")),
+                        model=_clean(opencode_context.get("model")),
+                    ),
+                    max_chars=24_000,
+                )
+                if not answer:
+                    raise OpenCodeAgentError("OpenCode paper session returned an empty answer.")
+                result = InteractiveAnswer(
+                    status="SUCCESS",
+                    answer=answer,
+                    evidence_refs=location_refs,
+                    claims=[],
+                    uncertainty="",
+                    follow_up_suggestions=_full_paper_follow_ups(focus_question),
+                    used_context={
+                        "memory": bool(conversation_history),
+                        "artifacts": True,
+                        "llm": True,
+                        "full_paper": True,
+                        "opencode_session": True,
+                        "conversation": continued,
+                    },
+                    context_trace=trace,
+                    warnings=[],
+                )
+                self._append_memory(
+                    memory_type="interactive_answer",
+                    text=selected_text,
+                    question=question,
+                    answer=result.answer,
+                    evidence_refs=location_refs,
+                    confidence=0.8,
+                    source_artifact="opencode_analysis",
+                    metadata={
+                        "selected_text": selected_text,
+                        "status": result.status,
+                        "context_mode": "opencode_paper_session",
+                        "full_text_chars": len(paper_text),
+                        "full_text_complete": complete,
+                    },
+                )
+                return result
+            except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+                logger.warning(
+                    "OpenCode paper-session answer failed for job %s; using direct LLM fallback: %s",
+                    self.job_id,
+                    exc,
+                    exc_info=True,
+                )
+                agent_warning = _warning(
+                    "M4_OPENCODE_SESSION_FAILED",
+                    "OpenCode paper session failed; switched to the full-paper LLM fallback.",
+                    detail=str(exc)[:500],
+                )
+
         if self.llm_client is None:
             return InteractiveAnswer(
                 status="DEGRADED",
@@ -612,7 +682,7 @@ class M4InteractionService:
                 warnings=[_warning("M4_LLM_EMPTY", "全文对话返回空内容。")],
             )
 
-        warnings: list[WarningItem] = []
+        warnings: list[WarningItem] = [agent_warning] if agent_warning is not None else []
         uncertainty = ""
         if not complete:
             uncertainty = "论文超过单次上下文预算，本轮保留了开头、相关段落和结尾；涉及遗漏细节时需要进一步定位。"
@@ -973,13 +1043,14 @@ class M4InteractionService:
                 "follow_up_suggestions": ["基于现有论文证据可以继续追问的问题"],
             },
         }
-        if _is_problem_solution_question(question):
-            prompt["output_rules"].append(
+        output_rules = prompt.get("output_rules")
+        if _is_problem_solution_question(question) and isinstance(output_rules, list):
+            output_rules.append(
                 "当前问题询问论文真正面对的研究问题或痛点；至少一条 claim 必须明确说明现有做法的困难、"
                 "限制或未满足需求，不能只复述新方法的步骤、模块或功能。"
             )
-        if selected_text:
-            prompt["output_rules"].append(
+        if selected_text and isinstance(output_rules, list):
+            output_rules.append(
                 "当前问题包含选中文本；第一条 claim 必须直接解释 selected_text 的含义和它在论文中的作用，"
                 "不能改答相邻段落、泛化到整篇论文，或只罗列无关方法细节。"
             )

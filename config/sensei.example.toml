@@ -79,6 +79,24 @@ host = "127.0.0.1"
 port = 8765
 reload = false
 
+[opencode]
+# OpenCode Server is a separate paper-agent path. It accepts rendered PDF
+# pages, preserves one persistent session per paper, and lets M4 continue the
+# same conversation. Enable it on machines with the `opencode` CLI installed.
+enabled = false
+base_url = "http://127.0.0.1:4096"
+auto_start = true
+command = "opencode"
+provider_id = "opencode-go"
+# Select an attachment-capable model. DeepSeek V4 Flash is text-only in the
+# current OpenCode Go catalogue, so it cannot inspect PDF page images.
+model = "qwen3.7-plus"
+timeout_seconds = 600
+startup_timeout_seconds = 20
+page_batch_size = 4
+max_pages = 120
+render_scale = 1.7
+
 [search]
 # Every field below is consumed by PaperSearchMcpAdapter through the canonical
 # SearchConfig. Unknown sources, empty commands, negative timeouts, and unsafe

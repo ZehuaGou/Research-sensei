@@ -12,7 +12,7 @@ import uuid
 from contextlib import asynccontextmanager
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Callable
+from typing import Callable, cast
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -30,11 +30,12 @@ from researchsensei.acquisition import (
 )
 from researchsensei.browser_downloader import BrowserSessionDownloader
 from researchsensei.acquisition.fulltext_resolver import FullTextResolver
-from researchsensei.core.config import AppConfig, ConfigService
+from researchsensei.core.config import AppConfig, ConfigService, ModelProviderConfig
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
 from researchsensei.ingestion import (
     LightweightIngestionService,
     MineruEnhancedIngestionService,
+    OpenCodePaperAgent,
     SinglePaperIngestionRunner,
 )
 from researchsensei.jobs import JobStore
@@ -153,11 +154,17 @@ def create_app(
         config_service=resolved_config_service,
         app_config=runtime_config,
     )
+    paper_agent = (
+        OpenCodePaperAgent(runtime_config.opencode, directory=Path.cwd())
+        if runtime_config.opencode.enabled
+        else None
+    )
     runner = SinglePaperIngestionRunner(
         workspace=workspace,
         jobs=jobs,
         ingestion=_ingestion_for_backend(runtime_config.app.parser_backend),
         llm_client=resolved_llm_client,
+        paper_agent=paper_agent,
     )
     resolver = SourceResolver(
         allowed_roots=allowed_local_roots if allowed_local_roots is not None else [workspace.root],
@@ -215,6 +222,7 @@ def create_app(
     app.state.job_service = job_service
     app.state.paper_library = paper_library
     app.state.background_tasks = background_tasks
+    app.state.paper_agent = paper_agent
     app.state.dependencies = WebDependencies(
         config_service=resolved_config_service,
         config=runtime_config,
@@ -235,6 +243,8 @@ def create_app(
         try:
             yield
         finally:
+            if paper_agent is not None:
+                paper_agent.client.close()
             background_tasks.close()
 
     app.router.lifespan_context = lifespan
@@ -285,7 +295,11 @@ def create_app(
             jobs=jobs,
             llm_client=resolved_llm_client,
             get_job=_get_job_or_404,
-            service_for_job=_m4_service_for_job,
+            service_for_job=lambda job, **kwargs: _m4_service_for_job(
+                job,
+                paper_agent=paper_agent,
+                **kwargs,
+            ),
             sync_memory=_sync_m4_memory_artifact,
             runtime_answer=_runtime_self_answer,
             get_config=lambda: app.state.runtime_config,
@@ -931,6 +945,7 @@ def _m4_service_for_job(
     job: JobRecord,
     *,
     llm_client: LLMClient | None = None,
+    paper_agent: OpenCodePaperAgent | None = None,
     required_gate: str = "reading_display",
 ) -> M4InteractionService:
     status = _job_understanding_status(job)
@@ -962,6 +977,7 @@ def _m4_service_for_job(
         run_dir=Path(job.run_dir),
         artifacts=_m4_artifacts(job),
         llm_client=llm_client,
+        paper_agent=paper_agent,
     )
 
 
@@ -977,6 +993,7 @@ def _m4_artifacts(job: JobRecord) -> dict[str, object]:
         "claim_evidence",
         "evidence_index",
         "paper_skeleton",
+        "opencode_analysis",
     }
     artifacts: dict[str, object] = {}
     for artifact in job.artifacts:
@@ -1182,6 +1199,10 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
             "auth_header": "",
             "route_note": "",
             "model_options": [],
+            "paper_agent_enabled": config.opencode.enabled,
+            "paper_agent_model": config.opencode.model,
+            "paper_agent_model_options": _opencode_paper_model_options(config.opencode.model),
+            "paper_agent_base_url": config.opencode.base_url,
             "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
             "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
             "api_key_configured": False,
@@ -1200,6 +1221,10 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
         "auth_header": provider.auth_header,
         "route_note": _provider_route_note(provider),
         "model_options": _model_options_for_provider(provider),
+        "paper_agent_enabled": config.opencode.enabled,
+        "paper_agent_model": config.opencode.model,
+        "paper_agent_model_options": _opencode_paper_model_options(config.opencode.model),
+        "paper_agent_base_url": config.opencode.base_url,
         "model_env": "RESEARCHSENSEI_LLM_MODEL",
         "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
         "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
@@ -1270,6 +1295,36 @@ def _model_options_for_provider(provider: object) -> list[dict[str, str]]:
     return options[:24]
 
 
+_OPENCODE_PAPER_MODELS = (
+    "qwen3.7-plus",
+    "qwen3.6-plus",
+    "kimi-k3",
+    "kimi-k2.7-code",
+    "kimi-k2.6",
+    "grok-4.5",
+    "mimo-v2.5",
+)
+
+
+def _opencode_paper_model_options(current_model: str) -> list[dict[str, str]]:
+    values = [current_model, *_OPENCODE_PAPER_MODELS]
+    seen: set[str] = set()
+    options: list[dict[str, str]] = []
+    for value in values:
+        model = str(value or "").strip()
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        options.append(
+            {
+                "id": model,
+                "label": model,
+                "source": "OpenCode PDF/图像附件模型",
+            }
+        )
+    return options
+
+
 def _ccswitch_live_models(base_url: str) -> list[dict[str, str]]:
     return _openai_compatible_live_models(base_url, api_key="", timeout=1.2)
 
@@ -1308,7 +1363,7 @@ _MODEL_CATALOG_CACHE_LOCK = threading.Lock()
 
 def _opencode_go_live_models(provider: object) -> list[dict[str, str]]:
     base_url = str(getattr(provider, "base_url", "") or "").rstrip("/")
-    api_key = resolve_ccswitch_api_key(provider)
+    api_key = resolve_ccswitch_api_key(cast(ModelProviderConfig, provider))
     if not base_url or not api_key:
         return []
     cache_key = (base_url, True)

@@ -16,6 +16,10 @@ class StrictRequest(BaseModel):
 
 class SettingsUpdate(StrictRequest):
     model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    paper_model: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+    ] | None = None
 
 
 class SettingsValidationRequest(StrictRequest):
