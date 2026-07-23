@@ -54,7 +54,18 @@ describe('useChatPaneResize', () => {
     wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'ArrowRight' }), 'left')
     expect(wrapper.vm.width).toBe(580)
     wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'End' }), 'left')
-    expect(wrapper.vm.width).toBe(880)
+    expect(wrapper.vm.width).toBe(1140)
+  })
+
+  it('uses the full available width for the wide-pane shortcut', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1600 })
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    wrapper.vm.toggleWide()
+    expect(wrapper.vm.width).toBe(1140)
+    wrapper.vm.toggleWide()
+    expect(wrapper.vm.width).toBe(560)
   })
 
   it('ends pointer resizing on cancellation', async () => {

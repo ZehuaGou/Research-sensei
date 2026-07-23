@@ -3,8 +3,8 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 const STORAGE_KEY = 'researchsensei.learningWorkspace.chatWidth.v2'
 const DEFAULT_WIDTH = 560
 const MIN_WIDTH = 360
-const MAX_WIDTH = 960
-const READER_AND_NAV_RESERVE = 720
+const MAX_WIDTH = 1280
+const MIN_VISIBLE_WORKSPACE_RESERVE = 460
 
 type PaneSide = 'left' | 'right'
 
@@ -87,7 +87,8 @@ export function useChatPaneResize() {
   }
 
   function toggleWide() {
-    width.value = width.value >= 700 ? clampWidth(DEFAULT_WIDTH) : clampWidth(780)
+    const widest = maximumAllowedWidth()
+    width.value = width.value >= widest - 40 ? clampWidth(DEFAULT_WIDTH) : widest
     saveWidth()
   }
 
@@ -121,7 +122,7 @@ function clampWidth(value: number) {
 }
 
 function maximumAllowedWidth() {
-  const viewportMax = Math.max(MIN_WIDTH, viewportWidth() - READER_AND_NAV_RESERVE)
+  const viewportMax = Math.max(MIN_WIDTH, viewportWidth() - MIN_VISIBLE_WORKSPACE_RESERVE)
   return Math.min(MAX_WIDTH, viewportMax)
 }
 
