@@ -172,6 +172,38 @@ describe('AskPanel', () => {
     expect(wrapper.text()).not.toContain('已恢复这篇论文的上一轮问题')
   })
 
+  it('reveals the latest message after reopening a long conversation', async () => {
+    let resolveMemory: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) {
+        return await new Promise<ReturnType<typeof jsonResponse>>((resolve) => {
+          resolveMemory = resolve
+        })
+      }
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { store, wrapper } = mountPanel()
+    store.replaceChat([
+      { role: 'user', content: '第一轮问题', timestamp: 1 },
+      { role: 'assistant', content: '最新一轮回答', timestamp: 2 },
+    ])
+    await wrapper.vm.$nextTick()
+
+    const messages = wrapper.get('.messages').element as HTMLElement
+    const scrollTo = vi.fn()
+    Object.defineProperty(messages, 'scrollHeight', { configurable: true, value: 2400 })
+    messages.scrollTo = scrollTo
+
+    expect(resolveMemory).toBeTypeOf('function')
+    resolveMemory?.(jsonResponse({ records: [] }))
+    await flushPromises()
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 2400, behavior: 'auto' })
+    expect(wrapper.text()).toContain('最新一轮回答')
+  })
+
   it('uses one full-paper request without the old evidence-preview round trip', async () => {
     let resolveFullPaper: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

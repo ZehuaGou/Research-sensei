@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useLearningStore, type ChatMessage } from '../../stores/learning'
 import { apiErrorMessage, workspaceApi } from '../../api/client'
 import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest, AskResponse } from '../../types/api'
@@ -197,7 +197,7 @@ function advisorEvaluationText(session: AdvisorSession) {
   return normalizeMessageText(`${score}${session.feedback || 'M4 已完成评价。'}${missing}${next}`)
 }
 
-async function loadMemory() {
+async function loadMemory({ revealLatest = false }: { revealLatest?: boolean } = {}) {
   if (!store.currentJobId) return
   try {
     const data = await workspaceApi.getMemory(store.currentJobId)
@@ -247,6 +247,8 @@ async function loadMemory() {
     }
   } catch {
     memoryCount.value = 0
+  } finally {
+    if (revealLatest) await scrollToBottom('auto')
   }
 }
 
@@ -421,10 +423,15 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
-async function scrollToBottom() {
+async function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
   await nextTick()
-  chatContainer.value?.scrollTo?.({ top: chatContainer.value.scrollHeight, behavior: 'smooth' })
+  const container = chatContainer.value
+  container?.scrollTo?.({ top: container.scrollHeight, behavior })
 }
+
+onMounted(() => {
+  void scrollToBottom('auto')
+})
 
 watch(() => store.selectedText, (text) => {
   if (text) {
@@ -440,7 +447,7 @@ watch(() => store.selectedText, (text) => {
 })
 
 watch(() => store.currentJobId, () => {
-  void loadMemory()
+  void loadMemory({ revealLatest: true })
 }, { immediate: true })
 
 watch(fontSize, (value) => {
