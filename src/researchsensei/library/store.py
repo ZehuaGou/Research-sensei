@@ -62,7 +62,7 @@ class PaperLibraryRecord:
 
 
 class PaperLibraryStore:
-    """SQLite-backed local paper library for M1 search/download reuse."""
+    """SQLite-backed local paper library for literature discovery search/download reuse."""
 
     def __init__(self, db_path: str | Path, *, managed_roots: list[str | Path] | None = None) -> None:
         self.db_path = Path(db_path)
@@ -407,7 +407,9 @@ class PaperLibraryStore:
         if not root.exists():
             return 0
         imported = 0
-        for manifest_path in root.glob("*/manifest.json"):
+        # Search recursively so workspaces created before the semantic directory
+        # rename remain importable without hard-coding any retired stage path.
+        for manifest_path in root.rglob("manifest.json"):
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):

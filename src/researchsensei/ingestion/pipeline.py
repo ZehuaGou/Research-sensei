@@ -663,7 +663,7 @@ class SinglePaperIngestionRunner:
                 "resolved_path": str(copied_source),
                 "size_bytes": copied_source.stat().st_size,
             }
-            if source_status.preferred_m2_input == "latex_source" or copied_source.suffix.lower() == ".tex":
+            if source_status.preferred_analysis_input == "latex_source" or copied_source.suffix.lower() == ".tex":
                 update_fields.update({
                     "latex_source_path": str(copied_source),
                     "latex_main_file": str(copied_source),

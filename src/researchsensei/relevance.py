@@ -259,7 +259,7 @@ _STOPWORDS = {
 
 
 class DeterministicRelevanceEvaluator:
-    """Offline M1 gate for task, data-shape, method, and intent coverage.
+    """Offline literature discovery gate for task, data-shape, method, and intent coverage.
 
     An LLM score may annotate a candidate, but it never rescues a candidate
     that fails this deterministic gate.

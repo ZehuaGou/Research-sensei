@@ -35,7 +35,7 @@ tool:
 - legal/OA full-text verification and `pdf_ready` download confirmation;
 - QualityAuditor, FSA-5, `source_latex`, and `/cards` gates;
 - claim-level evidence binding, formula provenance and source-only lookup;
-- local job, paper-library, and bounded M4-memory persistence;
+- local job, paper-library, and bounded Paper Tutor-memory persistence;
 - typed Chinese PaperWorkspace behavior.
 
 ## 替换原则

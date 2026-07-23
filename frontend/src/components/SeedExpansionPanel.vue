@@ -73,7 +73,7 @@ function warningText(warning: { code: string; message: string }) {
     return `${source} 暂时不可用，已用其它来源降级继续。`
   }
   if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
-  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return 'M1 已完成全文下载；验证通过的 PDF 可交给论文代理建立深读会话。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '检索已完成全文下载；验证通过的 PDF 可交给论文代理建立深读会话。'
   if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
   if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已标记为暂不推荐。`
   if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
@@ -259,12 +259,12 @@ async function prepareDeepRead(paper: Record<string, any>) {
               <span>关系：{{ paper.relation_type || '未知' }}</span>
               <span data-testid="seed-confidence">置信度：{{ percent(paper.confidence) }}</span>
               <span data-testid="seed-verification">验证：{{ paper.verification_status || '未知' }}</span>
-              <span data-testid="seed-can-enter-m2">M2：{{ paper.can_enter_m2 ? '可进入' : '待验证' }}</span>
+              <span data-testid="seed-can-enter-analysis">解析准备：{{ paper.can_enter_analysis ? '可进入' : '待验证' }}</span>
               <span>图谱：{{ paper.citation_graph_verified ? '已验证' : '未验证' }}</span>
             </div>
 
             <p class="paper-reason" data-testid="seed-relation-reason">{{ paper.relation_reason }}</p>
-            <p v-if="!paper.can_enter_m2" class="paper-note">
+            <p v-if="!paper.can_enter_analysis" class="paper-note">
               {{ paper.deep_read_unavailable_reason || '还没有可解析来源。' }}
             </p>
             <p v-if="handoffState(paper).error" class="paper-note danger" data-testid="seed-handoff-error">
@@ -288,7 +288,7 @@ async function prepareDeepRead(paper: Record<string, any>) {
         <h3>推荐扩展顺序</h3>
         <ol>
           <li v-for="item in result.recommended_expansion_order" :key="`${item.rank}-${item.title}`">
-            {{ item.rank }}. {{ item.title }} · {{ item.relation_type }} · M2 {{ item.can_enter_m2 ? '可进入' : '待验证' }}
+            {{ item.rank }}. {{ item.title }} · {{ item.relation_type }} · 解析准备 {{ item.can_enter_analysis ? '可进入' : '待验证' }}
           </li>
         </ol>
       </section>

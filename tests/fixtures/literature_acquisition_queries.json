@@ -1,13 +1,13 @@
-﻿{
+{
   "queries": [
-    {
+{
       "query": "time series anomaly detection",
       "min_total_candidates": 3,
       "min_non_arxiv": 1,
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
       "expected_attempted_sources": ["paper_search"],
-      "notes": "Core M1/M2/M3 main-chain domain; should retain non-arXiv candidates and legal fulltext."
+      "notes": "Core literature discovery/paper analysis/reader workspace main-chain domain; should retain non-arXiv candidates and legal fulltext."
     },
     {
       "query": "graph anomaly detection",
@@ -25,7 +25,7 @@
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
       "expected_attempted_sources": ["paper_search"],
-      "notes": "Known to produce PDF fallback or blocked M2 jobs; M1 should still find candidates."
+      "notes": "Known to produce PDF fallback or blocked paper analysis jobs; literature discovery should still find candidates."
     },
     {
       "query": "graph neural network anomaly detection",
@@ -43,7 +43,7 @@
       "min_legal_fulltext": 1,
       "min_source_ready": 0,
       "expected_attempted_sources": ["paper_search"],
-      "notes": "Previously audit-blocked in M2, now used as regression for source_latex path."
+      "notes": "Previously audit-blocked in paper analysis, now used as regression for source_latex path."
     },
     {
       "query": "transformer time series anomaly detection",

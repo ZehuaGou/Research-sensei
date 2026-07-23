@@ -8,12 +8,12 @@ convergence. It is intentionally narrower than the historical experiments in
 
 ```text
 research direction
-  -> M1 discovery, relevance ranking, legal full-text resolution
+  -> literature discovery, relevance ranking, legal full-text resolution
   -> verified local PDF
-  -> M2 OpenCode paper session (page images + page-preserving text)
+  -> Paper Analysis OpenCode paper session (page images + page-preserving text)
   -> project-owned passage, claim, card, formula-provenance and quality gates
-  -> M3 reader workspace
-  -> M4 full-paper dialogue / deterministic source lookup / advisor rehearsal
+  -> reader workspace
+  -> paper tutor: full-paper dialogue / deterministic source lookup / advisor rehearsal
 ```
 
 There is one primary PDF path. When the OpenCode paper agent is configured, an
@@ -24,9 +24,9 @@ The lightweight importer remains for Markdown, text and explicit non-agent
 operation, and PyMuPDF remains the deterministic page-text and rendering layer
 inside the paper agent.
 
-## M1: discovery and acquisition
+## Literature Discovery and Acquisition
 
-M1 owns search intent, query variants, deterministic relevance, deduplication,
+Literature Discovery owns search intent, query variants, deterministic relevance, deduplication,
 legal open-access resolution, browser-assisted publisher downloads, PDF
 verification and library reuse. `paper-search-mcp` is the primary discovery
 adapter; OpenAlex, Semantic Scholar, arXiv and publisher resolvers are bounded
@@ -37,12 +37,12 @@ OpenCode may help plan multilingual queries, but it does not decide whether a
 download is legal or whether bytes are a valid PDF. A candidate is ready for
 handoff only when a verified local PDF path exists (`paper_agent_ready`).
 
-## M2: one paper agent, two models
+## Paper Analysis: one paper agent, two models
 
-M2 renders PDF pages and preserves page numbers/text with PyMuPDF, then attaches
+Paper Analysis renders PDF pages and preserves page numbers/text with PyMuPDF, then attaches
 page batches to one persistent OpenCode session. The vision model extracts
 headings, full text, formulas, tables and figures into structured results. The
-session id, vision model and tutor model are stored with the run so M4 can
+session id, vision model and tutor model are stored with the run so Paper Tutor can
 continue the same paper context.
 
 The models are deliberately independent:
@@ -58,11 +58,11 @@ still owns stable block ids, page references, evidence refs, formula origins,
 QualityAuditor and the fail-closed `/cards` contract. A model cannot promote an
 unsupported formula derivation merely by sounding confident.
 
-## M3: reader workspace
+## Reader Workspace
 
 The Vue workspace follows a compact Codex-like shell: persistent research
 navigation on the left, a scrollable paper canvas in the center and an
-independently scrollable M4 panel on the right. Large component styles are
+independently scrollable Paper Tutor panel on the right. Large component styles are
 co-located in separate CSS files; answer formatting is a standalone utility.
 The user-facing modes are:
 
@@ -73,13 +73,13 @@ The user-facing modes are:
 The interface shows which model produced a full-paper answer and keeps technical
 status details collapsible instead of dominating the reading surface.
 
-## M4: session-first full-paper tutoring
+## Paper Tutor: session-first full-paper tutoring
 
-M4 uses the persistent paper session first. Selected text is an additional focus,
+Paper Tutor uses the persistent paper session first. Selected text is an additional focus,
 not a replacement for the paper. Conversation history is bounded and sent for
 continuity; local memory is an atomic, size-bounded transcript index and is never
 treated as paper evidence. If the session fails, the direct full-text LLM route
-is a bounded compatibility fallback. If both fail, M4 reports degradation rather
+is a bounded compatibility fallback. If both fail, Paper Tutor reports degradation rather
 than returning canned pseudo-explanations.
 
 Evidence-only mode never calls an LLM. Formula explanations use the paper session
@@ -95,7 +95,7 @@ local bridge and never returned by the settings API.
 ## Deleted legacy paths
 
 The old canonical document pipeline, MinerU/Marker adapters, formula crop repair
-scripts, the separate M2 full pipeline/survey runner and template-heavy M4 answer
+scripts, the separate Paper Analysis full pipeline/survey runner and template-heavy Paper Tutor answer
 stack are no longer runtime options. Their tests and operational scripts were
 removed with them. Historical result notes may remain in `docs/STATUS.md`, but
 they do not describe callable code.
@@ -105,7 +105,7 @@ they do not describe callable code.
 1. Ruff and mypy for static integrity.
 2. Backend unit/API contracts, including strict evidence and failure gates.
 3. Frontend Vitest, typecheck and production build.
-4. A real PDF OpenCode run and a same-session M4 follow-up.
+4. A real PDF OpenCode run and a same-session Paper Tutor follow-up.
 5. Playwright inspection of the actual direction, settings and reader flows.
 
 Offline fixtures, provider probes and live end-to-end acceptance are reported

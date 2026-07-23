@@ -32,7 +32,7 @@ describe('LibraryView', () => {
             year: 2024,
             venue: 'AAAI',
             venue_rank: 'A*',
-            local_path: 'D:\\workspace\\m1_searches\\topic\\paper.pdf',
+            local_path: 'D:\\workspace\\literature_searches\\topic\\paper.pdf',
             file_size: 1024,
           },
         ],
@@ -117,7 +117,7 @@ describe('LibraryView', () => {
             venue: 'ICML',
             venue_rank: 'A*',
             doi: '10.1000/reusable',
-            local_path: 'D:\\workspace\\m1_searches\\topic\\paper.pdf',
+            local_path: 'D:\\workspace\\literature_searches\\topic\\paper.pdf',
           },
         ],
       }))
@@ -135,7 +135,7 @@ describe('LibraryView', () => {
     const parseInit = fetchMock.mock.calls[2][1] as RequestInit
     expect(parseInit.method).toBe('POST')
     const body = parseInit.body as FormData
-    expect(body.get('local_path')).toBe('D:\\workspace\\m1_searches\\topic\\paper.pdf')
+    expect(body.get('local_path')).toBe('D:\\workspace\\literature_searches\\topic\\paper.pdf')
     expect(body.get('title')).toBe('Reusable Paper')
     expect(body.get('doi')).toBeNull()
     expect(routerPush).toHaveBeenCalledWith('/learn/job-library')

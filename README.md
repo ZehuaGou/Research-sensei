@@ -2,7 +2,7 @@
 
 ResearchSensei is a research-reading workflow for moving from a research
 direction to legal paper discovery, full-text acquisition, evidence-backed
-single-paper understanding, and a Chinese PaperWorkspace with an M4 tutor.
+single-paper understanding, and a Chinese reader workspace with a paper tutor.
 
 `docs/STATUS.md` is the authoritative status file. Other docs describe design
 intent and contracts; if they disagree, update `docs/STATUS.md` and then bring
@@ -14,17 +14,17 @@ the exact final commit, commands, pass/fail counts, and live-verification state.
 
 ## Current Scope
 
-- M1: literature acquisition, direction exploration, seed expansion, legal
+- Literature Discovery: literature acquisition, direction exploration, seed expansion, legal
   full-text discovery, and deep-read handoff.
-- M2: page-preserving PDF ingestion, optional OpenCode visual paper analysis,
+- Paper Analysis: page-preserving PDF ingestion, optional OpenCode visual paper analysis,
   passage/claim evidence, formula provenance, paper/formula/teaching card
   generation, quality audit, and fail-closed understanding status.
-- M3: typed Chinese Vue workspace for streamed upload, asynchronous direction
+- Reader Workspace: typed Chinese Vue workspace for streamed upload, asynchronous direction
   jobs, seed expansion, four-layer status gating, cards, and settings.
-- M4 v1: claim-level evidence-bound interactions plus full-paper tutoring that
+- Paper Tutor v1: claim-level evidence-bound interactions plus full-paper tutoring that
   can continue the persistent OpenCode paper session; selected-text and formula
   explanation, single-paper Q&A, advisor questions/evaluation, and atomic
-  bounded `m4_memory.json` remain available.
+  bounded `tutor_memory.json` remain available.
 
 Live LLM runs default to direct OpenCode Go (`opencode_go` config key). The
 general chat model, PDF vision model and paper tutor model can all be selected
@@ -37,7 +37,7 @@ HTTPS upstream must match exactly; the key stays in memory and is never copied
 to project files or settings responses. Set
 `RESEARCHSENSEI_CCSWITCH_CREDENTIAL_BRIDGE=0` to disable this local bridge.
 
-For PDF-aware M2, install the OpenCode CLI and enable `[opencode]` in the local
+For PDF-aware Paper Analysis, install the OpenCode CLI and enable `[opencode]` in the local
 configuration. This is a separate Server/Agent integration, not the text-only
 OpenCode Go provider. The project starts `opencode serve` on localhost when
 needed, renders the PDF page by page, and uses an attachment-capable model such
@@ -79,7 +79,7 @@ S2_API_KEY=...
 overrides belong in ignored `config/local.toml`. The `cc_switch` provider uses
 the Anthropic-compatible `/v1/messages` route. The `opencode_go` provider uses
 the upstream OpenAI-compatible `/chat/completions` route and explicitly disables
-model thinking for interactive M4 requests; this avoids a CC Switch transform
+model thinking for interactive Paper Tutor requests; this avoids a CC Switch transform
 that can drop the upstream's `thinking: disabled` control and spend the entire
 output budget on hidden reasoning.
 
@@ -160,9 +160,9 @@ or provider secrets.
 ## Documentation Map
 
 - `docs/STATUS.md`: current project state, evidence, blockers, and next steps.
-- `docs/ARCHITECTURE.md`: maintained M1-M4 runtime and deleted legacy boundaries.
+- `docs/ARCHITECTURE.md`: maintained literature-to-tutoring workflow runtime and deleted legacy boundaries.
 - `docs/DESIGN.md`: architecture overview.
 - `docs/DEVELOPMENT.md`: development rules and commands.
 - `docs/MODULE_CONTRACTS.md`: module input/output/boundary contracts.
-- `docs/development/M3_FRONTEND_RENDER.md`: UI/API gating contract.
-- `docs/development/M4_INTERACTIVE_LEARNING.md`: current M4 v1 contract.
+- `docs/development/READER_WORKSPACE.md`: UI/API gating contract.
+- `docs/development/PAPER_TUTOR.md`: current Paper Tutor v1 contract.

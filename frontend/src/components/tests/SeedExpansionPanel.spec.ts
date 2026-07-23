@@ -22,7 +22,7 @@ function seedResponse(overrides: Record<string, any> = {}) {
       { name: 'Upgrade weak relations with citation data', reason: 'Relations remain query-similarity based.' },
     ],
     recommended_expansion_order: [
-      { rank: 1, title: 'A Survey of Time Series Anomaly Detection', relation_type: 'survey', can_enter_m2: true },
+      { rank: 1, title: 'A Survey of Time Series Anomaly Detection', relation_type: 'survey', can_enter_analysis: true },
     ],
     papers: [],
     ...overrides,
@@ -48,7 +48,7 @@ function paper(overrides: Record<string, any> = {}) {
     confidence: 0.61,
     verification_status: 'verified',
     source_confidence: 'high',
-    can_enter_m2: true,
+    can_enter_analysis: true,
     can_prepare_deep_read: true,
     deep_read_unavailable_reason: '',
     ...overrides,
@@ -87,7 +87,7 @@ describe('SeedExpansionPanel', () => {
     expect(wrapper.get('[data-testid="seed-confidence"]').text()).toContain('置信度：61%')
     expect(wrapper.get('[data-testid="seed-source"]').text()).toContain('来源：arxiv')
     expect(wrapper.get('[data-testid="seed-verification"]').text()).toContain('verified')
-    expect(wrapper.get('[data-testid="seed-can-enter-m2"]').text()).toContain('M2：可进入')
+    expect(wrapper.get('[data-testid="seed-can-enter-analysis"]').text()).toContain('解析准备：可进入')
   })
 
   it('shows DEGRADED warnings from partial source failures', async () => {
@@ -183,7 +183,7 @@ describe('SeedExpansionPanel', () => {
             arxiv_id: '',
             arxiv_url: '',
             pdf_url: '',
-            can_enter_m2: false,
+            can_enter_analysis: false,
             can_prepare_deep_read: true,
           })],
           downstream_papers: [],

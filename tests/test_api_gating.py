@@ -145,7 +145,7 @@ def test_understanding_status_endpoint_returns_status(tmp_path: Path) -> None:
     assert data["understanding_status"]["status"] == "BASELINE_ONLY"
     assert data["paper_workspace_status"]["source_type"] == "upload"
     assert data["paper_workspace_status"]["verification_status"] == "verified"
-    assert data["paper_workspace_status"]["can_enter_m2"] is True
+    assert data["paper_workspace_status"]["can_enter_analysis"] is True
     assert data["paper_workspace_status"]["source_confidence"] == 1.0
     assert data["paper_workspace_status"]["paper_agent_status"] == "not_available"
 
@@ -618,8 +618,8 @@ def test_cards_endpoint_failed_returns_403(tmp_path: Path) -> None:
     assert response.json()["detail"]["status"] == "FAILED"
 
 
-def test_parse_registers_existing_m2_artifacts_and_cards_are_gated(tmp_path: Path) -> None:
-    artifact_dir = _write_m2_artifact_run(tmp_path / "m2_success")
+def test_parse_registers_existing_analysis_artifacts_and_cards_are_gated(tmp_path: Path) -> None:
+    artifact_dir = _write_analysis_artifact_run(tmp_path / "analysis_success")
     client = TestClient(
         create_app(
             workspace_root=tmp_path / "workspace",
@@ -639,9 +639,9 @@ def test_parse_registers_existing_m2_artifacts_and_cards_are_gated(tmp_path: Pat
     assert status_response.status_code == 200
     status_data = status_response.json()
     assert status_data["understanding_status"]["status"] == "SUCCESS"
-    assert status_data["paper_workspace_status"]["source_type"] == "m1_canonical_bundle"
+    assert status_data["paper_workspace_status"]["source_type"] == "canonical_paper_bundle"
     assert status_data["paper_workspace_status"]["paper_agent_status"] == "not_available"
-    assert status_data["paper_workspace_status"]["m2_ready"] is True
+    assert status_data["paper_workspace_status"]["analysis_ready"] is True
     assert status_data["paper_workspace_status"]["formula_origin"] == "mineru_latex"
     assert status_data["paper_workspace_status"]["formula_ocr_status"] == "not_required"
     assert status_data["paper_workspace_status"]["evidence_status"] == "SUCCESS"
@@ -655,11 +655,11 @@ def test_parse_registers_existing_m2_artifacts_and_cards_are_gated(tmp_path: Pat
     assert cards_data["cards"]["formula_cards"]["formula_cards"][0]["formula_origin"] == "mineru_latex"
 
 
-def _write_m2_artifact_run(root: Path) -> Path:
+def _write_analysis_artifact_run(root: Path) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     _plain_write_json(root / "source_status.json", {
-        "source_type": "m1_canonical_bundle",
-        "original_input": "m1",
+        "source_type": "canonical_paper_bundle",
+        "original_input": "literature-search",
         "resolved_path": str(root / "canonical_paper.md"),
         "status": "resolved",
         "content_type": "text/markdown",
@@ -667,9 +667,9 @@ def _write_m2_artifact_run(root: Path) -> Path:
     })
     _plain_write_json(root / "canonical_status.json", {
         "paper_id": "paper",
-        "title": "M2 Artifact Paper",
+        "title": "paper analysis Artifact Paper",
         "canonicalization_status": "success",
-        "m2_ready": True,
+        "analysis_ready": True,
     })
     _plain_write_json(root / "understanding_status.json", {
         "schema_version": "understanding_status",
@@ -712,8 +712,8 @@ def _write_m2_artifact_run(root: Path) -> Path:
     _plain_write_json(root / "quality_report.json", {"paper_id": "paper", "findings": []})
     _plain_write_json(root / "paper_card.json", {
         "paper_id": "paper",
-        "title": "M2 Artifact Paper",
-        "one_sentence_summary": "A real M2 artifact-style paper card.",
+        "title": "paper analysis Artifact Paper",
+        "one_sentence_summary": "A real paper analysis artifact-style paper card.",
         "problem": {"text": "Problem", "evidence_ref": "paper:b001"},
         "core_idea": {"text": "Idea", "evidence_ref": "paper:b001"},
         "method_overview": {"text": "Method", "evidence_ref": "paper:b001"},
@@ -738,7 +738,7 @@ def _write_m2_artifact_run(root: Path) -> Path:
             "evidence_refs": ["paper:b001"],
         }],
     })
-    _plain_write_json(root / "m2_run_summary.json", {"paper_id": "paper", "status": "SUCCESS"})
+    _plain_write_json(root / "analysis_run_summary.json", {"paper_id": "paper", "status": "SUCCESS"})
     return root
 
 

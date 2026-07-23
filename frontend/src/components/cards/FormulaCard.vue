@@ -62,7 +62,7 @@ async function renderFormula() {
 }
 
 async function explainFormula() {
-  store.isAskPanelOpen = true
+  store.isPaperTutorPanelOpen = true
   if (!store.currentJobId || formulaExplainLoading.value) return
   formulaExplainLoading.value = true
   store.addMessage({
@@ -87,7 +87,7 @@ async function explainFormula() {
 function askFormula() {
   const formulaLabel = displayTitle() || props.card.formula_id || props.card.evidence_ref || '当前公式'
   store.setSelectedText(`解释这个公式：${formulaLabel}`)
-  store.isAskPanelOpen = true
+  store.isPaperTutorPanelOpen = true
 }
 
 function termDetail(term: NonNullable<FormulaCard['terms']>[number]) {
@@ -102,14 +102,14 @@ function isInsufficientText(value: unknown) {
   const text = String(value || '').trim()
   return /^INSUFFICIENT_EVIDENCE\b/i.test(text)
     || /^UNKNOWN$/i.test(text)
-    || /M2 preserved this formula slot/i.test(text)
+    || /paper analysis preserved this formula slot/i.test(text)
     || /blocked detailed derivation/i.test(text)
     || /raw\/unknown formula text/i.test(text)
 }
 
 function isRawFormulaText(value: unknown) {
   const text = String(value || '').trim()
-  return /Formula evidence preserved from M1 context/i.test(text)
+  return /Formula evidence preserved from literature discovery context/i.test(text)
     || /\\begin\{(?:cases|aligned|matrix|bmatrix|pmatrix|equation|align)/.test(text)
     || /\\(?:frac|overline|underline|label|text|tau|sum|prod|int)\b/.test(text)
 }
@@ -241,7 +241,7 @@ function shouldOpenTermDetails() {
     </section>
 
     <footer>
-      <button type="button" class="secondary-btn" @click="explainFormula">{{ formulaExplainLoading ? '解释中...' : '让 M4 解释' }}</button>
+      <button type="button" class="secondary-btn" @click="explainFormula">{{ formulaExplainLoading ? '解释中...' : '让论文助教解释' }}</button>
       <button type="button" class="ghost-btn" @click="askFormula">继续追问</button>
     </footer>
   </article>

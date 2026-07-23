@@ -140,7 +140,7 @@ describe('FormulaCard', () => {
       display_title: '公式 1 来源不足，暂不推导',
       formula_raw: 'Precision = TP / (TP + FP) where TP represents true positives',
       formula_origin: 'raw_formula_text',
-      purpose: 'INSUFFICIENT_EVIDENCE: M1 did not provide reliable LaTeX.',
+      purpose: 'INSUFFICIENT_EVIDENCE: literature discovery did not provide reliable LaTeX.',
       intuition: 'INSUFFICIENT_EVIDENCE',
       numeric_example: 'INSUFFICIENT_EVIDENCE',
       terms: [],

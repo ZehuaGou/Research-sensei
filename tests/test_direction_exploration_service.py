@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from pathlib import Path
 
@@ -119,7 +119,7 @@ class DownloadedResolver:
                     sha256="a" * 64,
                     file_size=100000,
                     source_priority=SourcePriority.PDF,
-                    preferred_m2_input="pdf",
+                    preferred_analysis_input="pdf",
                     has_valid_deep_reading_source=True,
                 )
                 for candidate in candidates
@@ -752,8 +752,8 @@ def test_candidate_cards_include_required_direction_fields() -> None:
         "source_confidence",
         "pdf_available",
             "paper_agent_ready",
-        "m2_ready",
-        "can_enter_m2",
+        "analysis_ready",
+        "can_enter_analysis",
     ):
         assert field in card
 
@@ -797,7 +797,7 @@ def test_direction_download_attempts_follow_rerank_queue_not_venue_gate() -> Non
     assert cards["aaai-paper"]["venue_rank"] == "A*"
     assert cards["aaai-paper"]["can_prepare_deep_read"] is True
     assert cards["aaai-paper"]["paper_agent_ready"] is True
-    assert cards["aaai-paper"]["can_enter_m2"] is True
+    assert cards["aaai-paper"]["can_enter_analysis"] is True
     assert cards["aaai-paper"]["deep_read_button_state"] == "ready"
     assert cards["workshop-paper"]["download_selected"] is True
     assert cards["workshop-paper"]["download_decision"] == "SELECTED_BY_RERANKER"
@@ -975,7 +975,7 @@ def test_direction_download_pool_does_not_cap_single_venue_when_rerank_orders_it
     assert len(selected_cards) == 5
 
 
-def test_a_read_for_m2_gate_is_not_relaxed_without_canonical_readiness() -> None:
+def test_a_read_for_analysis_gate_is_not_relaxed_without_canonical_readiness() -> None:
     paper = _candidate(
         llm_relevance_score=0.9,
         llm_relevance_label="HIGH",
@@ -986,17 +986,17 @@ def test_a_read_for_m2_gate_is_not_relaxed_without_canonical_readiness() -> None
     bundle = service.explore("time series anomaly detection")
     card = bundle.candidate_cards[0]
 
-    assert card["priority"] != "A_READ_FOR_M2"
-    assert card["can_enter_m2"] is False
+    assert card["priority"] != "A_READ_ANALYSIS_READY"
+    assert card["can_enter_analysis"] is False
     assert card["deep_read_button_state"] == "prepare"
 
 
-def test_a_read_for_m2_requires_all_existing_selection_gates() -> None:
+def test_a_read_for_analysis_requires_all_existing_selection_gates() -> None:
     paper = _candidate(
         llm_relevance_score=0.9,
         llm_relevance_label="HIGH",
         should_a_read=True,
-        m2_ready=True,
+        analysis_ready=True,
         canonical_paper_path="/tmp/canonical_paper.md",
         canonical_quality_status=CanonicalQualityStatus.PASS,
         has_valid_deep_reading_source=True,
@@ -1010,6 +1010,6 @@ def test_a_read_for_m2_requires_all_existing_selection_gates() -> None:
     bundle = service.explore("time series anomaly detection")
     card = bundle.candidate_cards[0]
 
-    assert card["priority"] == "A_READ_FOR_M2"
-    assert card["can_enter_m2"] is True
+    assert card["priority"] == "A_READ_ANALYSIS_READY"
+    assert card["can_enter_analysis"] is True
     assert bundle.deep_read_candidates[0]["paper_id"] == "paper-1"

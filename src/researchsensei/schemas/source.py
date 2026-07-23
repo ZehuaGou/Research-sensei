@@ -22,7 +22,7 @@ class SourceStatus(SenseiModel):
     source_manifest_path: str = ""
     source_strategy: str = ""
     source_priority: str = ""
-    preferred_m2_input: str = ""
+    preferred_analysis_input: str = ""
     latex_source_available: bool = False
     latex_source_path: str = ""
     latex_main_file: str = ""

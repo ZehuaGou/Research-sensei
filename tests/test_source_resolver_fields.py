@@ -85,7 +85,7 @@ def test_downloaded_pdf_sets_source_aware_fields(tmp_path: Path) -> None:
 
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.source_priority == SourcePriority.PDF
-    assert result.preferred_m2_input == "pdf"
+    assert result.preferred_analysis_input == "pdf"
     assert result.has_valid_deep_reading_source is True
     assert result.local_path
     assert Path(result.local_path).exists()
@@ -133,7 +133,7 @@ def test_arxiv_retains_source_but_hands_validated_pdf_to_paper_agent(tmp_path: P
 
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.source_type == PaperSourceType.PDF
-    assert result.preferred_m2_input == "pdf"
+    assert result.preferred_analysis_input == "pdf"
     assert result.metadata["resolution_strategy"] == "arxiv_source_plus_pdf"
     assert result.metadata["latex_source_retained"] == "true"
     assert result.latex_source_available is True
@@ -172,7 +172,7 @@ def test_arxiv_source_fallback_pdf_is_not_mislabeled_as_latex(tmp_path: Path) ->
 
     assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
     assert result.source_type == PaperSourceType.PDF
-    assert result.preferred_m2_input == "pdf"
+    assert result.preferred_analysis_input == "pdf"
     assert result.latex_source_available is False
     assert result.latex_source_downloaded is False
     assert Path(result.local_path).read_bytes().startswith(b"%PDF")

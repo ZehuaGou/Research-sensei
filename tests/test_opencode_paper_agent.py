@@ -8,7 +8,7 @@ import httpx
 
 from researchsensei.core.config import OpenCodeConfig
 from researchsensei.ingestion.opencode_agent import OpenCodePaperAgent, OpenCodeServerClient
-from researchsensei.m4.service import M4InteractionService
+from researchsensei.tutor.service import PaperTutorService
 
 
 def _pdf(path: Path) -> None:
@@ -139,14 +139,14 @@ def test_opencode_agent_preserves_page_text_and_adds_visual_semantics(tmp_path: 
     assert "/session/ses_test_paper/message" in requests
 
 
-def test_m4_full_paper_continues_the_opencode_session(tmp_path: Path) -> None:
+def test_tutor_full_paper_continues_the_opencode_session(tmp_path: Path) -> None:
     class FakePaperAgent:
         def answer(self, **kwargs: object) -> str:
             assert kwargs["session_id"] == "ses_persisted"
             assert "method" in str(kwargs["question"]).lower()
             return "The method has two stages, followed by an ablation study."
 
-    service = M4InteractionService(
+    service = PaperTutorService(
         job_id="paper-1",
         run_dir=tmp_path,
         artifacts={

@@ -46,7 +46,7 @@ describe('useChatPaneResize', () => {
     expect(localStorage.getItem('researchsensei.learningWorkspace.chatWidth.v2')).toBe('560')
   })
 
-  it('resizes in the correct direction when M4 is placed on the left', async () => {
+  it('resizes in the correct direction when 论文助教 is placed on the left', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1600 })
     const wrapper = mount(Harness)
     await nextTick()

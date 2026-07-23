@@ -42,7 +42,7 @@ def test_request_models_reject_unknown_top_level_fields(
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_m4_history_and_enum_limits_are_enforced(client: TestClient) -> None:
+def test_tutor_history_and_enum_limits_are_enforced(client: TestClient) -> None:
     history = [{"role": "user", "content": "x"} for _ in range(21)]
 
     too_many = client.post("/api/v1/jobs/missing/ask", json={"question": "method?", "conversation_history": history})

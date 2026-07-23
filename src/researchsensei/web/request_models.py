@@ -61,7 +61,7 @@ class FormulaExplainRequest(StrictRequest):
     selected_symbol: ShortText = ""
 
 
-class M4AskRequest(StrictRequest):
+class TutorAskRequest(StrictRequest):
     question: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1200)] = ""
     user_question: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1200)] = ""
     selected_text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ""
@@ -92,7 +92,7 @@ class DirectionSearchRequest(StrictRequest):
 
 
 class CandidateRequest(BaseModel):
-    """Evolving M1 candidate payload.
+    """Evolving literature discovery candidate payload.
 
     Known source fields are bounded below. Extra metadata is intentionally
     accepted because candidates originate from multiple discovery providers;

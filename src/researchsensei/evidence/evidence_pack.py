@@ -199,10 +199,10 @@ _CORE_FORMULA_KEYWORDS = {
 
 
 def _formula_core_score(claim) -> float:
-    """Rank formula evidence for M2 deep explanation.
+    """Rank formula evidence for paper analysis deep explanation.
 
     The score is intentionally heuristic and evidence-local: it uses only the
-    formula text/context carried by M1/M2 artifacts, not external knowledge.
+    formula text/context carried by literature discovery/paper analysis artifacts, not external knowledge.
     """
     text = " ".join(
         str(getattr(claim, attr, "") or "")

@@ -13,7 +13,7 @@ DEFAULT_FIXTURE = (
     Path(__file__).resolve().parents[1]
     / "tests"
     / "fixtures"
-    / "m1_relevance_benchmark.json"
+    / "literature_relevance_benchmark.json"
 )
 
 
@@ -101,13 +101,13 @@ def _candidate(case_id: str, index: int, raw: dict[str, object]) -> CandidatePap
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Run the deterministic offline M1 relevance benchmark.",
+        description="Run the deterministic offline literature discovery relevance benchmark.",
     )
     parser.add_argument(
         "--fixture",
         type=Path,
         default=DEFAULT_FIXTURE,
-        help="Path to an m1_relevance_benchmark.v1 JSON fixture.",
+        help="Path to a literature_relevance_benchmark.v1 JSON fixture.",
     )
     parser.add_argument(
         "--show-passing-cases",

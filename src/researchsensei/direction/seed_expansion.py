@@ -35,7 +35,7 @@ RELATION_GROUPS = {
 
 
 class SeedExpansionService:
-    """Minimal M1 Seed Expansion loop over real paper-source adapters.
+    """Minimal literature discovery Seed Expansion loop over real paper-source adapters.
 
     This service intentionally does not claim citation-graph certainty. The
     current loop uses source-backed searches around the seed and marks those
@@ -358,7 +358,7 @@ def _to_expansion_paper(
         confidence=confidence,
         verification_status=_verification_status(paper),
         source_confidence=paper.source_confidence,
-        can_enter_m2=can_prepare,
+        can_enter_analysis=can_prepare,
         can_prepare_deep_read=can_prepare,
         deep_read_unavailable_reason="" if can_prepare else _deep_read_unavailable_reason(paper),
         is_weak_relation=True,
@@ -410,7 +410,7 @@ def _recommended_order(groups: dict[str, list[SeedExpansionPaper]]) -> list[Seed
                     title=paper.title,
                     relation_type=paper.relation_type,
                     reason=paper.relation_reason,
-                    can_enter_m2=paper.can_enter_m2,
+                    can_enter_analysis=paper.can_enter_analysis,
                 )
             )
     return ordered

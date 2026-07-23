@@ -29,7 +29,7 @@ class PaperSourceStatus(str, Enum):
 
 
 class VerificationStatus(str, Enum):
-    """M1.4 candidate verification status."""
+    """Candidate identity verification status."""
 
     VERIFIED = "verified"
     UNVERIFIED = "unverified"
@@ -72,7 +72,7 @@ class EvidenceType(str, Enum):
     INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
 
 
-# --- Source-aware M1 enums ---
+# --- Source-aware literature discovery enums ---
 
 class SourcePriority(str, Enum):
     """Source priority for best available source resolution."""
@@ -92,7 +92,7 @@ class CanonicalizationStatus(str, Enum):
 
 
 class CanonicalQualityStatus(str, Enum):
-    """Quality gate status for whether canonical_paper.md may enter M2."""
+    """Quality gate status for whether canonical_paper.md may enter paper analysis."""
     PASS = "PASS"
     DEGRADED = "DEGRADED"
     FAIL = "FAIL"
@@ -134,7 +134,7 @@ class AdapterStatus(str, Enum):
     NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
 
 
-# --- M1 venue-quality + fulltext source labels ---
+# --- literature discovery venue-quality + fulltext source labels ---
 
 class VenueRank(str, Enum):
     """A-conference / A-journal quality rank.

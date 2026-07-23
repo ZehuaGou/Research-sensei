@@ -348,7 +348,7 @@ function warningText(warning: { code: string; message: string }) {
     return `${source} 暂时不可用，已用其它来源降级继续。`
   }
   if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
-  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return 'M1 已完成全文下载；验证通过的 PDF 可交给论文代理建立深读会话。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return '检索已完成全文下载；验证通过的 PDF 可交给论文代理建立深读会话。'
   if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
   if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已标记为暂不推荐。`
   if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'
@@ -442,10 +442,10 @@ function discoverySourceLabel(value: unknown) {
   return labels[String(value || '')] || String(value || '未知来源')
 }
 
-function m2ReadinessNote(paper: Record<string, any>) {
-  const reason = String(paper.m2_unavailable_reason || paper.risk_note || '')
+function analysisReadinessNote(paper: Record<string, any>) {
+  const reason = String(paper.analysis_unavailable_reason || paper.risk_note || '')
   if (!reason) return '需要先下载并验证合法 PDF，之后由论文代理建立会话。'
-  if (reason.includes('Not cleared for M2')) return '尚未准备好深读：需要先下载并验证合法 PDF。'
+  if (reason.includes('Not cleared for paper analysis')) return '尚未准备好深读：需要先下载并验证合法 PDF。'
   if (reason.includes('Metadata/source confidence is low')) return '来源或元数据置信度偏低，进入深读前需要人工确认。'
   return reason
 }
@@ -467,7 +467,7 @@ function downloadDiagnosticNote(paper: Record<string, any>) {
 function readingOrderText(item: Record<string, any>) {
   const priorityLabels: Record<string, string> = {
     A_READ: '优先深读',
-    A_READ_FOR_M2: '优先进入 M2',
+    A_READ_ANALYSIS_READY: '优先进入论文解析',
     B_SKIM: '快速浏览',
     C_REFERENCE: '留作参考',
     D_IGNORE: '忽略',
@@ -699,7 +699,7 @@ async function openDeepRead(paper: Record<string, any>) {
             <ul>
               <li>先展示这个方向已经记录的论文，不会在点击历史方向时自动重新检索或下载。</li>
               <li>需要新增论文时，用底部输入框主动发起检索，再把可用全文移交到深读工作区。</li>
-              <li>候选列表只保留来源、全文、M2 门槛这些能支撑下一步阅读的证据。</li>
+              <li>候选列表只保留来源、全文和解析门槛这些能支撑下一步阅读的证据。</li>
             </ul>
           </div>
         </article>
@@ -913,7 +913,7 @@ async function openDeepRead(paper: Record<string, any>) {
                 <span>验证 {{ verificationLabel(paper.verification_status) }}</span>
                 <span>全文 {{ paper.pdf_available || paper.selected_fulltext_url ? '可用' : '待确认' }}</span>
                 <span>发现来源 {{ discoverySourcesText(paper) }}</span>
-                <span>论文代理 {{ paper.paper_agent_ready || paper.m2_ready || paper.can_enter_m2 ? '可接收' : '待验证' }}</span>
+                <span>论文代理 {{ paper.paper_agent_ready || paper.analysis_ready || paper.can_enter_analysis ? '可接收' : '待验证' }}</span>
               </div>
 
               <p v-if="paper.selected_fulltext_source || paper.fulltext_failure_reason" class="note" data-testid="fulltext-note">
@@ -923,8 +923,8 @@ async function openDeepRead(paper: Record<string, any>) {
               <p v-if="downloadDiagnosticNote(paper)" class="note" data-testid="browser-download-note">
                 {{ downloadDiagnosticNote(paper) }}
               </p>
-              <p v-if="!paper.paper_agent_ready && !paper.can_enter_m2" class="note" data-testid="m2-readiness-note">
-                深读准备：{{ m2ReadinessNote(paper) }}
+              <p v-if="!paper.paper_agent_ready && !paper.can_enter_analysis" class="note" data-testid="analysis-readiness-note">
+                深读准备：{{ analysisReadinessNote(paper) }}
               </p>
               <p v-if="!hasDeepReadSource(paper)" class="note warning" data-testid="source-unavailable-note">
                 {{ paper.deep_read_unavailable_reason || '没有可支持的全文来源。' }}

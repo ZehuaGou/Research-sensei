@@ -44,10 +44,10 @@ const message = computed(() => {
       || props.paperWorkspaceStatus?.formula_origin === 'not_applicable'
     ) {
       return props.paperWorkspaceStatus?.formula_detection_status === 'scanned_no_candidates'
-        ? '可以阅读论文并继续向 M4 追问；PDF 已完成公式区域扫描，本篇未发现可生成卡片的独立方程。'
-        : '可以阅读论文并继续向 M4 追问；当前没有可生成卡片的公式。'
+        ? '可以阅读论文并继续向论文助教追问；PDF 已完成公式区域扫描，本篇未发现可生成卡片的独立方程。'
+        : '可以阅读论文并继续向论文助教追问；当前没有可生成卡片的公式。'
     }
-    return '可以阅读论文卡片、解释公式，并继续向 M4 追问。'
+    return '可以阅读论文卡片、解释公式，并继续向论文助教追问。'
   }
   if (props.status === 'BASELINE_ONLY') return reasonText.NO_LLM_CLIENT
   if (props.status === 'BLOCKED_UNDERSTANDING') return reasonText[props.blockingReason || ''] || props.blockingReason || '当前结果不能展示给用户。'
@@ -94,7 +94,7 @@ function readableKey(value: unknown) {
     local_path: '本地文件',
     upload: '上传文件',
     arxiv_source: 'arXiv 来源',
-    m1_canonical_bundle: '规范化论文包',
+    canonical_paper_bundle: '规范化论文包',
     verified: '已验证',
     success: '成功',
     SUCCESS: '成功',

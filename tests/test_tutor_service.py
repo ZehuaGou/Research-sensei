@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from researchsensei.m4.service import M4InteractionService
+from researchsensei.tutor.service import PaperTutorService
 
 
 class FakePaperAgent:
@@ -91,10 +91,10 @@ def _artifacts() -> dict[str, object]:
     }
 
 
-def _service(tmp_path: Path) -> tuple[M4InteractionService, FakePaperAgent]:
+def _service(tmp_path: Path) -> tuple[PaperTutorService, FakePaperAgent]:
     agent = FakePaperAgent()
     return (
-        M4InteractionService(
+        PaperTutorService(
             job_id="paper",
             run_dir=tmp_path,
             artifacts=_artifacts(),

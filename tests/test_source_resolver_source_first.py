@@ -63,7 +63,7 @@ def test_arxiv_source_download_success_prefers_latex(tmp_path: Path) -> None:
 
     assert status.status == "resolved"
     assert status.source_type == "arxiv_source"
-    assert status.preferred_m2_input == "latex_source"
+    assert status.preferred_analysis_input == "latex_source"
     assert status.source_priority == "latex_source"
     assert status.latex_source_available is True
     assert status.latex_source_path.endswith("main.tex")
@@ -94,7 +94,7 @@ def test_arxiv_source_unavailable_falls_back_to_pdf(tmp_path: Path) -> None:
 
     assert status.status == "resolved"
     assert status.source_type == "arxiv_pdf"
-    assert status.preferred_m2_input == "pdf"
+    assert status.preferred_analysis_input == "pdf"
     assert status.source_strategy == "pdf_fallback"
     assert status.fallback_used == "source_unavailable"
     assert status.warnings[:2] == ["ARXIV_SOURCE_UNAVAILABLE", "source_unavailable"]

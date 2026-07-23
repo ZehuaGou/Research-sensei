@@ -81,16 +81,16 @@ class CandidatePaper(SenseiModel):
     open_access: bool = False
     pdf_available: bool = False
     pdf_downloaded: bool = False
-    can_enter_m2: bool = False
+    can_enter_analysis: bool = False
     source_confidence: str = "low"
     metadata_confidence: str = "low"
     raw_source_metadata: dict[str, object] = Field(default_factory=dict)
-    # M1.4 verification fields
+    # Candidate identity verification fields
     verification_status: VerificationStatus = VerificationStatus.UNVERIFIED
     verification_method: str = ""
     verification_reason: str = ""
     verification_confidence: str = "low"
-    # M1.4 LLM relevance fields
+    # LLM-assisted relevance fields
     relevance_score: float = 0.0
     rule_relevance_score: float = 0.0
     llm_relevance_score: float = 0.0
@@ -104,9 +104,9 @@ class CandidatePaper(SenseiModel):
     relevance_gate_passed: bool = False
     should_download: bool = False
     should_a_read: bool = False
-    # Source-aware M1 fields
+    # Source-aware literature discovery fields
     source_priority: SourcePriority = SourcePriority.METADATA_ONLY
-    preferred_m2_input: str = ""  # latex_source | structured_html | pdf | none
+    preferred_analysis_input: str = ""  # latex_source | structured_html | pdf | none
     has_valid_deep_reading_source: bool = False
     latex_source_available: bool = False
     latex_source_downloaded: bool = False
@@ -117,7 +117,7 @@ class CandidatePaper(SenseiModel):
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
-    m2_ready: bool = False
+    analysis_ready: bool = False
     # Current product gate: a verified local PDF can be handed to the
     # OpenCode paper agent.  Canonical fields above remain read-compatible for
     # old saved direction bundles but no longer participate in decisions.
@@ -152,7 +152,7 @@ class ReadingPlanItem(SenseiModel):
     scoring_breakdown: ScoringBreakdown = Field(default_factory=ScoringBreakdown)
     selection_reason: str = ""
     risk_note: str = ""
-    can_enter_m2: bool = False
+    can_enter_analysis: bool = False
 
 
 class CandidatePool(SenseiModel):
@@ -169,10 +169,10 @@ class CandidatePool(SenseiModel):
 
 
 class ResolvedPaperSource(SenseiModel):
-    """M1.3 source acquisition result for one candidate paper.
+    """Source acquisition result for one candidate paper.
 
     This records source material availability only. It must not contain parsed
-    paper content; parsing belongs to M2.
+    paper content; parsing belongs to paper analysis.
     """
 
     paper_id: str
@@ -194,13 +194,13 @@ class ResolvedPaperSource(SenseiModel):
     warnings: list[WarningItem] = Field(default_factory=list)
     error: str = ""
     metadata: dict[str, str] = Field(default_factory=dict)
-    # M1.3 PDF metadata validation fields
+    # Downloaded PDF metadata validation fields
     pdf_metadata_check: str = ""  # "passed", "failed", "skipped"
     pdf_title_match: str = ""  # "match", "mismatch", "unknown"
     pdf_metadata_warning: str = ""
-    # Source-aware M1 fields
+    # Source-aware literature discovery fields
     source_priority: SourcePriority = SourcePriority.METADATA_ONLY
-    preferred_m2_input: str = ""
+    preferred_analysis_input: str = ""
     has_valid_deep_reading_source: bool = False
     latex_source_available: bool = False
     latex_source_downloaded: bool = False
@@ -213,14 +213,14 @@ class ResolvedPaperSource(SenseiModel):
     canonicalization_status: CanonicalizationStatus = CanonicalizationStatus.NOT_ATTEMPTED
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
-    m2_ready: bool = False
+    analysis_ready: bool = False
     paper_agent_ready: bool = False
     paper_agent_input_path: str = ""
     degradation_reason: str = ""
 
 
 class SourceResolutionResult(SenseiModel):
-    """M1.3 source acquisition artifact for a candidate pool."""
+    """Source acquisition artifact for a candidate pool."""
 
     query: str
     items: list[ResolvedPaperSource] = Field(default_factory=list)
@@ -238,7 +238,7 @@ class ReadingPlan(SenseiModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class M1LayerStatus(SenseiModel):
+class WorkflowLayerStatus(SenseiModel):
     """One explicit reliability dimension for a direction-search result.
 
     ``status`` is intentionally dimension-local. Consumers must not infer
@@ -260,10 +260,10 @@ class DirectionBundle(SenseiModel):
 
     status: str = "UNKNOWN"
     direction_workspace_status: str = "UNKNOWN"
-    pipeline_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
-    relevance_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
-    source_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
-    understanding_status: M1LayerStatus = Field(default_factory=M1LayerStatus)
+    pipeline_status: WorkflowLayerStatus = Field(default_factory=WorkflowLayerStatus)
+    relevance_status: WorkflowLayerStatus = Field(default_factory=WorkflowLayerStatus)
+    source_status: WorkflowLayerStatus = Field(default_factory=WorkflowLayerStatus)
+    understanding_status: WorkflowLayerStatus = Field(default_factory=WorkflowLayerStatus)
     query: str = ""
     message: str = ""
     overview: str = ""
@@ -280,7 +280,7 @@ class DirectionBundle(SenseiModel):
     filtered_candidates: CandidatePool
     reading_plan: ReadingPlan
     warnings: list[str] = Field(default_factory=list)
-    # M1.4 verification and relevance metadata
+    # Identity verification and relevance metadata
     verification_summary: dict[str, int] = Field(default_factory=dict)
     relevance_summary: dict[str, int] = Field(default_factory=dict)
 
@@ -328,7 +328,7 @@ class SeedExpansionPaper(SenseiModel):
     confidence: float = 0.0
     verification_status: str = "unverified"
     source_confidence: str = "low"
-    can_enter_m2: bool = False
+    can_enter_analysis: bool = False
     can_prepare_deep_read: bool = False
     deep_read_unavailable_reason: str = ""
     is_weak_relation: bool = True
@@ -341,7 +341,7 @@ class SeedExpansionOrderItem(SenseiModel):
     title: str
     relation_type: str
     reason: str = ""
-    can_enter_m2: bool = False
+    can_enter_analysis: bool = False
 
 
 class SeedExpansionBundle(SenseiModel):

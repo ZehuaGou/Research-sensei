@@ -21,7 +21,7 @@ from researchsensei.schemas import (
 )
 
 
-FIXTURE_PATH = Path(__file__).parent / "fixtures" / "m1_relevance_benchmark.json"
+FIXTURE_PATH = Path(__file__).parent / "fixtures" / "literature_relevance_benchmark.json"
 
 
 def _benchmark() -> dict[str, object]:
@@ -50,7 +50,7 @@ def test_relevance_benchmark_has_required_fixed_offline_coverage() -> None:
     benchmark = _benchmark()
     cases = _cases()
 
-    assert benchmark["schema_version"] == "m1_relevance_benchmark.v1"
+    assert benchmark["schema_version"] == "literature_relevance_benchmark.v1"
     assert benchmark["minimum_case_pass_rate"] == 1.0
     assert len(cases) >= 20
     assert any(any("\u4e00" <= char <= "\u9fff" for char in str(case["query"])) for case in cases)
@@ -228,7 +228,7 @@ def test_pipeline_success_and_relevance_failure_are_independent_bundle_states() 
     bundle = service.explore("time series anomaly detection")
 
     assert bundle.pipeline_status.status == "SUCCESS"
-    assert bundle.pipeline_status.details["m2_completed"] is False
+    assert bundle.pipeline_status.details["analysis_completed"] is False
     assert bundle.relevance_status.status == "BLOCKED"
     assert bundle.relevance_status.code == "NO_CANDIDATE_PASSED_RELEVANCE_GATE"
     assert bundle.source_status.status == "BLOCKED"

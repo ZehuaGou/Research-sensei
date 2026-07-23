@@ -601,7 +601,7 @@ def _fallback_card(item: EvidencePackItem, paper_id: str) -> FormulaCard:
         derivation_status="blocked" if raw_or_unknown else "summary_only",
         location=_location(item),
         purpose=_fallback_purpose(item, raw_or_unknown),
-        intuition="INSUFFICIENT_EVIDENCE" if raw_or_unknown else "M2 preserved the formula evidence, but the LLM did not return a dedicated explanation for this formula.",
+        intuition="INSUFFICIENT_EVIDENCE" if raw_or_unknown else "paper analysis preserved the formula evidence, but the LLM did not return a dedicated explanation for this formula.",
         numeric_example="INSUFFICIENT_EVIDENCE",
         what_if_removed="INSUFFICIENT_EVIDENCE",
         weight_sensitivity="INSUFFICIENT_EVIDENCE",
@@ -658,15 +658,15 @@ def _missing_formula_reason(evidence_ref: str, warnings: list[str]) -> str:
 
 def _fallback_purpose(item: EvidencePackItem, raw_or_unknown: bool) -> str:
     if raw_or_unknown:
-        return "INSUFFICIENT_EVIDENCE: M1 did not provide reliable LaTeX for downstream derivation."
+        return "INSUFFICIENT_EVIDENCE: literature discovery did not provide reliable LaTeX for downstream derivation."
     context = item.quote_or_summary or item.passage_text
-    return f"Formula evidence preserved from M1 context: {context[:180].strip() or 'UNKNOWN'}"
+    return f"Formula evidence preserved from literature discovery context: {context[:180].strip() or 'UNKNOWN'}"
 
 
 def _fallback_summary(item: EvidencePackItem, raw_or_unknown: bool) -> str:
     if raw_or_unknown:
-        return "M2 preserved this formula slot but blocked detailed derivation because only raw/unknown formula text was available."
-    return "M2 preserved this formula slot and provided a summary-only card because the LLM omitted a dedicated card."
+        return "paper analysis preserved this formula slot but blocked detailed derivation because only raw/unknown formula text was available."
+    return "paper analysis preserved this formula slot and provided a summary-only card because the LLM omitted a dedicated card."
 
 
 def _structure_derived_confidence(origin: str) -> float:

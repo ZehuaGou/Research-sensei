@@ -27,7 +27,7 @@ import type {
 } from '../types/workspace'
 
 const DEFAULT_TIMEOUT_MS = 20_000
-const M4_REQUEST_TIMEOUT_MS = 120_000
+const TUTOR_REQUEST_TIMEOUT_MS = 120_000
 const DIRECTION_TASK_POLL_MS = 1_000
 const DIRECTION_TASK_TIMEOUT_MS = 30 * 60_000
 const DOCUMENT_TASK_POLL_MS = 750
@@ -204,7 +204,7 @@ export const workspaceApi: WorkspaceApi = {
       method: 'POST',
       body: request,
       signal,
-      timeoutMs: M4_REQUEST_TIMEOUT_MS,
+      timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
     })
   },
   advisorQuestion(jobId, request, signal) {
@@ -212,7 +212,7 @@ export const workspaceApi: WorkspaceApi = {
       method: 'POST',
       body: request,
       signal,
-      timeoutMs: M4_REQUEST_TIMEOUT_MS,
+      timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
     })
   },
   advisorEvaluate(jobId, request, signal) {
@@ -220,7 +220,7 @@ export const workspaceApi: WorkspaceApi = {
       method: 'POST',
       body: request,
       signal,
-      timeoutMs: M4_REQUEST_TIMEOUT_MS,
+      timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
     })
   },
   explainFormula(jobId, card: FormulaCard, signal) {
@@ -228,7 +228,7 @@ export const workspaceApi: WorkspaceApi = {
       method: 'POST',
       body: { formula_id: card.formula_id || card.formula_ref || '' },
       signal,
-      timeoutMs: M4_REQUEST_TIMEOUT_MS,
+      timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
     })
   },
 }

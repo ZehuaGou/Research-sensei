@@ -194,7 +194,7 @@ class FullTextResolver:
                     started,
                     "",
                 ))
-                # Resolve the cached PDF into the run_dir so downstream M2 sees a
+                # Resolve the cached PDF into the run_dir so downstream paper analysis sees a
                 # local file under the expected path layout.
                 paper_dir = Path(run_dir) / _safe_name(candidate.paper_id or candidate.title or candidate.doi or "paper")
                 paper_dir.mkdir(parents=True, exist_ok=True)

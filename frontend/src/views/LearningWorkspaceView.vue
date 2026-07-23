@@ -7,7 +7,7 @@ import { useWorkspaceData } from '../composables/useWorkspaceData'
 import { useWorkspaceTabs } from '../composables/useWorkspaceTabs'
 import { useFormulaDock } from '../composables/useFormulaDock'
 import { useChatPaneResize } from '../composables/useChatPaneResize'
-import AskPanel from '../components/layout/AskPanel.vue'
+import PaperTutorPanel from '../components/layout/PaperTutorPanel.vue'
 import TextSelectionToolbar from '../components/interactive/TextSelectionToolbar.vue'
 import PaperCardComponent from '../components/cards/PaperCard.vue'
 import FormulaCardComponent from '../components/cards/FormulaCard.vue'
@@ -25,7 +25,7 @@ import { formatTaskStage } from '../utils/taskStage'
 const route = useRoute()
 const router = useRouter()
 const store = useLearningStore()
-const { isAskPanelOpen } = storeToRefs(store)
+const { isPaperTutorPanelOpen } = storeToRefs(store)
 const jobId = String(route.params.jobId || '')
 const readerPaneRef = ref<HTMLElement | null>(null)
 const chatPaneRef = ref<HTMLElement | null>(null)
@@ -35,17 +35,17 @@ const activeFormulaAnchor = ref('')
 const formulaOrder = ref<string[]>([])
 const collapsedFormulas = ref<Record<string, boolean>>({})
 const focusedFormula = ref<FormulaEntry | null>(null)
-const m4Side = ref<'left' | 'right'>(loadM4Side())
+const tutorSide = ref<'left' | 'right'>(loadTutorSide())
 let formulaObserver: IntersectionObserver | null = null
 let formulaRestoreFocusElement: HTMLElement | null = null
-let m4RestoreFocusElement: HTMLElement | null = null
+let tutorRestoreFocusElement: HTMLElement | null = null
 
 const workspace = useWorkspaceData(jobId)
 const tabsState = useWorkspaceTabs(jobId, readerPaneRef)
 const chatResize = useChatPaneResize()
 const formulaDock = useFormulaDock({
   activeTab: tabsState.activeTab,
-  isAskPanelOpen,
+  isPaperTutorPanelOpen,
   canShowCards: workspace.canShowCards,
   chatPaneWidth: chatResize.width,
 })
@@ -74,7 +74,7 @@ const workspaceSubtitle = computed(() => {
 })
 const noCardsMessage = computed(() => {
   if (workspace.status.value === 'BASELINE_ONLY' && workspace.understandingStatus.value?.blocking_reason === 'NO_LLM_CLIENT') {
-    return '这次运行没有接入实时大模型，所以只保留基础诊断，不展示用户可读卡片。请确认 ccswitch 正在运行、环境变量已启用，然后重新深读。'
+  return '这次运行没有接入实时大模型，所以只保留基础诊断，不展示用户可读卡片。请到模型设置检查当前服务连接，然后重新深读。'
   }
   if (workspace.status.value === 'BLOCKED_UNDERSTANDING') {
     return '理解阶段被阻断。系统没有展示半成品卡片，请查看上方状态原因后重新运行。'
@@ -173,26 +173,26 @@ async function reparseCurrentPaper() {
   if (nextJobId) window.location.assign(`/learn/${encodeURIComponent(nextJobId)}`)
 }
 
-function closeM4() {
-  isAskPanelOpen.value = false
+function closeTutor() {
+  isPaperTutorPanelOpen.value = false
 }
 
-function loadM4Side(): 'left' | 'right' {
+function loadTutorSide(): 'left' | 'right' {
   if (typeof localStorage === 'undefined') return 'right'
-  return localStorage.getItem('researchsensei.learningWorkspace.m4Side') === 'left' ? 'left' : 'right'
+  return localStorage.getItem('researchsensei.learningWorkspace.tutorSide') === 'left' ? 'left' : 'right'
 }
 
-function toggleM4Side() {
-  m4Side.value = m4Side.value === 'right' ? 'left' : 'right'
-  localStorage.setItem('researchsensei.learningWorkspace.m4Side', m4Side.value)
+function toggleTutorSide() {
+  tutorSide.value = tutorSide.value === 'right' ? 'left' : 'right'
+  localStorage.setItem('researchsensei.learningWorkspace.tutorSide', tutorSide.value)
 }
 
-function startM4Resize(event: PointerEvent) {
-  chatResize.startResize(event, m4Side.value)
+function startTutorResize(event: PointerEvent) {
+  chatResize.startResize(event, tutorSide.value)
 }
 
-function handleM4ResizeKeydown(event: KeyboardEvent) {
-  chatResize.handleSeparatorKeydown(event, m4Side.value)
+function handleTutorResizeKeydown(event: KeyboardEvent) {
+  chatResize.handleSeparatorKeydown(event, tutorSide.value)
 }
 
 function handleDialogKeys(event: KeyboardEvent) {
@@ -200,15 +200,15 @@ function handleDialogKeys(event: KeyboardEvent) {
     if (focusedFormula.value) {
       event.preventDefault()
       closeFormulaFocus()
-    } else if (chatResize.compactViewport.value && isAskPanelOpen.value) {
+    } else if (chatResize.compactViewport.value && isPaperTutorPanelOpen.value) {
       event.preventDefault()
-      closeM4()
+      closeTutor()
     }
     return
   }
   if (event.key !== 'Tab') return
   const activeDialog = focusedFormula.value ? formulaDialogRef.value : (
-    chatResize.compactViewport.value && isAskPanelOpen.value ? chatPaneRef.value : null
+    chatResize.compactViewport.value && isPaperTutorPanelOpen.value ? chatPaneRef.value : null
   )
   if (activeDialog) trapFocus(event, activeDialog)
 }
@@ -245,17 +245,17 @@ watch(focusedFormula, async value => {
     formulaRestoreFocusElement = null
   }
 })
-watch([isAskPanelOpen, chatResize.compactViewport], async ([open, compact]) => {
+watch([isPaperTutorPanelOpen, chatResize.compactViewport], async ([open, compact]) => {
   if (open && compact && !focusedFormula.value) {
-    m4RestoreFocusElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    tutorRestoreFocusElement = document.activeElement instanceof HTMLElement ? document.activeElement : null
     await nextTick()
     chatPaneRef.value?.focus()
   } else if (!open) {
-    const target = m4RestoreFocusElement
-    m4RestoreFocusElement = null
+    const target = tutorRestoreFocusElement
+    tutorRestoreFocusElement = null
     await nextTick()
     if (target?.isConnected) target.focus()
-    else document.querySelector<HTMLElement>('[data-testid="m4-open"]')?.focus()
+    else document.querySelector<HTMLElement>('[data-testid="tutor-open"]')?.focus()
   }
 })
 
@@ -312,8 +312,8 @@ onBeforeUnmount(() => {
     class="workspace-shell"
     data-testid="learning-workspace"
     :class="{
-      'with-chat': isAskPanelOpen && workspace.canShowCards.value && !chatResize.compactViewport.value,
-      'chat-left': m4Side === 'left',
+      'with-chat': isPaperTutorPanelOpen && workspace.canShowCards.value && !chatResize.compactViewport.value,
+      'chat-left': tutorSide === 'left',
       'formula-mode': tabsState.activeTab.value === 'formulas' && workspace.formulaCards.value.length > 0,
     }"
     :style="chatResize.shellStyle.value"
@@ -338,15 +338,15 @@ onBeforeUnmount(() => {
               {{ workspace.isReparsing.value ? `重新解析 ${workspace.reparseProgress.value}% · ${formatTaskStage(workspace.reparseStage.value)}` : '重新解析' }}
             </button>
             <button
-              v-if="!isAskPanelOpen"
+              v-if="!isPaperTutorPanelOpen"
               type="button"
               class="primary-btn"
-              data-testid="m4-open"
-              aria-controls="m4-chat-pane"
-              :aria-expanded="isAskPanelOpen"
-              @click="isAskPanelOpen = true"
+              data-testid="tutor-open"
+              aria-controls="tutor-chat-pane"
+              :aria-expanded="isPaperTutorPanelOpen"
+              @click="isPaperTutorPanelOpen = true"
             >
-              打开 M4
+              打开论文助教
             </button>
           </div>
         </section>
@@ -408,7 +408,7 @@ onBeforeUnmount(() => {
               <template v-if="workspace.paperWorkspaceStatus.value.formula_detection_status === 'scanned_no_candidates'">
                 <h2>本篇未发现独立公式</h2>
                 <p>系统已扫描 PDF 的正文与编号公式区域，没有发现适合单独拆解的方程。这不代表论文解析失败；本篇更偏方法与软件说明。</p>
-                <p>你仍然可以在 M4 中直接询问文中的指标、算法步骤或数学含义，M4 会结合整篇论文回答。</p>
+                <p>你仍然可以在论文助教中直接询问文中的指标、算法步骤或数学含义，助教会结合整篇论文回答。</p>
               </template>
               <template v-else>
                 <h2>公式拆解暂时不可用</h2>
@@ -467,61 +467,61 @@ onBeforeUnmount(() => {
     />
 
     <aside
-      v-if="isAskPanelOpen && workspace.canShowCards.value && !chatResize.compactViewport.value"
-      id="m4-chat-pane"
+      v-if="isPaperTutorPanelOpen && workspace.canShowCards.value && !chatResize.compactViewport.value"
+      id="tutor-chat-pane"
       ref="chatPaneRef"
       class="chat-pane"
-      data-testid="m4-chat-pane"
-      aria-label="M4 论文助教"
+      data-testid="tutor-chat-pane"
+      aria-label="论文助教"
     >
       <div
         class="chat-resize-handle"
-        data-testid="m4-resize-handle"
+        data-testid="tutor-resize-handle"
         role="separator"
         aria-orientation="vertical"
-        aria-label="调整 M4 宽度"
+        aria-label="调整论文助教宽度"
         aria-valuemin="360"
         :aria-valuemax="Math.round(chatResize.maxWidth.value)"
         :aria-valuenow="Math.round(chatResize.width.value)"
-        title="拖动调整 M4 宽度；双击切换宽屏"
+        title="拖动调整论文助教宽度；双击切换宽屏"
         tabindex="0"
-        @pointerdown="startM4Resize"
+        @pointerdown="startTutorResize"
         @dblclick="chatResize.toggleWide"
-        @keydown="handleM4ResizeKeydown"
+        @keydown="handleTutorResizeKeydown"
       />
-      <AskPanel :paper-title="workspaceTitle" :side="m4Side" @toggle-side="toggleM4Side" />
+      <PaperTutorPanel :paper-title="workspaceTitle" :side="tutorSide" @toggle-side="toggleTutorSide" />
     </aside>
 
     <div
-      v-if="isAskPanelOpen && workspace.canShowCards.value && chatResize.compactViewport.value"
+      v-if="isPaperTutorPanelOpen && workspace.canShowCards.value && chatResize.compactViewport.value"
       class="chat-overlay"
       role="presentation"
-      @click.self="closeM4"
+      @click.self="closeTutor"
     >
       <aside
-        id="m4-chat-pane"
+        id="tutor-chat-pane"
         ref="chatPaneRef"
         class="chat-pane compact"
-        data-testid="m4-chat-pane"
+        data-testid="tutor-chat-pane"
         role="dialog"
         aria-modal="true"
-        aria-label="M4 论文助教"
+        aria-label="论文助教"
         tabindex="-1"
       >
-        <AskPanel :paper-title="workspaceTitle" :side="m4Side" @toggle-side="toggleM4Side" />
+        <PaperTutorPanel :paper-title="workspaceTitle" :side="tutorSide" @toggle-side="toggleTutorSide" />
       </aside>
     </div>
 
     <button
-      v-if="workspace.canShowCards.value && !isAskPanelOpen"
+      v-if="workspace.canShowCards.value && !isPaperTutorPanelOpen"
       type="button"
       class="chat-fab"
-      data-testid="m4-open"
-      aria-controls="m4-chat-pane"
-      :aria-expanded="isAskPanelOpen"
-      @click="isAskPanelOpen = true"
+      data-testid="tutor-open"
+      aria-controls="tutor-chat-pane"
+      :aria-expanded="isPaperTutorPanelOpen"
+      @click="isPaperTutorPanelOpen = true"
     >
-      M4
+      论文助教
     </button>
 
     <TextSelectionToolbar v-if="workspace.canShowCards.value" />

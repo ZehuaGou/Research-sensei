@@ -3,7 +3,7 @@ import type { WorkspaceTab } from '../types/workspace'
 
 interface FormulaDockOptions {
   activeTab: Ref<WorkspaceTab>
-  isAskPanelOpen: Ref<boolean>
+  isPaperTutorPanelOpen: Ref<boolean>
   canShowCards: Readonly<Ref<boolean>>
   chatPaneWidth: Ref<number>
 }
@@ -46,7 +46,7 @@ export function useFormulaDock(options: FormulaDockOptions) {
   }))
 
   const isCompactViewport = ref(viewportBounds().width <= 1120)
-  const hiddenForCompactChat = computed(() => isCompactViewport.value && options.isAskPanelOpen.value)
+  const hiddenForCompactChat = computed(() => isCompactViewport.value && options.isPaperTutorPanelOpen.value)
 
   function loadPreferences() {
     if (typeof localStorage === 'undefined') return
@@ -86,7 +86,7 @@ export function useFormulaDock(options: FormulaDockOptions) {
   }
 
   function reservedRight() {
-    return !isCompactViewport.value && options.isAskPanelOpen.value && options.canShowCards.value
+    return !isCompactViewport.value && options.isPaperTutorPanelOpen.value && options.canShowCards.value
       ? options.chatPaneWidth.value + 18
       : 0
   }
@@ -224,7 +224,7 @@ export function useFormulaDock(options: FormulaDockOptions) {
       handleViewportChange()
       return
     }
-    collapsed.value = options.activeTab.value === 'formulas' && options.isAskPanelOpen.value
+    collapsed.value = options.activeTab.value === 'formulas' && options.isPaperTutorPanelOpen.value
     position.value = defaultPosition()
   }
 
@@ -239,7 +239,7 @@ export function useFormulaDock(options: FormulaDockOptions) {
     window.visualViewport?.addEventListener('scroll', handleViewportChange)
   })
 
-  watch([options.activeTab, options.isAskPanelOpen, options.canShowCards], syncDefaultCollapse, { flush: 'post' })
+  watch([options.activeTab, options.isPaperTutorPanelOpen, options.canShowCards], syncDefaultCollapse, { flush: 'post' })
   watch(collapsed, () => void clampPosition(), { flush: 'post' })
 
   onBeforeUnmount(() => {

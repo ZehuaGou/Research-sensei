@@ -49,10 +49,10 @@ class ClientLike(Protocol):
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the ResearchSensei M1 -> M2 -> M3 main-chain acceptance through local API handlers."
+        description="Run the ResearchSensei literature discovery -> paper analysis -> reader workspace main-chain acceptance through local API handlers."
     )
     parser.add_argument("--query", default="time series anomaly detection")
-    parser.add_argument("--provider", default="cc_switch")
+    parser.add_argument("--provider", default="opencode_go")
     parser.add_argument("--max-candidates", type=int, default=10)
     parser.add_argument("--skip-llm", action="store_true")
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "main_chain_acceptance"))
@@ -499,7 +499,7 @@ def _candidate_relevance_score(candidate: dict[str, Any], *, query_terms: set[st
         score -= 25
 
     # Source readiness
-    if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
+    if candidate.get("can_enter_analysis") is True or candidate.get("can_prepare_deep_read") is True:
         score += 3
     if _candidate_arxiv_id(candidate):
         score += 5
@@ -605,7 +605,7 @@ def _handoff_candidate_score(candidate: dict[str, Any], *, query_terms: set[str]
     # Survey penalty
     if _is_survey_like(title):
         score -= 25
-    if candidate.get("can_enter_m2") is True or candidate.get("can_prepare_deep_read") is True:
+    if candidate.get("can_enter_analysis") is True or candidate.get("can_prepare_deep_read") is True:
         score += 3
     if _candidate_arxiv_id(candidate):
         score += 5

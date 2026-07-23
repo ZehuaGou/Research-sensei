@@ -1,7 +1,7 @@
-# M2.4 Audit and Quality Contract
+# Audit And Quality Contract
 
 Current implementation evidence and test results live in `docs/STATUS.md`.
-M2.4 is the final trust boundary before cards become learner-facing.
+Quality Audit is the final trust boundary before cards become learner-facing.
 
 ## Audit Inputs
 
@@ -18,7 +18,7 @@ M2.4 is the final trust boundary before cards become learner-facing.
 - overall understanding status and component statuses;
 - blocking reasons and non-blocking warnings;
 - evidence and formula provenance summaries;
-- safe-to-render decision consumed by `/cards` and M3.
+- safe-to-render decision consumed by `/cards` and Reader Workspace.
 
 ## Hard Gates
 
@@ -30,7 +30,7 @@ The following gates cannot be weakened or bypassed to make a test pass:
 4. `source_latex` is accepted only from an allowed source/provenance path.
 5. `/cards` is fail-closed for `BASELINE_ONLY`,
    `BLOCKED_UNDERSTANDING`, and `FAILED`.
-6. M4 receives only artifacts that passed the same user-facing boundary.
+6. Paper Tutor receives only artifacts that passed the same user-facing boundary.
 
 ## Evidence Validation
 
@@ -54,7 +54,7 @@ identity, surrounding method context, and derivation safety. In particular:
 - missing crop/overlay/LaTeX provenance is not silently ignored;
 - an unknown origin cannot produce a detailed derivation;
 - all-formulas-in-Abstract, section contradiction, and missing
-  latex/crop/overlay remain M1/M2 gate failures;
+  latex/crop/overlay remain Literature Discovery/Paper Analysis gate failures;
 - a display-friendly rendering must not alter the source expression.
 
 ## Status Decision
@@ -65,7 +65,7 @@ limitation after the remaining understanding has passed. Core builder failure,
 unknown evidence, or source contradiction produces `BLOCKED_UNDERSTANDING` or
 `FAILED`, not partial success.
 
-The API returns status before cards. M3 requests `/cards` only for an allowed
+The API returns status before cards. Reader Workspace requests `/cards` only for an allowed
 status and still handles a 403 gate response. Raw intermediate artifacts are
 debug/admin material and must not be substituted for blocked cards.
 

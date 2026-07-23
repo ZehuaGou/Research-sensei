@@ -19,7 +19,7 @@ function mountView() {
       stubs: {
         PaperCard: { props: ['card'], template: '<div data-testid="paper-card">{{ card.thirty_second }}</div>' },
         FormulaCard: { props: ['card'], template: '<div data-testid="formula-card">{{ card.problem }}</div>' },
-        AskPanel: { template: '<div data-testid="ask-panel-stub"></div>' },
+        PaperTutorPanel: { template: '<div data-testid="paper-tutor-panel-stub"></div>' },
         TextSelectionToolbar: { template: '<div data-testid="selection-toolbar-stub"></div>' },
       },
     },
@@ -65,10 +65,10 @@ describe('LearningWorkspaceView', () => {
     expect(String(fetchMock.mock.calls[0][0])).toContain('/understanding_status')
     expect(wrapper.find('[data-testid="no-cards-state"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="paper-card"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="paper-tutor-panel-stub"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="selection-toolbar-stub"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('仅基础解析')
-    expect(wrapper.text()).toContain('ccswitch')
+    expect(wrapper.text()).toContain('模型设置')
     expect(wrapper.text()).toContain('来源类型')
     expect(wrapper.text()).toContain('论文卡片')
   })
@@ -85,9 +85,9 @@ describe('LearningWorkspaceView', () => {
           allowed_downstream: { reading_display: false },
         },
         paper_workspace_status: {
-          source_type: 'm1_canonical_bundle',
+          source_type: 'canonical_paper_bundle',
           canonicalization_status: 'success',
-          m2_ready: true,
+          analysis_ready: true,
           evidence_status: 'SUCCESS',
         },
       }),
@@ -100,7 +100,7 @@ describe('LearningWorkspaceView', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="paper-card"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="no-cards-state"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="paper-tutor-panel-stub"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('理解被阻断')
     expect(wrapper.text()).toContain('缺少方法证据')
   })
@@ -118,9 +118,9 @@ describe('LearningWorkspaceView', () => {
             allowed_downstream: { reading_display: true, advisor_questions: true },
           },
           paper_workspace_status: {
-            source_type: 'm1_canonical_bundle',
+            source_type: 'canonical_paper_bundle',
             canonicalization_status: 'success',
-            m2_ready: true,
+            analysis_ready: true,
             formula_origin: 'mineru_latex',
             formula_ocr_status: 'not_required',
             evidence_status: 'SUCCESS',
@@ -177,8 +177,8 @@ describe('LearningWorkspaceView', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(String(fetchMock.mock.calls[1][0])).toContain('/cards')
     expect(wrapper.find('[data-testid="paper-card"]').text()).toContain('A grounded summary.')
-    expect(wrapper.find('[data-testid="ask-panel-stub"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('打开 M4')
+    expect(wrapper.find('[data-testid="paper-tutor-panel-stub"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('打开论文助教')
     expect(wrapper.find('[data-testid="selection-toolbar-stub"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('理解完成')
     expect(wrapper.text()).toContain('公式来源')
@@ -249,9 +249,9 @@ describe('LearningWorkspaceView', () => {
             allowed_downstream: { reading_display: true, advisor_questions: true },
           },
           paper_workspace_status: {
-            source_type: 'm1_canonical_bundle',
+            source_type: 'canonical_paper_bundle',
             canonicalization_status: 'success',
-            m2_ready: true,
+            analysis_ready: true,
             degradation_reason: 'FORMULA_DERIVATION_BLOCKED',
             formula_origin: 'raw_formula_text',
             formula_ocr_status: 'not_available',
@@ -332,7 +332,7 @@ describe('LearningWorkspaceView', () => {
           allowed_downstream: { reading_display: false },
         },
         paper_workspace_status: {
-          source_type: 'm1_canonical_bundle',
+          source_type: 'canonical_paper_bundle',
           canonicalization_status: 'success',
           evidence_status: 'SUCCESS',
         },

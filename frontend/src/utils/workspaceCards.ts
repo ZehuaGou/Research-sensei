@@ -92,8 +92,8 @@ export function isNoisyFormulaText(value: unknown) {
   return !text
     || /^INSUFFICIENT_EVIDENCE\b/i.test(text)
     || /^UNKNOWN$/i.test(text)
-    || /Formula evidence preserved from M1 context/i.test(text)
-    || /M2 preserved this formula slot/i.test(text)
+    || /Formula evidence preserved from literature discovery context/i.test(text)
+    || /paper analysis preserved this formula slot/i.test(text)
     || /blocked detailed derivation/i.test(text)
     || /raw\/unknown formula text/i.test(text)
     || /\\begin\{(?:cases|aligned|matrix|bmatrix|pmatrix|equation|align)/.test(text)

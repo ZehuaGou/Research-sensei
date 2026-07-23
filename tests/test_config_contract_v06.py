@@ -120,7 +120,7 @@ def test_environment_overrides_toml_search_settings(
     assert config.search.browser_headless is True
 
 
-def test_native_chrome_fallback_is_injected_into_production_m1(
+def test_native_chrome_fallback_is_injected_into_production_literature_search(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _clear_search_env(monkeypatch)

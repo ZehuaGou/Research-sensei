@@ -78,7 +78,7 @@ def test_seed_expansion_api_returns_bundle(tmp_path: Path) -> None:
     assert data["status"] == "SUCCESS"
     assert data["seed_expansion_status"] == "SUCCESS"
     assert data["papers"]
-    assert data["papers"][0]["can_enter_m2"] is True
+    assert data["papers"][0]["can_enter_analysis"] is True
     assert data["papers"][0]["citation_graph_verified"] is False
 
 

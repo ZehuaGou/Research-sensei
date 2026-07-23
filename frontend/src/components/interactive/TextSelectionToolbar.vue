@@ -58,7 +58,7 @@ function positionToolbar(rect: DOMRect | undefined, fallbackX: number, fallbackY
 
 function askAbout(intent: 'explain' | 'simplify' | 'example') {
   learningStore.setSelectedText(selectionStore.selectedText, intent)
-  learningStore.isAskPanelOpen = true
+  learningStore.isPaperTutorPanelOpen = true
   selectionStore.hide()
 }
 

@@ -2,7 +2,7 @@
 
 Vue 3 + TypeScript + Vite frontend for the Chinese ResearchSensei workflow:
 Home, Upload, DirectionSearchView, SeedExpansionPanel, Settings,
-PaperWorkspace, and the M4 tutor panel.
+PaperWorkspace, and the paper tutor panel.
 
 ## Commands
 
@@ -25,11 +25,11 @@ Start the backend from the repository root:
 ## UI Contract
 
 - User-facing copy is Chinese by default.
-- PaperWorkspace uses a left reading nav, central card pane, and right M4 tutor.
+- PaperWorkspace uses a left reading nav, central card pane, and right paper tutor.
 - `StatusBanner` is compact; detailed technical fields live under a collapsed
   status section.
 - `TextSelectionToolbar` positions from the selected text rectangle and clamps
   to the viewport to avoid browser-native selection menus.
-- M4 UI mounts only when `/cards` is allowed.
+- Paper Tutor UI mounts only when `/cards` is allowed.
 - `BASELINE_ONLY`, `BLOCKED_UNDERSTANDING`, and `FAILED` must not show
   explanatory cards.

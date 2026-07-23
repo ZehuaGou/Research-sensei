@@ -123,7 +123,7 @@ async function saveTutorModel() {
     })
     settings.value = data
     tutorModelDraft.value = data.paper_tutor_model || tutorModel
-    saveResult.value = '论文讲解模型已保存，后续 M4 对话立即使用。'
+    saveResult.value = '论文讲解模型已保存，后续论文助教对话立即使用。'
   } catch (saveError) {
     saveResult.value = apiErrorMessage(saveError, '保存论文讲解模型失败。')
   } finally {
@@ -138,7 +138,7 @@ async function testConnection() {
     const data = await researchApi.validateSettings()
     testResult.value = data.ok
       ? `连接可用。Research Sensei 会通过 ${requestModeLabel.value} 通道发送请求。`
-      : (data.message || '连接未就绪，请检查 ccswitch 是否运行，以及环境变量是否启用。')
+      : (data.message || '连接未就绪，请检查当前模型服务是否运行，以及环境变量是否启用。')
   } catch (testError) {
     testResult.value = apiErrorMessage(testError, '设置请求失败，请确认后端服务正在运行。')
   } finally {
@@ -212,7 +212,7 @@ async function testConnection() {
             </button>
           </div>
           <small>
-            M2 会把 PDF 按页渲染后交给这个支持图像附件的 OpenCode 模型，识别章节、公式和图表；
+            论文解析会把 PDF 按页渲染后交给这个支持图像附件的 OpenCode 模型，识别章节、公式和图表；
             论文讲解模型在下一项单独选择。
           </small>
           <small>{{ settings.paper_agent_base_url }}</small>
@@ -240,7 +240,7 @@ async function testConnection() {
             </button>
           </div>
           <small>
-            M4 会在同一个论文会话中使用该模型继续讲解。视觉解析与讲解分开选择：
+            论文助教会在同一个论文会话中使用该模型继续讲解。视觉解析与讲解分开选择：
             Qwen 负责公式和页面，MiMo 可以专注长上下文问答。
           </small>
         </div>
@@ -281,7 +281,7 @@ async function testConnection() {
           <small>{{ providerLabel }} · {{ settings.provider_key || settings.active_provider }}</small>
         </div>
         <p v-if="!settings.llm_enabled" class="notice">
-          未启用实时 LLM 时，系统只会生成基础解析，不会进入用户可读的 M2/M4 卡片。
+          未启用实时 LLM 时，系统只会生成基础解析，不会生成用户可读的解析卡片和助教回答。
         </p>
       </aside>
     </section>

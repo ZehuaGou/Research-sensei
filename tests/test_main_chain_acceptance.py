@@ -98,7 +98,7 @@ class FakeClient:
                 "source_status": {
                     "source_type": "arxiv_source",
                     "source_strategy": "source_first",
-                    "preferred_m2_input": "latex_source",
+                    "preferred_analysis_input": "latex_source",
                     "latex_source_available": True,
                 },
             })
@@ -137,7 +137,7 @@ def _seed_paper(arxiv_id: str, title: str, relation_type: str) -> dict[str, Any]
         "arxiv_url": f"https://arxiv.org/abs/{arxiv_id}",
         "pdf_url": f"https://arxiv.org/pdf/{arxiv_id}.pdf",
         "relation_type": relation_type,
-        "can_enter_m2": True,
+        "can_enter_analysis": True,
         "can_prepare_deep_read": True,
     }
 

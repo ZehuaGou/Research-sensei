@@ -71,7 +71,7 @@ def test_direction_arxiv_candidate_handoff_creates_job(tmp_path: Path) -> None:
     assert data["handoff_status"] == "JOB_CREATED"
     assert data["job_id"]
     assert data["source_status"]["source_type"] == "arxiv_source"
-    assert data["source_status"]["preferred_m2_input"] == "latex_source"
+    assert data["source_status"]["preferred_analysis_input"] == "latex_source"
     assert data["source_status"]["latex_source_available"] is True
     assert data["understanding_status"]["status"] == "BASELINE_ONLY"
     assert http_client.urls == ["https://arxiv.org/e-print/2401.00001"]

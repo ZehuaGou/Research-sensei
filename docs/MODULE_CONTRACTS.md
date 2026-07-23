@@ -19,7 +19,7 @@ known, plus legal full-text lookup metadata from official/OA resolver inputs.
 Boundary: adapters may fail independently; failures must become source metrics
 and warnings, not fake success. Direction acquisition should continue across
 fallback variants only when the primary PaperSearch query cannot produce usable
-candidates; when the primary external search returns results, M1 should preserve
+candidates; when the primary external search returns results, Literature Discovery should preserve
 that order rather than injecting venue-targeted variants into the same result
 pool.
 
@@ -34,7 +34,7 @@ Boundary: deterministic required-concept coverage and forbidden
 intent-mismatch penalties gate Top-1 and deep-read candidates. An optional LLM
 judge cannot rescue a deterministic failure. Metadata-only high-value papers
 must not be discarded merely because
-they cannot immediately enter M2. The default M1 download queue is produced from
+they cannot immediately enter Paper Analysis. The default Literature Discovery download queue is produced from
 the external PaperSearch result pool by the configured reranker, with the
 original external result position preserved as `search_rank`. CCF rank is
 retained as a quality annotation and reporting signal, not as a hard gate that
@@ -42,13 +42,13 @@ blocks unranked but relevant search results from download attempts.
 
 ## paper_library
 
-Input: downloaded M1 source-resolution items, candidate metadata, search query,
-and the direction folder under `workspace/m1_searches/`.
+Input: downloaded Literature Discovery source-resolution items, candidate metadata, search query,
+and the direction folder under `workspace/literature_searches/`.
 Output: persistent paper records in `workspace/sensei.sqlite3`, including title,
 authors, year, venue/journal, CCF rank, DOI, arXiv ID, URL fields, SHA-256,
 local path, search-run membership, and delete state.
 Boundary: the library is a reuse and management layer, not a replacement search
-engine. M1 must still use PaperSearch MCP for fresh discovery, then use the
+engine. Literature Discovery must still use PaperSearch MCP for fresh discovery, then use the
 library to avoid duplicate download and to reuse already downloaded legal full
 text. Soft-deleted papers must not be reused unless explicitly restored later.
 
@@ -57,12 +57,12 @@ text. Soft-deleted papers must not be reused unless explicitly restored later.
 Input: `download_selected` candidate payload, local paper-library match, arXiv
 ID/URL, DOI-resolved legal PDF, PDF URL, or uploaded file.
 Output: resolved source status, downloaded legal full text when available, and a
-preferred M2 input type such as `arxiv_source`, `arxiv_pdf`, `external_pdf`, or
+preferred Paper Analysis input type such as `arxiv_source`, `arxiv_pdf`, `external_pdf`, or
 `metadata_only`.
 Boundary: arXiv source/e-print is preferred over PDF; DOI-only deep_read may
 resolve to a legal OA PDF through Unpaywall, otherwise it fails explicitly with
 `NO_LEGAL_OA_FULLTEXT_FOUND`; no paywall bypassing. Direction-search downloads
-are grouped by topic under `workspace/m1_searches/<direction>/`, with PDF files
+are grouped by topic under `workspace/literature_searches/<direction>/`, with PDF files
 named from paper titles plus a manifest for reuse and duplicate avoidance.
 Before any network download, source_resolver must check the paper library; a hit
 returns `library_reuse` and records the current search run without redownloading.
@@ -128,7 +128,7 @@ Boundary: labels are navigation hints, not proof of scientific relation.
 
 ## drill
 
-Input: M4 learning state and paper-grounded teaching/advisor context.
+Input: Paper Tutor learning state and paper-grounded teaching/advisor context.
 Output: future full drill sessions. Current v1 only exposes advisor-style
 questions and answer evaluation.
 Boundary: do not present v1 advisor checks as a complete drill engine.
@@ -136,16 +136,16 @@ Boundary: do not present v1 advisor checks as a complete drill engine.
 ## interactive
 
 Input: current job id, selected text, formula id/symbol, user question, advisor
-mode, and existing user-facing M2 artifacts.
+mode, and existing user-facing Paper Analysis artifacts.
 Output: selected-text explanations, formula/symbol explanations, claim-level
 evidence-bound answers, advisor questions/evaluations, and schema-versioned
-`m4_memory.json`.
+`tutor_memory.json`.
 Boundary: strict evidence mode still requires each material claim to bind to
 allowed refs whose text supports that claim. A legal ref does not legalize
 unrelated prose, and all allowed refs must not be attached wholesale. Formulae,
 thresholds, numbers, datasets, metrics, and results use stricter support checks.
 Full-paper mode may continue the paper-scoped OpenCode session created during
-M2, which contains rendered pages and page-preserving text; it must remain
+Paper Analysis, which contains rendered pages and page-preserving text; it must remain
 inside that paper and report unavailable details instead of inventing them.
 Memory writes are locked, atomic, and bounded; corruption is quarantined with a
 warning. There is no direction-level chat yet.
@@ -170,8 +170,8 @@ Input: API status payloads and gated cards.
 Output: DirectionSearchView, SeedExpansionPanel, SettingsView, HomeView, and
 PaperWorkspace UI.
 Boundary: render status before cards; BLOCKED, BASELINE_ONLY, and FAILED never
-show explanatory card content. Mount M4 chat/QA controls only when cards are
-allowed and the backend M4 gate accepts the job. API calls use the typed client;
+show explanatory card content. Mount Paper Tutor chat/QA controls only when cards are
+allowed and the backend Paper Tutor gate accepts the job. API calls use the typed client;
 floating controls remain viewport-clamped and keyboard-operable.
 
 ## configuration
@@ -201,7 +201,7 @@ is restricted to workspace-managed roots.
 
 ## OpenCode Paper-Agent Boundary
 
-- A verified local PDF is the M1-to-M2 handoff; search metadata is not enough.
+- A verified local PDF is the Literature Discovery-to-Paper Analysis handoff; search metadata is not enough.
 - The configured OpenCode session is the only semantic PDF-analysis path.
 - PyMuPDF supplies deterministic page text, numbering, rendering and validation.
 - The vision model and tutor model are independent runtime settings.

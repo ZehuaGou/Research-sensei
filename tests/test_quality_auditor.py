@@ -150,7 +150,7 @@ def _make_canonical_status() -> dict:
         "paper_id": "test",
         "canonicalization_status": "success",
         "canonical_quality_status": "PASS",
-        "m2_ready": True,
+        "analysis_ready": True,
     }
 
 
@@ -739,7 +739,7 @@ def test_formula_card_missing_formula_evidence_ref_produces_fsa13() -> None:
     assert any(f.code == "FSA-13" and f.effect == "BLOCK" for f in report.findings)
 
 
-def test_formula_card_coverage_skips_when_m1_formula_understanding_not_ready() -> None:
+def test_formula_card_coverage_skips_when_source_formula_understanding_not_ready() -> None:
     claim_evidence = _make_claim_evidence()
     claim_evidence["claims"].append({
         "claim_id": "test:claim:f001",
@@ -753,7 +753,7 @@ def test_formula_card_coverage_skips_when_m1_formula_understanding_not_ready() -
         "formula_origin": "raw_formula_text",
     })
     canonical_status = _make_canonical_status()
-    canonical_status["m2_ready_for_formula_understanding"] = False
+    canonical_status["analysis_ready_for_formula_understanding"] = False
 
     report = QualityAuditor().audit(ArtifactBundle(
         formula_cards={"paper_id": "test", "formula_cards": []},

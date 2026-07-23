@@ -47,7 +47,7 @@ export interface AskRequest {
   conversation_history?: ConversationMessageRequest[]
 }
 
-export interface M4ContextTrace {
+export interface TutorContextTrace {
   scope: 'selection' | 'paper'
   context_mode?: 'full_paper' | 'evidence'
   continued_from_history: boolean
@@ -65,7 +65,7 @@ export interface AskResponse {
   evidence_refs?: string[]
   uncertainty?: string
   follow_up_suggestions?: string[]
-  context_trace?: M4ContextTrace
+  context_trace?: TutorContextTrace
   [key: string]: unknown
 }
 

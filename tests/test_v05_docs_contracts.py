@@ -54,12 +54,12 @@ def test_reuse_report_marks_external_tools_as_replaceable():
 
 
 def test_current_architecture_documents_single_pdf_agent_path():
-    text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8").lower()
     for phrase in [
-        "M1: discovery and acquisition",
-        "M2: one paper agent, two models",
-        "M3: reader workspace",
-        "M4: session-first full-paper tutoring",
+        "literature discovery and acquisition",
+        "paper analysis: one paper agent, two models",
+        "reader workspace",
+        "paper tutor: session-first full-paper tutoring",
         "never hidden by parser fallback",
     ]:
         assert phrase in text

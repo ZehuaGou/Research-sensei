@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 from datetime import datetime, timezone
 import re
@@ -531,7 +531,7 @@ class QualityAuditor:
         if us_status not in {"SUCCESS", "DEGRADED_STRUCTURAL"}:
             return findings
         canonical_status = artifacts.canonical_status or {}
-        if canonical_status.get("m2_ready_for_formula_understanding") is False:
+        if canonical_status.get("analysis_ready_for_formula_understanding") is False:
             return findings
         formula_claims = [
             claim for claim in (artifacts.claim_evidence or {}).get("claims", [])
@@ -557,7 +557,7 @@ class QualityAuditor:
                 code="FSA-13",
                 severity="P0",
                 effect="BLOCK",
-                message=f"formula_cards do not cover all M1 formula evidence refs; missing {len(missing)} refs: {sample}",
+                message=f"formula_cards do not cover all literature discovery formula evidence refs; missing {len(missing)} refs: {sample}",
                 artifact="formula_cards",
                 field="formula_cards[].evidence_ref",
             ))

@@ -43,7 +43,7 @@ class FormulaSymbolExplanation(SenseiModel):
 
 
 class GroundedClaim(SenseiModel):
-    """A user-facing M4 claim whose evidence binding was checked by the backend."""
+    """A user-facing tutor claim whose evidence binding was checked by the backend."""
 
     text: str
     evidence_refs: list[str] = Field(default_factory=list)
@@ -52,8 +52,8 @@ class GroundedClaim(SenseiModel):
     uncertainty: str = ""
 
 
-class M4ContextTrace(SenseiModel):
-    """User-safe description of how M4 interpreted the current turn."""
+class TutorContextTrace(SenseiModel):
+    """User-safe description of how the paper tutor interpreted the current turn."""
 
     scope: Literal["paper", "selection"] = "paper"
     context_mode: Literal["full_paper", "evidence"] = "evidence"
@@ -75,7 +75,7 @@ class InteractiveAnswer(SenseiModel):
     uncertainty: str = ""
     follow_up_suggestions: list[str] = Field(default_factory=list)
     used_context: dict[str, bool] = Field(default_factory=dict)
-    context_trace: M4ContextTrace = Field(default_factory=M4ContextTrace)
+    context_trace: TutorContextTrace = Field(default_factory=TutorContextTrace)
     warnings: list[WarningItem] = Field(default_factory=list)
 
 
@@ -107,7 +107,7 @@ class AdvisorEvaluation(SenseiModel):
     warnings: list[WarningItem] = Field(default_factory=list)
 
 
-class M4MemoryRecord(SenseiModel):
+class TutorMemoryRecord(SenseiModel):
     memory_id: str
     job_id: str
     memory_type: str
@@ -122,10 +122,10 @@ class M4MemoryRecord(SenseiModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class M4MemoryBundle(SenseiModel):
-    schema_version: Literal["m4_memory.v2"] = "m4_memory.v2"
+class TutorMemoryBundle(SenseiModel):
+    schema_version: Literal["tutor_memory.v1"] = "tutor_memory.v1"
     job_id: str
-    records: list[M4MemoryRecord] = Field(default_factory=list)
+    records: list[TutorMemoryRecord] = Field(default_factory=list)
     migrated_from: str = ""
     warnings: list[WarningItem] = Field(default_factory=list)
 

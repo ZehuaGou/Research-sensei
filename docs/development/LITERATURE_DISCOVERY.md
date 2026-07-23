@@ -1,11 +1,11 @@
-# M1 Literature Search, Direction Exploration, And Seed Expansion
+# Literature Discovery, Direction Exploration, And Seed Expansion
 
-This is the M1 contract document. Current status and evidence live in
+This is the Literature Discovery contract document. Current status and evidence live in
 `docs/STATUS.md`.
 
 ## Scope
 
-M1 is responsible for:
+Literature Discovery is responsible for:
 
 - direction query normalization;
 - PaperSearch MCP multi-source paper discovery;
@@ -17,9 +17,9 @@ M1 is responsible for:
 - arXiv source-first handoff;
 - Direction Exploration bundle generation;
 - Seed Expansion bundle generation;
-- deep_read handoff into M2/M3.
+- deep_read handoff into Paper Analysis/Reader Workspace.
 
-It is not responsible for M4 tutoring, long-term memory, or drills.
+It is not responsible for paper tutoring, long-term memory, or drills.
 
 ## Current Implemented Surfaces
 
@@ -35,7 +35,7 @@ It is not responsible for M4 tutoring, long-term memory, or drills.
 ## Deterministic Relevance Contract
 
 Relevance is not inferred from pipeline completion and is not delegated solely
-to another LLM. For every query, M1 evaluates:
+to another LLM. For every query, Literature Discovery evaluates:
 
 - required task, data-shape, and method concepts;
 - optional concepts that improve confidence;
@@ -47,7 +47,7 @@ to another LLM. For every query, M1 evaluates:
 
 Top-1 and deep-read candidates use explicit minimum thresholds. An optional LLM
 judge may veto or annotate but cannot rescue a deterministic failure. If no
-candidate clears the gate, M1 returns `DEGRADED` or `BLOCKED` and does not pick
+candidate clears the gate, Literature Discovery returns `DEGRADED` or `BLOCKED` and does not pick
 an incorrect paper to keep the pipeline moving.
 
 The maintained offline fixture has at least twenty English, Chinese, and mixed
@@ -55,12 +55,12 @@ queries. It includes acceptable/unacceptable examples and historical wrong
 selections. Run it with:
 
 ```powershell
-.venv\Scripts\python.exe scripts\run_m1_relevance_benchmark.py
+.venv\Scripts\python.exe scripts\run_relevance_benchmark.py
 ```
 
 ## Source And Full-Text Priority
 
-The default M1 product flow is:
+The default Literature Discovery product flow is:
 
 1. Query PaperSearch MCP through `PaperSearchMcpAdapter`. The default source
    set is `openalex,semantic,crossref,dblp,arxiv,core`, configurable with
@@ -96,8 +96,8 @@ The default M1 product flow is:
    resolver. Library hits are returned as `library_reuse`; failed downloads,
    landing-only candidates, non-PDF responses, and missing PDF URLs are recorded
    explicitly instead of being silently replaced by lower-ranked papers.
-10. Normalize downloaded source/PDF material into canonical M1 artifacts and
-   hand only M2-ready artifacts onward.
+10. Normalize downloaded source/PDF material into canonical Literature Discovery artifacts and
+   hand only Paper Analysis-ready artifacts onward.
 
 This design intentionally uses PaperSearch MCP as the external discovery layer
 instead of maintaining separate in-repo scrapers for each paper source. The
@@ -106,7 +106,7 @@ supports reuse, and gives the user a manageable inventory of downloaded papers.
 
 Downloaded direction-search material lives under:
 
-`workspace/m1_searches/<direction-or-topic>/`
+`workspace/literature_searches/<direction-or-topic>/`
 
 The direction folder should contain all downloaded papers for that direction.
 PDF files are named from the paper title, for example
@@ -114,7 +114,7 @@ PDF files are named from the paper title, for example
 not generic names such as `source.pdf`. Each folder also keeps `manifest.json`
 and `README.md` with title, authors, venue/journal, CCF rank, download status,
 SHA-256, and local path. When another nearby direction downloads the same paper
-title, M1 should reuse the existing named PDF instead of downloading a duplicate.
+title, Literature Discovery should reuse the existing named PDF instead of downloading a duplicate.
 
 ## Local Paper Library
 
@@ -133,7 +133,7 @@ Tables:
   URL, local path, SHA-256, file size, first/last seen timestamps, and soft-delete
   timestamp.
 - `paper_sources`: source IDs and URLs observed for the paper.
-- `search_runs`: one row per M1 search run, including query, topic folder,
+- `search_runs`: one row per Literature Discovery search run, including query, topic folder,
   candidate count, new download count, and reuse count.
 - `search_run_papers`: per-run paper rows, including original rank/order,
   action (`downloaded`, `reused`, `failed`, `skipped`, `not_attempted`), CCF
@@ -141,11 +141,11 @@ Tables:
 
 Reuse algorithm:
 
-1. M1 calls PaperSearch MCP for the current query.
-2. If PaperSearch returns results, M1 keeps the deduped multi-source result
+1. Literature Discovery calls PaperSearch MCP for the current query.
+2. If PaperSearch returns results, Literature Discovery keeps the deduped multi-source result
    pool and uses FlashRank to build the download queue. The original external
    result position remains visible as `search_rank`.
-3. If PaperSearch is unavailable or returns no candidates, M1 may use temporary
+3. If PaperSearch is unavailable or returns no candidates, Literature Discovery may use temporary
    legacy fallback adapters, but the run must be labeled as degraded primary
    discovery.
 4. Each selected candidate is matched against the library by DOI, arXiv ID,
@@ -159,7 +159,7 @@ Reuse algorithm:
    `metadata.resolution_strategy = "library_reuse"`.
 
 PMC articles use the official machine-access route instead of treating the
-interactive article page as the download API. M1 lists the article's versioned
+interactive article page as the download API. Literature Discovery lists the article's versioned
 metadata in the PMC Cloud Service, requires the record to be open access or an
 author manuscript, reads its declared `pdf_url`, and accepts the response only
 after the ordinary PDF validation gates pass. This avoids the HTML
@@ -167,7 +167,7 @@ after the ordinary PDF validation gates pass. This avoids the HTML
 
 This preserves external search quality and still avoids duplicate downloads.
 Failed downloads remain visible in `search_runs`. If too many selected papers
-cannot be downloaded, M1 reports the high failure rate so the next step can be a
+cannot be downloaded, Literature Discovery reports the high failure rate so the next step can be a
 manual upload, a different query, or a clearly labeled supplemental search.
 
 Broad RCA/LLM/AIOps queries remain difficult for live discovery, but the
@@ -184,11 +184,11 @@ Management API:
 
 Management UI:
 
-- `/papers/library` lists downloaded papers, shows local paths and recent M1
+- `/papers/library` lists downloaded papers, shows local paths and recent Literature Discovery
   search runs, supports title/venue filtering, and can delete a paper record plus
   its local PDF.
 
-On app startup, M1 imports existing `workspace/m1_searches/*/manifest.json`
+On app startup, Literature Discovery imports existing `workspace/literature_searches/*/manifest.json`
 files into the library, so previously downloaded direction folders become
 searchable without redownloading.
 
@@ -264,7 +264,7 @@ other security-sensitive publishers; headless mode is an opt-in after live
 validation. Normal legal OA URLs are still tried first. The browser is used
 only after ordinary HTTP candidates fail or a publisher landing page has no
 extractable PDF URL; the resulting file must still pass the same PDF magic,
-size, SHA-256, and metadata checks before M2 can use it.
+size, SHA-256, and metadata checks before Paper Analysis can use it.
 
 Before interacting with a publisher PDF control, the helper checks visible
 Cookie/privacy overlays in the page and embedded consent frames. It prefers
@@ -276,7 +276,7 @@ generic article-page button is not clicked accidentally.
 Transient publisher security checks are allowed a bounded wait for the normal
 page to finish hydrating. A real CAPTCHA or human-verification prompt is never
 clicked or bypassed. Failed attempts save `*.cookie-consent.png` (when a consent
-panel was found) and `*.browser-failure.png` beside the intended PDF. The M1
+panel was found) and `*.browser-failure.png` beside the intended PDF. The Literature Discovery
 source result and direction manifest record `cookie_consent_action`,
 `page_barrier`, and these diagnostic paths. Common barriers are distinguished as
 Cookie blocking, user verification, subscription/login, and PDF not exposed.
@@ -313,10 +313,10 @@ while retaining the proven ACM recovery path.
 Direction Exploration output must include:
 
 - status: SUCCESS, DEGRADED, EMPTY_RESULT, or BLOCKED;
-- `pipeline_status`: whether search/source/M2/card execution completed;
+- `pipeline_status`: whether search/source/Paper Analysis/card execution completed;
 - `relevance_status`: whether the selected candidate cleared the deterministic
   query gate;
-- `source_status`: whether legal verified full text can enter M2;
+- `source_status`: whether legal verified full text can enter Paper Analysis;
 - `understanding_status`: whether cards/evidence are safe for user display;
 - overview;
 - key sub-directions;
@@ -328,7 +328,7 @@ Direction Exploration output must include:
 
 Each candidate must include source, title, authors/year, URL/DOI/arXiv ID when
 known, relevance score, verification status, source confidence, and whether it
-can enter M2. The four status dimensions are independent; a pipeline success
+can enter Paper Analysis. The four status dimensions are independent; a pipeline success
 does not erase a relevance, source, or understanding failure.
 
 ## SeedExpansionBundle Requirements
@@ -373,4 +373,4 @@ report files.
   MCP or another explicit external provider with a working anti-bot strategy.
 - No fake PDF, DOI, arXiv ID, OA status, or citation relation.
 - Do not hide metadata-only high-value papers.
-- Do not treat offline fixtures or a completed pipeline as broad M1 REAL_E2E.
+- Do not treat offline fixtures or a completed pipeline as broad Literature Discovery REAL_E2E.

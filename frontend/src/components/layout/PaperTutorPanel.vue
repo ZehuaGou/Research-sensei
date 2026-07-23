@@ -10,7 +10,7 @@ import {
   compactInlineText,
   contextSizeLabel,
   normalizeMessageText,
-} from '../../utils/m4AnswerFormatting'
+} from '../../utils/tutorAnswerFormatting'
 
 const store = useLearningStore()
 const props = withDefaults(defineProps<{ paperTitle?: string; side?: 'left' | 'right' }>(), {
@@ -24,14 +24,14 @@ const isAdvisorEvaluating = ref(false)
 const memoryCount = ref(0)
 const advisorAnswer = ref('')
 const advisorSession = ref<AdvisorSession | null>(null)
-const mode = ref<AskMode>('paper')
+const mode = ref<TutorMode>('paper')
 const activeQuestionMessageIndex = ref(-1)
-const fontStorageKey = 'researchsensei.m4.fontSize.v2'
-const fontSize = ref(initialM4FontSize())
+const fontStorageKey = 'researchsensei.tutor.fontSize.v2'
+const fontSize = ref(initialTutorFontSize())
 
-type AskMode = 'paper' | 'evidence' | 'advisor'
+type TutorMode = 'paper' | 'evidence' | 'advisor'
 
-const modeOptions: Array<{ key: AskMode; label: string; hint: string }> = [
+const modeOptions: Array<{ key: TutorMode; label: string; hint: string }> = [
   { key: 'paper', label: '论文问答', hint: '结合全文，自然讲解' },
   { key: 'evidence', label: '原文证据', hint: '只定位出处，不调用模型' },
   { key: 'advisor', label: '组会演练', hint: '追问、作答、反馈' },
@@ -51,7 +51,7 @@ const questionNodes = computed(() => {
   })
 })
 
-const modePrompts: Record<AskMode, string> = {
+const modePrompts: Record<TutorMode, string> = {
   paper: '请像一位耐心的论文助教一样，结合整篇论文自然地讲清楚核心方法。根据内容决定详略，不要只给一句概括。',
   evidence: '这条结论对应哪条证据？',
   advisor: '',
@@ -82,7 +82,7 @@ const starterPrompts = computed(() => {
 const inputPlaceholder = computed(() => {
   if (mode.value === 'evidence') return '问证据，例如：这个结论靠哪类实验或正文段落支撑？'
   if (mode.value === 'advisor') return '写下你想被追问的点；留空则按整篇论文生成组会问题'
-  return '问 M4，例如：这篇论文到底解决了什么问题？'
+  return '问论文助教，例如：这篇论文到底解决了什么问题？'
 })
 
 const submitLabel = computed(() => {
@@ -91,8 +91,8 @@ const submitLabel = computed(() => {
   return '发送'
 })
 
-const askPanelStyle = computed<Record<string, string>>(() => ({
-  '--m4-font-size': `${fontSize.value}px`,
+const tutorPanelStyle = computed<Record<string, string>>(() => ({
+  '--tutor-font-size': `${fontSize.value}px`,
 }))
 
 type AdvisorSession = {
@@ -108,7 +108,7 @@ type AdvisorSession = {
   nextQuestion: string
 }
 
-function initialM4FontSize() {
+function initialTutorFontSize() {
   if (typeof localStorage === 'undefined') return 15
   const raw = localStorage.getItem(fontStorageKey)
   if (raw === null || !raw.trim()) return 15
@@ -147,7 +147,7 @@ function conversationHistoryPayload(limit = 10) {
 function assistantMessage(data: AskResponse) {
   return {
     role: 'assistant' as const,
-    content: normalizeMessageText(data.answer || 'M4 暂时无法回答这个问题。'),
+    content: normalizeMessageText(data.answer || '论文助教暂时无法回答这个问题。'),
     timestamp: Date.now(),
     evidenceRefs: stringList(data.evidence_refs),
     uncertainty: typeof data.uncertainty === 'string' ? data.uncertainty : '',
@@ -167,7 +167,7 @@ async function askPaper(request: AskRequest, answerMode: 'full_paper' | 'evidenc
   return response
 }
 
-function useSuggestion(suggestion: string, nextMode: AskMode = 'paper') {
+function useSuggestion(suggestion: string, nextMode: TutorMode = 'paper') {
   mode.value = nextMode
   input.value = suggestion
 }
@@ -210,7 +210,7 @@ function advisorEvaluationText(session: AdvisorSession) {
   const score = session.score === null ? '' : `评分：${Math.round(session.score * 100)}%。\n`
   const missing = session.missingPoints.length ? `\n\n还要补：${session.missingPoints.join('；')}` : ''
   const next = session.nextQuestion ? `\n\n下一问：${session.nextQuestion}` : ''
-  return normalizeMessageText(`${score}${session.feedback || 'M4 已完成评价。'}${missing}${next}`)
+  return normalizeMessageText(`${score}${session.feedback || '论文助教已完成评价。'}${missing}${next}`)
 }
 
 async function loadMemory({ revealLatest = false }: { revealLatest?: boolean } = {}) {
@@ -289,7 +289,7 @@ async function send() {
     await askPaper(request, answerMode)
     await loadMemory()
   } catch (error) {
-    const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
+    const message = apiErrorMessage(error, '论文助教请求失败，请稍后再试。')
     store.addMessage({ role: 'assistant', content: message, timestamp: Date.now() })
   } finally {
     isLoading.value = false
@@ -401,7 +401,7 @@ async function clearMemory() {
   advisorAnswer.value = ''
 }
 
-function chooseMode(nextMode: AskMode) {
+function chooseMode(nextMode: TutorMode) {
   const currentInput = input.value.trim()
   const generatedPrompts = Object.values(modePrompts).filter(Boolean)
   const shouldReplacePrompt = !currentInput || generatedPrompts.includes(currentInput)
@@ -421,7 +421,7 @@ async function handleModeKeydown(event: KeyboardEvent, currentIndex: number) {
   event.preventDefault()
   chooseMode(nextMode)
   await nextTick()
-  document.getElementById(`m4-mode-${nextMode}`)?.focus()
+  document.getElementById(`tutor-mode-${nextMode}`)?.focus()
 }
 
 async function submitActiveMode() {
@@ -492,7 +492,7 @@ watch(() => store.selectedText, (text) => {
     }
     mode.value = 'paper'
     input.value = `${promptMap[store.selectedIntent]}：${clipText(text, 260)}`
-    store.isAskPanelOpen = true
+    store.isPaperTutorPanelOpen = true
   }
 })
 
@@ -507,10 +507,10 @@ watch(fontSize, (value) => {
 </script>
 
 <template>
-  <section class="ask-panel" data-testid="ask-panel" :style="askPanelStyle">
+  <section class="paper-tutor-panel" data-testid="paper-tutor-panel" :style="tutorPanelStyle">
     <header>
       <div>
-        <h2>M4 论文助教</h2>
+        <h2>论文助教</h2>
         <strong v-if="props.paperTitle" class="paper-focus" :title="props.paperTitle">{{ props.paperTitle }}</strong>
         <p>{{ store.selectedText ? '整篇论文 + 选中文本 · 支持连续追问' : '整篇论文已加入上下文 · 支持连续追问' }}</p>
       </div>
@@ -518,32 +518,32 @@ watch(fontSize, (value) => {
         <button
           type="button"
           class="pane-side-toggle"
-          data-testid="m4-side-toggle"
-          :aria-label="props.side === 'right' ? '把 M4 移到论文左侧' : '把 M4 移到论文右侧'"
-          :title="props.side === 'right' ? '把 M4 移到论文左侧' : '把 M4 移到论文右侧'"
+          data-testid="tutor-side-toggle"
+          :aria-label="props.side === 'right' ? '把论文助教移到论文左侧' : '把论文助教移到论文右侧'"
+          :title="props.side === 'right' ? '把论文助教移到论文左侧' : '把论文助教移到论文右侧'"
           @click="emit('toggleSide')"
         >
           {{ props.side === 'right' ? '左置' : '右置' }}
         </button>
-        <div class="font-controls" aria-label="M4 字体大小">
-          <button type="button" aria-label="减小 M4 字体" @click="setFontSize(fontSize - 1)">A-</button>
+        <div class="font-controls" aria-label="论文助教字体大小">
+          <button type="button" aria-label="减小论文助教字体" @click="setFontSize(fontSize - 1)">A-</button>
           <span>{{ fontSize }}</span>
-          <button type="button" aria-label="增大 M4 字体" @click="setFontSize(fontSize + 1)">A+</button>
+          <button type="button" aria-label="增大论文助教字体" @click="setFontSize(fontSize + 1)">A+</button>
         </div>
-        <button type="button" class="ghost-btn !min-h-9 !px-3" data-testid="ask-panel-toggle" @click="store.isAskPanelOpen = false">收起</button>
+        <button type="button" class="ghost-btn !min-h-9 !px-3" data-testid="paper-tutor-panel-toggle" @click="store.isPaperTutorPanelOpen = false">收起</button>
       </div>
     </header>
 
-    <div class="mode-tabs" role="tablist" aria-label="M4 提问模式">
+    <div class="mode-tabs" role="tablist" aria-label="论文助教提问模式">
       <button
         v-for="(option, optionIndex) in modeOptions"
-        :id="`m4-mode-${option.key}`"
+        :id="`tutor-mode-${option.key}`"
         :key="option.key"
         type="button"
         role="tab"
         :class="{ active: mode === option.key }"
         :aria-selected="mode === option.key"
-        aria-controls="m4-mode-panel"
+        aria-controls="tutor-mode-panel"
         :tabindex="mode === option.key ? 0 : -1"
         @click="chooseMode(option.key)"
         @keydown="handleModeKeydown($event, optionIndex)"
@@ -562,11 +562,11 @@ watch(fontSize, (value) => {
     </div>
 
     <div
-      id="m4-mode-panel"
+      id="tutor-mode-panel"
       ref="chatContainer"
       class="messages"
       role="tabpanel"
-      :aria-labelledby="`m4-mode-${mode}`"
+      :aria-labelledby="`tutor-mode-${mode}`"
       aria-live="polite"
       @scroll.passive="updateActiveQuestion"
     >
@@ -594,7 +594,7 @@ watch(fontSize, (value) => {
         :data-question-message-index="msg.role === 'user' ? index : undefined"
         data-testid="chat-message"
       >
-        <div class="avatar">{{ msg.role === 'user' ? '你' : 'M4' }}</div>
+        <div class="avatar">{{ msg.role === 'user' ? '你' : '助教' }}</div>
         <div v-if="msg.role === 'assistant'" class="message-body">
           <div class="context-trace" v-if="msg.contextTrace" data-testid="context-trace">
             <span>{{ msg.contextTrace.continued_from_history ? '承接上一问' : msg.contextTrace.scope === 'selection' ? '选中文本' : '当前论文' }}</span>
@@ -623,7 +623,7 @@ watch(fontSize, (value) => {
       </article>
 
       <div v-if="isLoading" class="message assistant">
-        <div class="avatar">M4</div>
+        <div class="avatar">助教</div>
         <div class="bubble loading">正在阅读整篇论文并组织回答...</div>
       </div>
     </div>
@@ -649,7 +649,7 @@ watch(fontSize, (value) => {
           v-model="advisorAnswer"
           data-testid="advisor-answer"
           rows="2"
-          placeholder="写下你的 20-30 秒回答，M4 会按问题、机制、证据给反馈"
+          placeholder="写下你的 20-30 秒回答，论文助教会按问题、机制、证据给反馈"
           :disabled="isAdvisorEvaluating"
         />
         <button
@@ -692,4 +692,4 @@ watch(fontSize, (value) => {
   </section>
 </template>
 
-<style scoped src="./AskPanel.css"></style>
+<style scoped src="./PaperTutorPanel.css"></style>

@@ -9,17 +9,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.m4 import M4MemoryBundle, M4MemoryRecord
+from researchsensei.schemas.tutor import TutorMemoryBundle, TutorMemoryRecord
 
 
-MEMORY_FILENAME = "m4_memory.json"
+MEMORY_FILENAME = "tutor_memory.json"
 MAX_RECORDS = 200
 MAX_BYTES = 1_048_576
 
 _MEMORY_LOCK = threading.RLock()
 
 
-class M4MemoryStore:
+class TutorMemoryStore:
     """Small atomic conversation ledger for one paper job.
 
     OpenCode owns conversational context.  This file only keeps the user-visible
@@ -29,53 +29,71 @@ class M4MemoryStore:
 
     def __init__(self, run_dir: Path, job_id: str) -> None:
         self.job_id = job_id
-        self.path = Path(run_dir) / MEMORY_FILENAME
+        self.run_dir = Path(run_dir)
+        self.path = self.run_dir / MEMORY_FILENAME
         # Memory files are tiny and writes are infrequent. A process-wide lock
         # is intentionally simpler and avoids path-identity races while a run
         # directory is being created concurrently on Windows.
         self._lock = _MEMORY_LOCK
 
-    def read(self) -> M4MemoryBundle:
+    def read(self) -> TutorMemoryBundle:
         with self._lock:
-            if not self.path.exists():
-                return M4MemoryBundle(job_id=self.job_id)
+            source_path = self.path if self.path.exists() else self._legacy_path()
+            if source_path is None:
+                return TutorMemoryBundle(job_id=self.job_id)
             try:
-                value = json.loads(self.path.read_text(encoding="utf-8"))
-                if value.get("schema_version") == "m4_memory":
-                    value["schema_version"] = "m4_memory.v2"
-                    value["migrated_from"] = "m4_memory"
+                value = json.loads(source_path.read_text(encoding="utf-8"))
+                schema_version = str(value.get("schema_version") or "legacy")
+                migrated = source_path != self.path or schema_version != "tutor_memory.v1"
+                if migrated:
+                    value["schema_version"] = "tutor_memory.v1"
+                    value["migrated_from"] = schema_version
+                    warnings = value.get("warnings")
+                    warnings = warnings if isinstance(warnings, list) else []
                     value["warnings"] = [
+                        *warnings,
                         {
-                            "code": "M4_MEMORY_SCHEMA_MIGRATED",
-                            "message": "Legacy M4 memory was loaded and will be upgraded on write.",
-                        }
+                            "code": "TUTOR_MEMORY_SCHEMA_MIGRATED",
+                            "message": "Legacy tutor memory was loaded and upgraded to the semantic schema.",
+                        },
                     ]
-                bundle = M4MemoryBundle.model_validate(value)
+                bundle = TutorMemoryBundle.model_validate(value)
                 if bundle.job_id != self.job_id:
                     raise ValueError("memory job id does not match")
+                if source_path != self.path:
+                    self._write(bundle)
+                    source_path.unlink(missing_ok=True)
                 return bundle
             except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
-                preserved = self.path.with_name(
-                    f"m4_memory.corrupt-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}.json"
+                preserved = source_path.with_name(
+                    f"tutor_memory.corrupt-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}.json"
                 )
                 try:
-                    os.replace(self.path, preserved)
+                    os.replace(source_path, preserved)
                 except OSError:
-                    preserved = self.path
-                return M4MemoryBundle(
+                    preserved = source_path
+                return TutorMemoryBundle(
                     job_id=self.job_id,
                     warnings=[
                         WarningItem(
-                            code="M4_MEMORY_CORRUPTED",
-                            message="Invalid M4 memory was preserved and excluded from the conversation.",
+                            code="TUTOR_MEMORY_CORRUPTED",
+                            message="Invalid tutor memory was preserved and excluded from the conversation.",
                             detail=f"{str(exc)[:220]}; preserved={preserved.name}",
                         )
                     ],
                 )
 
-    def clear(self) -> M4MemoryBundle:
+    def _legacy_path(self) -> Path | None:
+        candidates = sorted(
+            path
+            for path in self.run_dir.glob("*_memory.json")
+            if path.name != MEMORY_FILENAME
+        )
+        return candidates[0] if candidates else None
+
+    def clear(self) -> TutorMemoryBundle:
         with self._lock:
-            bundle = M4MemoryBundle(job_id=self.job_id)
+            bundle = TutorMemoryBundle(job_id=self.job_id)
             self._write(bundle)
             return bundle
 
@@ -90,12 +108,12 @@ class M4MemoryStore:
         text: str = "",
         confidence: float = 0.8,
         metadata: dict[str, object] | None = None,
-    ) -> M4MemoryRecord:
+    ) -> TutorMemoryRecord:
         with self._lock:
             bundle = self.read()
             now = datetime.now(timezone.utc).isoformat()
-            record = M4MemoryRecord(
-                memory_id=f"m4-{uuid.uuid4().hex[:12]}",
+            record = TutorMemoryRecord(
+                memory_id=f"tutor-{uuid.uuid4().hex[:12]}",
                 job_id=self.job_id,
                 memory_type=memory_type,
                 text=text,
@@ -111,7 +129,7 @@ class M4MemoryStore:
             if not _is_useful(record):
                 cleaned = _warning_once(
                     bundle.warnings,
-                    "M4_MEMORY_RECORDS_CLEANED",
+                    "TUTOR_MEMORY_RECORDS_CLEANED",
                     "Blank, duplicate or internal-artifact memory records were removed.",
                 )
                 self._write(bundle.model_copy(update={"warnings": cleaned}))
@@ -125,7 +143,7 @@ class M4MemoryStore:
             if len(records) != len(bundle.records):
                 warnings = _warning_once(
                     warnings,
-                    "M4_MEMORY_RECORDS_CLEANED",
+                    "TUTOR_MEMORY_RECORDS_CLEANED",
                     "Blank, duplicate or internal-artifact memory records were removed.",
                 )
             records.append(record)
@@ -133,7 +151,7 @@ class M4MemoryStore:
                 records = records[-MAX_RECORDS:]
                 warnings = _warning_once(
                     warnings,
-                    "M4_MEMORY_RECORD_LIMIT",
+                    "TUTOR_MEMORY_RECORD_LIMIT",
                     "Old conversation records were removed to keep memory bounded.",
                 )
             candidate = bundle.model_copy(update={"records": records, "warnings": warnings})
@@ -145,7 +163,7 @@ class M4MemoryStore:
             if size_trimmed:
                 warnings = _warning_once(
                     candidate.warnings,
-                    "M4_MEMORY_SIZE_LIMIT",
+                    "TUTOR_MEMORY_SIZE_LIMIT",
                     "Old conversation records were removed to keep the file size bounded.",
                 )
                 candidate = candidate.model_copy(update={"warnings": warnings})
@@ -155,9 +173,9 @@ class M4MemoryStore:
             self._write(candidate)
             return record
 
-    def _write(self, bundle: M4MemoryBundle) -> None:
+    def _write(self, bundle: TutorMemoryBundle) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        target = self.path.with_name(f".m4_memory.{uuid.uuid4().hex}.tmp")
+        target = self.path.with_name(f".tutor_memory.{uuid.uuid4().hex}.tmp")
         data = _encoded(bundle)
         try:
             with target.open("wb") as handle:
@@ -179,7 +197,7 @@ class M4MemoryStore:
             target.unlink(missing_ok=True)
 
 
-def _encoded(bundle: M4MemoryBundle) -> bytes:
+def _encoded(bundle: TutorMemoryBundle) -> bytes:
     return json.dumps(
         bundle.model_dump(mode="json"),
         ensure_ascii=False,
@@ -187,7 +205,7 @@ def _encoded(bundle: M4MemoryBundle) -> bytes:
     ).encode("utf-8")
 
 
-def _dedupe_key(record: M4MemoryRecord) -> tuple[str, str, str]:
+def _dedupe_key(record: TutorMemoryRecord) -> tuple[str, str, str]:
     return (
         record.memory_type.strip().lower(),
         record.question.strip().lower(),
@@ -195,7 +213,7 @@ def _dedupe_key(record: M4MemoryRecord) -> tuple[str, str, str]:
     )
 
 
-def _is_useful(record: M4MemoryRecord) -> bool:
+def _is_useful(record: TutorMemoryRecord) -> bool:
     content = f"{record.text} {record.question} {record.answer}".strip().lower()
     if not record.question.strip() and not record.answer.strip():
         return False

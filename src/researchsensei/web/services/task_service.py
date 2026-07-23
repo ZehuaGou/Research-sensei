@@ -25,7 +25,7 @@ class TaskExecutionError(RuntimeError):
 
 
 class PersistentTaskService:
-    """Small persistent task executor for long local M1 operations."""
+    """Small persistent task executor for long local literature discovery operations."""
 
     def __init__(self, db_path: str | Path, *, max_workers: int = 2) -> None:
         self.db_path = Path(db_path)

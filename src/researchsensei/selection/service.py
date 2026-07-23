@@ -37,7 +37,7 @@ _CONFIDENCE_ORDER = {"low": 0, "medium": 1, "high": 2}
 
 
 class SelectionService:
-    """Deduplicates, scores, and prioritizes M1 candidate papers."""
+    """Deduplicates, scores, and prioritizes literature discovery candidate papers."""
 
     def __init__(self, max_a_read: int = 8) -> None:
         self.max_a_read = max_a_read
@@ -212,21 +212,21 @@ class SelectionService:
             if paper.relevance_gate_evaluated
             else True
         )
-        can_enter_m2 = bool(
-            paper.can_enter_m2
+        can_enter_analysis = bool(
+            paper.can_enter_analysis
             and relevance_gate_ok
             and breakdown.relevance_score >= minimum_relevance
             and _confidence_at_least(paper.source_confidence, "medium")
             and _confidence_at_least(paper.metadata_confidence, "medium")
         )
         return ReadingPlanItem(
-            paper=paper.model_copy(update={"can_enter_m2": can_enter_m2}),
+            paper=paper.model_copy(update={"can_enter_analysis": can_enter_analysis}),
             role=role,
             priority="B_SKIM",
             scoring_breakdown=breakdown,
             selection_reason=self._selection_reason(paper, role, breakdown),
-            risk_note=self._risk_note(paper, can_enter_m2),
-            can_enter_m2=can_enter_m2,
+            risk_note=self._risk_note(paper, can_enter_analysis),
+            can_enter_analysis=can_enter_analysis,
         )
 
     def _relevance_score(self, query_plan: QueryPlan, paper: CandidatePaper) -> float:
@@ -315,13 +315,13 @@ class SelectionService:
     def _source_readiness_score(paper: CandidatePaper) -> float:
         """Rank source-first candidates above URL-only candidates without relaxing gates."""
         if (
-            paper.preferred_m2_input == "latex_source"
+            paper.preferred_analysis_input == "latex_source"
             or paper.source_priority == SourcePriority.LATEX_SOURCE
             or paper.latex_source_downloaded
             or paper.latex_source_available
         ):
             return 1.0
-        if paper.has_valid_deep_reading_source and (paper.pdf_downloaded or paper.can_enter_m2):
+        if paper.has_valid_deep_reading_source and (paper.pdf_downloaded or paper.can_enter_analysis):
             return 0.92
         if paper.pdf_downloaded:
             return 0.88
@@ -398,10 +398,10 @@ class SelectionService:
         ])
 
     @staticmethod
-    def _risk_note(paper: CandidatePaper, can_enter_m2: bool) -> str:
+    def _risk_note(paper: CandidatePaper, can_enter_analysis: bool) -> str:
         notes = []
-        if not can_enter_m2:
-            notes.append("Not cleared for M2 deep-card generation until full text is downloaded and validated.")
+        if not can_enter_analysis:
+            notes.append("Not cleared for paper analysis deep-card generation until full text is downloaded and validated.")
         if paper.source_confidence == "low" or paper.metadata_confidence == "low":
             notes.append("Metadata/source confidence is low; verify before using as an anchor paper.")
         return " ".join(notes)
@@ -415,8 +415,8 @@ class SelectionService:
             f"pdf={'yes' if breakdown.pdf_available_score else 'no'}",
             f"metadata={breakdown.metadata_completeness}",
         ]
-        if paper.preferred_m2_input:
-            parts.append(f"m2_input={paper.preferred_m2_input}")
+        if paper.preferred_analysis_input:
+            parts.append(f"analysis_input={paper.preferred_analysis_input}")
         if paper.has_valid_deep_reading_source:
             parts.append("source_ready=yes")
         if breakdown.venue_prestige >= 0.9:
@@ -513,7 +513,7 @@ class SelectionService:
             "open_access": bool(keep.open_access or dup.open_access),
             "pdf_available": bool(keep.pdf_available or dup.pdf_available or keep.pdf_url or dup.pdf_url),
             "pdf_downloaded": bool(keep.pdf_downloaded or dup.pdf_downloaded),
-            "can_enter_m2": bool(keep.can_enter_m2 or dup.can_enter_m2),
+            "can_enter_analysis": bool(keep.can_enter_analysis or dup.can_enter_analysis),
             "source_confidence": _max_confidence(keep.source_confidence, dup.source_confidence),
             "metadata_confidence": _max_confidence(keep.metadata_confidence, dup.metadata_confidence),
         }

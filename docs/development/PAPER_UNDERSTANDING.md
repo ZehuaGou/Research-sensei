@@ -1,4 +1,4 @@
-# M2.3 Paper Understanding Contract
+# Paper Understanding Contract
 
 Current implementation evidence and test results live in `docs/STATUS.md`.
 This document defines the maintained boundary between evidence extraction and
@@ -6,7 +6,7 @@ learner-facing cards.
 
 ## Purpose
 
-M2.3 turns a verified paper/evidence bundle into compact Chinese learning
+Paper Understanding turns a verified paper/evidence bundle into compact Chinese learning
 artifacts. It does not repair missing source material, invent experimental
 results, or treat fluent prose as evidence.
 
@@ -18,7 +18,7 @@ results, or treat fluent prose as evidence.
 - parser and source-quality status;
 - optional configured LLM client.
 
-M2.3 may start only after the M1/M2 input contract has been checked. Missing or
+Paper Understanding may start only after the Literature Discovery/Paper Analysis input contract has been checked. Missing or
 contradictory provenance remains a gate failure; it is not filled with model
 knowledge.
 

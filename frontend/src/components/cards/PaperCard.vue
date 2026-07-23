@@ -40,7 +40,7 @@ function evidenceLabel(value: string | EvidenceText | undefined) {
 
 function ask(label: string, text: string) {
   store.setSelectedText(`${label}：${text}`)
-  store.isAskPanelOpen = true
+  store.isPaperTutorPanelOpen = true
 }
 
 function copySummary() {
@@ -112,7 +112,7 @@ function copySummary() {
     </section>
 
     <footer class="paper-actions">
-      <button type="button" class="primary-btn" @click="ask('用中文讲透这篇论文', card.thirty_second || card.one_sentence_summary || '')">让 M4 讲透</button>
+      <button type="button" class="primary-btn" @click="ask('用中文讲透这篇论文', card.thirty_second || card.one_sentence_summary || '')">让论文助教讲透</button>
       <button type="button" class="ghost-btn" @click="ask('像组会一样追问这篇论文', card.title || '')">组会追问</button>
     </footer>
   </article>

@@ -70,21 +70,21 @@ describe('UploadView', () => {
     expect(body.get('doi')).toBe('10.1145/example')
   })
 
-  it('submits an existing M2 artifact directory through local_path', async () => {
+  it('submits an existing analysis artifact directory through local_path', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ job_id: 'job-m2', status: 'succeeded' }),
+      json: async () => ({ job_id: 'job-analysis', status: 'succeeded' }),
     })
     vi.stubGlobal('fetch', fetchMock)
     const wrapper = mount(UploadView)
 
-    await sourceButton(wrapper, 'M2 目录').trigger('click')
-    await wrapper.get('[data-testid="m2-artifact-dir-input"]').setValue('D:\\Code\\Python\\Research-sensei\\reports\\m2_live_acceptance_work\\positive_2310_08800v2')
+    await sourceButton(wrapper, '解析产物目录').trigger('click')
+    await wrapper.get('[data-testid="analysis-artifact-dir-input"]').setValue('D:\\Code\\Python\\Research-sensei\\reports\\analysis_acceptance_work\\positive_2310_08800v2')
     await wrapper.get('[data-testid="submit-upload"]').trigger('click')
     await flushPromises()
 
     const body = fetchMock.mock.calls[0][1].body as FormData
-    expect(body.get('local_path')).toBe('D:\\Code\\Python\\Research-sensei\\reports\\m2_live_acceptance_work\\positive_2310_08800v2')
-    expect(routerMock.push).toHaveBeenCalledWith('/learn/job-m2')
+    expect(body.get('local_path')).toBe('D:\\Code\\Python\\Research-sensei\\reports\\analysis_acceptance_work\\positive_2310_08800v2')
+    expect(routerMock.push).toHaveBeenCalledWith('/learn/job-analysis')
   })
 })

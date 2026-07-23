@@ -15,7 +15,7 @@ _ARXIV_URL_RE = re.compile(r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5})(?:v\d+)?(?:
 
 
 class CandidateVerifier:
-    """M1.4 three-layer candidate verification.
+    """verification three-layer candidate verification.
 
     Layer 1: arXiv ID lookup (from arxiv_id field or extracted from pdf_url/landing_url)
     Layer 2: CrossRef DOI lookup

@@ -7,19 +7,20 @@ authoritative implementation/status source.
 
 ResearchSensei is a research-reading system with four active surfaces:
 
-1. M1 discovers papers, resolves legal full text, and hands source-backed
+1. Literature Discovery discovers papers, resolves legal full text, and hands source-backed
    candidates to PaperWorkspace.
-2. M2 converts paper material into evidence-backed understanding artifacts:
+2. Paper Analysis converts paper material into evidence-backed understanding artifacts:
    paper cards, formula cards, teaching cards, formula provenance, and quality
    audit reports.
-3. M3 renders a Chinese workflow for direction search, seed expansion, upload,
+3. Reader Workspace renders a Chinese workflow for direction search, seed expansion, upload,
    settings, and the PaperWorkspace card reader.
-4. M4 v1 provides claim-level evidence-bound interaction inside PaperWorkspace: selected
+4. Paper Tutor v1 provides claim-level evidence-bound interaction inside PaperWorkspace: selected
    text explanation, formula explanation, paper Q&A, advisor questions,
    advisor evaluation, and atomic bounded JSON memory.
 
-Live LLM execution defaults to ccswitch (`cc_switch` config key). The project
-calls the local ccswitch endpoint and sends the model selected in settings.
+Live LLM execution defaults to OpenCode Go (`opencode_go` config key). The
+general, PDF-vision, and paper-tutor models remain independently selectable.
+CC Switch is an optional compatibility provider.
 
 ## Runtime Flow
 
@@ -27,12 +28,12 @@ calls the local ccswitch endpoint and sends the model selected in settings.
 direction query / uploaded source / arXiv / DOI
   -> deterministic task/concept relevance gate
   -> legal source resolver
-  -> M1 canonical candidate or source file
-  -> M2 parse, evidence, cards, audit
+  -> Literature Discovery canonical candidate or source file
+  -> Paper Analysis parse, evidence, cards, audit
   -> understanding_status
   -> gated /cards
   -> Chinese PaperWorkspace
-  -> M4 evidence-bound tutoring
+  -> Paper Tutor evidence-bound tutoring
 ```
 
 Pipeline completion, candidate relevance, source readiness, and understanding
@@ -44,7 +45,7 @@ to imply all four.
 `researchsensei.web.app:create_app` is a compatibility entry point. The real
 composition lives in `web/app_factory.py`; it loads one complete configuration,
 builds dependencies, and mounts focused settings, jobs, library, directions,
-and M4 routers. Bounded Pydantic request models define API input. Upload and job
+and Paper Tutor routers. Bounded Pydantic request models define API input. Upload and job
 logic live in focused services instead of route functions.
 
 Long direction search and deep-read operations use a small local executor with
@@ -55,7 +56,7 @@ maintainable; ResearchSensei does not require a distributed queue.
 SQLite stores use a busy timeout, WAL, explicit transactions, and schema
 versions. Cleanup is permitted only under workspace-managed roots.
 
-## M1 Relevance Boundary
+## Literature Discovery Relevance Boundary
 
 Deterministic required-concept coverage and forbidden intent-mismatch penalties
 gate Top-1 and deep-read candidates. Survey, forecasting, imputation, anomaly,
@@ -63,7 +64,7 @@ clustering, graph, GNN, diffusion, and RCA intent are not interchangeable. An
 optional LLM judge can veto or annotate but cannot rescue a deterministic
 failure. Insufficient relevance returns `DEGRADED` or `BLOCKED`.
 
-## M2 Fail-Closed Rules
+## Paper Analysis Fail-Closed Rules
 
 - `paper_card`, `formula_cards`, and `teaching_cards` are core card-builder
   outputs. If any LLM card builder fails or returns invalid/empty output, the
@@ -77,31 +78,31 @@ failure. Insufficient relevance returns `DEGRADED` or `BLOCKED`.
 - Weak or unknown formula provenance must not produce detailed derivations.
 - QualityAuditor and evidence-ref validation remain hard gates.
 
-## M3/M4 UI Design
+## Reader Workspace/Paper Tutor UI Design
 
 - The first screen of PaperWorkspace is a working reader, not a marketing page.
 - The reader uses a left navigation rail, central card reading pane, and right
-  M4 tutor panel.
+  paper tutor panel.
 - User-facing text is Chinese by default.
 - Status details are available but compact; they should not dominate the
   reading surface.
-- Text selection opens a small M4 action toolbar positioned from the selection
+- Text selection opens a small Paper Tutor action toolbar positioned from the selection
   rectangle and clamped to the viewport to avoid browser-native selection UI.
-- M4 controls mount only when the job is allowed to show cards.
+- Paper Tutor controls mount only when the job is allowed to show cards.
 - Workspace API access is centralized in a typed client. Formula dock, tab and
   scroll memory, chat resizing, and workspace data are separate typed units.
 - Floating controls are viewport-clamped after drag, resize, zoom/layout
   change, and persisted-coordinate migration; keyboard operation is required.
 
-## M4 Evidence Design
+## Paper Tutor Evidence Design
 
-M4 produces internal claims, each with its own evidence refs, supporting text,
+Paper Tutor produces internal claims, each with its own evidence refs, supporting text,
 and uncertainty. The backend validates both ref membership and semantic support
 before rendering Chinese prose. Formulae, thresholds, numbers, datasets,
 metrics, and experimental results use stricter matching. Unsupported claims are
 removed or cause `DEGRADED`; all allowed refs are never attached wholesale.
 
-Memory schema `m4_memory.v2` uses per-job locking and temp-file plus atomic
+Memory schema `tutor_memory.v1` uses per-job locking and temp-file plus atomic
 replace. Corruption is quarantined and surfaced as a warning rather than
 silently overwritten.
 

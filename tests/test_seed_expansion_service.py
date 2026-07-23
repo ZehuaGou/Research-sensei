@@ -172,12 +172,12 @@ def test_seed_expansion_does_not_fabricate_citation_graph() -> None:
     assert all("not a verified citation graph" in paper.relation_reason for paper in bundle.papers)
 
 
-def test_can_enter_m2_accepts_resolvable_handoff_sources() -> None:
+def test_can_enter_analysis_accepts_resolvable_handoff_sources() -> None:
     service = _service({"crossref": RelationAdapter()}, sources=["crossref"])
 
     bundle = service.expand({"title": "Time Series Anomaly Detection with Transformers"})
 
     by_title = {paper.title: paper for paper in bundle.papers}
-    assert by_title["Foundations of Time Series Anomaly Detection"].can_enter_m2 is True
-    assert by_title["A Survey of Time Series Anomaly Detection"].can_enter_m2 is True
+    assert by_title["Foundations of Time Series Anomaly Detection"].can_enter_analysis is True
+    assert by_title["A Survey of Time Series Anomaly Detection"].can_enter_analysis is True
     assert by_title["Improving Transformer Anomaly Detection"].can_prepare_deep_read is True

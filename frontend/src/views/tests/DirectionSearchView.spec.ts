@@ -69,12 +69,12 @@ function directionResponse(overrides: Record<string, any> = {}) {
         source_confidence: 'high',
         pdf_available: true,
         canonicalization_status: 'not_attempted',
-        m2_ready: false,
-        can_enter_m2: false,
+        analysis_ready: false,
+        can_enter_analysis: false,
         can_prepare_deep_read: true,
         priority: 'B_SKIM',
-        risk_note: 'Not cleared for M2 deep-card generation until full text is downloaded and validated.',
-        m2_unavailable_reason: 'Not cleared for M2 deep-card generation until full text is downloaded and validated.',
+        risk_note: 'Not cleared for paper analysis deep-card generation until full text is downloaded and validated.',
+        analysis_unavailable_reason: 'Not cleared for paper analysis deep-card generation until full text is downloaded and validated.',
         deep_read_unavailable_reason: '',
       },
     ],
@@ -540,7 +540,7 @@ describe('DirectionSearchView', () => {
     expect(routerPush).not.toHaveBeenCalled()
   })
 
-  it('shows why a candidate is not currently cleared for M2', async () => {
+  it('shows why a candidate is not currently cleared for 论文解析', async () => {
     mockFetch(directionResponse())
 
     const wrapper = mount(DirectionSearchView)
@@ -548,7 +548,7 @@ describe('DirectionSearchView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('尚未准备好深读')
+    expect(wrapper.get('[data-testid="analysis-readiness-note"]').text()).toContain('尚未准备好深读')
   })
 
   it('explains publisher browser barriers on the candidate card', async () => {
@@ -609,8 +609,8 @@ describe('DirectionSearchView', () => {
           source_confidence: 'low',
           pdf_available: false,
           canonicalization_status: 'not_attempted',
-          m2_ready: false,
-          can_enter_m2: false,
+          analysis_ready: false,
+          can_enter_analysis: false,
           can_prepare_deep_read: false,
           priority: 'C_REFERENCE',
           deep_read_unavailable_reason: 'No arXiv ID, arXiv URL, or PDF URL is available for this candidate.',

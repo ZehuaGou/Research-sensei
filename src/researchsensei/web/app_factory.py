@@ -42,7 +42,7 @@ from researchsensei.library import PaperLibraryStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.ccswitch_bridge import resolve_ccswitch_api_key
 from researchsensei.llm.types import LLMConfig
-from researchsensei.m4.service import M4InteractionService
+from researchsensei.tutor.service import PaperTutorService
 from researchsensei.query import QueryPlanner
 from researchsensei.schemas import CandidatePaper, InteractiveAnswer, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
 from researchsensei.source_resolver import PaperSourceResolver, SourceResolver
@@ -52,7 +52,7 @@ from researchsensei.web.routers import (
     create_directions_router,
     create_jobs_router,
     create_library_router,
-    create_m4_router,
+    create_tutor_router,
     create_settings_router,
 )
 from researchsensei.web.dependencies import WebDependencies
@@ -173,8 +173,8 @@ def create_app(
         max_download_bytes=resolved_max_bytes,
         timeout_seconds=float(runtime_config.search.timeout_seconds),
     )
-    m1_source_dir = workspace.root / "m1_searches"
-    paper_library.import_manifests(m1_source_dir)
+    literature_source_dir = workspace.root / "literature_searches"
+    paper_library.import_manifests(workspace.root)
     configured_search_adapter = PaperSearchMcpAdapter(
         sources=runtime_config.search.sources,
         command=_paper_search_command(runtime_config),
@@ -195,7 +195,7 @@ def create_app(
         },
         source_resolver=PaperSourceResolver(
             network_enabled=True,
-            download_dir=m1_source_dir,
+            download_dir=literature_source_dir,
             http_client=http_client,
             timeout_seconds=float(runtime_config.search.timeout_seconds),
             max_download_bytes=resolved_max_bytes,
@@ -203,7 +203,7 @@ def create_app(
             browser_downloader=browser_downloader,
         ),
         fulltext_resolver=fulltext_resolver,
-        source_download_dir=m1_source_dir,
+        source_download_dir=literature_source_dir,
         paper_library=paper_library,
         max_results_per_source=runtime_config.search.max_results,
         max_download_candidates=runtime_config.search.max_download_candidates,
@@ -288,16 +288,16 @@ def create_app(
     app.include_router(create_library_router(paper_library))
     app.include_router(create_jobs_router(jobs=jobs, job_service=job_service, job_payload=_job_response))
     app.include_router(
-        create_m4_router(
+        create_tutor_router(
             jobs=jobs,
             llm_client=resolved_llm_client,
             get_job=_get_job_or_404,
-            service_for_job=lambda job, **kwargs: _m4_service_for_job(
+            service_for_job=lambda job, **kwargs: _tutor_service_for_job(
                 job,
                 paper_agent=paper_agent,
                 **kwargs,
             ),
-            sync_memory=_sync_m4_memory_artifact,
+            sync_memory=_sync_tutor_memory_artifact,
             runtime_answer=_runtime_self_answer,
             get_config=lambda: app.state.runtime_config,
         )
@@ -360,14 +360,14 @@ def create_app(
 
         run_dir = workspace.new_run_dir(job_id)
         if local_path.strip():
-            m2_artifact_job = _try_register_m2_artifact_job(
+            analysis_artifact_job = _try_register_analysis_artifact_job(
                 resolver=resolver,
                 jobs=jobs,
                 job_id=job_id,
                 artifact_dir_text=local_path.strip(),
             )
-            if m2_artifact_job is not None:
-                return _job_parse_response(m2_artifact_job)
+            if analysis_artifact_job is not None:
+                return _job_parse_response(analysis_artifact_job)
 
         request_identity = _request_source_identity(
             doi=doi,
@@ -484,7 +484,7 @@ def create_app(
         arxiv_url: str = Form(""),
         force: bool = Form(False),
     ) -> dict[str, object]:
-        """Queue document parsing so slow M2/LLM work survives HTTP timeouts."""
+        """Queue document parsing so slow paper analysis/LLM work survives HTTP timeouts."""
         upload_service = UploadService(
             workspace.root / "incoming",
             max_bytes=resolved_max_bytes,
@@ -807,7 +807,7 @@ def create_app(
     return app
 
 
-M2_ARTIFACT_TYPES = {
+ANALYSIS_ARTIFACT_TYPES = {
     "source_status.json": "source_status",
     "canonical_status.json": "canonical_status",
     "parsed_document.json": "parsed_document",
@@ -827,13 +827,13 @@ M2_ARTIFACT_TYPES = {
     "teaching_cards.json": "teaching_cards",
     "quality_report.json": "quality_report",
     "understanding_status.json": "understanding_status",
-    "m4_memory.json": "m4_memory",
-    "m2_run_summary.json": "m2_run_summary",
-    "m2_full_report.md": "m2_full_report",
+    "tutor_memory.json": "tutor_memory",
+    "analysis_run_summary.json": "analysis_run_summary",
+    "analysis_report.md": "analysis_report",
 }
 
 
-def _try_register_m2_artifact_job(
+def _try_register_analysis_artifact_job(
     *,
     resolver: SourceResolver,
     jobs: JobStore,
@@ -844,7 +844,7 @@ def _try_register_m2_artifact_job(
         artifact_dir = Path(artifact_dir_text).resolve(strict=True)
     except OSError:
         return None
-    if not artifact_dir.is_dir() or not _looks_like_m2_artifact_dir(artifact_dir):
+    if not artifact_dir.is_dir() or not _looks_like_analysis_artifact_dir(artifact_dir):
         return None
     if not resolver._is_allowed(artifact_dir):
         raise HTTPException(
@@ -852,7 +852,7 @@ def _try_register_m2_artifact_job(
             detail={
                 "job_id": job_id,
                 "source_status": SourceStatus(
-                    source_type="m2_artifact_dir",
+                    source_type="analysis_artifact_dir",
                     original_input=artifact_dir_text,
                     status="rejected",
                     warnings=["SECURITY_REJECTED"],
@@ -863,19 +863,19 @@ def _try_register_m2_artifact_job(
 
     artifacts = [
         WorkspaceArtifact(artifact_type=artifact_type, path=str(artifact_dir / filename))
-        for filename, artifact_type in M2_ARTIFACT_TYPES.items()
+        for filename, artifact_type in ANALYSIS_ARTIFACT_TYPES.items()
         if (artifact_dir / filename).exists()
     ]
     status_content = _read_json_file(artifact_dir / "understanding_status.json")
     source_status = _read_json_file(artifact_dir / "source_status.json")
     warnings = [
-        WarningItem(code="M2_ARTIFACT_JOB", message="Registered existing M2 artifact run for PaperWorkspace display.")
+        WarningItem(code="ANALYSIS_ARTIFACT_JOB", message="Registered existing paper analysis artifact run for PaperWorkspace display.")
     ]
     raw_warnings = status_content.get("warnings", [])
     for warning in raw_warnings if isinstance(raw_warnings, list) else []:
         if isinstance(warning, dict):
             warnings.append(WarningItem(
-                code=str(warning.get("code") or "M2_WARNING"),
+                code=str(warning.get("code") or "ANALYSIS_WARNING"),
                 message=str(warning.get("message") or ""),
                 detail=str(warning.get("detail") or ""),
             ))
@@ -885,15 +885,15 @@ def _try_register_m2_artifact_job(
         source_path=str(source_status.get("resolved_path") or artifact_dir),
         run_dir=str(artifact_dir),
         status=JobStatus.SUCCEEDED,
-        current_step="m2_artifacts_registered",
+        current_step="analysis_artifacts_registered",
         warnings=warnings,
         artifacts=artifacts,
     ))
 
 
-def _looks_like_m2_artifact_dir(path: Path) -> bool:
+def _looks_like_analysis_artifact_dir(path: Path) -> bool:
     return (path / "understanding_status.json").exists() and (
-        (path / "m2_run_summary.json").exists()
+        (path / "analysis_run_summary.json").exists()
         or (path / "paper_card.json").exists()
         or (path / "quality_report.json").exists()
     )
@@ -938,13 +938,13 @@ def _backfill_reparse_successors(jobs: JobStore) -> None:
         jobs.link_successor(source.job_id, candidate.job_id)
 
 
-def _m4_service_for_job(
+def _tutor_service_for_job(
     job: JobRecord,
     *,
     llm_client: LLMClient | None = None,
     paper_agent: OpenCodePaperAgent | None = None,
     required_gate: str = "reading_display",
-) -> M4InteractionService:
+) -> PaperTutorService:
     status = _job_understanding_status(job)
     if not status:
         raise HTTPException(status_code=404, detail="understanding_status not found.")
@@ -954,7 +954,7 @@ def _m4_service_for_job(
             detail={
                 "status": status.get("status", "BLOCKED"),
                 "blocking_reason": status.get("blocking_reason", ""),
-                "message": "M4 requires user-facing M2 understanding artifacts.",
+                "message": "paper tutor requires user-facing paper analysis understanding artifacts.",
             },
         )
     downstream = status.get("allowed_downstream")
@@ -966,19 +966,19 @@ def _m4_service_for_job(
                 "status": status.get("status", "BLOCKED"),
                 "blocking_reason": status.get("blocking_reason", ""),
                 "gate": f"allowed_downstream.{required_gate}",
-                "message": f"M4 route requires allowed_downstream.{required_gate}.",
+                "message": f"paper tutor route requires allowed_downstream.{required_gate}.",
             },
         )
-    return M4InteractionService(
+    return PaperTutorService(
         job_id=job.job_id,
         run_dir=Path(job.run_dir),
-        artifacts=_m4_artifacts(job),
+        artifacts=_tutor_artifacts(job),
         llm_client=llm_client,
         paper_agent=paper_agent,
     )
 
 
-def _m4_artifacts(job: JobRecord) -> dict[str, object]:
+def _tutor_artifacts(job: JobRecord) -> dict[str, object]:
     allowed_types = {
         "understanding_status",
         "ingestion",
@@ -1000,14 +1000,14 @@ def _m4_artifacts(job: JobRecord) -> dict[str, object]:
     return artifacts
 
 
-def _sync_m4_memory_artifact(jobs: JobStore, job: JobRecord, memory_path: Path) -> JobRecord:
+def _sync_tutor_memory_artifact(jobs: JobStore, job: JobRecord, memory_path: Path) -> JobRecord:
     if not memory_path.exists():
         return job
-    if any(artifact.artifact_type == "m4_memory" for artifact in job.artifacts):
+    if any(artifact.artifact_type == "tutor_memory" for artifact in job.artifacts):
         return job
     return jobs.update(
         job.job_id,
-        artifacts=[*job.artifacts, WorkspaceArtifact(artifact_type="m4_memory", path=str(memory_path))],
+        artifacts=[*job.artifacts, WorkspaceArtifact(artifact_type="tutor_memory", path=str(memory_path))],
     )
 
 
@@ -1031,7 +1031,7 @@ def _runtime_self_answer(
     api_key_configured = bool(settings.get("api_key_configured", True))
 
     lines = [
-        "我是 ResearchSensei 的 M4 论文助教，负责基于当前论文证据解释论文、公式和追问。",
+        "我是 ResearchSensei 的论文助教，负责基于当前论文证据解释论文、公式和追问。",
         f"当前模型配置是 {model}。",
         f"提供方是 {provider}。",
     ]
@@ -1096,7 +1096,7 @@ def _is_runtime_self_question(question: str) -> bool:
     paper_markers = ("这篇论文", "当前论文", "论文里", "论文中", "文中", "文章里", "方法里")
     self_markers = (
         "你",
-        "m4",
+        "论文助教",
         "助教",
         "系统",
         "当前配置",
@@ -1125,7 +1125,7 @@ def _is_runtime_self_question(question: str) -> bool:
 
 
 def _is_runtime_identity_question(compact_lower_question: str) -> bool:
-    identity_markers = ("你是谁", "你现在是谁", "你是哪个", "你是什么", "你能做什么", "m4是谁", "助教是谁")
+    identity_markers = ("你是谁", "你现在是谁", "你是哪个", "你是什么", "你能做什么", "助教是谁")
     return any(marker in compact_lower_question for marker in identity_markers)
 
 
@@ -1760,25 +1760,25 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     source_type = str(source_status.get("source_type", "unknown"))
     source_resolved = source_status.get("status") == "resolved"
     is_pdf = Path(job.source_path).suffix.lower() == ".pdf"
-    m2_ready = bool(opencode_analysis.get("session_id")) if is_pdf else source_resolved
+    analysis_ready = bool(opencode_analysis.get("session_id")) if is_pdf else source_resolved
     return {
         "source_type": source_type,
         "source_status": source_status.get("status", "unknown"),
         "source_strategy": source_status.get("source_strategy", ""),
         "source_priority": source_status.get("source_priority", ""),
-        "preferred_m2_input": source_status.get("preferred_m2_input", ""),
+        "preferred_analysis_input": source_status.get("preferred_analysis_input", ""),
         "latex_source_available": source_status.get("latex_source_available", False),
         "latex_source_path": source_status.get("latex_source_path", ""),
         "fallback_used": source_status.get("fallback_used", ""),
         "verification_status": "verified" if source_resolved else "unverified",
         "pdf_metadata_check": source_status.get("pdf_metadata_check", "not_available"),
         "pdf_title_match": source_status.get("pdf_title_match", "not_available"),
-        "can_enter_m2": m2_ready,
+        "can_enter_analysis": analysis_ready,
         "source_confidence": 1.0 if source_resolved else 0.0,
         "paper_agent_status": "ready" if opencode_analysis.get("session_id") else "not_available",
         "paper_agent_model": opencode_analysis.get("model", ""),
         "paper_tutor_model": opencode_analysis.get("tutor_model", ""),
-        "m2_ready": m2_ready,
+        "analysis_ready": analysis_ready,
         "degradation_reason": (
             "; ".join(degraded_flags)
             or status_content.get("blocking_reason", "")

@@ -57,7 +57,7 @@ describe('api client error contract', () => {
     await cancelAssertion
   })
 
-  it('keeps M4 requests alive beyond the backend model deadline', async () => {
+  it('keeps 论文助教 requests alive beyond the backend model deadline', async () => {
     vi.useFakeTimers()
     let requestAborted = false
     vi.stubGlobal('fetch', vi.fn((_path: string, init: RequestInit) => new Promise((_resolve, reject) => {

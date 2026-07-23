@@ -19,10 +19,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from starlette.testclient import TestClient
+from starlette.testclient import TestClient  # noqa: E402
 
-from researchsensei.core.env_loader import load_runtime_env
-from researchsensei.web.app import create_app
+from researchsensei.core.env_loader import load_runtime_env  # noqa: E402
+from researchsensei.web.app import create_app  # noqa: E402
 
 # Import acceptance helpers as a module so cache helpers and utilities are available.
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -46,9 +46,9 @@ DEFAULT_QUERIES = [
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run the ResearchSensei M1->M2->M3 main-chain regression matrix."
+        description="Run the ResearchSensei literature discovery->paper analysis->reader workspace main-chain regression matrix."
     )
-    parser.add_argument("--provider", default="cc_switch")
+    parser.add_argument("--provider", default="opencode_go")
     parser.add_argument("--skip-llm", action="store_true")
     parser.add_argument("--use-cache", action="store_true", help="Use cached direction search results when available.")
     parser.add_argument("--refresh-cache", action="store_true", help="Force refresh cache even if valid entry exists.")
@@ -83,8 +83,6 @@ def _classify_failure_root_cause(row: dict[str, Any]) -> str:
     stage = row.get("failed_stage", "")
     status = row.get("final_understanding_status", "")
     blocking = row.get("blocking_reason", "")
-    source_strategy = row.get("source_strategy", "")
-
     if verdict == "FAIL":
         if stage == "direction_search":
             if status or blocking:

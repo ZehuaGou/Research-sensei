@@ -90,13 +90,13 @@ const statuses: Record<FixtureKind, object> = {
       status: 'SUCCESS',
       warnings: [],
       component_status: { paper_card: 'SUCCESS', formula_cards: 'SUCCESS', teaching_cards: 'SUCCESS' },
-      allowed_downstream: { cards: true, m4: true },
+      allowed_downstream: { cards: true, tutor: true },
     },
     paper_workspace_status: {
       source_type: 'local_path',
       verification_status: 'verified',
-      can_enter_m2: true,
-      m2_ready: true,
+      can_enter_analysis: true,
+      analysis_ready: true,
       formula_origin: 'source_latex',
       evidence_status: 'verified',
       quality_status: 'pass',
@@ -108,7 +108,7 @@ const statuses: Record<FixtureKind, object> = {
       blocking_reason: 'FORMULA_DERIVATION_BLOCKED',
       warnings: [{ code: 'FORMULA_DERIVATION_BLOCKED', message: 'The offline fixture has no supported formula derivation.' }],
       component_status: { paper_card: 'SUCCESS', formula_cards: 'FAILED', teaching_cards: 'SUCCESS' },
-      allowed_downstream: { cards: true, m4: true },
+      allowed_downstream: { cards: true, tutor: true },
     },
     paper_workspace_status: {
       source_type: 'local_path',
@@ -125,7 +125,7 @@ const statuses: Record<FixtureKind, object> = {
       blocking_reason: 'MISSING_METHOD_EVIDENCE',
       warnings: [{ code: 'MISSING_METHOD_EVIDENCE', message: 'The fixed fixture is intentionally blocked.' }],
       component_status: { evidence_pack: 'FAILED' },
-      allowed_downstream: { cards: false, m4: false },
+      allowed_downstream: { cards: false, tutor: false },
     },
     paper_workspace_status: {
       source_type: 'local_path',
@@ -140,7 +140,7 @@ const statuses: Record<FixtureKind, object> = {
       blocking_reason: 'NO_LLM_CLIENT',
       warnings: [{ code: 'NO_LLM_CLIENT', message: 'No live model is configured for the offline fixture.' }],
       component_status: { llm: 'SKIPPED' },
-      allowed_downstream: { cards: false, m4: false },
+      allowed_downstream: { cards: false, tutor: false },
     },
     paper_workspace_status: {
       source_type: 'local_path',
@@ -186,7 +186,7 @@ export async function mockWorkspaceApi(page: Page, kind: FixtureKind) {
       return
     }
     if (pathname.endsWith('/memory') && route.request().method() === 'GET') {
-      await json(route, { records: [], schema_version: 2 })
+      await json(route, { records: [], schema_version: 'tutor_memory.v1' })
       return
     }
     if (pathname.endsWith('/memory') && route.request().method() === 'DELETE') {
@@ -261,8 +261,8 @@ export async function mockDirectionTaskApi(page: Page): Promise<DirectionMockSta
         pdf_available: true,
         fulltext_status: 'pdf_ready',
         selected_fulltext_source: 'local_fixture',
-        can_enter_m2: true,
-        m2_ready: true,
+        can_enter_analysis: true,
+        analysis_ready: true,
         relevance_score: 0.98,
         source_confidence: 'high',
         verification_status: 'verified',

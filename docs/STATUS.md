@@ -7,15 +7,48 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-23 semantic naming normalization
+
+Numbered implementation-stage names have been removed from maintained source,
+tests, scripts, fixtures, documentation, API fields and frontend components.
+The product vocabulary is now:
+
+- **Literature Discovery** for query planning, relevance, acquisition and legal
+  full-text resolution.
+- **Paper Analysis** for PDF ingestion, OpenCode visual analysis, evidence,
+  cards and quality gates.
+- **Reader Workspace** for the learner-facing paper interface.
+- **Paper Tutor** for full-paper questions, source lookup, formula explanation
+  and advisor rehearsal.
+
+The tutor backend now lives under `researchsensei.tutor`; its router, schemas,
+memory store and Vue panel use the same name. Direction and source contracts use
+`can_enter_analysis`, `analysis_ready` and `preferred_analysis_input`.
+New downloads are stored under `workspace/literature_searches/`. Existing paper
+manifests remain discoverable recursively, and older conversation memory files
+are upgraded atomically to `tutor_memory.json` with schema
+`tutor_memory.v1`.
+
+Verification for this normalization:
+
+| Check | Result |
+|---|---|
+| Backend unit/API suite | `645 passed` in 168.72s |
+| Frontend Vitest | `110 passed` |
+| Frontend Playwright fixture E2E | `7 passed` |
+| Offline relevance benchmark | `23/23` cases and `46/46` candidate expectations |
+| Ruff, frontend type checking and production build | passed |
+| Manual local browser inspection | direction, settings, upload, library, reader and Paper Tutor checked |
+
 ## 2026-07-23 OpenCode architecture convergence
 
-The maintained runtime now has one configured semantic PDF path. M1 hands a
-verified local PDF to the OpenCode paper agent; M2 renders page images and
+The maintained runtime now has one configured semantic PDF path. Literature Discovery hands a
+verified local PDF to the OpenCode paper agent; Paper Analysis renders page images and
 preserves page text/page numbers with PyMuPDF, then records one persistent
 OpenCode session. An enabled paper-agent failure is explicit and no longer
 silently replaced by the lightweight parser. The old canonical/MinerU/Marker
-pipeline, repair scripts, separate M2 full-pipeline/survey runner and the
-template-heavy M4 service were removed. See `docs/ARCHITECTURE.md`.
+pipeline, repair scripts, separate Paper Analysis full-pipeline/survey runner and the
+template-heavy Paper Tutor service were removed. See `docs/ARCHITECTURE.md`.
 
 Vision and tutoring models are independent settings. The current defaults are
 `qwen3.7-plus` for page/formula vision and `mimo-v2.5` for full-paper tutoring.
@@ -25,32 +58,32 @@ while MiMo transposed the indices to `\\hat{x}_t^i`. On the SmartRoot paper,
 MiMo produced a detailed tutor response in a similar latency range, so it is a
 useful tutor but not a universal replacement for Qwen vision.
 
-The M3 settings page exposes the general, PDF-vision and paper-tutor models
-separately. M4 modes are now **论文问答**, **原文证据** and **组会演练**;
+The Reader Workspace settings page exposes the general, PDF-vision and paper-tutor models
+separately. Paper Tutor modes are now **论文问答**, **原文证据** and **组会演练**;
 source-only mode does not call a model. Full-paper responses display the actual
 tutor model and restored conversation metadata. Large Vue component styles and
-M4 answer formatting were split into focused files; the settings layout was
+Paper Tutor answer formatting were split into focused files; the settings layout was
 made container-safe for the persistent Codex-like sidebar.
 
 Verification for the current tree:
 
 | Check | Result |
 |---|---|
-| Backend unit/API suite | `645 passed` in 188.33s |
-| Frontend Vitest | `100 passed` |
+| Backend unit/API suite | `645 passed` in 168.72s |
+| Frontend Vitest | `110 passed` |
 | Ruff / mypy / frontend production build | passed |
 | Real SmartRoot PDF | 11/11 pages, 99 blocks, 16 figures, 3 tables, no warnings; Qwen vision + MiMo tutor session |
-| Real cross-page M4 question | `SUCCESS`, 5,372 Chinese characters, 4 evidence refs, 59,814 full-text chars, 33.1s |
-| Real continued M4 question | `SUCCESS`, 4,133 characters, `continued_from_history=true`, `mimo-v2.5`, 31.8s |
-| Playwright | settings/workspace/M4 inspected; independent M4 scroll moved 900px while reader stayed at 0; no console errors |
+| Real cross-page Paper Tutor question | `SUCCESS`, 5,372 Chinese characters, 4 evidence refs, 59,814 full-text chars, 33.1s |
+| Real continued Paper Tutor question | `SUCCESS`, 4,133 characters, `continued_from_history=true`, `mimo-v2.5`, 31.8s |
+| Playwright | `7 passed`; settings/workspace/Paper Tutor also inspected manually |
 
 The SmartRoot paper contains no independent mathematical equations, so its
 zero formula-card count is expected and does not validate formula OCR. Formula
 vision was assessed separately on the equation-page fixture described above.
 
-## 2026-07-22 OpenCode PDF paper agent and persistent M4 session
+## 2026-07-22 OpenCode PDF paper agent and persistent Paper Tutor session
 
-M2 now has an optional OpenCode Server paper-agent path that is distinct from
+Paper Analysis now has an optional OpenCode Server paper-agent path that is distinct from
 the text-only OpenCode Go `/chat/completions` provider. PyMuPDF deterministically
 preserves complete page text and PDF page numbers. OpenCode receives rendered
 page images in bounded batches and supplies visual semantics: section headings,
@@ -66,7 +99,7 @@ because that model supports neither PDF nor image input. The new PDF-agent
 setting therefore defaults to the attachment-capable `qwen3.7-plus`; the web
 settings page exposes chat and PDF-vision models separately. The app can start
 a localhost-only `opencode serve` sidecar on demand and stops only the process
-it started. If OpenCode is unavailable, M2 preserves page text with the
+it started. If OpenCode is unavailable, Paper Analysis preserves page text with the
 maintained parser and records an explicit degraded warning.
 
 Live acceptance used the 11-page, 999,493-byte SmartRoot paper. All 11 pages
@@ -156,7 +189,7 @@ local GPU/parser and live LLM acceptance, not a fixture result.
 ## 2026-07-21 Deep-read progress and recovery correction
 
 The direction and upload deep-read tasks no longer remain at
-`resolving_source · 10%` while the complete M2/LLM chain runs. Progress now
+`resolving_source · 10%` while the complete Paper Analysis/LLM chain runs. Progress now
 comes from the actual ingestion pipeline and identifies source preparation,
 document parsing, evidence indexing, evidence-pack construction, paper-card
 generation, formula-card batches, teaching-card generation, quality audit, and
@@ -194,7 +227,7 @@ source/LLM/card correctness. This correction did not repeat the approximately
 improvement; it fixes truthful observability, reload recovery, and safe
 intermediate persistence.
 
-## 2026-07-20 ExplainIt source, formula, and M4 live correction
+## 2026-07-20 ExplainIt source, formula, and Paper Tutor live correction
 
 The live arXiv deep-read path was exercised with `1903.08132`, *ExplainIt! --
 A Declarative Root-cause Analysis Engine for Time Series Data*. This exposed
@@ -206,12 +239,12 @@ LaTeX main-file selection now scores active document structure, included
 sections, path depth, and sample/template filenames instead of choosing the
 largest file with a `documentclass` token.
 
-The same run exposed Anthropic-compatible output-budget failures. M4 previously
+The same run exposed Anthropic-compatible output-budget failures. Paper Tutor previously
 ended with only a `thinking` block at `max_tokens=3200`, and formula generation
 could repeat the same failure per formula at 4500 tokens. Both paths now use a
 12,000-token output budget with thinking disabled. Formula generation uses
 bounded three-formula batches with three-way concurrency, retaining single-item
-split/compact retries when a batch is incomplete. M4 content validation still
+split/compact retries when a batch is incomplete. Paper Tutor content validation still
 requires an allowed `evidence_ref` and a verbatim quote from the underlying
 paper evidence. An audited, evidence-bound paper-card phrase may additionally
 serve as a cross-language bridge when comparing a Chinese claim with English
@@ -224,7 +257,7 @@ approximately 13 minutes 50 seconds. It selected `explainit.tex` from the arXiv
 source archive, reported `source_latex`/no OCR, produced 33 formula cards and two
 teaching cards, and finished with all five understanding components at
 `SUCCESS`, `quality_status=pass`, no structural degradation, and no top-level
-warnings. A real M4 question, `这篇论文真正解决了什么问题？`, returned `SUCCESS`
+warnings. A real Paper Tutor question, `这篇论文真正解决了什么问题？`, returned `SUCCESS`
 in 40.6 seconds with two independently validated claims, three evidence refs,
 and no warnings. A real follow-up carrying the frontend's conversation-history
 payload set `continued_from_history=true` and `conversation=true`; one supported
@@ -291,9 +324,9 @@ checking, and the production frontend build all passed. The completed live run
 was reopened from the UI and showed four recorded candidates, one newly
 downloaded source, one reused local source, and no browser console warnings.
 
-## 2026-07-20 Complete M1 Revalidation
+## 2026-07-20 Complete Literature Discovery Revalidation
 
-The configured user-authorized native-Chrome session and the production M1
+The configured user-authorized native-Chrome session and the production Literature Discovery
 service were revalidated from clean workspaces. This was not a fixed fixture or
 a cached-library acceptance.
 
@@ -341,7 +374,7 @@ repeat of the previously failing Masked GNN path completed in 5.01s with a
 
 External search remains variable: Semantic Scholar returned HTTP 429 during the
 final run, while the configured paper-search/OpenAlex paths still supplied the
-candidate pool. Download success does not weaken the downstream M2 gate; the
+candidate pool. Download success does not weaken the downstream Paper Analysis gate; the
 final bundle still warned that some candidate metadata was unverified and kept
 those papers out of `A_READ` until verification is complete.
 
@@ -376,12 +409,12 @@ remain eligible for the authorized-browser fallback. The two unresolved papers
 were the IEEE and Elsevier items with no OA/PDF candidate; no lower-relevance
 paper was substituted.
 
-## 2026-07-19 M1 Open-Fulltext Rescue
+## 2026-07-19 Literature Discovery Open-Fulltext Rescue
 
 ### Relevance-first correction
 
 The earlier implementation and acceptance table used a seven-paper download
-queue. That framing was incorrect: M1 must never treat a count as a quota or
+queue. That framing was incorrect: Literature Discovery must never treat a count as a quota or
 promote an easier source over a more relevant paper. The current behavior is:
 
 - strict deterministic relevance plus the deep-read score threshold is applied
@@ -408,12 +441,12 @@ promote an easier source over a more relevant paper. The current behavior is:
   `resolution_strategy=authorized_browser_session`,
   `browser_mode=native_chrome_cdp`, 6,701,685 validated bytes, and a matching
   PDF title. The fallback is publisher-agnostic and is injected into the
-  production M1 resolver, but it runs only after cache, official OA services,
+  production Literature Discovery resolver, but it runs only after cache, official OA services,
   and ordinary HTTP candidates fail. This proves the tested session/path, not universal
   access to every ACM item; subscription and institutional permissions remain
   unchanged.
 
-This section supersedes the earlier single-query M1 `2/7` result below.
+This section supersedes the earlier single-query Literature Discovery `2/7` result below.
 
 - Git history is consolidated on `main`; local and remote have no other branch.
 - The production direction service now actually wires OpenAlex and Semantic
@@ -473,7 +506,7 @@ the historical v0.6 release ledger.
   task endpoints with 202 submission, progress polling, typed terminal failures,
   cancellation requests, restart interruption state, and frontend task recovery.
   The synchronous parse/reparse endpoints remain compatibility paths.
-- M4 structured output accepts fenced/trailing JSON, performs one bounded
+- Paper Tutor structured output accepts fenced/trailing JSON, performs one bounded
   format-only repair attempt, and never exposes raw malformed model output in a
   learner-facing error. Existing claim/evidence validation remains unchanged.
 - Request/library title metadata enters the ingestion skeleton before card
@@ -506,22 +539,22 @@ Current verification:
 
 Remaining external boundaries are explicit: the pre-existing GitHub Actions run
 remains red until this checkout is pushed and GitHub reruns the updated workflow;
-the repaired M4 format path has deterministic tests but was not charged against a
+the repaired Paper Tutor format path has deterministic tests but was not charged against a
 live model again; task cancellation is cooperative and cannot pre-empt a parser or
 LLM call already executing; and the prior 12-query external acquisition matrix
 remains a failed live acceptance rather than being reclassified by local success.
 
-## 2026-07-19 M1/M4 Main-Flow Optimization
+## 2026-07-19 Literature Discovery/Paper Tutor Main-Flow Optimization
 
 This follow-up targets the main learner workflows rather than additional
 reliability plumbing.
 
-- M4 now resolves pronouns and short follow-ups against the previous user turn
+- Paper Tutor now resolves pronouns and short follow-ups against the previous user turn
   before deciding that a question is underspecified. The resolved focus and the
   previous turn's verified refs seed retrieval, while conversation history and
   memory are explicitly forbidden from acting as paper evidence or supporting
   quotations.
-- Every M4 response can expose a user-safe context trace: current paper versus
+- Every Paper Tutor response can expose a user-safe context trace: current paper versus
   selected text, whether the turn continues the previous question, and how many
   verified evidence refs survived. Model-proposed follow-up questions are
   bounded and presented as reusable prompts.
@@ -529,11 +562,11 @@ reliability plumbing.
   last question and a safe recovery notice; legacy answer bodies are not replayed
   because older memory may predate current claim-level validation. The next
   answer is retrieved and validated again.
-- The M4 pane shows the active paper title, evidence scope, context continuity,
+- The Paper Tutor pane shows the active paper title, evidence scope, context continuity,
   selected-text controls, evidence counts, uncertainty, and follow-up actions.
   The successful status ledger is one row on desktop so the paper content starts
   higher in the reading pane.
-- M1 no longer treats any non-empty primary result as sufficient. Thin candidate
+- Literature Discovery no longer treats any non-empty primary result as sufficient. Thin candidate
   pools, weak topic coverage, or too few open-fulltext hints trigger a bounded
   two-query supplement through the configured OpenAlex/Semantic Scholar fallback
   adapters. Source metrics record the trigger, and the direction UI displays a
@@ -552,12 +585,12 @@ Verification for this follow-up:
 | `npm test`, `npm run typecheck`, `npm run build` | 15 files / 75 tests passed; typecheck and production build passed | Frontend unit/static acceptance. |
 | `npm run test:e2e` | 6/6 Chromium fixture tests passed | Deterministic browser E2E. |
 | Real browser, configured paper `55b9e24aec49` | Paper-scoped recovery, active title, context trace, evidence count, composer scope, and zero console errors verified | Local runtime UI smoke. |
-| Live M1 query `graph neural network multivariate time series anomaly detection` | Persistent task succeeded in 50.8s; 30 candidates; bundle remained `DEGRADED`; 2/7 attempted downloads succeeded | Live acquisition probe, explicitly not full acceptance. |
-| Live ccswitch validation and M4 follow-up | 8-second provider probe succeeded; one evidence-retrieved follow-up reached 8 refs but the structured model request failed and the UI refused unvalidated output | Provider connection passed; full M4 live answer failed safely. |
+| Live Literature Discovery query `graph neural network multivariate time series anomaly detection` | Persistent task succeeded in 50.8s; 30 candidates; bundle remained `DEGRADED`; 2/7 attempted downloads succeeded | Live acquisition probe, explicitly not full acceptance. |
+| Live ccswitch validation and Paper Tutor follow-up | 8-second provider probe succeeded; one evidence-retrieved follow-up reached 8 refs but the structured model request failed and the UI refused unvalidated output | Provider connection passed; full Paper Tutor live answer failed safely. |
 
-Remaining risks: the live M1 result still had a high download failure rate and no
-candidate cleared every A_READ/M2 gate in the search response; ccswitch accepted
-a connection probe but did not complete the tested structured M4 request. These
+Remaining risks: the live Literature Discovery result still had a high download failure rate and no
+candidate cleared every A_READ/Paper Analysis gate in the search response; ccswitch accepted
+a connection probe but did not complete the tested structured Paper Tutor request. These
 are live-service failures, not reclassified by the green offline suites.
 
 ## Release Identity
@@ -577,15 +610,15 @@ and clean-worktree check.
 
 ## Reliability Model
 
-M1 and the downstream workspace no longer use one overloaded `SUCCESS` label
+Literature Discovery and the downstream workspace no longer use one overloaded `SUCCESS` label
 to represent every stage. The maintained status dimensions are:
 
 | Dimension | Meaning |
 |---|---|
-| `pipeline_status` | Search, source resolution, parsing, M2, and card pipeline completion. |
+| `pipeline_status` | Search, source resolution, parsing, Paper Analysis, and card pipeline completion. |
 | `relevance_status` | Whether the selected paper covers the requested task, data shape, and method concepts. |
-| `source_status` | Whether a legal, verified source can enter M2. |
-| `understanding_status` | Whether evidence-backed M2 cards are safe for user display. |
+| `source_status` | Whether a legal, verified source can enter Paper Analysis. |
+| `understanding_status` | Whether evidence-backed Paper Analysis cards are safe for user display. |
 
 A completed pipeline with a relevance failure is not product success. A
 candidate below the deterministic relevance threshold is returned as
@@ -593,7 +626,7 @@ candidate below the deterministic relevance threshold is returned as
 
 ## Implemented v0.6 Hardening
 
-### M1 relevance
+### Literature Discovery relevance
 
 - The offline relevance benchmark contains at least twenty English, Chinese,
   and mixed-language cases covering anomaly detection, forecasting,
@@ -630,7 +663,7 @@ alias remains for compatibility.
 - `researchsensei.web.app:create_app` remains the stable entry point and
   delegates to an app factory with dependency wiring, routers, request models,
   and focused services.
-- Direction search/deep-read, seed expansion, M4, and settings mutations use
+- Direction search/deep-read, seed expansion, Paper Tutor, and settings mutations use
   bounded Pydantic request models. Unknown fields are rejected except where the
   documented compatibility candidate payload requires preservation.
 - Validation and HTTP failures expose a stable machine-readable error code.
@@ -641,9 +674,9 @@ alias remains for compatibility.
   result, typed failure, cancellation, and restart-time stale-task recognition.
   Synchronous endpoints remain compatibility paths.
 
-### M4 grounding and memory
+### Paper Tutor grounding and memory
 
-- M4 no longer emits a fixed spectral-residual/Fourier/threshold explanation
+- Paper Tutor no longer emits a fixed spectral-residual/Fourier/threshold explanation
   from broad keywords such as “time series” or “anomaly”.
 - LLM output is claim-structured. Every claim carries its own evidence refs and
   supporting quotation; the backend validates the ref allow-list and whether
@@ -651,7 +684,7 @@ alias remains for compatibility.
 - Formulae, thresholds, numbers, datasets, metrics, and experimental results
   receive stricter matching. Unsupported claims are removed or cause
   `DEGRADED`; a legal ref does not make an unrelated answer legal.
-- `m4_memory.json` uses schema `m4_memory.v2`, per-job locking, temporary-file
+- `tutor_memory.json` uses schema `tutor_memory.v1`, per-job locking, temporary-file
   write plus `fsync`/atomic replace, bounded records/file size, deduplication,
   legacy migration, and corrupt-file quarantine with a visible warning.
 
@@ -676,7 +709,7 @@ alias remains for compatibility.
 - FSA-5 remains strict.
 - `source_latex` is accepted only from an allowed source path.
 - `/cards` remains fail-closed for blocked understanding.
-- M4 stays within the current paper evidence boundary.
+- Paper Tutor stays within the current paper evidence boundary.
 - DOI, arXiv ID, PDF readiness, source identity, and live-service results are
   never synthesized to make a test pass.
 
@@ -694,7 +727,7 @@ alias remains for compatibility.
 | `cd frontend; npm audit --omit=dev --registry=https://registry.npmjs.org` | `0 vulnerabilities`. | Registry-backed dependency audit. |
 | `git diff --check` | Passed. | Repository hygiene. |
 | `python -m researchsensei --help` and maintained script `--help` checks | Passed. | Import/CLI smoke checks. |
-| `.venv\Scripts\python -m pytest tests/test_m1_search_and_device.py::test_environment_audit_produces_output -q` | `1 passed`. | Proved the baseline environment-audit failure was caused by the bare interpreter, not an application regression. |
+| Historical environment-audit regression | `1 passed`. | Proved the baseline environment-audit failure was caused by the bare interpreter, not an application regression. |
 
 ### Interim v0.6 checks
 
@@ -703,10 +736,10 @@ suite.
 
 | Command | Result | Scope |
 |---|---|---|
-| `.venv\Scripts\python -m pytest tests/test_m1_relevance_benchmark.py tests/test_paper_ranker.py tests/test_direction_exploration_service.py tests/test_m4_api.py tests/test_m4_memory.py -q` | `89 passed` in 85.02s. | Deterministic relevance, ranking, direction flow, claim-level M4 grounding, and memory. |
+| `.venv\Scripts\python -m pytest tests/test_literature_relevance_benchmark.py tests/test_paper_ranker.py tests/test_direction_exploration_service.py tests/test_tutor_service.py tests/test_tutor_memory.py -q` | `89 passed` in 85.02s. | Deterministic relevance, ranking, direction flow, claim-level Paper Tutor grounding, and memory. |
 | `.venv\Scripts\python -m pytest tests/test_background_tasks.py -q` | `5 passed`. | Persistent local task lifecycle and cancellation. |
 | `cd frontend; npm test` | `13 files, 66 tests passed` in 9.17s. | Typed client and workspace interaction unit tests. |
-| `.venv\Scripts\python -m pytest tests/test_encoding_hygiene.py tests/test_m1_docs_contract.py tests/test_v05_docs_contracts.py -q` | `6 passed` in 0.30s. | UTF-8 and documentation contracts. |
+| Historical UTF-8 and documentation-contract checks | `6 passed` in 0.30s. | Verified encoding and documentation consistency for that release. |
 
 ### Final required commands
 
@@ -714,7 +747,7 @@ suite.
 |---|---|
 | `.venv\Scripts\python -m pytest -q` | `771 passed, 15 skipped` in 194.12s. |
 | `.venv\Scripts\python -m pytest tests/test_main_chain_matrix.py -v` | `28 passed` in 1.31s. |
-| `.venv\Scripts\python scripts/run_m1_relevance_benchmark.py` | `23/23` cases and `46/46` candidate expectations passed; offline verdict `PASS`. |
+| `.venv\Scripts\python scripts/run_relevance_benchmark.py` | `23/23` cases and `46/46` candidate expectations passed; offline verdict `PASS`. |
 | `cd frontend; npm ci` | Installed 242 locked packages successfully. |
 | `cd frontend; npm test` | `14` files, `73` tests passed. |
 | `cd frontend; npm run typecheck` | Passed (`vue-tsc -b`). |
@@ -731,7 +764,7 @@ suite.
 |---|---|---|
 | External paper APIs and legal full-text download | `LIVE_ATTEMPT_FAILED` | The 12-query run attempted current `paper-search-mcp` access, but six queries hit the 90s query timeout and six returned no candidates after the search command timed out at 30s. No live PDF/full-text success was established. |
 | ccswitch provider connection | `LIVE_VERIFIED` | `POST /api/v1/settings/validate` with `live=true` and an 8s timeout returned HTTP 200, `ok=true`, `live_tested=true`, and `Provider connection succeeded.` via the Anthropic-compatible `/v1/messages` route. No secret was printed. |
-| ccswitch full M1-to-M4 chain | `NOT_LIVE_VERIFIED` | Only the bounded provider connection was proven; no complete live acquisition, M2 card, and M4 answer chain was accepted. |
+| ccswitch full literature-to-tutoring workflow chain | `NOT_LIVE_VERIFIED` | Only the bounded provider connection was proven; no complete live acquisition, Paper Analysis card, and Paper Tutor answer chain was accepted. |
 | 12-query acquisition matrix | `LIVE_ATTEMPT_FAILED` | `.venv\Scripts\python scripts/run_main_chain_matrix.py --skip-llm --use-cache --query-timeout-seconds 90 --max-failures 0` completed 12 rows in 992.7s: 0 passed, 0 degraded, 0 blocked, 12 failed; cache hits were 0 because the six-hour cache TTL had expired. |
 
 ### Root-system paper formula false-positive regression (2026-07-21)
@@ -756,11 +789,11 @@ suite.
   suite `815 passed, 15 skipped`; Ruff and mypy passed; frontend StatusBanner
   tests `10 passed`; full frontend suite `89 passed`; production build passed.
 
-### M4 exact-quote selection regression (2026-07-21)
+### Paper Tutor exact-quote selection regression (2026-07-21)
 
-- On GiA Roots job `941a6709af95`, M4 retrieved the correct `b002` source and
+- On GiA Roots job `941a6709af95`, Paper Tutor retrieved the correct `b002` source and
   produced a supported Chinese answer to “这篇论文真正解决了什么问题？”, but
-  rejected the entire answer as `M4_CLAIM_UNSUPPORTED` when the model lightly
+  rejected the entire answer as `Paper Tutor_CLAIM_UNSUPPORTED` when the model lightly
   paraphrased the English `supporting_quote` instead of copying it verbatim.
 - Source evidence rows now receive server-generated `quote_id` values. The
   model selects an ID and the server binds its own exact source text. For
@@ -772,17 +805,17 @@ suite.
   payloads remain compatible.
 - Live API and browser checks on the same GiA Roots question returned the
   correct problem statement with one supported claim and evidence ref
-  `941a6709af95:b002`; the M4 panel displayed “1 条已验证证据” instead of deleting
-  the answer. Targeted M4/memory tests reported `40 passed`; full backend tests
+  `941a6709af95:b002`; the Paper Tutor panel displayed “1 条已验证证据” instead of deleting
+  the answer. Targeted Paper Tutor/memory tests reported `40 passed`; full backend tests
   reported `818 passed, 15 skipped`; Ruff and mypy passed.
 
-### M4 detailed-list retrieval regression (2026-07-21)
+### Paper Tutor detailed-list retrieval regression (2026-07-21)
 
 - The GiA Roots PDF already contained the complete list of 19 RSA traits, but
-  several overlapping passages shared the same evidence refs. M4 kept the
+  several overlapping passages shared the same evidence refs. Paper Tutor kept the
   earlier abstract passage, discarded the later trait-selection passage during
   deduplication, and then rejected the model's generic answer.
-- M4 now ranks source passages for list questions, deduplicates by passage
+- Paper Tutor now ranks source passages for list questions, deduplicates by passage
   identity instead of only by evidence ref, and extracts a query-focused window
   from long passages. Generic phrases such as an author "list of" do not outrank
   a phrase that explicitly lists traits.
@@ -794,23 +827,23 @@ suite.
 - A live API request and an in-app browser retry of
   `GiA Roots软件具体提供了哪些根系结构性状？` returned `SUCCESS`, one supported
   claim, evidence ref `941a6709af95:b002`, all 19 traits, and no warnings. The
-  M4 panel displayed `当前论文 · 1 条已验证证据` with the complete list.
-- Verification: M4 API tests reported `34 passed`; full backend tests reported
+  Paper Tutor panel displayed `当前论文 · 1 条已验证证据` with the complete list.
+- Verification: Paper Tutor API tests reported `34 passed`; full backend tests reported
   `819 passed, 15 skipped`; Ruff and mypy passed.
 
-### M4 interactive timeout-budget regression (2026-07-22)
+### Paper Tutor interactive timeout-budget regression (2026-07-22)
 
-- The frontend previously aborted M4 calls after 95 seconds while the backend
+- The frontend previously aborted Paper Tutor calls after 95 seconds while the backend
   allowed a single model attempt to run for 120 seconds and could retry it.
   The browser therefore displayed a generic request-timeout error while the
   backend was still working, even when verified selected-text evidence was
   already available.
-- Interactive M4 model calls are now bounded to 80 seconds with no transport
+- Interactive Paper Tutor model calls are now bounded to 80 seconds with no transport
   retry, and the optional structured-JSON repair pass is independently capped
-  at 25 seconds. The frontend M4 request budget is 120 seconds, so it remains
+  at 25 seconds. The frontend Paper Tutor request budget is 120 seconds, so it remains
   alive long enough to receive either the validated model result or the
   backend's controlled response.
-- When a selected-text request times out or the model transport fails, M4 keeps
+- When a selected-text request times out or the model transport fails, Paper Tutor keeps
   only the artifact-derived explanation whose evidence refs and claims have
   already passed validation. It explicitly says that model enhancement did not
   finish and that no unverified model output was used. Generic paper questions
@@ -825,15 +858,15 @@ suite.
   `12 passed`, and the full frontend suite reported `90 passed`. Ruff, mypy,
   frontend typecheck, and the production build passed.
 
-### M4 evidence-first answer regression (2026-07-22)
+### Paper Tutor evidence-first answer regression (2026-07-22)
 
 - The timeout fallback above was still too narrow. Paper-card actions such as
   `用中文讲透这篇论文` intentionally ignore their generated Chinese summary as
   raw source evidence, but the timeout fallback required a non-ignored text
   selection. In addition, a model response rejected as
-  `M4_CLAIM_UNSUPPORTED` could replace an already available artifact answer
+  `Paper Tutor_CLAIM_UNSUPPORTED` could replace an already available artifact answer
   with the generic failure card.
-- M4 questions now use two phases. `evidence_only` returns the deterministic,
+- Paper Tutor questions now use two phases. `evidence_only` returns the deterministic,
   evidence-bound paper-card answer without calling the model or persisting a
   duplicate memory record. The frontend displays that result immediately and
   then requests `enhanced` output in the background. A successful audited model
@@ -847,18 +880,18 @@ suite.
   1,679-character evidence answer with refs `b001` and `b002` in 222 ms without
   calling the model. The enhancement request then timed out after 80.7 seconds
   and retained the same answer. A separate in-app browser run exercised
-  `M4_CLAIM_UNSUPPORTED`: the page showed the evidence answer immediately,
+  `Paper Tutor_CLAIM_UNSUPPORTED`: the page showed the evidence answer immediately,
   removed the loading state after model validation, kept the answer, and added
   only the controlled enhancement notice.
-- Verification: M4 API tests reported `37 passed`; the full backend suite
+- Verification: Paper Tutor API tests reported `37 passed`; the full backend suite
   reported `823 passed, 15 skipped`. Targeted frontend tests reported
   `14 passed`, and the full frontend suite reported `92 passed`. Ruff, mypy,
   frontend typecheck, and the production build passed.
 
-### M4 model-service latency root cause and direct OpenCode Go route (2026-07-22)
+### Paper Tutor model-service latency root cause and direct OpenCode Go route (2026-07-22)
 
-- The fast settings probe was not representative of M4: it used 128 output
-  tokens and a trivial prompt. A real GiA Roots M4 request contained about
+- The fast settings probe was not representative of Paper Tutor: it used 128 output
+  tokens and a trivial prompt. A real GiA Roots Paper Tutor request contained about
   2,535 input tokens. Through CC Switch's Anthropic-to-OpenAI conversion,
   `thinking: disabled` was dropped and `deepseek-v4-pro` spent all 2,400 output
   tokens on a thinking block in 39.98 seconds, returning no text. Historical
@@ -880,7 +913,7 @@ suite.
   seven accepted evidence-bound claims, and evidence ref `b002`. One additional
   unsupported claim was removed and reported as a warning; the evidence gate
   remained fail-closed.
-- Verification: focused provider/M4 tests reported `65 passed`; the full backend
+- Verification: focused provider/Paper Tutor tests reported `65 passed`; the full backend
   suite reported `831 passed, 15 skipped`. Ruff and mypy passed.
 
 Live tests remain opt-in through `RUN_LIVE_TESTS`, `RUN_LLM_TESTS`, and
@@ -894,7 +927,7 @@ converted into passes.
   the branch is pushed and GitHub runs it.
 - Current external paper search/full-text acquisition did not pass the live
   12-query run; network/provider timeout behavior remains a real release risk.
-- The ccswitch connection is live-verified, but the complete live M1-to-M4
+- The ccswitch connection is live-verified, but the complete live literature-to-tutoring workflow
   product chain remains `NOT_LIVE_VERIFIED`.
 - The local executor is intentionally single-host and SQLite-backed. It
   recognizes interrupted tasks after restart but is not a distributed queue.

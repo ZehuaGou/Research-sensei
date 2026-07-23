@@ -1,14 +1,14 @@
-# M4 Interactive Learning Contract
+# Paper Tutor Interactive Learning Contract
 
-M4 v1 is an evidence-bound tutor inside PaperWorkspace. It is not a raw-PDF
+Paper Tutor v1 is an evidence-bound tutor inside PaperWorkspace. It is not a raw-PDF
 chatbot and it is not a general assistant. Current verification evidence lives
 in `docs/STATUS.md`.
 
 ## Implemented Surface
 
-- Backend service: `src/researchsensei/m4/service.py`
-- Schemas: `src/researchsensei/schemas/m4.py`
-- Router: `src/researchsensei/web/routers/m4.py`
+- Backend service: `src/researchsensei/tutor/service.py`
+- Schemas: `src/researchsensei/schemas/tutor.py`
+- Router: `src/researchsensei/web/routers/tutor.py`
 - API routes:
   - `POST /api/v1/jobs/{job_id}/selection/explain`
   - `POST /api/v1/jobs/{job_id}/formula/explain`
@@ -18,13 +18,13 @@ in `docs/STATUS.md`.
   - `GET /api/v1/jobs/{job_id}/memory`
   - `DELETE /api/v1/jobs/{job_id}/memory`
 - Frontend tutor, selected-text actions, formula actions, and advisor flow
-- Memory artifact: `m4_memory.json`, schema `m4_memory.v2`
+- Memory artifact: `tutor_memory.json`, schema `tutor_memory.v1`
 
 ## Input Boundary
 
-M4 reads only user-facing artifacts for the current job: paper cards, formula
+Paper Tutor reads only user-facing artifacts for the current job: paper cards, formula
 cards, teaching cards, passage index, claim evidence, evidence index, and
-previous valid M4 memory. M4 controls mount only when `/cards` is allowed.
+previous valid Paper Tutor memory. Paper Tutor controls mount only when `/cards` is allowed.
 
 Non-paper prompts such as weather, jokes, travel booking, creative writing, or
 unrelated code generation return a clear refusal/degraded result without
@@ -49,7 +49,7 @@ The backend then validates:
 
 It is not valid to attach all allowed refs to a fluent answer. A correct ref
 does not make an unsupported conclusion correct. If no material claim survives,
-M4 returns `DEGRADED` rather than disguising the result as `SUCCESS`.
+Paper Tutor returns `DEGRADED` rather than disguising the result as `SUCCESS`.
 
 ## Deterministic Fallback Boundary
 
@@ -66,24 +66,25 @@ an explicit limitation, not a general-domain answer.
 
 ## Memory Reliability
 
-- Schema version is `m4_memory.v2`; legacy records are migrated explicitly.
+- Schema version is `tutor_memory.v1`; legacy records are migrated explicitly.
 - A per-job/path lock protects concurrent read-modify-write operations.
 - Writes use a sibling temporary file, flush, `fsync`, and atomic replace.
 - Record count and file size are bounded.
 - Blank, duplicate, and low-quality records are removed.
-- Damaged JSON is renamed to a timestamped `m4_memory.corrupt-*.json` artifact
+- Damaged JSON is renamed to a timestamped `tutor_memory.corrupt-*.json` artifact
   and surfaced as a warning. It is never silently overwritten with an empty
   history.
 - A write interruption leaves the previously committed file readable.
 
 ## Provider and Failure Handling
 
-The configured live path defaults to ccswitch. Interactive requests are bounded
-by route-specific token/timeout settings. Missing, empty, invalid, timed-out, or
-unsupported LLM output goes through evidence-safe fallback/degradation. Provider
-readiness or a listening port is not a live acceptance result.
+The configured live path defaults to OpenCode Go. CC Switch remains an optional
+compatibility route. Interactive requests are bounded by route-specific
+token/timeout settings. Missing, empty, invalid, timed-out, or unsupported LLM
+output goes through evidence-safe fallback/degradation. Provider readiness or a
+listening port is not a live acceptance result.
 
-User-facing M4 text remains Chinese. Evidence refs and memory counts may appear
+User-facing Paper Tutor text remains Chinese. Evidence refs and memory counts may appear
 as compact technical details.
 
 ## Frontend Interaction
@@ -91,10 +92,10 @@ as compact technical details.
 - Selected text exposes Chinese follow-up/simplify/example actions.
 - The toolbar is positioned from the selection rectangle and clamped to the
   viewport.
-- The M4 panel is bounded by the actual viewport and uses overlay/drawer behavior
+- The Paper Tutor panel is bounded by the actual viewport and uses overlay/drawer behavior
   on small screens.
 - Open, close, and resize flows support Escape/focus/keyboard semantics.
-- Formula dock and M4 panel coordinate structurally and do not obscure one
+- Formula dock and Paper Tutor panel coordinate structurally and do not obscure one
   another through arbitrary z-index escalation.
 
 ## Not Implemented

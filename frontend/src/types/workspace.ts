@@ -25,12 +25,12 @@ export interface PaperWorkspaceStatus {
   verification_status?: string
   pdf_metadata_check?: string
   pdf_title_match?: string
-  can_enter_m2?: boolean
+  can_enter_analysis?: boolean
   source_confidence?: string | number
   paper_agent_status?: string
   paper_agent_model?: string
   paper_tutor_model?: string
-  m2_ready?: boolean
+  analysis_ready?: boolean
   degradation_reason?: string
   formula_origin?: string
   formula_ocr_status?: string

@@ -36,7 +36,7 @@ def bm25_score(
     k1: float = 1.5,
     b: float = 0.75,
 ) -> float:
-    """BM25 scoring function."""
+    """Bpaper analysis5 scoring function."""
     if avg_doc_len <= 0:
         return 0.0
     doc_len = len(doc_tokens)
@@ -70,7 +70,7 @@ class EvidenceRetriever:
         query: str,
         passage_index: PassageIndex,
     ) -> list[EvidenceRetrievalResult]:
-        """Retrieve passages relevant to a query using BM25."""
+        """Retrieve passages relevant to a query using Bpaper analysis5."""
         if not query.strip():
             return []
         if not passage_index.passages:

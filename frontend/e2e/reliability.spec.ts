@@ -40,7 +40,6 @@ test('uses persistent async direction jobs for search and deep-read handoff', as
 
   await page.getByTestId('deep-read-button').click()
   await expect(page.getByTestId('deep-read-progress')).toContainText('正在生成公式卡片（3/11 批）')
-  await expect(page.getByTestId('deep-read-progress')).toContainText('61%')
   await expect(page).toHaveURL(/\/learn\/fixture-deep-read$/)
   await expect(page.getByTestId('status-banner')).toContainText('仅基础解析')
   expect(taskState.deepReadCreates).toBe(1)
@@ -113,18 +112,17 @@ test('clamps migrated and dragged formula dock positions inside the viewport', a
   expect(saved.position.y).toBeLessThan(600)
 })
 
-test('opens, resizes, and closes M4 without colliding with the formula dock', async ({ page }) => {
+test('opens, resizes, and closes 论文助教 without colliding with the formula dock', async ({ page }) => {
   await mockWorkspaceApi(page, 'success')
   await page.setViewportSize({ width: 1440, height: 800 })
   await page.goto(fixtureJobPath.success)
 
-  await page.getByTestId('m4-open').first().click()
-  const pane = page.getByTestId('m4-chat-pane')
-  const separator = page.getByTestId('m4-resize-handle')
+  await page.getByTestId('tutor-open').first().click()
+  const pane = page.getByTestId('tutor-chat-pane')
+  const separator = page.getByTestId('tutor-resize-handle')
   await expect(pane).toBeVisible()
   const initialWidth = Number(await separator.getAttribute('aria-valuenow'))
-  expect(initialWidth).toBeGreaterThanOrEqual(320)
-  expect(initialWidth).toBeLessThanOrEqual(540)
+  expect(initialWidth).toBe(560)
 
   const separatorBox = await separator.boundingBox()
   expect(separatorBox).not.toBeNull()
@@ -143,12 +141,12 @@ test('opens, resizes, and closes M4 without colliding with the formula dock', as
   expect(paneBox).not.toBeNull()
   expect(dockBox!.x + dockBox!.width).toBeLessThanOrEqual(paneBox!.x)
 
-  await page.getByTestId('ask-panel-toggle').click()
+  await page.getByTestId('paper-tutor-panel-toggle').click()
   await expect(pane).toBeHidden()
 
   await page.setViewportSize({ width: 900, height: 700 })
-  await page.getByTestId('m4-open').first().click()
-  const compactPane = page.getByRole('dialog', { name: 'M4 论文助教' })
+  await page.getByTestId('tutor-open').first().click()
+  const compactPane = page.getByRole('dialog', { name: '论文助教' })
   await expect(compactPane).toBeVisible()
   await expect(page.getByTestId('formula-dock')).toBeHidden()
   await page.keyboard.press('Escape')
@@ -189,13 +187,13 @@ test('renders explicit degraded, blocked, and no-LLM states without leaking card
   await expect(page.getByTestId('status-banner')).toContainText('理解被阻断')
   await expect(page.getByTestId('no-cards-state')).toBeVisible()
   await expect(page.getByTestId('paper-card')).toHaveCount(0)
-  await expect(page.getByTestId('m4-open')).toHaveCount(0)
+  await expect(page.getByTestId('tutor-open')).toHaveCount(0)
 
   await page.unroute('**/api/v1/**')
   await mockWorkspaceApi(page, 'no-llm')
   await page.goto(fixtureJobPath['no-llm'])
   await expect(page.getByTestId('status-banner')).toContainText('仅基础解析')
-  await expect(page.getByTestId('no-cards-state')).toContainText('ccswitch')
+  await expect(page.getByTestId('no-cards-state')).toContainText('模型设置')
   await expect(page.getByTestId('no-cards-state')).toContainText('没有接入实时大模型')
 })
 

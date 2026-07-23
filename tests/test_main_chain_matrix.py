@@ -284,7 +284,7 @@ def test_default_queries_are_12():
 
 def test_parse_args_defaults():
     args = matrix.parse_args([])
-    assert args.provider == "cc_switch"
+    assert args.provider == "opencode_go"
     assert args.max_candidates == 10
     assert args.use_cache is False
     assert args.refresh_cache is False

@@ -7,30 +7,30 @@ from fastapi import APIRouter
 from researchsensei.core.config import AppConfig
 from researchsensei.jobs import JobStore
 from researchsensei.llm.client import LLMClient
-from researchsensei.m4.service import M4InteractionService
+from researchsensei.tutor.service import PaperTutorService
 from researchsensei.schemas import InteractiveAnswer, JobRecord
 from researchsensei.web.request_models import (
     AdvisorEvaluateRequest,
     AdvisorQuestionRequest,
     FormulaExplainRequest,
-    M4AskRequest,
+    TutorAskRequest,
     SelectionExplainRequest,
 )
 
 
-def create_m4_router(
+def create_tutor_router(
     *,
     jobs: JobStore,
     llm_client: LLMClient | None,
     get_job: Callable[[JobStore, str], JobRecord],
-    service_for_job: Callable[..., M4InteractionService],
+    service_for_job: Callable[..., PaperTutorService],
     sync_memory: Callable[..., JobRecord],
     runtime_answer: Callable[..., InteractiveAnswer | None],
     get_config: Callable[[], AppConfig],
 ) -> APIRouter:
-    router = APIRouter(prefix="/api/v1/jobs/{job_id}", tags=["m4"])
+    router = APIRouter(prefix="/api/v1/jobs/{job_id}", tags=["paper-tutor"])
 
-    def service(job: JobRecord, required_gate: str = "reading_display") -> M4InteractionService:
+    def service(job: JobRecord, required_gate: str = "reading_display") -> PaperTutorService:
         return service_for_job(job, llm_client=llm_client, required_gate=required_gate)
 
     @router.post("/selection/explain")
@@ -50,7 +50,7 @@ def create_m4_router(
         return result.model_dump(mode="json")
 
     @router.post("/ask")
-    def ask_job(job_id: str, payload: M4AskRequest) -> dict[str, object]:
+    def ask_job(job_id: str, payload: TutorAskRequest) -> dict[str, object]:
         job = get_job(jobs, job_id)
         request_payload = payload.model_dump(mode="json")
         answer = runtime_answer(

@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { ApiClientError, apiErrorMessage, researchApi } from '../api/client'
 import { formatTaskStage } from '../utils/taskStage'
 
-type SourceMode = 'file' | 'pdf_url' | 'arxiv_id' | 'arxiv_url' | 'doi' | 'm2_artifact_dir'
+type SourceMode = 'file' | 'pdf_url' | 'arxiv_id' | 'arxiv_url' | 'doi' | 'analysis_artifact_dir'
 
 const router = useRouter()
 const mode = ref<SourceMode>('file')
@@ -14,7 +14,7 @@ const doi = ref('')
 const pdfUrl = ref('')
 const arxivId = ref('')
 const arxivUrl = ref('')
-const m2ArtifactDir = ref('')
+const analysisArtifactDir = ref('')
 const isDragging = ref(false)
 const isUploading = ref(false)
 const taskId = ref('')
@@ -36,7 +36,7 @@ const sourceOptions: Array<{ key: SourceMode; label: string; hint: string }> = [
   { key: 'arxiv_url', label: 'arXiv 链接', hint: 'abs 或 pdf 链接' },
   { key: 'pdf_url', label: 'PDF 链接', hint: '开放 PDF URL' },
   { key: 'doi', label: 'DOI', hint: '自动查开放全文' },
-  { key: 'm2_artifact_dir', label: 'M2 目录', hint: '调试/复现入口' },
+  { key: 'analysis_artifact_dir', label: '解析产物目录', hint: '调试/复现入口' },
 ]
 
 const activeOption = computed(() => sourceOptions.find((item) => item.key === mode.value) || sourceOptions[0])
@@ -46,7 +46,7 @@ const canSubmit = computed(() => {
   if (mode.value === 'pdf_url') return Boolean(pdfUrl.value.trim())
   if (mode.value === 'arxiv_id') return Boolean(arxivId.value.trim())
   if (mode.value === 'arxiv_url') return Boolean(arxivUrl.value.trim())
-  if (mode.value === 'm2_artifact_dir') return Boolean(m2ArtifactDir.value.trim())
+  if (mode.value === 'analysis_artifact_dir') return Boolean(analysisArtifactDir.value.trim())
   return Boolean(doi.value.trim())
 })
 
@@ -85,7 +85,7 @@ function appendFields(formData: FormData) {
   if (mode.value === 'pdf_url') formData.append('pdf_url', pdfUrl.value.trim())
   if (mode.value === 'arxiv_id') formData.append('arxiv_id', arxivId.value.trim())
   if (mode.value === 'arxiv_url') formData.append('arxiv_url', arxivUrl.value.trim())
-  if (mode.value === 'm2_artifact_dir') formData.append('local_path', m2ArtifactDir.value.trim())
+  if (mode.value === 'analysis_artifact_dir') formData.append('local_path', analysisArtifactDir.value.trim())
   if (mode.value === 'doi') formData.append('doi', doi.value.trim())
 }
 
@@ -239,9 +239,9 @@ onMounted(() => {
             placeholder="https://arxiv.org/abs/2310.08800"
           />
           <input
-            v-else-if="mode === 'm2_artifact_dir'"
-            v-model="m2ArtifactDir"
-            data-testid="m2-artifact-dir-input"
+            v-else-if="mode === 'analysis_artifact_dir'"
+            v-model="analysisArtifactDir"
+            data-testid="analysis-artifact-dir-input"
             placeholder="D:\\Code\\Python\\Research-sensei\\workspace\\runs\\..."
           />
           <input

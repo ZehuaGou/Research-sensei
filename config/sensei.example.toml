@@ -80,7 +80,7 @@ reload = false
 
 [opencode]
 # OpenCode Server is a separate paper-agent path. It accepts rendered PDF
-# pages, preserves one persistent session per paper, and lets M4 continue the
+# pages, preserves one persistent session per paper, and lets paper tutor continue the
 # same conversation. Enable it on machines with the `opencode` CLI installed.
 enabled = false
 base_url = "http://127.0.0.1:4096"
@@ -112,7 +112,7 @@ min_citation_count = 0
 max_download_candidates = 0
 # Optional, explicit user-authorized native-Chrome fallback for any publisher
 # page that rejects backend HTTP requests. Create this state with the command
-# documented in docs/development/M1_LITERATURE_SEARCH.md. Never commit it.
+# documented in docs/development/LITERATURE_DISCOVERY.md. Never commit it.
 browser_download_enabled = false
 browser_session_state = "workspace/browser-session.json"
 browser_headless = false

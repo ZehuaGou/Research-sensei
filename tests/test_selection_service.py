@@ -84,7 +84,7 @@ def test_source_first_candidate_ranks_above_pdf_url_only_peer() -> None:
             pdf_available=True,
             has_valid_deep_reading_source=True,
             source_priority=SourcePriority.LATEX_SOURCE,
-            preferred_m2_input="latex_source",
+            preferred_analysis_input="latex_source",
             latex_source_available=True,
             source_confidence="high",
             metadata_confidence="high",
@@ -95,7 +95,7 @@ def test_source_first_candidate_ranks_above_pdf_url_only_peer() -> None:
 
     assert plan.items[0].paper.title == "Multivariate Time Series Forecasting with Source"
     assert plan.items[0].scoring_breakdown.pdf_available_score > plan.items[1].scoring_breakdown.pdf_available_score
-    assert "m2_input=latex_source" in plan.items[0].selection_reason
+    assert "analysis_input=latex_source" in plan.items[0].selection_reason
 
 
 def test_mixed_intent_candidate_ranks_above_single_intent_peer() -> None:

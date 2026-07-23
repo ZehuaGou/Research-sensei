@@ -49,7 +49,7 @@ SEARCH_SOURCE_ORDER = ["paper_search", "arxiv", "openalex", "semantic_scholar", 
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Acceptance-check ResearchSensei M1 literature acquisition and legal full-text discovery.")
+    parser = argparse.ArgumentParser(description="Acceptance-check ResearchSensei literature acquisition and legal full-text discovery.")
     parser.add_argument("--query", default="")
     parser.add_argument("--fixture", default="", help="JSON fixture list of acquisition queries and minimum expectations.")
     parser.add_argument("--max-results", type=int, default=20)
@@ -57,7 +57,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--sources",
         default="paper-search,unpaywall",
-        help="Comma-separated sources. Default M1 chain is paper-search,unpaywall; diagnostics may pass arxiv/openalex/semanticscholar/dblp explicitly.",
+        help="Comma-separated sources. Default literature discovery chain is paper-search,unpaywall; diagnostics may pass arxiv/openalex/semanticscholar/dblp explicitly.",
     )
     parser.add_argument("--workspace", default=str(ROOT / "workspace" / "literature_acquisition_acceptance"))
     return parser.parse_args(argv)

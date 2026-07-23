@@ -88,7 +88,7 @@ function statusText(status?: string) {
       <p class="eyebrow">Research Sensei</p>
       <h1>把论文变成可以追问、可以复习的中文阅读工作台</h1>
       <p class="intro-copy">
-        默认通过 ccswitch 调用你当前选中的模型。系统会先生成有证据引用的论文卡片、公式卡片和教学卡片，然后进入 M4 助教对话。
+        默认通过 OpenCode Go 调用你当前选中的模型。系统会先生成有证据引用的论文卡片、公式卡片和教学卡片，然后进入论文助教对话。
       </p>
     </section>
 
@@ -105,7 +105,7 @@ function statusText(status?: string) {
         <span class="entry-icon green">读</span>
         <span>
           <strong>深读一篇论文</strong>
-          <small>上传 PDF、粘贴 arXiv/DOI/PDF 链接，进入 M2+M4 工作流。</small>
+          <small>上传 PDF、粘贴 arXiv/DOI/PDF 链接，开始论文解析并进入论文助教。</small>
         </span>
       </button>
     </section>

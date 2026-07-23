@@ -11,7 +11,7 @@ from researchsensei.web.app import create_app
 
 def test_library_api_imports_manifest_and_deletes_paper(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
-    topic_dir = workspace / "m1_searches" / "time series anomaly detection"
+    topic_dir = workspace / "literature_searches" / "time series anomaly detection"
     topic_dir.mkdir(parents=True)
     pdf = topic_dir / "Manifest Imported Paper.pdf"
     content = b"%PDF-1.4\nmanifest\n%%EOF"

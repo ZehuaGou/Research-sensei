@@ -27,7 +27,7 @@ from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
     DirectionBundle,
-    M1LayerStatus,
+    WorkflowLayerStatus,
     PaperSourceStatus,
     QueryPlan,
     ReadingPlan,
@@ -54,7 +54,7 @@ class QueryPlannerAdapter(Protocol):
 
 
 class DirectionExplorationService:
-    """Minimal M1 direction exploration loop over real paper-source adapters."""
+    """Minimal literature discovery direction exploration loop over real paper-source adapters."""
 
     def __init__(
         self,
@@ -233,8 +233,8 @@ class DirectionExplorationService:
         deep_read_candidates = [
             card for card in card_candidates
             if (
-                card.get("priority") in {"A_READ", "A_READ_FOR_M2"}
-                and card.get("can_enter_m2") is True
+                card.get("priority") in {"A_READ", "A_READ_ANALYSIS_READY"}
+                and card.get("can_enter_analysis") is True
                 and card.get("deep_read_relevance_passed") is True
             )
         ]
@@ -520,7 +520,7 @@ class DirectionExplorationService:
                 })
         # A supplement is intentionally redundant. If at least one OA index
         # succeeds, another optional index being rate-limited must remain
-        # visible in metrics without degrading an otherwise healthy M1 run.
+        # visible in metrics without degrading an otherwise healthy literature discovery run.
         if trigger != "low_coverage_oa_supplement" or not candidates:
             warnings.extend(fallback_failures)
         return candidates, warnings, search_log, source_metrics
@@ -609,29 +609,29 @@ class DirectionExplorationService:
         return DirectionBundle(
             status=status,
             direction_workspace_status=status,
-            pipeline_status=M1LayerStatus(
+            pipeline_status=WorkflowLayerStatus(
                 status="BLOCKED",
                 code="EMPTY_QUERY" if "EMPTY_QUERY" in warnings else "PIPELINE_BLOCKED",
                 message=message,
                 completed=False,
             ),
-            relevance_status=M1LayerStatus(
+            relevance_status=WorkflowLayerStatus(
                 status="BLOCKED",
                 code="NO_QUERY" if "EMPTY_QUERY" in warnings else "NO_CANDIDATES",
                 message="Relevance cannot be evaluated without a query and candidates.",
                 completed=False,
                 threshold=MIN_RELEVANCE_SCORE,
             ),
-            source_status=M1LayerStatus(
+            source_status=WorkflowLayerStatus(
                 status="BLOCKED",
                 code="NO_RELEVANT_CANDIDATE",
                 message="Source selection is blocked until a candidate passes relevance.",
                 completed=False,
             ),
-            understanding_status=M1LayerStatus(
+            understanding_status=WorkflowLayerStatus(
                 status="BLOCKED",
-                code="M2_NOT_REACHED",
-                message="M2 understanding was not reached.",
+                code="ANALYSIS_NOT_REACHED",
+                message="paper analysis understanding was not reached.",
                 completed=False,
             ),
             query=query,
@@ -663,7 +663,7 @@ class DirectionExplorationService:
                 and resolved.local_path
                 and Path(resolved.local_path).suffix.casefold() == ".pdf"
             )
-            can_enter_m2 = paper_agent_ready
+            can_enter_analysis = paper_agent_ready
             source_confidence = "high" if source_downloaded else ("medium" if pdf_available else candidate.source_confidence)
             metadata_confidence = candidate.metadata_confidence
             if source_confidence == "high" and metadata_confidence == "low":
@@ -676,12 +676,12 @@ class DirectionExplorationService:
                         "source_url": candidate.source_url or resolved.source_url,
                         "pdf_available": pdf_available,
                         "pdf_downloaded": pdf_downloaded,
-                        "can_enter_m2": can_enter_m2,
-                        "m2_ready": paper_agent_ready,
+                        "can_enter_analysis": can_enter_analysis,
+                        "analysis_ready": paper_agent_ready,
                         "paper_agent_ready": paper_agent_ready,
                         "paper_agent_input_path": resolved.local_path if paper_agent_ready else "",
                         "source_priority": resolved.source_priority,
-                        "preferred_m2_input": resolved.preferred_m2_input,
+                        "preferred_analysis_input": resolved.preferred_analysis_input,
                         "has_valid_deep_reading_source": resolved.has_valid_deep_reading_source,
                         "latex_source_available": resolved.latex_source_available,
                         "latex_source_downloaded": resolved.latex_source_downloaded,
@@ -1279,49 +1279,49 @@ def _pipeline_layer_status(
     warning_count: int,
     download_attempt_count: int,
     downloaded_count: int,
-) -> M1LayerStatus:
+) -> WorkflowLayerStatus:
     attempted = [metric for metric in source_metrics if metric.get("attempted")]
     failed = [metric for metric in attempted if not metric.get("success")]
     details = {
-        "scope": "M1_DIRECTION_EXPLORATION",
+        "scope": "LITERATURE_DIRECTION_EXPLORATION",
         "search_completed": bool(attempted),
         "verification_completed": candidate_count > 0,
         "ranking_completed": candidate_count > 0,
         "source_resolution_completed": download_attempt_count > 0,
         "download_attempt_count": download_attempt_count,
         "downloaded_count": downloaded_count,
-        "m2_completed": False,
+        "analysis_completed": False,
         "cards_completed": False,
     }
     if candidate_count == 0:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED" if failed and not any(metric.get("success") for metric in attempted) else "EMPTY_RESULT",
             code="SEARCH_SOURCES_BLOCKED" if failed and not any(metric.get("success") for metric in attempted) else "NO_SEARCH_RESULTS",
-            message="M1 search produced no candidates; downstream stages were not run.",
+            message="literature discovery search produced no candidates; downstream stages were not run.",
             completed=bool(attempted),
             candidate_count=0,
             details=details,
         )
     if failed or warning_count or (download_attempt_count > 0 and downloaded_count < download_attempt_count):
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="DEGRADED",
-            code="M1_PIPELINE_PARTIAL",
-            message="M1 search and ranking completed, but one or more source/download operations degraded.",
+            code="LITERATURE_PIPELINE_PARTIAL",
+            message="literature discovery search and ranking completed, but one or more source/download operations degraded.",
             completed=True,
             candidate_count=candidate_count,
             details=details,
         )
-    return M1LayerStatus(
+    return WorkflowLayerStatus(
         status="SUCCESS",
-        code="M1_PIPELINE_COMPLETE",
-        message="M1 search, verification, and ranking completed for this endpoint; M2/cards were not run.",
+        code="LITERATURE_PIPELINE_COMPLETE",
+        message="literature discovery search, verification, and ranking completed for this endpoint; paper analysis/cards were not run.",
         completed=True,
         candidate_count=candidate_count,
         details=details,
     )
 
 
-def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+def _relevance_layer_status(candidates: list[CandidatePaper]) -> WorkflowLayerStatus:
     evaluated = [candidate for candidate in candidates if candidate.relevance_gate_evaluated]
     passed = [candidate for candidate in evaluated if candidate.relevance_gate_passed]
     details = {
@@ -1333,7 +1333,7 @@ def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
         "llm_is_supplemental": True,
     }
     if not candidates:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED",
             code="NO_CANDIDATES",
             message="No candidate was available for relevance evaluation.",
@@ -1342,7 +1342,7 @@ def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
             details=details,
         )
     if not passed:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED",
             code="NO_CANDIDATE_PASSED_RELEVANCE_GATE",
             message="Candidates were found, but none covered all required task/method concepts without an intent mismatch.",
@@ -1352,7 +1352,7 @@ def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
             threshold=MIN_RELEVANCE_SCORE,
             details=details,
         )
-    return M1LayerStatus(
+    return WorkflowLayerStatus(
         status="SUCCESS",
         code="RELEVANCE_GATE_PASSED",
         message=f"{len(passed)}/{len(evaluated)} candidates passed deterministic relevance checks.",
@@ -1364,7 +1364,7 @@ def _relevance_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
     )
 
 
-def _source_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+def _source_layer_status(candidates: list[CandidatePaper]) -> WorkflowLayerStatus:
     relevant = [candidate for candidate in candidates if candidate.relevance_gate_passed]
     source_ready = [candidate for candidate in relevant if candidate.has_valid_deep_reading_source]
     details = {
@@ -1373,7 +1373,7 @@ def _source_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
         "metadata_only_count": sum(1 for candidate in relevant if candidate.metadata_only),
     }
     if not relevant:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED",
             code="NO_RELEVANT_CANDIDATE",
             message="Source acceptance is blocked because no candidate passed relevance.",
@@ -1381,16 +1381,16 @@ def _source_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
             details=details,
         )
     if not source_ready:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="DEGRADED",
             code="NO_VERIFIED_FULLTEXT_FOR_RELEVANT_CANDIDATE",
-            message="Relevant candidates exist, but none has a verified legal full-text source for M2.",
+            message="Relevant candidates exist, but none has a verified legal full-text source for paper analysis.",
             completed=True,
             candidate_count=len(relevant),
             passed_candidate_count=0,
             details=details,
         )
-    return M1LayerStatus(
+    return WorkflowLayerStatus(
         status="SUCCESS",
         code="VERIFIED_FULLTEXT_AVAILABLE",
         message=f"{len(source_ready)}/{len(relevant)} relevant candidates have a verified full-text source.",
@@ -1401,43 +1401,43 @@ def _source_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
     )
 
 
-def _understanding_layer_status(candidates: list[CandidatePaper]) -> M1LayerStatus:
+def _understanding_layer_status(candidates: list[CandidatePaper]) -> WorkflowLayerStatus:
     relevant = [candidate for candidate in candidates if candidate.relevance_gate_passed]
     source_ready = [candidate for candidate in relevant if candidate.has_valid_deep_reading_source]
-    m2_ready = [
+    analysis_ready = [
         candidate
         for candidate in source_ready
-        if candidate.paper_agent_ready and candidate.can_enter_m2
+        if candidate.paper_agent_ready and candidate.can_enter_analysis
     ]
     details = {
-        "m2_was_run": False,
+        "analysis_was_run": False,
         "cards_were_generated": False,
-        "m2_ready_candidate_ids": [candidate.paper_id for candidate in m2_ready],
+        "analysis_ready_candidate_ids": [candidate.paper_id for candidate in analysis_ready],
     }
     if not relevant:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED",
             code="RELEVANCE_GATE_BLOCKED_UNDERSTANDING",
-            message="M2 understanding cannot start without a relevant candidate.",
+            message="paper analysis understanding cannot start without a relevant candidate.",
             completed=False,
             details=details,
         )
     if not source_ready:
-        return M1LayerStatus(
+        return WorkflowLayerStatus(
             status="BLOCKED",
             code="SOURCE_GATE_BLOCKED_UNDERSTANDING",
-            message="M2 understanding cannot start without verified full text.",
+            message="paper analysis understanding cannot start without verified full text.",
             completed=False,
             candidate_count=len(relevant),
             details=details,
         )
-    return M1LayerStatus(
+    return WorkflowLayerStatus(
         status="NOT_RUN",
-        code="READY_FOR_M2" if m2_ready else "M2_PREPARATION_NOT_RUN",
-        message="This direction endpoint does not run M2 or generate user-facing cards.",
+        code="READY_FOR_ANALYSIS" if analysis_ready else "ANALYSIS_PREPARATION_NOT_RUN",
+        message="This direction endpoint does not run paper analysis or generate user-facing cards.",
         completed=False,
         candidate_count=len(source_ready),
-        passed_candidate_count=len(m2_ready),
+        passed_candidate_count=len(analysis_ready),
         details=details,
     )
 
@@ -1496,10 +1496,10 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             update={
                 "relevance_score": item.scoring_breakdown.relevance_score,
                 "rule_relevance_score": item.scoring_breakdown.relevance_score,
-                "can_enter_m2": item.can_enter_m2,
+                "can_enter_analysis": item.can_enter_analysis,
             }
         )
-        priority = "A_READ_FOR_M2" if item.priority == "A_READ" and item.can_enter_m2 else item.priority
+        priority = "A_READ_ANALYSIS_READY" if item.priority == "A_READ" and item.can_enter_analysis else item.priority
         source_resolution = paper.raw_source_metadata.get("source_resolution")
         source_resolution = source_resolution if isinstance(source_resolution, dict) else {}
         cards.append({
@@ -1563,17 +1563,17 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "source_confidence": paper.source_confidence,
             "metadata_confidence": paper.metadata_confidence,
             "pdf_available": paper.pdf_available,
-            "m2_ready": paper.m2_ready,
+            "analysis_ready": paper.analysis_ready,
             "paper_agent_ready": paper.paper_agent_ready,
-            "can_enter_m2": item.can_enter_m2,
+            "can_enter_analysis": item.can_enter_analysis,
             "priority": priority,
             "role": item.role,
             "selection_reason": item.selection_reason,
             "risk_note": item.risk_note,
             "can_prepare_deep_read": _can_prepare_deep_read(paper),
             "deep_read_unavailable_reason": _deep_read_unavailable_reason(paper),
-            "m2_unavailable_reason": "" if item.can_enter_m2 else item.risk_note,
-            "deep_read_button_state": "ready" if priority == "A_READ_FOR_M2" else (
+            "analysis_unavailable_reason": "" if item.can_enter_analysis else item.risk_note,
+            "deep_read_button_state": "ready" if priority == "A_READ_ANALYSIS_READY" else (
                 "prepare" if _can_prepare_deep_read(paper) else "source_unavailable"
             ),
         })
@@ -1590,9 +1590,9 @@ def _reading_order(reading_plan: ReadingPlan) -> list[dict[str, object]]:
             "rank": index,
             "title": item.paper.title,
             "role": item.role,
-            "priority": "A_READ_FOR_M2" if item.priority == "A_READ" and item.can_enter_m2 else item.priority,
+            "priority": "A_READ_ANALYSIS_READY" if item.priority == "A_READ" and item.can_enter_analysis else item.priority,
             "reason": item.selection_reason,
-            "can_enter_m2": item.can_enter_m2,
+            "can_enter_analysis": item.can_enter_analysis,
         }
         for index, item in enumerate(ordered_items, start=1)
     ]

@@ -1,11 +1,11 @@
-# M2.5 Full Pipeline And Understanding Gates
+# Paper Analysis Pipeline And Understanding Gates
 
-This document describes the M2 pipeline contract. Current status and evidence
+This document describes the Paper Analysis pipeline contract. Current status and evidence
 live in `docs/STATUS.md`.
 
 ## Scope
 
-M2 receives a selected paper or resolved full-text source and produces
+Paper Analysis receives a selected paper or resolved full-text source and produces
 evidence-backed understanding artifacts:
 
 1. parsed document
@@ -18,7 +18,7 @@ evidence-backed understanding artifacts:
 8. quality report
 9. understanding status
 
-M2 is not a chatbot and does not implement M4 tutoring.
+Paper Analysis is not a chatbot and does not implement paper tutoring.
 
 ## Inputs
 
@@ -56,7 +56,7 @@ Required artifact names for a completed run directory:
 - top-level status;
 - source type;
 - canonicalization status;
-- `m2_ready`;
+- `analysis_ready`;
 - component status;
 - allowed downstream components;
 - missing components;
@@ -98,7 +98,7 @@ Do not fake formula origins or let the LLM overwrite evidence provenance.
 
 ## Known Status Boundaries
 
-Selected-paper acceptance for `2310_08800v2` passed, but this is not broad M2
+Selected-paper acceptance for `2310_08800v2` passed, but this is not broad Paper Analysis
 REAL_E2E. Raw/source handoff jobs can be SUCCESS, DEGRADED_STRUCTURAL, or
 BLOCKED_UNDERSTANDING depending on evidence and provenance. That fail-closed
 behavior is correct.
@@ -111,5 +111,5 @@ $env:RESEARCHSENSEI_LLM_PROVIDER="cc_switch"
 .venv\Scripts\python.exe scripts\run_main_chain_acceptance.py --query "time series anomaly detection" --provider cc_switch
 ```
 
-The acceptance command exercises M1 direction search, seed expansion, deep_read handoff,
-M2 understanding status, and M3 `/cards` gating. It writes no report files.
+The acceptance command exercises Literature Discovery direction search, seed expansion, deep_read handoff,
+Paper Analysis understanding status, and Reader Workspace `/cards` gating. It writes no report files.

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-import researchsensei.m4.memory_store as memory_store
-from researchsensei.m4.memory_store import M4MemoryStore
+import researchsensei.tutor.memory_store as memory_store
+from researchsensei.tutor.memory_store import TutorMemoryStore
 
 
-def test_m4_memory_concurrent_writes_do_not_lose_records(tmp_path: Path) -> None:
+def test_tutor_memory_concurrent_writes_do_not_lose_records(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
 
     def write_record(index: int) -> None:
@@ -23,10 +23,10 @@ def test_m4_memory_concurrent_writes_do_not_lose_records(tmp_path: Path) -> None
     bundle = _service(run_dir).read()
     assert len(bundle.records) == 24
     assert {record.question for record in bundle.records} == {f"question-{index}" for index in range(24)}
-    assert json.loads((run_dir / "m4_memory.json").read_text(encoding="utf-8"))["schema_version"] == "m4_memory.v2"
+    assert json.loads((run_dir / "tutor_memory.json").read_text(encoding="utf-8"))["schema_version"] == "tutor_memory.v1"
 
 
-def test_m4_memory_atomic_replace_failure_preserves_previous_file(
+def test_tutor_memory_atomic_replace_failure_preserves_previous_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -49,7 +49,7 @@ def test_m4_memory_atomic_replace_failure_preserves_previous_file(
     assert list(service.path.parent.glob(".*.tmp")) == []
 
 
-def test_m4_memory_interrupted_write_preserves_previous_file(
+def test_tutor_memory_interrupted_write_preserves_previous_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -69,18 +69,18 @@ def test_m4_memory_interrupted_write_preserves_previous_file(
     assert list(service.path.parent.glob(".*.tmp")) == []
 
 
-def test_m4_memory_corruption_is_preserved_and_reported(tmp_path: Path) -> None:
+def test_tutor_memory_corruption_is_preserved_and_reported(tmp_path: Path) -> None:
     service = _service(tmp_path / "run")
     service.path.parent.mkdir(parents=True)
-    corrupt_bytes = b'{"schema_version": "m4_memory.v2", broken'
+    corrupt_bytes = b'{"schema_version": "tutor_memory.v1", broken'
     service.path.write_bytes(corrupt_bytes)
 
     bundle = service.read()
 
     assert bundle.records == []
-    assert bundle.warnings[0].code == "M4_MEMORY_CORRUPTED"
+    assert bundle.warnings[0].code == "TUTOR_MEMORY_CORRUPTED"
     assert not service.path.exists()
-    preserved = list(service.path.parent.glob("m4_memory.corrupt-*.json"))
+    preserved = list(service.path.parent.glob("tutor_memory.corrupt-*.json"))
     assert len(preserved) == 1
     assert preserved[0].read_bytes() == corrupt_bytes
 
@@ -91,15 +91,16 @@ def test_m4_memory_corruption_is_preserved_and_reported(tmp_path: Path) -> None:
     assert preserved[0].read_bytes() == corrupt_bytes
 
 
-def test_m4_memory_migrates_legacy_schema_on_next_write(tmp_path: Path) -> None:
+def test_tutor_memory_migrates_legacy_schema_on_next_write(tmp_path: Path) -> None:
     service = _service(tmp_path / "run")
     service.path.parent.mkdir(parents=True)
+    legacy_path = service.path.parent / "legacy_memory.json"
     legacy = {
-        "schema_version": "m4_memory",
+        "schema_version": "legacy_memory.v2",
         "job_id": "job-1",
         "records": [
             {
-                "memory_id": "m4_legacy",
+                "memory_id": "legacy-record",
                 "job_id": "job-1",
                 "memory_type": "selection_explanation",
                 "text": "legacy evidence",
@@ -114,23 +115,25 @@ def test_m4_memory_migrates_legacy_schema_on_next_write(tmp_path: Path) -> None:
             }
         ],
     }
-    service.path.write_text(json.dumps(legacy), encoding="utf-8")
+    legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
 
     migrated = service.read()
 
-    assert migrated.schema_version == "m4_memory.v2"
-    assert migrated.migrated_from == "m4_memory"
-    assert migrated.warnings[0].code == "M4_MEMORY_SCHEMA_MIGRATED"
-    assert [record.memory_id for record in migrated.records] == ["m4_legacy"]
+    assert migrated.schema_version == "tutor_memory.v1"
+    assert migrated.migrated_from == "legacy_memory.v2"
+    assert migrated.warnings[0].code == "TUTOR_MEMORY_SCHEMA_MIGRATED"
+    assert [record.memory_id for record in migrated.records] == ["legacy-record"]
+    assert service.path.exists()
+    assert not legacy_path.exists()
 
     _append(service, question="new question", answer="new answer")
     persisted = json.loads(service.path.read_text(encoding="utf-8"))
-    assert persisted["schema_version"] == "m4_memory.v2"
-    assert persisted["migrated_from"] == "m4_memory"
+    assert persisted["schema_version"] == "tutor_memory.v1"
+    assert persisted["migrated_from"] == "legacy_memory.v2"
     assert len(persisted["records"]) == 2
 
 
-def test_m4_memory_enforces_record_and_file_size_limits(
+def test_tutor_memory_enforces_record_and_file_size_limits(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -150,10 +153,10 @@ def test_m4_memory_enforces_record_and_file_size_limits(
     assert bundle.records[-1].question == "question-19"
     assert service.path.stat().st_size <= 3_200
     warning_codes = {warning.code for warning in bundle.warnings}
-    assert warning_codes & {"M4_MEMORY_RECORD_LIMIT", "M4_MEMORY_SIZE_LIMIT"}
+    assert warning_codes & {"TUTOR_MEMORY_RECORD_LIMIT", "TUTOR_MEMORY_SIZE_LIMIT"}
 
 
-def test_m4_memory_cleans_blank_low_quality_and_duplicate_records(tmp_path: Path) -> None:
+def test_tutor_memory_cleans_blank_low_quality_and_duplicate_records(tmp_path: Path) -> None:
     service = _service(tmp_path / "run")
     _append(service, question="", answer="", text="")
     _append(service, question="same", answer="grounded answer")
@@ -163,15 +166,15 @@ def test_m4_memory_cleans_blank_low_quality_and_duplicate_records(tmp_path: Path
     bundle = service.read()
 
     assert [(record.question, record.answer) for record in bundle.records] == [("same", "grounded answer")]
-    assert "M4_MEMORY_RECORDS_CLEANED" in {warning.code for warning in bundle.warnings}
+    assert "TUTOR_MEMORY_RECORDS_CLEANED" in {warning.code for warning in bundle.warnings}
 
 
-def _service(run_dir: Path) -> M4MemoryStore:
-    return M4MemoryStore(run_dir=run_dir, job_id="job-1")
+def _service(run_dir: Path) -> TutorMemoryStore:
+    return TutorMemoryStore(run_dir=run_dir, job_id="job-1")
 
 
 def _append(
-    service: M4MemoryStore,
+    service: TutorMemoryStore,
     *,
     question: str,
     answer: str,

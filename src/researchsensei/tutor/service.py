@@ -10,15 +10,15 @@ import httpx
 from researchsensei.ingestion.opencode_agent import OpenCodeAgentError, OpenCodePaperAgent
 from researchsensei.llm.client import LLMClient, LLMClientError, parse_llm_json
 from researchsensei.llm.types import ChatMessage, LLMConfig
-from researchsensei.m4.memory_store import M4MemoryStore
+from researchsensei.tutor.memory_store import TutorMemoryStore
 from researchsensei.schemas.common import WarningItem
-from researchsensei.schemas.m4 import (
+from researchsensei.schemas.tutor import (
     AdvisorEvaluation,
     AdvisorQuestion,
     FormulaSymbolExplanation,
     InteractiveAnswer,
-    M4ContextTrace,
-    M4MemoryBundle,
+    TutorContextTrace,
+    TutorMemoryBundle,
     SelectionExplanation,
 )
 
@@ -29,7 +29,7 @@ FULL_PAPER_TIMEOUT_SECONDS = 180.0
 FULL_PAPER_MAX_CHARS = 600_000
 
 
-class M4InteractionService:
+class PaperTutorService:
     """OpenCode-first paper tutoring with an explicit source-only mode.
 
     The previous implementation maintained a second, template-driven answer
@@ -53,7 +53,7 @@ class M4InteractionService:
         self.artifacts = artifacts
         self.llm_client = llm_client
         self.paper_agent = paper_agent
-        self.memory = M4MemoryStore(self.run_dir, job_id)
+        self.memory = TutorMemoryStore(self.run_dir, job_id)
 
     @property
     def memory_path(self) -> Path:
@@ -71,7 +71,7 @@ class M4InteractionService:
         if not selected_text and _is_general_chat(question):
             return _degraded(
                 "我是当前论文的阅读助教。你可以问研究问题、方法流程、公式、实验结论或局限性。",
-                "M4_PAPER_SCOPE_ONLY",
+                "TUTOR_PAPER_SCOPE_ONLY",
                 "这个问题没有指向当前论文。",
             )
         if mode == "evidence_only":
@@ -136,7 +136,7 @@ class M4InteractionService:
                 answer = self._session_prompt(prompt, selected_text=latex)
             except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
                 logger.warning("OpenCode formula explanation failed: %s", exc)
-                warnings.append(_warning("M4_FORMULA_AGENT_FAILED", "公式讲解模型请求失败，已显示公式卡片内容。", str(exc)))
+                warnings.append(_warning("TUTOR_FORMULA_AGENT_FAILED", "公式讲解模型请求失败，已显示公式卡片内容。", str(exc)))
         meaning = answer or fallback
         evidence_ref = _clean(formula.get("evidence_ref"))
         self.memory.append(
@@ -182,7 +182,7 @@ class M4InteractionService:
         try:
             data = parse_llm_json(self._session_prompt(prompt)) if self._has_paper_session() else {}
         except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
-            warnings.append(_warning("M4_ADVISOR_AGENT_FAILED", "组会问题生成失败，已使用简洁备用问题。", str(exc)))
+            warnings.append(_warning("TUTOR_ADVISOR_AGENT_FAILED", "组会问题生成失败，已使用简洁备用问题。", str(exc)))
         question = _clean(data.get("question")) or (
             f"请说明“{focus}”与论文核心方法和实验依据之间的关系。"
             if focus
@@ -236,7 +236,7 @@ class M4InteractionService:
         try:
             data = parse_llm_json(self._session_prompt(prompt)) if self._has_paper_session() else {}
         except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
-            warnings.append(_warning("M4_ADVISOR_EVALUATION_FAILED", "模型评价失败，已给出基础完整度反馈。", str(exc)))
+            warnings.append(_warning("TUTOR_ADVISOR_EVALUATION_FAILED", "模型评价失败，已给出基础完整度反馈。", str(exc)))
         score = _score(data.get("score"), answer, expected)
         covered = _string_list(data.get("covered_points"))
         missing = _string_list(data.get("missing_points"))
@@ -268,10 +268,10 @@ class M4InteractionService:
         )
         return result
 
-    def get_memory(self) -> M4MemoryBundle:
+    def get_memory(self) -> TutorMemoryBundle:
         return self.memory.read()
 
-    def clear_memory(self) -> M4MemoryBundle:
+    def clear_memory(self) -> TutorMemoryBundle:
         return self.memory.clear()
 
     def _paper_answer(
@@ -292,15 +292,15 @@ class M4InteractionService:
                 used_session = True
             except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
                 logger.warning("OpenCode paper session failed for %s: %s", self.job_id, exc)
-                warnings.append(_warning("M4_OPENCODE_SESSION_FAILED", "论文会话请求失败，正在尝试全文模型备用通道。", str(exc)))
+                warnings.append(_warning("TUTOR_OPENCODE_SESSION_FAILED", "论文会话请求失败，正在尝试全文模型备用通道。", str(exc)))
         if not answer and self.llm_client is not None:
             try:
                 answer = self._direct_llm_answer(question, selected_text, history, paper_text)
             except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
-                logger.warning("M4 direct full-paper fallback failed for %s: %s", self.job_id, exc)
-                code = "M4_LLM_TIMEOUT" if "timeout" in str(exc).lower() else "M4_LLM_REQUEST_FAILED"
+                logger.warning("paper tutor direct full-paper fallback failed for %s: %s", self.job_id, exc)
+                code = "TUTOR_LLM_TIMEOUT" if "timeout" in str(exc).lower() else "TUTOR_LLM_REQUEST_FAILED"
                 warnings.append(_warning(code, "全文模型备用请求失败。", str(exc)))
-        trace = M4ContextTrace(
+        trace = TutorContextTrace(
             scope="selection" if selected_text else "paper",
             context_mode="full_paper",
             continued_from_history=bool(history),
@@ -320,7 +320,7 @@ class M4InteractionService:
                 follow_up_suggestions=_follow_ups(),
                 used_context={"memory": False, "artifacts": True, "llm": False, "full_paper": True},
                 context_trace=trace,
-                warnings=warnings or [_warning("M4_MODEL_UNAVAILABLE", "没有可用的论文讲解模型。")],
+                warnings=warnings or [_warning("TUTOR_MODEL_UNAVAILABLE", "没有可用的论文讲解模型。")],
             )
         record = self.memory.append(
             memory_type="interactive_answer",
@@ -377,7 +377,7 @@ class M4InteractionService:
             uncertainty="原文证据模式不会调用模型补充解释。",
             follow_up_suggestions=["切换到论文问答，让模型结合全文解释这些原文。"],
             used_context={"memory": False, "artifacts": True, "llm": False, "full_paper": False},
-            context_trace=M4ContextTrace(
+            context_trace=TutorContextTrace(
                 scope="selection" if selected_text else "paper",
                 context_mode="evidence",
                 focus_question=question,
@@ -627,4 +627,4 @@ def _run_async(coro):
         return asyncio.run(coro)
     if hasattr(coro, "close"):
         coro.close()
-    raise RuntimeError("M4 synchronous service cannot run inside an active event loop")
+    raise RuntimeError("paper tutor synchronous service cannot run inside an active event loop")

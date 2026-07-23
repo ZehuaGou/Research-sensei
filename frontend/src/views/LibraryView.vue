@@ -135,8 +135,8 @@ function authorsText(paper: LibraryPaper) {
 function compactPath(path: string | undefined) {
   if (!path) return 'No local path'
   const normalized = path.replace(/\\/g, '/')
-  const parts = normalized.split('/')
-  return parts.length > 4 ? `.../${parts.slice(-4).join('/')}` : path
+  const parts = normalized.split('/').filter(Boolean)
+  return parts.length > 2 ? `.../${parts.slice(-2).join('/')}` : normalized
 }
 
 function formatDate(value: string | undefined) {
@@ -150,10 +150,10 @@ function formatDate(value: string | undefined) {
   <main class="library-page">
     <section class="library-head">
       <div>
-        <p class="eyebrow">M1 Paper Library</p>
+        <p class="eyebrow">Paper Library</p>
         <h1>本地论文库</h1>
         <p class="intro">
-          M1 已下载和复用的论文集中放在这里，可以直接进入 PaperWorkspace 解析。
+          检索、下载和复用的论文集中放在这里，可以直接进入深读工作区。
         </p>
       </div>
       <div class="stats surface">
@@ -195,7 +195,7 @@ function formatDate(value: string | undefined) {
             <span v-if="paper.doi">DOI {{ paper.doi }}</span>
             <span v-if="paper.arxiv_id">arXiv {{ paper.arxiv_id }}</span>
           </div>
-          <code :title="paper.local_path">{{ compactPath(paper.local_path) }}</code>
+          <code :title="compactPath(paper.local_path)">{{ compactPath(paper.local_path) }}</code>
           <small v-if="paper.downloaded_at">Downloaded {{ formatDate(paper.downloaded_at) }}</small>
         </div>
         <div class="paper-actions">
@@ -232,7 +232,7 @@ function formatDate(value: string | undefined) {
 
     <section class="runs surface" data-testid="library-runs">
       <header>
-        <h2>Recent M1 search runs</h2>
+        <h2>最近的检索任务</h2>
       </header>
       <div v-if="searchRuns.length" class="run-list">
         <div v-for="run in searchRuns" :key="run.run_id" class="run-row">
@@ -243,7 +243,7 @@ function formatDate(value: string | undefined) {
           <small>{{ formatDate(run.created_at) }}</small>
         </div>
       </div>
-      <p v-else>No M1 search runs have been recorded yet.</p>
+      <p v-else>还没有记录过论文检索任务。</p>
     </section>
   </main>
 </template>

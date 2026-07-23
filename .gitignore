@@ -32,7 +32,7 @@ config/local.toml
 /.cache/
 /tmp/
 .tmp_pytest*/
-.tmp_debug_m1/
+.tmp_debug_*/
 *.ckpt
 *.pt
 *.pth

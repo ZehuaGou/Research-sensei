@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import AskPanel from '../layout/AskPanel.vue'
+import PaperTutorPanel from '../layout/PaperTutorPanel.vue'
 import { useLearningStore } from '../../stores/learning'
 
 function jsonResponse(data: unknown) {
@@ -11,7 +11,7 @@ function jsonResponse(data: unknown) {
   }
 }
 
-function mockM4Fetch() {
+function mockTutorFetch() {
   return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const method = init?.method || 'GET'
@@ -19,7 +19,7 @@ function mockM4Fetch() {
       return jsonResponse({ status: 'CLEARED', records: [] })
     }
     if (url.endsWith('/memory')) {
-      return jsonResponse({ records: [{ memory_id: 'm4_memory_1' }] })
+      return jsonResponse({ records: [{ memory_id: 'tutor_memory_1' }] })
     }
     if (url.endsWith('/ask')) {
       return jsonResponse({
@@ -30,7 +30,7 @@ function mockM4Fetch() {
           '能追到的证据是论文正文里的方法描述和实验对比，它们说明这种权重分配支撑了结论。',
         ].join('\n\n'),
         evidence_refs: ['paper:b001'],
-        memory_refs: ['m4_memory_2'],
+        memory_refs: ['tutor_memory_2'],
         uncertainty: '回答基于当前论文证据。',
         follow_up_suggestions: ['为什么这种机制能连接稀疏证据？'],
         context_trace: {
@@ -81,7 +81,7 @@ function mountPanel() {
   store.currentJobId = 'job-123'
   return {
     store,
-    wrapper: mount(AskPanel, {
+    wrapper: mount(PaperTutorPanel, {
       global: {
         plugins: [pinia],
       },
@@ -89,26 +89,26 @@ function mountPanel() {
   }
 }
 
-describe('AskPanel', () => {
+describe('PaperTutorPanel', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     localStorage.clear()
   })
 
-  it('uses a readable default font and can request moving M4 to the other side', async () => {
-    vi.stubGlobal('fetch', mockM4Fetch())
+  it('uses a readable default font and can request moving 论文助教 to the other side', async () => {
+    vi.stubGlobal('fetch', mockTutorFetch())
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="ask-panel"]').attributes('style')).toContain('--m4-font-size: 15px')
-    expect(wrapper.get('[data-testid="m4-side-toggle"]').text()).toBe('左置')
-    await wrapper.get('[data-testid="m4-side-toggle"]').trigger('click')
+    expect(wrapper.get('[data-testid="paper-tutor-panel"]').attributes('style')).toContain('--tutor-font-size: 15px')
+    expect(wrapper.get('[data-testid="tutor-side-toggle"]').text()).toBe('左置')
+    await wrapper.get('[data-testid="tutor-side-toggle"]').trigger('click')
     expect(wrapper.emitted('toggleSide')).toHaveLength(1)
   })
 
   it('loads memory and sends full-paper questions with selected text', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { store, wrapper } = mountPanel()
     store.selectedText = 'attention architecture'
@@ -137,7 +137,7 @@ describe('AskPanel', () => {
     expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('4.8 万字全文')
     expect(wrapper.text()).toContain('为什么这种机制能连接稀疏证据？')
     expect(wrapper.text()).not.toContain('paper:b001')
-    expect(wrapper.text()).not.toContain('m4_memory_2')
+    expect(wrapper.text()).not.toContain('tutor_memory_2')
   })
 
   it('restores real recent answers so a refreshed page can continue the conversation', async () => {
@@ -205,7 +205,7 @@ describe('AskPanel', () => {
   })
 
   it('uses a floating question navigator to return to earlier conversation nodes', async () => {
-    vi.stubGlobal('fetch', mockM4Fetch())
+    vi.stubGlobal('fetch', mockTutorFetch())
     const { store, wrapper } = mountPanel()
     store.replaceChat([
       { role: 'user', content: '第一个问题：这篇论文解决了什么？', timestamp: 1 },
@@ -383,12 +383,12 @@ describe('AskPanel', () => {
   })
 
   it('keeps strict lookup only when the user explicitly chooses 找证据', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    await wrapper.get('#m4-mode-evidence').trigger('click')
+    await wrapper.get('#tutor-mode-evidence').trigger('click')
     await wrapper.get('[data-testid="ask-input"]').setValue('这条结论对应哪段正文？')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -400,12 +400,12 @@ describe('AskPanel', () => {
   })
 
   it('routes explanation questions back to full-paper mode instead of returning raw evidence', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    await wrapper.get('#m4-mode-evidence').trigger('click')
+    await wrapper.get('#tutor-mode-evidence').trigger('click')
     await wrapper.get('[data-testid="ask-input"]').setValue('请按实际执行顺序展开论文的核心方法。')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -415,16 +415,16 @@ describe('AskPanel', () => {
       question: '请按实际执行顺序展开论文的核心方法。',
       answer_mode: 'full_paper',
     })
-    expect(wrapper.get('#m4-mode-paper').attributes('aria-selected')).toBe('true')
+    expect(wrapper.get('#tutor-mode-paper').attributes('aria-selected')).toBe('true')
   })
 
   it('shows mode-specific starter prompts and sends evidence starters as strict lookup', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()
 
-    await wrapper.get('#m4-mode-evidence').trigger('click')
+    await wrapper.get('#tutor-mode-evidence').trigger('click')
     const starter = wrapper.findAll('.starter-prompts button').find(button => button.text().includes('核心方法对应哪些原文'))
     expect(starter).toBeDefined()
     await starter!.trigger('click')
@@ -442,7 +442,7 @@ describe('AskPanel', () => {
   })
 
   it('answers a custom user question before creating a focused advisor question', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { store, wrapper } = mountPanel()
     store.selectedText = 'Attention helps connect scattered evidence.'
@@ -477,7 +477,7 @@ describe('AskPanel', () => {
   })
 
   it('requests advisor questions without exposing internal evidence refs', async () => {
-    const fetchMock = mockM4Fetch()
+    const fetchMock = mockTutorFetch()
     vi.stubGlobal('fetch', fetchMock)
     const { wrapper } = mountPanel()
     await flushPromises()

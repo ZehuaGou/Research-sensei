@@ -56,8 +56,8 @@ def test_cache_make_key_is_deterministic() -> None:
 
 
 def test_cache_make_key_varies_by_model() -> None:
-    k1 = ResponseCache.make_key(model_name="m1", prompt_version="default", prompt_hash="h")
-    k2 = ResponseCache.make_key(model_name="m2", prompt_version="default", prompt_hash="h")
+    k1 = ResponseCache.make_key(model_name="discovery-model", prompt_version="default", prompt_hash="h")
+    k2 = ResponseCache.make_key(model_name="analysis-model", prompt_version="default", prompt_hash="h")
     assert k1 != k2
 
 
@@ -108,14 +108,14 @@ def test_cache_invalidate_by_version() -> None:
 
 def test_cache_invalidate_by_model() -> None:
     cache = ResponseCache()
-    k1 = cache.make_key(model_name="m1", prompt_version="default", prompt_hash="h1")
-    k2 = cache.make_key(model_name="m1", prompt_version="evidence_grounded", prompt_hash="h2")
-    k3 = cache.make_key(model_name="m2", prompt_version="default", prompt_hash="h3")
-    cache.set(k1, "a", model_name="m1", prompt_version="default")
-    cache.set(k2, "b", model_name="m1", prompt_version="evidence_grounded")
-    cache.set(k3, "c", model_name="m2", prompt_version="default")
+    k1 = cache.make_key(model_name="discovery-model", prompt_version="default", prompt_hash="h1")
+    k2 = cache.make_key(model_name="discovery-model", prompt_version="evidence_grounded", prompt_hash="h2")
+    k3 = cache.make_key(model_name="analysis-model", prompt_version="default", prompt_hash="h3")
+    cache.set(k1, "a", model_name="discovery-model", prompt_version="default")
+    cache.set(k2, "b", model_name="discovery-model", prompt_version="evidence_grounded")
+    cache.set(k3, "c", model_name="analysis-model", prompt_version="default")
 
-    removed = cache.invalidate_by_model("m1")
+    removed = cache.invalidate_by_model("discovery-model")
     assert removed == 2
     assert cache.get(k1) is None
     assert cache.get(k3) == "c"

@@ -1,5 +1,5 @@
 {
-  "schema_version": "m1_relevance_benchmark.v1",
+  "schema_version": "literature_relevance_benchmark.v1",
   "minimum_case_pass_rate": 1.0,
   "cases": [
     {

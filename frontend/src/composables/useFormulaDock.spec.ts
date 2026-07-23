@@ -12,7 +12,7 @@ const Harness = defineComponent({
     const canShowCards = ref(true)
     const chatPaneWidth = ref(380)
     const dockElement = ref<HTMLElement | null>(null)
-    const dock = useFormulaDock({ activeTab, isAskPanelOpen: open, canShowCards, chatPaneWidth })
+    const dock = useFormulaDock({ activeTab, isPaperTutorPanelOpen: open, canShowCards, chatPaneWidth })
     onMounted(() => {
       if (dockElement.value) {
         vi.spyOn(dockElement.value, 'getBoundingClientRect').mockReturnValue({
@@ -58,7 +58,7 @@ describe('useFormulaDock', () => {
     expect(saved.position.x).toBeLessThanOrEqual(488)
   })
 
-  it('reserves desktop M4 space and supports keyboard reset', async () => {
+  it('reserves desktop 论文助教 space and supports keyboard reset', async () => {
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1_400 })
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 700 })
     const wrapper = mount(Harness)

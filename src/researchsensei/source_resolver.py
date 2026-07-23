@@ -66,10 +66,10 @@ class LatexSourceMaterialization:
 
 
 class PaperSourceResolver:
-    """M1 resolver for candidate-paper source acquisition.
+    """literature discovery resolver for candidate-paper source acquisition.
 
-    M1 must distinguish metadata-only candidates from papers whose full-text PDF
-    was actually downloaded and validated. Parsing still belongs to M2.
+    literature discovery must distinguish metadata-only candidates from papers whose full-text PDF
+    was actually downloaded and validated. Parsing still belongs to paper analysis.
     """
 
     def __init__(
@@ -142,7 +142,7 @@ class PaperSourceResolver:
                 if resolved is not None:
                     return resolved
         except Exception as exc:
-            logger.warning("M1 paper source resolver failed for %s: %s", paper.paper_id, exc)
+            logger.warning("literature discovery paper source resolver failed for %s: %s", paper.paper_id, exc)
             return self._base_result(
                 paper,
                 status=PaperSourceStatus.FAILED_DOWNLOAD,
@@ -197,7 +197,7 @@ class PaperSourceResolver:
                                     "latex_source_retained": "true",
                                 },
                                 "source_priority": SourcePriority.PDF,
-                                "preferred_m2_input": "pdf",
+                                "preferred_analysis_input": "pdf",
                                 "has_valid_deep_reading_source": True,
                                 "latex_source_available": source_result.latex_source_available,
                                 "latex_source_downloaded": source_result.latex_source_downloaded,
@@ -756,7 +756,7 @@ class PaperSourceResolver:
         target.write_bytes(content)
         sha256 = hashlib.sha256(content).hexdigest()
 
-        # M1.3 lightweight PDF metadata validation
+        # source acquisition lightweight PDF metadata validation
         meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
 
         return self._base_result(
@@ -835,7 +835,7 @@ class PaperSourceResolver:
             return None
         source_path = Path(status.resolved_path)
         content = source_path.read_bytes()
-        if content.startswith(PDF_BYTES) or status.preferred_m2_input == "pdf":
+        if content.startswith(PDF_BYTES) or status.preferred_analysis_input == "pdf":
             meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
             return self._base_result(
                 paper,
@@ -858,7 +858,7 @@ class PaperSourceResolver:
                     "fallback_used": status.fallback_used,
                 },
                 source_priority=SourcePriority.PDF,
-                preferred_m2_input="pdf",
+                preferred_analysis_input="pdf",
                 has_valid_deep_reading_source=True,
             )
         return self._base_result(
@@ -880,7 +880,7 @@ class PaperSourceResolver:
                 "source_dir": status.source_dir,
             },
             source_priority=SourcePriority.LATEX_SOURCE,
-            preferred_m2_input="latex_source",
+            preferred_analysis_input="latex_source",
             has_valid_deep_reading_source=True,
             latex_source_available=True,
             latex_source_downloaded=True,
@@ -943,7 +943,7 @@ class PaperSourceResolver:
             meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
         source_type = PaperSourceType.PDF if is_pdf else PaperSourceType.ARXIV_SOURCE
         source_priority = SourcePriority.PDF if is_pdf else SourcePriority.LATEX_SOURCE
-        preferred_m2_input = "pdf" if is_pdf else "latex_source"
+        preferred_analysis_input = "pdf" if is_pdf else "latex_source"
         return self._base_result(
             paper,
             status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED if is_pdf else PaperSourceStatus.RESOLVED,
@@ -964,7 +964,7 @@ class PaperSourceResolver:
                 "library_paper_id": record.paper_id,
             },
             source_priority=source_priority,
-            preferred_m2_input=preferred_m2_input,
+            preferred_analysis_input=preferred_analysis_input,
             has_valid_deep_reading_source=True,
         )
 
@@ -1067,7 +1067,7 @@ class PaperSourceResolver:
         pdf_title_match: str = "",
         pdf_metadata_warning: str = "",
         source_priority: SourcePriority | None = None,
-        preferred_m2_input: str = "",
+        preferred_analysis_input: str = "",
         has_valid_deep_reading_source: bool | None = None,
         latex_source_available: bool = False,
         latex_source_downloaded: bool = False,
@@ -1081,7 +1081,7 @@ class PaperSourceResolver:
             and file_size > 0
         )
         actual_source_priority = source_priority or (SourcePriority.PDF if has_valid_pdf else SourcePriority.METADATA_ONLY)
-        actual_preferred_m2_input = preferred_m2_input or ("pdf" if has_valid_pdf else "none")
+        actual_preferred_analysis_input = preferred_analysis_input or ("pdf" if has_valid_pdf else "none")
         actual_valid_source = has_valid_deep_reading_source if has_valid_deep_reading_source is not None else has_valid_pdf
         return ResolvedPaperSource(
             paper_id=paper.paper_id,
@@ -1107,7 +1107,7 @@ class PaperSourceResolver:
             pdf_title_match=pdf_title_match,
             pdf_metadata_warning=pdf_metadata_warning,
             source_priority=actual_source_priority,
-            preferred_m2_input=actual_preferred_m2_input,
+            preferred_analysis_input=actual_preferred_analysis_input,
             has_valid_deep_reading_source=actual_valid_source,
             latex_source_available=latex_source_available,
             latex_source_downloaded=latex_source_downloaded,
@@ -1199,7 +1199,7 @@ class SourceResolver:
             size_bytes=target.stat().st_size,
             source_strategy="local_path",
             source_priority="latex_source" if suffix == ".tex" else ("pdf" if suffix == ".pdf" else "low_confidence_text"),
-            preferred_m2_input="latex_source" if suffix == ".tex" else ("pdf" if suffix == ".pdf" else "text"),
+            preferred_analysis_input="latex_source" if suffix == ".tex" else ("pdf" if suffix == ".pdf" else "text"),
             latex_source_available=suffix == ".tex",
             latex_source_path=str(target) if suffix == ".tex" else "",
             latex_main_file=str(target) if suffix == ".tex" else "",
@@ -1267,7 +1267,7 @@ class SourceResolver:
             pdf_url=pdf_url,
             source_strategy="pdf_direct",
             source_priority="pdf",
-            preferred_m2_input="pdf",
+            preferred_analysis_input="pdf",
         )
 
     def resolve_arxiv_id(self, arxiv_id: str, run_dir: str | Path) -> SourceStatus:
@@ -1460,7 +1460,7 @@ class SourceResolver:
             source_manifest_path=str(manifest_path),
             source_strategy="source_first",
             source_priority="latex_source",
-            preferred_m2_input="latex_source",
+            preferred_analysis_input="latex_source",
             latex_source_available=True,
             latex_source_path=str(main_tex),
             latex_main_file=str(main_tex),
@@ -1535,7 +1535,7 @@ def _status(
     pdf_url: str = "",
     source_strategy: str = "",
     source_priority: str = "",
-    preferred_m2_input: str = "",
+    preferred_analysis_input: str = "",
     fallback_used: str = "",
 ) -> SourceStatus:
     return SourceStatus(
@@ -1551,7 +1551,7 @@ def _status(
         pdf_url=pdf_url,
         source_strategy=source_strategy,
         source_priority=source_priority,
-        preferred_m2_input=preferred_m2_input,
+        preferred_analysis_input=preferred_analysis_input,
         fallback_used=fallback_used,
     )
 
@@ -1850,7 +1850,7 @@ def _find_reusable_pdf(download_dir: Path, filename: str, *, exclude: Path) -> P
 
 
 def _check_pdf_metadata(content: bytes, expected_title: str) -> tuple[str, str, str]:
-    """M1.3 PDF metadata/title validation.
+    """source acquisition PDF metadata/title validation.
 
     Returns (pdf_metadata_check, pdf_title_match, pdf_metadata_warning).
     1. Check %PDF header.

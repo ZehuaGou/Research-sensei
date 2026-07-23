@@ -229,7 +229,7 @@ function selectNode(messageIndex: number) {
 
 .question-node-label {
   overflow: hidden;
-  font-size: calc(var(--m4-font-size, 15px) - 2px);
+  font-size: calc(var(--tutor-font-size, 15px) - 2px);
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;

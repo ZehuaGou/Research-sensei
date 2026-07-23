@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class QueryPlanningError(RuntimeError):
-    """Raised when M1 cannot produce a real LLM query plan."""
+    """Raised when literature discovery cannot produce a real LLM query plan."""
 
 
 class QueryPlannerClient(Protocol):
@@ -36,23 +36,23 @@ class QueryPlanner:
     async def plan(self, user_query: str) -> QueryPlan:
         """Generate a query plan from user input.
 
-        M1 must not silently fall back to heuristic query planning. A missing or
+        literature discovery must not silently fall back to heuristic query planning. A missing or
         invalid LLM plan is a real blocker because Chinese research directions
         often need precise English academic query terms.
         """
         if self.llm is None:
-            raise QueryPlanningError("M1_QUERY_PLANNING_REQUIRES_REAL_LLM")
+            raise QueryPlanningError("LITERATURE_QUERY_PLANNING_REQUIRES_REAL_LLM")
 
         try:
             return await self._plan_with_llm(user_query)
         except Exception as exc:
             logger.warning("LLM query planning failed: %s", exc)
-            raise QueryPlanningError(f"M1_QUERY_PLANNING_FAILED: {type(exc).__name__}: {exc}") from exc
+            raise QueryPlanningError(f"LITERATURE_QUERY_PLANNING_FAILED: {type(exc).__name__}: {exc}") from exc
 
     async def _plan_with_llm(self, user_query: str) -> QueryPlan:
         llm = self.llm
         if llm is None:
-            raise QueryPlanningError("M1_QUERY_PLANNING_REQUIRES_REAL_LLM")
+            raise QueryPlanningError("LITERATURE_QUERY_PLANNING_REQUIRES_REAL_LLM")
         prompt_builder = PromptBuilder()
         messages = prompt_builder.build_simple(
             system=(

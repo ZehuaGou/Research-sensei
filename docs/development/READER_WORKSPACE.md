@@ -1,4 +1,4 @@
-# M3 API and Frontend Rendering Contract
+# Reader API And Frontend Rendering Contract
 
 Current status and exact verification evidence live in `docs/STATUS.md`.
 ResearchSensei remains a Chinese research-learning workspace, not a marketing
@@ -12,7 +12,7 @@ commands. It delegates to:
 - `web/app_factory.py`: one-time configuration and dependency composition;
 - `web/dependencies.py`: runtime dependency container;
 - `web/request_models.py`: bounded Pydantic inputs;
-- `web/routers/settings.py`, `jobs.py`, `library.py`, `directions.py`, `m4.py`;
+- `web/routers/settings.py`, `jobs.py`, `library.py`, `directions.py`, `tutor.py`;
 - `web/services/upload_service.py`, `job_service.py`, `task_service.py`.
 
 The Vue app centralizes HTTP access in `frontend/src/api/client.ts` and uses
@@ -51,7 +51,7 @@ Settings and management:
 - `GET /api/v1/maintenance/orphan-runs`
 - `POST /api/v1/maintenance/orphan-runs/cleanup`
 
-M4 routes are listed in `M4_INTERACTIVE_LEARNING.md`.
+Paper Tutor routes are listed in `Paper Tutor_INTERACTIVE_LEARNING.md`.
 
 ## Request and Error Contract
 
@@ -79,7 +79,7 @@ parse, interruption, cancellation, and request-failure paths.
 - Request `/cards` only for `SUCCESS` or `DEGRADED_STRUCTURAL`.
 - Do not show explanatory cards for `BASELINE_ONLY`,
   `BLOCKED_UNDERSTANDING`, or `FAILED`.
-- Do not mount M4 controls for statuses that cannot show cards.
+- Do not mount Paper Tutor controls for statuses that cannot show cards.
 - Display `pipeline_status`, `relevance_status`, `source_status`, and
   `understanding_status` independently. Pipeline success must not hide a
   relevance or source failure.
@@ -101,7 +101,7 @@ parse, interruption, cancellation, and request-failure paths.
 - `FormulaDock`
 - `WorkspaceStatusPanel`
 
-The central pane renders paper, formula, and teaching cards. The M4 pane is
+The central pane renders paper, formula, and teaching cards. The Paper Tutor pane is
 width-bounded against the actual viewport and becomes an overlay/drawer on
 small screens. Formula and chat surfaces must not rely on an escalating z-index
 patch stack to avoid one another.

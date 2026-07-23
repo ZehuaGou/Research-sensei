@@ -29,7 +29,7 @@ uv pip compile pyproject.toml --extra dev --universal --upgrade `
 ```
 
 Review the resulting diff for major-version changes and transitive additions.
-Before merging, install from the new lock and run the backend suite, M1 matrix,
+Before merging, install from the new lock and run the backend suite, Literature Discovery matrix,
 encoding gate, Ruff, and mypy locally. GitHub Actions repeats the backend suite
 on Python 3.10 and 3.13 and verifies the frontend with the pinned Node version.
 Never hand-edit a single transitive pin without regenerating and testing the

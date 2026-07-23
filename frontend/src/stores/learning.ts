@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { M4ContextTrace } from '../types/api'
+import type { TutorContextTrace } from '../types/api'
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -9,7 +9,7 @@ export interface ChatMessage {
   evidenceRefs?: string[]
   uncertainty?: string
   followUpSuggestions?: string[]
-  contextTrace?: M4ContextTrace
+  contextTrace?: TutorContextTrace
   status?: string
 }
 
@@ -27,7 +27,7 @@ export const useLearningStore = defineStore('learning', () => {
   const chatByJob = ref<Record<string, ChatMessage[]>>({})
   const selectedText = ref('')
   const selectedIntent = ref<'explain' | 'simplify' | 'example'>('explain')
-  const isAskPanelOpen = ref(false)
+  const isPaperTutorPanelOpen = ref(false)
 
   function addMessage(msg: ChatMessage) {
     chatHistory.value.push(msg)
@@ -69,7 +69,7 @@ export const useLearningStore = defineStore('learning', () => {
     chatHistory,
     selectedText,
     selectedIntent,
-    isAskPanelOpen,
+    isPaperTutorPanelOpen,
     addMessage,
     clearChat,
     replaceChat,
