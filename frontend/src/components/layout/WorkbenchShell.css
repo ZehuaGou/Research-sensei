@@ -1,6 +1,6 @@
 .codex-shell {
   display: grid;
-  grid-template-columns: 292px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-pane-width, 292px) minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
@@ -13,6 +13,7 @@
 }
 
 .workbench-sidebar {
+  position: relative;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 10px;
@@ -22,6 +23,36 @@
   background: var(--bg-sidebar);
   color: var(--sidebar-text);
   overflow: hidden;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  z-index: 12;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resize-handle::after {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  width: 3px;
+  height: 52px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-muted) 42%, transparent);
+  content: '';
+  transform: translateY(-50%);
+  transition: height 0.14s ease, background 0.14s ease;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle:focus-visible::after {
+  height: 76px;
+  background: var(--accent);
 }
 
 .sidebar-brand {
@@ -469,6 +500,10 @@
     width: min(292px, calc(100vw - 52px));
     box-shadow: var(--shadow-lg);
     transform: translateX(0);
+  }
+
+  .sidebar-resize-handle {
+    display: none;
   }
 
   .codex-shell.collapsed .workbench-sidebar {

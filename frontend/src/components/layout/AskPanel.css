@@ -17,7 +17,7 @@ header {
 
 h2 {
   color: var(--text-primary);
-  font-size: calc(var(--m4-font-size, 14px) + 2px);
+  font-size: calc(var(--m4-font-size, 15px) + 2px);
   font-weight: 720;
 }
 
@@ -27,7 +27,7 @@ h2 {
   overflow: hidden;
   margin-top: 4px;
   color: var(--text-primary);
-  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   font-weight: 620;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -37,7 +37,7 @@ h2 {
 header p {
   margin-top: 4px;
   color: var(--text-muted);
-  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
 }
 
 .header-actions {
@@ -45,6 +45,22 @@ header p {
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
+}
+
+.pane-side-toggle {
+  min-height: 34px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0 9px;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.pane-side-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .font-controls {
@@ -107,7 +123,7 @@ header p {
 }
 
 .mode-tabs span {
-  font-size: 13px;
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   font-weight: 650;
   line-height: 1.2;
 }
@@ -115,7 +131,7 @@ header p {
 .mode-tabs small {
   overflow: hidden;
   color: inherit;
-  font-size: 11px;
+  font-size: calc(var(--m4-font-size, 15px) - 3px);
   line-height: 1.35;
   opacity: 0.74;
   text-overflow: ellipsis;
@@ -131,7 +147,7 @@ header p {
 
 .selected span {
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   font-weight: 650;
 }
 
@@ -159,7 +175,7 @@ header p {
   max-height: 118px;
   overflow-y: auto;
   color: var(--text-secondary);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
   line-height: 1.7;
   overflow-wrap: break-word;
   white-space: normal;
@@ -199,7 +215,7 @@ header p {
 .advisor-question {
   margin-top: 8px;
   color: var(--text-primary);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
   line-height: 1.65;
 }
 
@@ -209,7 +225,7 @@ header p {
   margin-top: 8px;
   padding-left: 18px;
   color: var(--text-secondary);
-  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   line-height: 1.55;
 }
 
@@ -225,7 +241,7 @@ header p {
   min-height: 54px;
   border-radius: 8px;
   background: var(--bg-card);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
 }
 
 .advisor-feedback {
@@ -235,7 +251,7 @@ header p {
   border-left: 3px solid var(--accent);
   padding-left: 10px;
   color: var(--text-secondary);
-  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   line-height: 1.55;
 }
 
@@ -291,7 +307,7 @@ header p {
 .empty p {
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: calc(var(--m4-font-size, 14px) + 1px);
+  font-size: calc(var(--m4-font-size, 15px) + 1px);
 }
 
 .message {
@@ -338,7 +354,7 @@ header p {
   padding: 10px 12px;
   background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
   line-height: 1.75;
   letter-spacing: 0;
   overflow-wrap: break-word;
@@ -393,7 +409,7 @@ header p {
   border-left: 2px solid var(--warning);
   padding-left: 9px;
   color: var(--text-muted);
-  font-size: calc(var(--m4-font-size, 14px) - 2px);
+  font-size: calc(var(--m4-font-size, 15px) - 2px);
   line-height: 1.55;
 }
 
@@ -487,6 +503,6 @@ textarea {
   padding: 12px 14px;
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
   line-height: 1.6;
 }

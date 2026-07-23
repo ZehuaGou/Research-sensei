@@ -40,10 +40,21 @@ describe('useChatPaneResize', () => {
     await nextTick()
 
     wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'ArrowLeft', shiftKey: true }))
-    expect(wrapper.vm.width).toBe(420)
+    expect(wrapper.vm.width).toBe(600)
     wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'Home' }))
-    expect(wrapper.vm.width).toBe(380)
-    expect(localStorage.getItem('researchsensei.learningWorkspace.chatWidth')).toBe('380')
+    expect(wrapper.vm.width).toBe(560)
+    expect(localStorage.getItem('researchsensei.learningWorkspace.chatWidth.v2')).toBe('560')
+  })
+
+  it('resizes in the correct direction when M4 is placed on the left', async () => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1600 })
+    const wrapper = mount(Harness)
+    await nextTick()
+
+    wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'ArrowRight' }), 'left')
+    expect(wrapper.vm.width).toBe(580)
+    wrapper.vm.handleSeparatorKeydown(new KeyboardEvent('keydown', { key: 'End' }), 'left')
+    expect(wrapper.vm.width).toBe(880)
   })
 
   it('ends pointer resizing on cancellation', async () => {
@@ -59,6 +70,6 @@ describe('useChatPaneResize', () => {
       preventDefault: vi.fn(),
     } as unknown as PointerEvent)
     window.dispatchEvent(new Event('pointercancel'))
-    expect(localStorage.getItem('researchsensei.learningWorkspace.chatWidth')).toBe('380')
+    expect(localStorage.getItem('researchsensei.learningWorkspace.chatWidth.v2')).toBe('560')
   })
 })

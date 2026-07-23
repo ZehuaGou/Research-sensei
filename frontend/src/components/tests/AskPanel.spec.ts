@@ -93,6 +93,18 @@ describe('AskPanel', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+    localStorage.clear()
+  })
+
+  it('uses a readable default font and can request moving M4 to the other side', async () => {
+    vi.stubGlobal('fetch', mockM4Fetch())
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="ask-panel"]').attributes('style')).toContain('--m4-font-size: 15px')
+    expect(wrapper.get('[data-testid="m4-side-toggle"]').text()).toBe('左置')
+    await wrapper.get('[data-testid="m4-side-toggle"]').trigger('click')
+    expect(wrapper.emitted('toggleSide')).toHaveLength(1)
   })
 
   it('loads memory and sends full-paper questions with selected text', async () => {

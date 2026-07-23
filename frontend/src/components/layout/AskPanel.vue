@@ -12,7 +12,10 @@ import {
 } from '../../utils/m4AnswerFormatting'
 
 const store = useLearningStore()
-const props = defineProps<{ paperTitle?: string }>()
+const props = withDefaults(defineProps<{ paperTitle?: string; side?: 'left' | 'right' }>(), {
+  side: 'right',
+})
+const emit = defineEmits<{ toggleSide: [] }>()
 const input = ref('')
 const chatContainer = ref<HTMLElement>()
 const isLoading = ref(false)
@@ -21,7 +24,7 @@ const memoryCount = ref(0)
 const advisorAnswer = ref('')
 const advisorSession = ref<AdvisorSession | null>(null)
 const mode = ref<AskMode>('paper')
-const fontStorageKey = 'researchsensei.m4.fontSize'
+const fontStorageKey = 'researchsensei.m4.fontSize.v2'
 const fontSize = ref(initialM4FontSize())
 
 type AskMode = 'paper' | 'evidence' | 'advisor'
@@ -68,13 +71,15 @@ type AdvisorSession = {
 }
 
 function initialM4FontSize() {
-  if (typeof localStorage === 'undefined') return 14
-  const saved = Number(localStorage.getItem(fontStorageKey))
-  return Number.isFinite(saved) ? Math.min(Math.max(saved, 13), 18) : 14
+  if (typeof localStorage === 'undefined') return 15
+  const raw = localStorage.getItem(fontStorageKey)
+  if (raw === null || !raw.trim()) return 15
+  const saved = Number(raw)
+  return Number.isFinite(saved) ? Math.min(Math.max(saved, 14), 20) : 15
 }
 
 function setFontSize(nextSize: number) {
-  fontSize.value = Math.min(Math.max(nextSize, 13), 18)
+  fontSize.value = Math.min(Math.max(nextSize, 14), 20)
 }
 
 function selectedPreviewText() {
@@ -406,6 +411,16 @@ watch(fontSize, (value) => {
         <p>{{ store.selectedText ? '整篇论文 + 选中文本 · 支持连续追问' : '整篇论文已加入上下文 · 支持连续追问' }}</p>
       </div>
       <div class="header-actions">
+        <button
+          type="button"
+          class="pane-side-toggle"
+          data-testid="m4-side-toggle"
+          :aria-label="props.side === 'right' ? '把 M4 移到论文左侧' : '把 M4 移到论文右侧'"
+          :title="props.side === 'right' ? '把 M4 移到论文左侧' : '把 M4 移到论文右侧'"
+          @click="emit('toggleSide')"
+        >
+          {{ props.side === 'right' ? '左置' : '右置' }}
+        </button>
         <div class="font-controls" aria-label="M4 字体大小">
           <button type="button" aria-label="减小 M4 字体" @click="setFontSize(fontSize - 1)">A-</button>
           <span>{{ fontSize }}</span>

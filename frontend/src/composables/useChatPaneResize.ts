@@ -1,8 +1,12 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
-const STORAGE_KEY = 'researchsensei.learningWorkspace.chatWidth'
-const MIN_WIDTH = 320
-const MAX_WIDTH = 540
+const STORAGE_KEY = 'researchsensei.learningWorkspace.chatWidth.v2'
+const DEFAULT_WIDTH = 560
+const MIN_WIDTH = 360
+const MAX_WIDTH = 960
+const READER_AND_NAV_RESERVE = 720
+
+type PaneSide = 'left' | 'right'
 
 interface ResizeState {
   pointerId: number
@@ -12,11 +16,13 @@ interface ResizeState {
 }
 
 export function useChatPaneResize() {
-  const width = ref(380)
+  const width = ref(DEFAULT_WIDTH)
   const compactViewport = ref(false)
   let resizeState: ResizeState | null = null
+  let resizeSide: PaneSide = 'right'
 
   const shellStyle = computed<Record<string, string>>(() => ({ '--chat-pane-width': `${width.value}px` }))
+  const maxWidth = computed(() => maximumAllowedWidth())
 
   function loadWidth() {
     if (typeof localStorage === 'undefined') return
@@ -32,15 +38,16 @@ export function useChatPaneResize() {
 
   function updateViewportMode() {
     compactViewport.value = viewportWidth() <= 1120
-    width.value = clampWidth(width.value)
+    if (!compactViewport.value) width.value = clampWidth(width.value)
   }
 
-  function startResize(event: PointerEvent) {
+  function startResize(event: PointerEvent, side: PaneSide = 'right') {
     if (event.button !== 0 || compactViewport.value) return
     const target = event.currentTarget as HTMLElement | null
     if (!target) return
     event.preventDefault()
     resizeState = { pointerId: event.pointerId, startX: event.clientX, startWidth: width.value, target }
+    resizeSide = side
     target.setPointerCapture?.(event.pointerId)
     target.addEventListener('lostpointercapture', stopResize)
     window.addEventListener('pointermove', moveResize)
@@ -51,7 +58,8 @@ export function useChatPaneResize() {
 
   function moveResize(event: PointerEvent) {
     if (!resizeState || event.pointerId !== resizeState.pointerId) return
-    width.value = clampWidth(resizeState.startWidth + resizeState.startX - event.clientX)
+    const delta = event.clientX - resizeState.startX
+    width.value = clampWidth(resizeState.startWidth + (resizeSide === 'left' ? delta : -delta))
   }
 
   function stopResize() {
@@ -67,12 +75,19 @@ export function useChatPaneResize() {
     saveWidth()
   }
 
-  function handleSeparatorKeydown(event: KeyboardEvent) {
-    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return
+  function handleSeparatorKeydown(event: KeyboardEvent, side: PaneSide = 'right') {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
-    if (event.key === 'Home') width.value = 380
-    if (event.key === 'ArrowLeft') width.value = clampWidth(width.value + (event.shiftKey ? 40 : 20))
-    if (event.key === 'ArrowRight') width.value = clampWidth(width.value - (event.shiftKey ? 40 : 20))
+    if (event.key === 'Home') width.value = DEFAULT_WIDTH
+    if (event.key === 'End') width.value = maximumAllowedWidth()
+    const movement = event.shiftKey ? 40 : 20
+    if (event.key === 'ArrowLeft') width.value = clampWidth(width.value + (side === 'right' ? movement : -movement))
+    if (event.key === 'ArrowRight') width.value = clampWidth(width.value + (side === 'left' ? movement : -movement))
+    saveWidth()
+  }
+
+  function toggleWide() {
+    width.value = width.value >= 700 ? clampWidth(DEFAULT_WIDTH) : clampWidth(780)
     saveWidth()
   }
 
@@ -89,12 +104,25 @@ export function useChatPaneResize() {
     window.visualViewport?.removeEventListener('resize', updateViewportMode)
   })
 
-  return { width, compactViewport, shellStyle, startResize, stopResize, handleSeparatorKeydown }
+  return {
+    width,
+    maxWidth,
+    compactViewport,
+    shellStyle,
+    startResize,
+    stopResize,
+    handleSeparatorKeydown,
+    toggleWide,
+  }
 }
 
 function clampWidth(value: number) {
-  const viewportMax = Math.max(MIN_WIDTH, viewportWidth() - 420)
-  return Math.min(Math.max(value, MIN_WIDTH), Math.min(MAX_WIDTH, viewportMax))
+  return Math.min(Math.max(value, MIN_WIDTH), maximumAllowedWidth())
+}
+
+function maximumAllowedWidth() {
+  const viewportMax = Math.max(MIN_WIDTH, viewportWidth() - READER_AND_NAV_RESERVE)
+  return Math.min(MAX_WIDTH, viewportMax)
 }
 
 function viewportWidth() {

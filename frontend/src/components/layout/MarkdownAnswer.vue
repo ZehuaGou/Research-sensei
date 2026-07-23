@@ -58,7 +58,7 @@ const rendered = computed(() => markdown.render(normalizedMarkdown(props.content
 .markdown-answer {
   min-width: 0;
   color: var(--text-primary);
-  font-size: var(--m4-font-size, 14px);
+  font-size: var(--m4-font-size, 15px);
   line-height: 1.82;
   overflow-wrap: anywhere;
 }
@@ -81,21 +81,21 @@ const rendered = computed(() => markdown.render(normalizedMarkdown(props.content
 }
 
 .markdown-answer :deep(h1) {
-  font-size: calc(var(--m4-font-size, 14px) + 4px);
+  font-size: calc(var(--m4-font-size, 15px) + 4px);
 }
 
 .markdown-answer :deep(h2) {
   border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 7px;
-  font-size: calc(var(--m4-font-size, 14px) + 3px);
+  font-size: calc(var(--m4-font-size, 15px) + 3px);
 }
 
 .markdown-answer :deep(h3) {
-  font-size: calc(var(--m4-font-size, 14px) + 2px);
+  font-size: calc(var(--m4-font-size, 15px) + 2px);
 }
 
 .markdown-answer :deep(h4) {
-  font-size: calc(var(--m4-font-size, 14px) + 1px);
+  font-size: calc(var(--m4-font-size, 15px) + 1px);
 }
 
 .markdown-answer :deep(p) {
@@ -168,7 +168,7 @@ const rendered = computed(() => markdown.render(normalizedMarkdown(props.content
   width: 100%;
   margin: 14px 0 18px;
   border-collapse: collapse;
-  font-size: calc(var(--m4-font-size, 14px) - 1px);
+  font-size: calc(var(--m4-font-size, 15px) - 1px);
   line-height: 1.55;
 }
 

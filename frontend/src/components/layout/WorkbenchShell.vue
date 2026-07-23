@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useThemeStore } from '../../stores/theme'
 import { researchApi } from '../../api/client'
 import type { SearchRun } from '../../types/api'
+import { useSidebarPaneResize } from '../../composables/useSidebarPaneResize'
 
 type CommandItem = {
   id: string
@@ -19,6 +20,7 @@ type CommandItem = {
 const router = useRouter()
 const route = useRoute()
 const theme = useThemeStore()
+const sidebarResize = useSidebarPaneResize()
 
 const collapsed = ref(loadBoolean('researchsensei.sidebarCollapsed') || isNarrowViewport())
 const commandQuery = ref('')
@@ -215,7 +217,7 @@ function formatCount(run: SearchRun) {
 </script>
 
 <template>
-  <div class="codex-shell" :class="{ collapsed }">
+  <div class="codex-shell" :class="{ collapsed }" :style="sidebarResize.shellStyle.value">
     <aside class="workbench-sidebar">
       <header class="sidebar-brand">
         <router-link to="/directions/new" class="brand-mark" aria-label="Research Sensei">
@@ -292,6 +294,22 @@ function formatCount(run: SearchRun) {
         </section>
       </div>
 
+      <div
+        v-if="!collapsed"
+        class="sidebar-resize-handle"
+        data-testid="sidebar-resize-handle"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整导航栏宽度"
+        aria-valuemin="240"
+        aria-valuemax="420"
+        :aria-valuenow="Math.round(sidebarResize.width.value)"
+        title="拖动调整导航栏宽度；双击恢复默认"
+        tabindex="0"
+        @pointerdown="sidebarResize.startResize"
+        @dblclick="sidebarResize.resetWidth"
+        @keydown="sidebarResize.handleSeparatorKeydown"
+      />
     </aside>
 
     <section class="workbench-frame">

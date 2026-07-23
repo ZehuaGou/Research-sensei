@@ -35,6 +35,7 @@ const activeFormulaAnchor = ref('')
 const formulaOrder = ref<string[]>([])
 const collapsedFormulas = ref<Record<string, boolean>>({})
 const focusedFormula = ref<FormulaEntry | null>(null)
+const m4Side = ref<'left' | 'right'>(loadM4Side())
 let formulaObserver: IntersectionObserver | null = null
 let formulaRestoreFocusElement: HTMLElement | null = null
 let m4RestoreFocusElement: HTMLElement | null = null
@@ -176,6 +177,24 @@ function closeM4() {
   isAskPanelOpen.value = false
 }
 
+function loadM4Side(): 'left' | 'right' {
+  if (typeof localStorage === 'undefined') return 'right'
+  return localStorage.getItem('researchsensei.learningWorkspace.m4Side') === 'left' ? 'left' : 'right'
+}
+
+function toggleM4Side() {
+  m4Side.value = m4Side.value === 'right' ? 'left' : 'right'
+  localStorage.setItem('researchsensei.learningWorkspace.m4Side', m4Side.value)
+}
+
+function startM4Resize(event: PointerEvent) {
+  chatResize.startResize(event, m4Side.value)
+}
+
+function handleM4ResizeKeydown(event: KeyboardEvent) {
+  chatResize.handleSeparatorKeydown(event, m4Side.value)
+}
+
 function handleDialogKeys(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     if (focusedFormula.value) {
@@ -294,6 +313,7 @@ onBeforeUnmount(() => {
     data-testid="learning-workspace"
     :class="{
       'with-chat': isAskPanelOpen && workspace.canShowCards.value && !chatResize.compactViewport.value,
+      'chat-left': m4Side === 'left',
       'formula-mode': tabsState.activeTab.value === 'formulas' && workspace.formulaCards.value.length > 0,
     }"
     :style="chatResize.shellStyle.value"
@@ -460,14 +480,16 @@ onBeforeUnmount(() => {
         role="separator"
         aria-orientation="vertical"
         aria-label="调整 M4 宽度"
-        aria-valuemin="320"
-        aria-valuemax="540"
+        aria-valuemin="360"
+        :aria-valuemax="Math.round(chatResize.maxWidth.value)"
         :aria-valuenow="Math.round(chatResize.width.value)"
+        title="拖动调整 M4 宽度；双击切换宽屏"
         tabindex="0"
-        @pointerdown="chatResize.startResize"
-        @keydown="chatResize.handleSeparatorKeydown"
+        @pointerdown="startM4Resize"
+        @dblclick="chatResize.toggleWide"
+        @keydown="handleM4ResizeKeydown"
       />
-      <AskPanel :paper-title="workspaceTitle" />
+      <AskPanel :paper-title="workspaceTitle" :side="m4Side" @toggle-side="toggleM4Side" />
     </aside>
 
     <div
@@ -486,7 +508,7 @@ onBeforeUnmount(() => {
         aria-label="M4 论文助教"
         tabindex="-1"
       >
-        <AskPanel :paper-title="workspaceTitle" />
+        <AskPanel :paper-title="workspaceTitle" :side="m4Side" @toggle-side="toggleM4Side" />
       </aside>
     </div>
 
