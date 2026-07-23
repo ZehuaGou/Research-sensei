@@ -4,6 +4,7 @@ import { useLearningStore, type ChatMessage } from '../../stores/learning'
 import { apiErrorMessage, workspaceApi } from '../../api/client'
 import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest, AskResponse } from '../../types/api'
 import MarkdownAnswer from './MarkdownAnswer.vue'
+import QuestionNavigator from './QuestionNavigator.vue'
 import {
   clipText,
   compactInlineText,
@@ -24,6 +25,7 @@ const memoryCount = ref(0)
 const advisorAnswer = ref('')
 const advisorSession = ref<AdvisorSession | null>(null)
 const mode = ref<AskMode>('paper')
+const activeQuestionMessageIndex = ref(-1)
 const fontStorageKey = 'researchsensei.m4.fontSize.v2'
 const fontSize = ref(initialM4FontSize())
 
@@ -34,6 +36,20 @@ const modeOptions: Array<{ key: AskMode; label: string; hint: string }> = [
   { key: 'evidence', label: '原文证据', hint: '只定位出处，不调用模型' },
   { key: 'advisor', label: '组会演练', hint: '追问、作答、反馈' },
 ]
+
+const questionNodes = computed(() => {
+  let sequence = 0
+  return store.chatHistory.flatMap((message, messageIndex) => {
+    if (message.role !== 'user') return []
+    sequence += 1
+    return [{
+      messageIndex,
+      sequence,
+      label: clipText(message.content, 48),
+      title: message.content,
+    }]
+  })
+})
 
 const modePrompts: Record<AskMode, string> = {
   paper: '请像一位耐心的论文助教一样，结合整篇论文自然地讲清楚核心方法。根据内容决定详略，不要只给一句概括。',
@@ -423,10 +439,44 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function updateActiveQuestion() {
+  const container = chatContainer.value
+  if (!container || !questionNodes.value.length) {
+    activeQuestionMessageIndex.value = -1
+    return
+  }
+  const markerY = container.getBoundingClientRect().top + Math.min(110, container.clientHeight * 0.25)
+  const questionElements = Array.from(
+    container.querySelectorAll<HTMLElement>('[data-question-message-index]'),
+  )
+  let activeIndex = questionNodes.value[0].messageIndex
+  for (const element of questionElements) {
+    if (element.getBoundingClientRect().top > markerY) break
+    const messageIndex = Number(element.dataset.questionMessageIndex)
+    if (Number.isFinite(messageIndex)) activeIndex = messageIndex
+  }
+  activeQuestionMessageIndex.value = activeIndex
+}
+
+function scrollToQuestion(messageIndex: number) {
+  const container = chatContainer.value
+  const target = container?.querySelector<HTMLElement>(
+    `[data-question-message-index="${messageIndex}"]`,
+  )
+  if (!container || !target) return
+  const top = container.scrollTop
+    + target.getBoundingClientRect().top
+    - container.getBoundingClientRect().top
+    - 12
+  activeQuestionMessageIndex.value = messageIndex
+  container.scrollTo?.({ top: Math.max(0, top), behavior: 'auto' })
+}
+
 async function scrollToBottom(behavior: ScrollBehavior = 'smooth') {
   await nextTick()
   const container = chatContainer.value
   container?.scrollTo?.({ top: container.scrollHeight, behavior })
+  activeQuestionMessageIndex.value = questionNodes.value.at(-1)?.messageIndex ?? -1
 }
 
 onMounted(() => {
@@ -518,6 +568,7 @@ watch(fontSize, (value) => {
       role="tabpanel"
       :aria-labelledby="`m4-mode-${mode}`"
       aria-live="polite"
+      @scroll.passive="updateActiveQuestion"
     >
       <div v-if="!store.chatHistory.length && !isLoading" class="empty">
         <span class="scope-badge">整篇论文对话</span>
@@ -540,6 +591,7 @@ watch(fontSize, (value) => {
         :key="index"
         class="message"
         :class="msg.role"
+        :data-question-message-index="msg.role === 'user' ? index : undefined"
         data-testid="chat-message"
       >
         <div class="avatar">{{ msg.role === 'user' ? '你' : 'M4' }}</div>
@@ -575,6 +627,13 @@ watch(fontSize, (value) => {
         <div class="bubble loading">正在阅读整篇论文并组织回答...</div>
       </div>
     </div>
+
+    <QuestionNavigator
+      v-if="questionNodes.length > 1"
+      :nodes="questionNodes"
+      :active-message-index="activeQuestionMessageIndex"
+      @select="scrollToQuestion"
+    />
 
     <section v-if="advisorSession" class="advisor-card" data-testid="advisor-card">
       <div class="advisor-head">

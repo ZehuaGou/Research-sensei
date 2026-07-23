@@ -1,5 +1,7 @@
 .ask-panel {
+  position: relative;
   display: flex;
+  overflow: hidden;
   height: 100%;
   min-height: 0;
   flex-direction: column;

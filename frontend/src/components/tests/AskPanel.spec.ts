@@ -204,6 +204,44 @@ describe('AskPanel', () => {
     expect(wrapper.text()).toContain('最新一轮回答')
   })
 
+  it('uses a floating question navigator to return to earlier conversation nodes', async () => {
+    vi.stubGlobal('fetch', mockM4Fetch())
+    const { store, wrapper } = mountPanel()
+    store.replaceChat([
+      { role: 'user', content: '第一个问题：这篇论文解决了什么？', timestamp: 1 },
+      { role: 'assistant', content: '第一个回答', timestamp: 2 },
+      { role: 'user', content: '第二个问题：核心方法如何实现？', timestamp: 3 },
+      { role: 'assistant', content: '第二个回答', timestamp: 4 },
+      { role: 'user', content: '第三个问题：实验有哪些限制？', timestamp: 5 },
+      { role: 'assistant', content: '第三个回答', timestamp: 6 },
+    ])
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="question-navigator-toggle"]').text()).toContain('3/3')
+    await wrapper.get('[data-testid="question-navigator-toggle"]').trigger('click')
+
+    const nodeButtons = wrapper.findAll('.question-node')
+    expect(nodeButtons).toHaveLength(3)
+    expect(nodeButtons[0].text()).toContain('第一个问题')
+    expect(nodeButtons[1].text()).toContain('第二个问题')
+
+    const messages = wrapper.get('.messages').element as HTMLElement
+    const secondQuestion = wrapper.get('[data-question-message-index="2"]').element as HTMLElement
+    const scrollTo = vi.fn()
+    Object.defineProperty(messages, 'scrollTop', { configurable: true, value: 500 })
+    messages.scrollTo = scrollTo
+    vi.spyOn(messages, 'getBoundingClientRect').mockReturnValue({ top: 100 } as DOMRect)
+    vi.spyOn(secondQuestion, 'getBoundingClientRect').mockReturnValue({ top: 340 } as DOMRect)
+
+    await nodeButtons[1].trigger('click')
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 728, behavior: 'auto' })
+    expect(wrapper.find('.question-node-popover').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="question-navigator-toggle"]').trigger('click')
+    expect(wrapper.findAll('.question-node')[1].attributes('aria-current')).toBe('step')
+  })
+
   it('uses one full-paper request without the old evidence-preview round trip', async () => {
     let resolveFullPaper: ((value: ReturnType<typeof jsonResponse>) => void) | undefined
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
