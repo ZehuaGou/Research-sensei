@@ -41,6 +41,28 @@ const modePrompts: Record<AskMode, string> = {
   advisor: '',
 }
 
+const starterPrompts = computed(() => {
+  if (mode.value === 'evidence') {
+    return [
+      { label: '核心方法对应哪些原文？', prompt: '这篇论文的核心方法对应哪些原文段落或页码？' },
+      { label: '哪些实验支撑主要结论？', prompt: '作者用哪些实验或正文证据支撑主要结论？' },
+      { label: '局限写在什么位置？', prompt: '论文在哪些原文段落说明了方法局限？' },
+    ]
+  }
+  if (mode.value === 'advisor') {
+    return [
+      { label: '围绕核心方法追问', prompt: '请围绕这篇论文的核心方法进行组会追问。' },
+      { label: '围绕实验设计追问', prompt: '请围绕这篇论文的实验设计进行组会追问。' },
+      { label: '围绕局限性追问', prompt: '请围绕这篇论文的局限性进行组会追问。' },
+    ]
+  }
+  return [
+    { label: '真正解决了什么问题？', prompt: '这篇论文真正解决了什么问题？' },
+    { label: '核心方法为什么有效？', prompt: '核心方法为什么有效？' },
+    { label: '实验是否支撑结论？', prompt: '实验结果足以支持作者的结论吗？' },
+  ]
+})
+
 const inputPlaceholder = computed(() => {
   if (mode.value === 'evidence') return '问证据，例如：这个结论靠哪类实验或正文段落支撑？'
   if (mode.value === 'advisor') return '写下你想被追问的点；留空则按整篇论文生成组会问题'
@@ -129,8 +151,31 @@ async function askPaper(request: AskRequest, answerMode: 'full_paper' | 'evidenc
   return response
 }
 
-function useSuggestion(suggestion: string) {
+function useSuggestion(suggestion: string, nextMode: AskMode = 'paper') {
+  mode.value = nextMode
   input.value = suggestion
+}
+
+function isEvidenceLookupQuestion(question: string) {
+  const normalized = question.toLowerCase().replace(/\s+/g, '')
+  return [
+    /原文/,
+    /出处/,
+    /页码|第几页|哪(?:一)?页/,
+    /哪(?:一)?段|哪(?:一)?句/,
+    /引用/,
+    /证据/,
+    /依据/,
+    /支撑|支持/,
+    /文中哪里|论文哪里|在哪里(?:提到|说明|写)/,
+    /\b(?:quote|citation|evidence|page|paragraph|source)\b/,
+  ].some(pattern => pattern.test(normalized))
+}
+
+function answerModeForQuestion(question: string): 'full_paper' | 'evidence_only' {
+  if (mode.value === 'evidence' && isEvidenceLookupQuestion(question)) return 'evidence_only'
+  if (mode.value === 'evidence') mode.value = 'paper'
+  return 'full_paper'
 }
 
 function clearSelectedContext() {
@@ -208,6 +253,7 @@ async function loadMemory() {
 async function send() {
   const question = compactInlineText(input.value)
   if (!question || isLoading.value || !store.currentJobId) return
+  const answerMode = answerModeForQuestion(question)
   const selectedText = selectedPayloadText()
   const conversationHistory = conversationHistoryPayload()
   store.addMessage({ role: 'user', content: question, timestamp: Date.now() })
@@ -222,7 +268,7 @@ async function send() {
       context_scope: selectedText ? 'selection' : 'paper',
       conversation_history: conversationHistory,
     }
-    await askPaper(request, mode.value === 'evidence' ? 'evidence_only' : 'full_paper')
+    await askPaper(request, answerMode)
     await loadMemory()
   } catch (error) {
     const message = apiErrorMessage(error, 'M4 请求失败，请稍后再试。')
@@ -338,11 +384,12 @@ async function clearMemory() {
 }
 
 function chooseMode(nextMode: AskMode) {
+  const currentInput = input.value.trim()
+  const generatedPrompts = Object.values(modePrompts).filter(Boolean)
+  const shouldReplacePrompt = !currentInput || generatedPrompts.includes(currentInput)
   mode.value = nextMode
   const prompt = modePrompts[nextMode]
-  if (prompt && !input.value.trim()) {
-    input.value = prompt
-  }
+  if (shouldReplacePrompt) input.value = prompt
 }
 
 async function handleModeKeydown(event: KeyboardEvent, currentIndex: number) {
@@ -470,9 +517,14 @@ watch(fontSize, (value) => {
         <h3>从理解论文开始</h3>
         <p>先问一个具体问题，之后可以直接用“它”“为什么”“展开讲”连续追问。</p>
         <div class="starter-prompts">
-          <button type="button" @click="useSuggestion('这篇论文真正解决了什么问题？')">真正解决了什么问题？</button>
-          <button type="button" @click="useSuggestion('核心方法为什么有效？')">核心方法为什么有效？</button>
-          <button type="button" @click="useSuggestion('实验结果足以支持作者的结论吗？')">实验是否支撑结论？</button>
+          <button
+            v-for="starter in starterPrompts"
+            :key="starter.prompt"
+            type="button"
+            @click="useSuggestion(starter.prompt, mode)"
+          >
+            {{ starter.label }}
+          </button>
         </div>
       </div>
 
@@ -502,7 +554,7 @@ watch(fontSize, (value) => {
               v-for="suggestion in msg.followUpSuggestions"
               :key="suggestion"
               type="button"
-              @click="useSuggestion(suggestion)"
+              @click="useSuggestion(suggestion, 'paper')"
             >
               {{ suggestion }}
             </button>

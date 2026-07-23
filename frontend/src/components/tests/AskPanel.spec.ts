@@ -329,6 +329,48 @@ describe('AskPanel', () => {
     })
   })
 
+  it('routes explanation questions back to full-paper mode instead of returning raw evidence', async () => {
+    const fetchMock = mockM4Fetch()
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('#m4-mode-evidence').trigger('click')
+    await wrapper.get('[data-testid="ask-input"]').setValue('请按实际执行顺序展开论文的核心方法。')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const askCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/ask'))
+    expect(JSON.parse(String((askCall![1] as RequestInit).body))).toMatchObject({
+      question: '请按实际执行顺序展开论文的核心方法。',
+      answer_mode: 'full_paper',
+    })
+    expect(wrapper.get('#m4-mode-paper').attributes('aria-selected')).toBe('true')
+  })
+
+  it('shows mode-specific starter prompts and sends evidence starters as strict lookup', async () => {
+    const fetchMock = mockM4Fetch()
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('#m4-mode-evidence').trigger('click')
+    const starter = wrapper.findAll('.starter-prompts button').find(button => button.text().includes('核心方法对应哪些原文'))
+    expect(starter).toBeDefined()
+    await starter!.trigger('click')
+    expect(wrapper.get('[data-testid="ask-input"]').element).toHaveProperty(
+      'value',
+      '这篇论文的核心方法对应哪些原文段落或页码？',
+    )
+
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    const askCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/ask'))
+    expect(JSON.parse(String((askCall![1] as RequestInit).body))).toMatchObject({
+      answer_mode: 'evidence_only',
+    })
+  })
+
   it('answers a custom user question before creating a focused advisor question', async () => {
     const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)
