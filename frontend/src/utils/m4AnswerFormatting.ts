@@ -1,14 +1,12 @@
 export type AnswerTone = 'lead' | 'concept' | 'evidence' | 'caution' | 'followup' | 'plain'
+export type AnswerKind = 'heading' | 'paragraph' | 'list'
 
 export type AnswerBlock = {
   text: string
   tone: AnswerTone
   label: string
-}
-
-export type AnswerSegment = {
-  text: string
-  highlighted: boolean
+  kind: AnswerKind
+  items: string[]
 }
 
 const toneLabels: Record<AnswerTone, string> = {
@@ -19,12 +17,6 @@ const toneLabels: Record<AnswerTone, string> = {
   followup: '继续',
   plain: '',
 }
-
-const highlightTerms = [
-  '核心问题', '核心方法', '关键机制', '关键', '直觉', '机制', '证据', '依据',
-  '结论', '限制', '公式', '变量', '实验', '消融', '结果', '注意力', 'attention',
-  'embedding', 'loss', 'reward',
-]
 
 export function compactInlineText(value: string) {
   return value
@@ -46,11 +38,17 @@ export function normalizeMessageText(value: string) {
     .trim()
 }
 
-function splitAnswerText(content: string) {
-  return content
+type ParsedBlock = {
+  text: string
+  kind: AnswerKind
+  items: string[]
+}
+
+function splitAnswerText(content: string): ParsedBlock[] {
+  const parts = content
     .replace(/\r\n/g, '\n')
     .replace(/^\s{0,3}[-*_]{3,}\s*$/gm, '')
-    .replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, '\n\n$1\n\n')
+    .replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, '\n\n§heading§$1\n\n')
     .replace(/^\s*\|?(?:\s*:?-+:?\s*\|)+\s*$/gm, '')
     .replace(/^\s*\|(.+)\|\s*$/gm, (_line, cells: string) => {
       const values = cells.split('|').map(value => value.trim()).filter(Boolean)
@@ -63,6 +61,25 @@ function splitAnswerText(content: string) {
     .split(/\n\s*\n|\n(?=\s*(?:\d+[.、]|[-*•]\s|[（(]?\d+[）)]))/)
     .map(part => part.replace(/\s*\n\s*/g, ' ').trim())
     .filter(Boolean)
+    .map((part): ParsedBlock => {
+      if (part.startsWith('§heading§')) {
+        return { text: part.slice('§heading§'.length).trim(), kind: 'heading', items: [] }
+      }
+      if (part.startsWith('• ')) {
+        return { text: '', kind: 'list', items: [part.slice(2).trim()] }
+      }
+      return { text: part, kind: 'paragraph', items: [] }
+    })
+
+  return parts.reduce<ParsedBlock[]>((blocks, part) => {
+    const previous = blocks.at(-1)
+    if (part.kind === 'list' && previous?.kind === 'list') {
+      previous.items.push(...part.items)
+      return blocks
+    }
+    blocks.push(part)
+    return blocks
+  }, [])
 }
 
 function answerTone(text: string, index: number): AnswerTone {
@@ -77,39 +94,17 @@ function answerTone(text: string, index: number): AnswerTone {
 }
 
 export function answerBlocks(content: string): AnswerBlock[] {
-  return splitAnswerText(content).map((text, index) => {
-    const tone = answerTone(text, index)
-    return { text, tone, label: toneLabels[tone] }
+  let paragraphIndex = 0
+  return splitAnswerText(content).map((block) => {
+    if (block.kind === 'heading') {
+      return { ...block, tone: 'plain', label: '' }
+    }
+    if (block.kind === 'list') {
+      return { ...block, tone: 'plain', label: '' }
+    }
+    const tone = answerTone(block.text, paragraphIndex++)
+    return { ...block, tone, label: toneLabels[tone] }
   })
-}
-
-export function highlightSegments(text: string): AnswerSegment[] {
-  const segments: AnswerSegment[] = []
-  const lowerText = text.toLowerCase()
-  const terms = [...highlightTerms].sort((a, b) => b.length - a.length)
-  let cursor = 0
-
-  while (cursor < text.length) {
-    let bestIndex = -1
-    let bestTerm = ''
-    for (const term of terms) {
-      const index = lowerText.indexOf(term.toLowerCase(), cursor)
-      if (index === -1) continue
-      if (bestIndex === -1 || index < bestIndex || (index === bestIndex && term.length > bestTerm.length)) {
-        bestIndex = index
-        bestTerm = term
-      }
-    }
-    if (bestIndex === -1) {
-      segments.push({ text: text.slice(cursor), highlighted: false })
-      break
-    }
-    if (bestIndex > cursor) segments.push({ text: text.slice(cursor, bestIndex), highlighted: false })
-    segments.push({ text: text.slice(bestIndex, bestIndex + bestTerm.length), highlighted: true })
-    cursor = bestIndex + bestTerm.length
-  }
-
-  return segments.length ? segments : [{ text, highlighted: false }]
 }
 
 export function contextSizeLabel(chars = 0) {

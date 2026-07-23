@@ -124,7 +124,7 @@ describe('AskPanel', () => {
     expect(wrapper.find('.answer-block.tone-lead').text()).toContain('回答')
     expect(wrapper.find('.answer-block.tone-concept').text()).toContain('关键机制')
     expect(wrapper.find('.answer-block.tone-evidence').text()).toContain('证据')
-    expect(wrapper.findAll('.answer-keyword').map(node => node.text())).toContain('证据')
+    expect(wrapper.findAll('.answer-keyword')).toHaveLength(0)
     expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('4.8 万字全文')
     expect(wrapper.text()).toContain('为什么这种机制能连接稀疏证据？')
     expect(wrapper.text()).not.toContain('paper:b001')
@@ -238,8 +238,10 @@ describe('AskPanel', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('核心方法')
+    expect(wrapper.get('.answer-heading').text()).toBe('核心方法')
     expect(wrapper.text()).toContain('第一步：读取图像。')
-    expect(wrapper.text()).toContain('• 继续追踪根节点。')
+    expect(wrapper.text()).toContain('继续追踪根节点。')
+    expect(wrapper.get('.answer-list').text()).toContain('继续追踪根节点。')
     expect(wrapper.text()).not.toContain('###')
     expect(wrapper.text()).not.toContain('**')
     expect(wrapper.text()).not.toContain('---')
@@ -265,8 +267,9 @@ describe('AskPanel', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('• 弯曲根 · 缩短节点间距')
-    expect(wrapper.text()).toContain('• 交叉根 · 约束直径')
+    expect(wrapper.text()).toContain('弯曲根 · 缩短节点间距')
+    expect(wrapper.text()).toContain('交叉根 · 约束直径')
+    expect(wrapper.get('.answer-list').findAll('li')).toHaveLength(2)
     expect(wrapper.text()).not.toContain('|---|')
   })
 
