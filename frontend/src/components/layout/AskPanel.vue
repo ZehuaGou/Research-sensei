@@ -3,8 +3,8 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useLearningStore, type ChatMessage } from '../../stores/learning'
 import { apiErrorMessage, workspaceApi } from '../../api/client'
 import type { AdvisorEvaluateRequest, AdvisorQuestionRequest, AskRequest, AskResponse } from '../../types/api'
+import MarkdownAnswer from './MarkdownAnswer.vue'
 import {
-  answerBlocks,
   clipText,
   compactInlineText,
   contextSizeLabel,
@@ -479,23 +479,7 @@ watch(fontSize, (value) => {
             <span v-if="msg.contextTrace.model">{{ msg.contextTrace.model }}</span>
           </div>
           <div class="bubble answer-bubble">
-            <template
-              v-for="(block, blockIndex) in answerBlocks(msg.content)"
-              :key="`${index}-${blockIndex}-${block.text.slice(0, 18)}`"
-            >
-              <h4 v-if="block.kind === 'heading'" class="answer-heading">{{ block.text }}</h4>
-              <ul v-else-if="block.kind === 'list'" class="answer-list">
-                <li v-for="item in block.items" :key="item">{{ item }}</li>
-              </ul>
-              <p
-                v-else
-                class="answer-block"
-                :class="`tone-${block.tone}`"
-              >
-                <span v-if="block.label" class="answer-label">{{ block.label }}</span>
-                <span class="answer-text">{{ block.text }}</span>
-              </p>
-            </template>
+            <MarkdownAnswer :content="msg.content" />
           </div>
           <p v-if="msg.status === 'DEGRADED' && msg.uncertainty" class="answer-uncertainty">{{ msg.uncertainty }}</p>
           <div v-if="msg.followUpSuggestions?.length" class="follow-up-row" aria-label="建议追问">

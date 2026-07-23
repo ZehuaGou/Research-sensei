@@ -121,10 +121,7 @@ describe('AskPanel', () => {
     })
     expect(wrapper.text()).toContain('模型不是平均看所有证据')
     expect(wrapper.find('.answer-bubble').exists()).toBe(true)
-    expect(wrapper.find('.answer-block.tone-lead').text()).toContain('回答')
-    expect(wrapper.find('.answer-block.tone-concept').text()).toContain('关键机制')
-    expect(wrapper.find('.answer-block.tone-evidence').text()).toContain('证据')
-    expect(wrapper.findAll('.answer-keyword')).toHaveLength(0)
+    expect(wrapper.get('.markdown-answer').findAll('p')).toHaveLength(3)
     expect(wrapper.get('[data-testid="context-trace"]').text()).toContain('4.8 万字全文')
     expect(wrapper.text()).toContain('为什么这种机制能连接稀疏证据？')
     expect(wrapper.text()).not.toContain('paper:b001')
@@ -238,10 +235,11 @@ describe('AskPanel', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('核心方法')
-    expect(wrapper.get('.answer-heading').text()).toBe('核心方法')
+    expect(wrapper.get('.markdown-answer h3').text()).toBe('核心方法')
     expect(wrapper.text()).toContain('第一步：读取图像。')
     expect(wrapper.text()).toContain('继续追踪根节点。')
-    expect(wrapper.get('.answer-list').text()).toContain('继续追踪根节点。')
+    expect(wrapper.get('.markdown-answer ul').text()).toContain('继续追踪根节点。')
+    expect(wrapper.get('.markdown-answer strong').text()).toBe('第一步')
     expect(wrapper.text()).not.toContain('###')
     expect(wrapper.text()).not.toContain('**')
     expect(wrapper.text()).not.toContain('---')
@@ -267,10 +265,39 @@ describe('AskPanel', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('弯曲根 · 缩短节点间距')
-    expect(wrapper.text()).toContain('交叉根 · 约束直径')
-    expect(wrapper.get('.answer-list').findAll('li')).toHaveLength(2)
+    const rows = wrapper.get('.markdown-answer table').findAll('tr')
+    expect(rows).toHaveLength(3)
+    expect(rows[1].text()).toContain('弯曲根')
+    expect(rows[1].text()).toContain('缩短节点间距')
+    expect(rows[2].text()).toContain('交叉根')
+    expect(rows[2].text()).toContain('约束直径')
     expect(wrapper.text()).not.toContain('|---|')
+  })
+
+  it('escapes model HTML and renders fenced latex with KaTeX', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) return jsonResponse({ records: [] })
+      if (url.endsWith('/ask')) return jsonResponse({
+        status: 'SUCCESS',
+        answer: '### 公式\n\n<script>window.bad = true</script>\n\n```latex\ny = Wx + b\n```',
+        evidence_refs: [],
+        context_trace: { scope: 'paper', context_mode: 'full_paper', evidence_count: 0 },
+      })
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('解释公式')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('.markdown-answer script').exists()).toBe(false)
+    expect(wrapper.text()).toContain('<script>window.bad = true</script>')
+    expect(wrapper.html()).toContain('markdown-math')
+    expect(wrapper.html()).toContain('katex')
   })
 
   it('keeps strict lookup only when the user explicitly chooses 找证据', async () => {
@@ -318,7 +345,7 @@ describe('AskPanel', () => {
       selected_text: 'Attention helps connect scattered evidence.',
     })
     expect(wrapper.text()).toContain('模型不是平均看所有证据')
-    expect(wrapper.findAll('.answer-block').length).toBeGreaterThanOrEqual(3)
+    expect(wrapper.get('.markdown-answer').findAll('p')).toHaveLength(3)
     expect(wrapper.text()).toContain('围绕你的问题：为什么这个方法能处理稀疏证据？')
     expect(wrapper.get('[data-testid="advisor-card"]').text()).toContain('先用一句自然话回答你真正想问的点')
     expect(wrapper.text()).not.toContain('paper:b001')

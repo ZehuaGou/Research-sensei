@@ -116,6 +116,7 @@ def test_default_question_reuses_opencode_session_and_tutor_model(tmp_path: Path
     assert result.evidence_refs
     assert agent.calls[0]["session_id"] == "ses-paper"
     assert agent.calls[0]["model"] == "mimo-v2.5"
+    assert "Markdown 正文" in agent.calls[0]["question"]
 
 
 def test_evidence_only_is_explicit_and_does_not_call_model(tmp_path: Path) -> None:
