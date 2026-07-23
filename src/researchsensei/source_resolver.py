@@ -163,6 +163,7 @@ class PaperSourceResolver:
         if paper.arxiv_id:
             arxiv_pdf = SourceResolver.arxiv_to_pdf_url(arxiv_id=paper.arxiv_id)
             pdf_url = pdf_url or arxiv_pdf
+            pdf_urls = _ordered_pdf_urls([pdf_url, *pdf_urls])
             source_url = self.arxiv_to_source_url(paper.arxiv_id)
             landing_url = landing_url or self.arxiv_to_abs_url(paper.arxiv_id)
             source_type = PaperSourceType.ARXIV_SOURCE
@@ -175,7 +176,51 @@ class PaperSourceResolver:
                     download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
                 )
                 if source_result is not None:
-                    return source_result
+                    if source_result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED:
+                        return source_result
+                    pdf_result = self._download_pdf(
+                        paper,
+                        pdf_url=pdf_url,
+                        source_url=source_url,
+                        landing_url=landing_url,
+                        source_type=PaperSourceType.PDF,
+                        download_dir=Path(download_dir or self.download_dir),  # type: ignore[arg-type]
+                    )
+                    if pdf_result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED:
+                        return pdf_result.model_copy(
+                            update={
+                                "warnings": [*source_result.warnings, *pdf_result.warnings],
+                                "metadata": {
+                                    **source_result.metadata,
+                                    **pdf_result.metadata,
+                                    "resolution_strategy": "arxiv_source_plus_pdf",
+                                    "latex_source_retained": "true",
+                                },
+                                "source_priority": SourcePriority.PDF,
+                                "preferred_m2_input": "pdf",
+                                "has_valid_deep_reading_source": True,
+                                "latex_source_available": source_result.latex_source_available,
+                                "latex_source_downloaded": source_result.latex_source_downloaded,
+                                "latex_main_file": source_result.latex_main_file,
+                                "latex_source_path": source_result.latex_source_path,
+                            }
+                        )
+                    return source_result.model_copy(
+                        update={
+                            "warnings": [
+                                *source_result.warnings,
+                                WarningItem(
+                                    code="PAPER_AGENT_PDF_UNAVAILABLE",
+                                    message="LaTeX source was retained, but no validated PDF is available for the paper agent.",
+                                ),
+                            ],
+                            "metadata": {
+                                **source_result.metadata,
+                                "pdf_download_error": pdf_result.error or pdf_result.error_code,
+                            },
+                        }
+                    )
+                source_type = PaperSourceType.PDF
 
         pmcid = _paper_pmcid(paper)
         if pmcid and self.network_enabled and (download_dir or self.download_dir):
@@ -790,6 +835,32 @@ class PaperSourceResolver:
             return None
         source_path = Path(status.resolved_path)
         content = source_path.read_bytes()
+        if content.startswith(PDF_BYTES) or status.preferred_m2_input == "pdf":
+            meta_check, title_match, meta_warning = _check_pdf_metadata(content, paper.title)
+            return self._base_result(
+                paper,
+                status=PaperSourceStatus.RESOLVED_PDF_DOWNLOADED,
+                source_type=PaperSourceType.PDF,
+                source_url=source_url,
+                pdf_url=pdf_url,
+                landing_url=landing_url,
+                download_status="downloaded",
+                content_type="application/pdf",
+                file_size=source_path.stat().st_size,
+                sha256=hashlib.sha256(content).hexdigest(),
+                local_path=str(source_path),
+                warnings=[WarningItem(code=warning, message=warning) for warning in status.warnings],
+                pdf_metadata_check=meta_check,
+                pdf_title_match=title_match,
+                pdf_metadata_warning=meta_warning,
+                metadata={
+                    "resolution_strategy": status.source_strategy or "arxiv_pdf_fallback",
+                    "fallback_used": status.fallback_used,
+                },
+                source_priority=SourcePriority.PDF,
+                preferred_m2_input="pdf",
+                has_valid_deep_reading_source=True,
+            )
         return self._base_result(
             paper,
             status=PaperSourceStatus.RESOLVED,

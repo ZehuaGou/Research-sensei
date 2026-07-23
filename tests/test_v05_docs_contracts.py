@@ -47,7 +47,19 @@ def test_module_contracts_cover_every_required_module():
 
 def test_reuse_report_marks_external_tools_as_replaceable():
     text = Path("docs/REUSE_REPORT.md").read_text(encoding="utf-8")
-    for tool in ["paper-search-mcp", "GPT-Researcher", "PaperQA2", "Docling", "Marker", "GROBID"]:
+    for tool in ["paper-search-mcp", "OpenCode Server", "OpenCode Go", "PyMuPDF"]:
         assert tool in text
     assert "OPTIONAL_ADAPTER" in text
     assert "替换" in text
+
+
+def test_current_architecture_documents_single_pdf_agent_path():
+    text = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    for phrase in [
+        "M1: discovery and acquisition",
+        "M2: one paper agent, two models",
+        "M3: reader workspace",
+        "M4: session-first full-paper tutoring",
+        "never hidden by parser fallback",
+    ]:
+        assert phrase in text

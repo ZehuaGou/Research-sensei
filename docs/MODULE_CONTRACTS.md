@@ -199,12 +199,12 @@ Boundary: restart marks stale running work explicitly; duplicate active source
 identity is rejected unless force semantics create a distinct identity; cleanup
 is restricted to workspace-managed roots.
 
-## Canonical Parser Boundary
+## OpenCode Paper-Agent Boundary
 
-- MinerU2.5-Pro via mineru-vl-utils is the primary M1 parser.
-- Marker is fallback/audit baseline.
-- Ollama is an optional structured refiner.
-- Ollama must not modify latex, bbox, page, or source identity.
-- M1 gate blocks all-formulas-in-Abstract.
-- M1 gate blocks section contradiction.
-- M1 gate blocks missing latex/crop/overlay.
+- A verified local PDF is the M1-to-M2 handoff; search metadata is not enough.
+- The configured OpenCode session is the only semantic PDF-analysis path.
+- PyMuPDF supplies deterministic page text, numbering, rendering and validation.
+- The vision model and tutor model are independent runtime settings.
+- An enabled paper-agent failure is explicit and never hidden by parser fallback.
+- Evidence refs, formula provenance, QualityAuditor and display gates remain
+  project-owned and cannot be overwritten by model prose.

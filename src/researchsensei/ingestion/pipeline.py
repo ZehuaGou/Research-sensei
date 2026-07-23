@@ -15,7 +15,6 @@ from researchsensei.formula_card_baseline import build_formula_cards as build_fo
 from researchsensei.formula_card import build_formula_cards
 from researchsensei.grounding import build_evidence_index
 from researchsensei.ingestion.lightweight import LightweightIngestionService
-from researchsensei.ingestion.mineru_enhanced import MineruEnhancedIngestionService
 from researchsensei.ingestion.opencode_agent import OpenCodePaperAgent
 from researchsensei.jobs import DuplicateSourceJobError, JobStore
 from researchsensei.llm.client import LLMClient
@@ -78,7 +77,7 @@ class SinglePaperIngestionRunner:
         self,
         workspace: WorkspaceStore,
         jobs: JobStore,
-        ingestion: LightweightIngestionService | MineruEnhancedIngestionService | None = None,
+        ingestion: LightweightIngestionService | None = None,
         parser_adapter: ParserAdapter | None = None,
         llm_client: LLMClient | None = None,
         paper_agent: OpenCodePaperAgent | None = None,
@@ -130,10 +129,10 @@ class SinglePaperIngestionRunner:
                 current_step="parsing_document",
             )
             report("parsing_document", 20)
-            # OpenCode owns the primary PDF semantic path. PyMuPDF still
-            # preserves complete page text and remains the safe fallback when
-            # the local server or a visual model is unavailable.
-            paper_agent_error: Exception | None = None
+            # OpenCode owns the configured PDF semantic path. Once enabled, a
+            # model failure is explicit: silently substituting page-text
+            # extraction produced plausible-looking but materially different
+            # results and made production failures hard to diagnose.
             if self.paper_agent is not None and copied_source.suffix.lower() == ".pdf":
                 try:
                     document = self.paper_agent.ingest_path(
@@ -142,18 +141,15 @@ class SinglePaperIngestionRunner:
                         progress=report,
                     )
                 except Exception as exc:
-                    paper_agent_error = exc
-                    logger.warning(
-                        "OpenCode PDF ingestion failed for %s; using maintained parser fallback: %s",
+                    logger.exception(
+                        "OpenCode PDF ingestion failed for %s; refusing silent parser fallback: %s",
                         actual_job_id,
                         exc,
-                        exc_info=True,
                     )
-                    document = self.ingestion.ingest_path(
-                        copied_source,
-                        paper_id=actual_job_id,
-                        progress=report,
-                    )
+                    raise RuntimeError(
+                        "OpenCode PDF analysis failed; retry the paper agent or select another "
+                        f"vision model. {type(exc).__name__}: {str(exc)[:300]}"
+                    ) from exc
             elif self.parser_adapter is not None:
                 if not self.parser_adapter.supports(copied_source):
                     raise ValueError(
@@ -166,23 +162,6 @@ class SinglePaperIngestionRunner:
                     copied_source,
                     paper_id=actual_job_id,
                     progress=report,
-                )
-            if paper_agent_error is not None:
-                document = document.model_copy(
-                    update={
-                        "degraded": True,
-                        "warnings": [
-                            *document.warnings,
-                            WarningItem(
-                                code="OPENCODE_PDF_AGENT_FAILED",
-                                message=(
-                                    "OpenCode PDF agent was unavailable; page text was preserved by "
-                                    f"the fallback parser. {type(paper_agent_error).__name__}: "
-                                    f"{str(paper_agent_error)[:300]}"
-                                ),
-                            ),
-                        ],
-                    }
                 )
             document = _apply_title_hint(document, title_hint)
             report("indexing_evidence", 32)

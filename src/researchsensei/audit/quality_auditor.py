@@ -364,14 +364,14 @@ class QualityAuditor:
 
     def _check_formula_source(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
         findings: list[AuditFinding] = []
-        findings.extend(self._check_canonical_trace(artifacts))
+        findings.extend(self._check_source_trace(artifacts))
         findings.extend(self._check_formula_cards_provenance(artifacts))
         findings.extend(self._check_formula_card_coverage(artifacts))
         findings.extend(self._check_blocked_canonical_no_cards(artifacts))
         findings.extend(self._check_formula_claim_risks(artifacts))
         return findings
 
-    def _check_canonical_trace(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
+    def _check_source_trace(self, artifacts: ArtifactBundle) -> list[AuditFinding]:
         findings: list[AuditFinding] = []
         claims_by_ref = {
             str(claim.get("evidence_ref") or ""): claim
@@ -385,13 +385,26 @@ class QualityAuditor:
             claim = claims_by_ref.get(ref)
             if not claim:
                 continue
-            source_path = str(claim.get("canonical_source_path") or "")
-            if source_path and source_path != "canonical_paper.md":
+            source_path = str(
+                claim.get("source_artifact_path")
+                or claim.get("canonical_source_path")
+                or ""
+            )
+            allowed_sources = {
+                "parsed_document.json",
+                "opencode_analysis.json",
+                "paper.md",
+                "canonical_paper.md",  # read compatibility for existing workspaces
+            }
+            if source_path and source_path not in allowed_sources:
                 findings.append(AuditFinding(
                     code="F-13",
                     severity="P0",
                     effect="BLOCK",
-                    message=f"{artifact}.{field} evidence_ref '{ref}' does not trace to canonical_paper.md",
+                    message=(
+                        f"{artifact}.{field} evidence_ref '{ref}' does not trace to a "
+                        "workspace-owned paper artifact"
+                    ),
                     artifact=artifact,
                     field=field,
                 ))

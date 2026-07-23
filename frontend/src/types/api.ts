@@ -43,7 +43,7 @@ export interface AskRequest {
   question: string
   selected_text?: string
   context_scope: 'selection' | 'paper'
-  answer_mode?: 'full_paper' | 'evidence_only' | 'enhanced'
+  answer_mode?: 'full_paper' | 'evidence_only'
   conversation_history?: ConversationMessageRequest[]
 }
 
@@ -56,6 +56,7 @@ export interface M4ContextTrace {
   selected_text_used: boolean
   full_text_chars?: number
   full_text_complete?: boolean
+  model?: string
 }
 
 export interface AskResponse {
@@ -239,6 +240,8 @@ export interface SettingsPayload {
   paper_agent_enabled?: boolean
   paper_agent_model?: string
   paper_agent_model_options?: Array<{ id: string; label?: string; source?: string }>
+  paper_tutor_model?: string
+  paper_tutor_model_options?: Array<{ id: string; label?: string; source?: string }>
   paper_agent_base_url?: string
   model_env?: string
   route_note?: string

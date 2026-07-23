@@ -46,7 +46,7 @@ class AppRuntimeConfig(ConfigModel):
     workspace_dir: str = "workspace"
     default_learning_mode: str = "reproducible_2h"
     max_upload_mb: int = Field(default=80, gt=0, le=1024)
-    parser_backend: Literal["mineru", "pymupdf", "lightweight"] = "pymupdf"
+    parser_backend: Literal["pymupdf", "lightweight"] = "pymupdf"
 
     @field_validator("parser_backend", mode="before")
     @classmethod
@@ -86,14 +86,17 @@ class OpenCodeConfig(ConfigModel):
     auto_start: bool = True
     command: str = "opencode"
     provider_id: str = "opencode-go"
+    # Vision and tutoring are deliberately separate.  A model can be an
+    # excellent long-context tutor without being reliable at equation OCR.
     model: str = "qwen3.7-plus"
+    tutor_model: str = "mimo-v2.5"
     timeout_seconds: int = Field(default=600, gt=0, le=1800)
     startup_timeout_seconds: int = Field(default=20, gt=0, le=120)
     page_batch_size: int = Field(default=4, ge=1, le=8)
     max_pages: int = Field(default=120, ge=1, le=500)
     render_scale: float = Field(default=1.7, ge=1.0, le=3.0)
 
-    @field_validator("base_url", "command", "provider_id", "model")
+    @field_validator("base_url", "command", "provider_id", "model", "tutor_model")
     @classmethod
     def opencode_value_must_not_be_empty(cls, value: str) -> str:
         cleaned = value.strip()
@@ -178,7 +181,7 @@ class SearchConfig(ConfigModel):
 
 
 class AppConfig(ConfigModel):
-    active_provider: str = "cc_switch"
+    active_provider: str = "opencode_go"
     providers: dict[str, ModelProviderConfig] = Field(default_factory=dict)
     app: AppRuntimeConfig = Field(default_factory=AppRuntimeConfig)
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -214,7 +217,7 @@ class ConfigService:
         data = _apply_environment_overrides(data)
         providers = self._build_providers(data.get("providers") or {})
         active_provider = _canonical_provider_name(
-            os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or data.get("active_provider", "cc_switch"),
+            os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or data.get("active_provider", "opencode_go"),
             providers,
         )
         model_override = os.getenv("RESEARCHSENSEI_LLM_MODEL", "").strip()
@@ -251,12 +254,12 @@ class ConfigService:
     def _build_providers(self, data: dict[str, Any]) -> dict[str, ModelProviderConfig]:
         if not data:
             data = {
-                "cc_switch": {
-                    "kind": "anthropic_compatible",
-                    "base_url": "http://127.0.0.1:15721/v1",
-                    "api_key_env": "",
-                    "model": "claude-sonnet-4-6",
-                    "auth_header": "none",
+                "opencode_go": {
+                    "kind": "openai_compatible",
+                    "base_url": "https://opencode.ai/zen/go/v1",
+                    "api_key_env": "OPENCODE_GO_API_KEY",
+                    "model": "deepseek-v4-flash",
+                    "auth_header": "authorization",
                     "timeout_seconds": 120,
                 }
             }
@@ -302,6 +305,7 @@ def _apply_environment_overrides(data: dict[str, Any]) -> dict[str, Any]:
     _set_if_present(opencode, "command", "RESEARCHSENSEI_OPENCODE_COMMAND")
     _set_if_present(opencode, "provider_id", "RESEARCHSENSEI_OPENCODE_PROVIDER")
     _set_if_present(opencode, "model", "RESEARCHSENSEI_OPENCODE_MODEL")
+    _set_if_present(opencode, "tutor_model", "RESEARCHSENSEI_OPENCODE_TUTOR_MODEL")
     _set_if_present(opencode, "timeout_seconds", "RESEARCHSENSEI_OPENCODE_TIMEOUT_SECONDS", cast=int)
     _set_if_present(opencode, "page_batch_size", "RESEARCHSENSEI_OPENCODE_PAGE_BATCH_SIZE", cast=int)
     _set_if_present(opencode, "max_pages", "RESEARCHSENSEI_OPENCODE_MAX_PAGES", cast=int)

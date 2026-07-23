@@ -72,6 +72,44 @@ def test_settings_patch_saves_model_override_to_env_file(tmp_path: Path, monkeyp
     assert 'RESEARCHSENSEI_LLM_MODEL="new-cici-model"' in env_path.read_text(encoding="utf-8")
 
 
+def test_settings_selects_paper_vision_and_tutor_models_independently(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config_path = tmp_path / "local.toml"
+    env_path = tmp_path / ".env"
+    _write_config(config_path, active_provider="opencode_go")
+    with config_path.open("a", encoding="utf-8") as handle:
+        handle.write(
+            '\n\n[opencode]\nenabled = true\nmodel = "qwen3.7-plus"\n'
+            'tutor_model = "mimo-v2.5"\n'
+        )
+    monkeypatch.delenv("RESEARCHSENSEI_OPENCODE_MODEL", raising=False)
+    monkeypatch.delenv("RESEARCHSENSEI_OPENCODE_TUTOR_MODEL", raising=False)
+
+    client = TestClient(create_app(
+        workspace_root=tmp_path / "workspace",
+        config_service=ConfigService(config_path=config_path, env_path=env_path),
+    ))
+
+    initial = client.get("/api/v1/settings").json()
+    assert initial["paper_agent_model"] == "qwen3.7-plus"
+    assert initial["paper_tutor_model"] == "mimo-v2.5"
+
+    response = client.patch(
+        "/api/v1/settings",
+        json={"paper_model": "mimo-v2.5", "tutor_model": "qwen3.7-plus"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["paper_agent_model"] == "mimo-v2.5"
+    assert data["paper_tutor_model"] == "qwen3.7-plus"
+    env_text = env_path.read_text(encoding="utf-8")
+    assert 'RESEARCHSENSEI_OPENCODE_MODEL="mimo-v2.5"' in env_text
+    assert 'RESEARCHSENSEI_OPENCODE_TUTOR_MODEL="qwen3.7-plus"' in env_text
+
+
 def test_settings_endpoint_presents_ccswitch_name_and_keeps_config_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     config_path = tmp_path / "local.toml"
     _write_config(config_path, active_provider="cc_switch")

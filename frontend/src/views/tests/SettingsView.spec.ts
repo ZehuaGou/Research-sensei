@@ -130,7 +130,7 @@ describe('SettingsView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('OpenCode Go 模型接入')
-    expect(wrapper.text()).toContain('保存后立即用于后续 M2/M4 请求')
+    expect(wrapper.text()).toContain('PDF 识读模型和论文讲解模型分开选择')
     expect(wrapper.text()).toContain('并立即生效')
     expect(wrapper.get('[data-testid="model-select"]').findAll('option')).toHaveLength(3)
     expect(wrapper.get('[data-testid="model-select"]').text()).toContain('DeepSeek V4 Pro · OpenCode Go 接口')
@@ -167,5 +167,46 @@ describe('SettingsView', () => {
     expect(fetchMock.mock.calls[1][0]).toBe('/api/v1/settings/test')
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST' })
     expect(wrapper.text()).toContain('连接可用')
+  })
+
+  it('selects PDF vision and paper tutor models independently', async () => {
+    const baseSettings = {
+      active_provider: 'opencode_go',
+      provider_display_name: 'OpenCode Go',
+      base_url: 'https://opencode.ai/zen/go/v1',
+      api_key_env: 'OPENCODE_GO_API_KEY',
+      model: 'deepseek-v4-flash',
+      model_options: [{ id: 'deepseek-v4-flash' }],
+      paper_agent_enabled: true,
+      paper_agent_model: 'qwen3.7-plus',
+      paper_agent_model_options: [{ id: 'qwen3.7-plus' }, { id: 'mimo-v2.5' }],
+      paper_tutor_model: 'mimo-v2.5',
+      paper_tutor_model_options: [{ id: 'mimo-v2.5' }, { id: 'qwen3.7-plus' }],
+      llm_enabled: true,
+      api_key_configured: true,
+      provider_known: true,
+    }
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => baseSettings })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...baseSettings, paper_tutor_model: 'qwen3.7-plus' }),
+      })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const wrapper = mount(SettingsView)
+    await flushPromises()
+
+    expect((wrapper.get('[data-testid="paper-model-select"]').element as HTMLSelectElement).value).toBe('qwen3.7-plus')
+    expect((wrapper.get('[data-testid="tutor-model-select"]').element as HTMLSelectElement).value).toBe('mimo-v2.5')
+
+    await wrapper.get('[data-testid="tutor-model-select"]').setValue('qwen3.7-plus')
+    await wrapper.get('[data-testid="save-tutor-model"]').trigger('click')
+    await flushPromises()
+
+    expect(JSON.parse(String((fetchMock.mock.calls[1][1] as RequestInit).body))).toMatchObject({
+      tutor_model: 'qwen3.7-plus',
+    })
+    expect(wrapper.text()).toContain('论文讲解模型已保存')
   })
 })

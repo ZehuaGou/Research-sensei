@@ -27,7 +27,9 @@ export interface PaperWorkspaceStatus {
   pdf_title_match?: string
   can_enter_m2?: boolean
   source_confidence?: string | number
-  canonicalization_status?: string
+  paper_agent_status?: string
+  paper_agent_model?: string
+  paper_tutor_model?: string
   m2_ready?: boolean
   degradation_reason?: string
   formula_origin?: string

@@ -158,7 +158,7 @@ def _detect_venue_targets(raw_query: str, secondary_strings: list[str]) -> list[
 def detect_venue_openalex_source_ids(canonical_targets: Iterable[str]) -> list[str]:
     """Map a list of canonical_name strings to OpenAlex source IDs.
 
-    Used by DirectionRunner after the planner has produced venue_targets.
+    Used by DirectionExplorationService after the planner has produced venue targets.
     """
     out: list[str] = []
     seen: set[str] = set()

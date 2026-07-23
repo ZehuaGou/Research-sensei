@@ -1,11 +1,52 @@
 # ResearchSensei v0.6 Reliability Baseline Status
 
-Last updated: 2026-07-22 (Asia/Shanghai).
+Last updated: 2026-07-23 (Asia/Shanghai).
 
 This is the authoritative implementation and verification ledger for
 ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
+
+## 2026-07-23 OpenCode architecture convergence
+
+The maintained runtime now has one configured semantic PDF path. M1 hands a
+verified local PDF to the OpenCode paper agent; M2 renders page images and
+preserves page text/page numbers with PyMuPDF, then records one persistent
+OpenCode session. An enabled paper-agent failure is explicit and no longer
+silently replaced by the lightweight parser. The old canonical/MinerU/Marker
+pipeline, repair scripts, separate M2 full-pipeline/survey runner and the
+template-heavy M4 service were removed. See `docs/ARCHITECTURE.md`.
+
+Vision and tutoring models are independent settings. The current defaults are
+`qwen3.7-plus` for page/formula vision and `mimo-v2.5` for full-paper tutoring.
+This is based on local same-input checks rather than popularity: both models
+found five formulas on the formula page, but Qwen preserved `\\hat{x}_i^t`
+while MiMo transposed the indices to `\\hat{x}_t^i`. On the SmartRoot paper,
+MiMo produced a detailed tutor response in a similar latency range, so it is a
+useful tutor but not a universal replacement for Qwen vision.
+
+The M3 settings page exposes the general, PDF-vision and paper-tutor models
+separately. M4 modes are now **论文问答**, **原文证据** and **组会演练**;
+source-only mode does not call a model. Full-paper responses display the actual
+tutor model and restored conversation metadata. Large Vue component styles and
+M4 answer formatting were split into focused files; the settings layout was
+made container-safe for the persistent Codex-like sidebar.
+
+Verification for the current tree:
+
+| Check | Result |
+|---|---|
+| Backend unit/API suite | `645 passed` in 188.33s |
+| Frontend Vitest | `100 passed` |
+| Ruff / mypy / frontend production build | passed |
+| Real SmartRoot PDF | 11/11 pages, 99 blocks, 16 figures, 3 tables, no warnings; Qwen vision + MiMo tutor session |
+| Real cross-page M4 question | `SUCCESS`, 5,372 Chinese characters, 4 evidence refs, 59,814 full-text chars, 33.1s |
+| Real continued M4 question | `SUCCESS`, 4,133 characters, `continued_from_history=true`, `mimo-v2.5`, 31.8s |
+| Playwright | settings/workspace/M4 inspected; independent M4 scroll moved 900px while reader stayed at 0; no console errors |
+
+The SmartRoot paper contains no independent mathematical equations, so its
+zero formula-card count is expected and does not validate formula OCR. Formula
+vision was assessed separately on the equation-page fixture described above.
 
 ## 2026-07-22 OpenCode PDF paper agent and persistent M4 session
 

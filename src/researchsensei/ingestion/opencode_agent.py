@@ -67,6 +67,7 @@ class OpenCodePaperAnalysis(SenseiModel):
     analyzed_pages: int = 0
     provider_id: str = ""
     model: str = ""
+    tutor_model: str = ""
     mode: str = "rendered_pages"
     session_id: str = ""
     pages: list[PaperPageAnalysis] = Field(default_factory=list)
@@ -211,7 +212,12 @@ class OpenCodeServerClient:
             value = response.json()
         return value if isinstance(value, dict) else {}
 
-    def select_model(self, *, require_image: bool) -> tuple[str, str]:
+    def select_model(
+        self,
+        *,
+        require_image: bool,
+        preferred_model: str = "",
+    ) -> tuple[str, str]:
         payload = self.providers()
         providers = payload.get("all", [])
         provider = next(
@@ -230,15 +236,16 @@ class OpenCodeServerClient:
         if not isinstance(models, dict):
             raise OpenCodeAgentError("OpenCode provider returned no model catalogue.")
 
-        preferred = models.get(self.config.model)
+        requested_model = preferred_model or self.config.model
+        preferred = models.get(requested_model)
         if isinstance(preferred, dict) and self._supports(preferred, image=require_image):
-            return self.config.provider_id, self.config.model
+            return self.config.provider_id, requested_model
 
         for model_id, model in models.items():
             if isinstance(model, dict) and self._supports(model, image=require_image):
                 logger.warning(
                     "OpenCode model %s cannot inspect rendered PDF pages; using %s instead",
-                    self.config.model,
+                    requested_model,
                     model_id,
                 )
                 return self.config.provider_id, str(model_id)
@@ -363,7 +370,14 @@ class OpenCodePaperAgent:
         actual_paper_id = paper_id or source.stem
         report("opencode_preparing_pages", 20)
         page_texts, page_images, total_pages = self._render_pdf(source)
-        provider_id, model = self.client.select_model(require_image=True)
+        provider_id, model = self.client.select_model(
+            require_image=True,
+            preferred_model=self.config.model,
+        )
+        _, tutor_model = self.client.select_model(
+            require_image=False,
+            preferred_model=self.config.tutor_model,
+        )
         session_id = self.client.create_session(
             title=f"ResearchSensei paper {actual_paper_id}",
             provider_id=provider_id,
@@ -406,6 +420,7 @@ class OpenCodePaperAgent:
             analyzed_pages=len({page.page for page in analyses}),
             provider_id=provider_id,
             model=model,
+            tutor_model=tutor_model,
             session_id=session_id,
             pages=sorted(analyses, key=lambda item: item.page),
             warnings=warnings,
@@ -424,7 +439,7 @@ class OpenCodePaperAgent:
         provider_id: str = "",
     ) -> str:
         chosen_provider = provider_id or self.config.provider_id
-        chosen_model = model or self.config.model
+        chosen_model = model or self.config.tutor_model
         user_text = question.strip()
         if selected_text.strip():
             user_text = (
@@ -712,6 +727,7 @@ Extracted page text:
             "session_id": analysis.session_id,
             "provider_id": analysis.provider_id,
             "model": analysis.model,
+            "tutor_model": analysis.tutor_model,
             "pages": [
                 {
                     "page": page.page,

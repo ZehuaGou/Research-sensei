@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import Field, model_validator
+from pydantic import AliasChoices, Field, model_validator
 
 from researchsensei.schemas.base import SenseiModel
 from researchsensei.schemas.common import WarningItem
@@ -107,7 +107,10 @@ class ClaimEvidenceRecord(SenseiModel):
     group_order: int = 0
     group_crop_path: str = ""
     group_overlay_path: str = ""
-    canonical_source_path: str = "canonical_paper.md"
+    source_artifact_path: str = Field(
+        default="parsed_document.json",
+        validation_alias=AliasChoices("source_artifact_path", "canonical_source_path"),
+    )
     source_location: dict = Field(default_factory=dict)
     block_source: str = ""
     section_confidence: str = ""

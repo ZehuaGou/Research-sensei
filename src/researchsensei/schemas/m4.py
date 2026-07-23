@@ -63,6 +63,7 @@ class M4ContextTrace(SenseiModel):
     selected_text_used: bool = False
     full_text_chars: int = 0
     full_text_complete: bool = False
+    model: str = ""
 
 
 class InteractiveAnswer(SenseiModel):

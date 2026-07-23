@@ -1,0 +1,333 @@
+.learning-topbar-tabs {
+  display: flex;
+  max-width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+
+.learning-topbar-tabs button {
+  display: inline-flex;
+  min-height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.learning-topbar-tabs button.active,
+.learning-topbar-tabs button:hover:not(:disabled) {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.learning-topbar-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "reader";
+  height: calc(100dvh - 49px);
+  max-height: calc(100dvh - 49px);
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.reader-pane,
+.chat-pane {
+  min-height: 0;
+}
+
+.reader-pane {
+  grid-area: reader;
+  height: 100%;
+  min-width: 0;
+  padding: 34px clamp(18px, 4vw, 44px) 56px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.workspace-shell.formula-mode .reader-pane {
+  padding-inline: clamp(16px, 2.2vw, 28px);
+}
+
+@media (min-width: 1121px) {
+  .workspace-shell.with-chat {
+    grid-template-columns: minmax(0, 1fr) var(--chat-pane-width, 380px);
+    grid-template-areas: "reader chat";
+  }
+}
+
+.reader-header {
+  display: grid;
+  max-width: 860px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin: 0 auto 14px;
+}
+
+.reader-title {
+  min-width: 0;
+}
+
+.reader-title > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.reader-title h1 {
+  overflow-wrap: anywhere;
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 26px;
+  font-weight: 720;
+  line-height: 1.28;
+}
+
+.reader-title p {
+  max-width: 780px;
+  margin-top: 8px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.72;
+}
+
+.reader-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.loading-state,
+.error-state,
+.no-cards,
+.empty-card {
+  max-width: 780px;
+  margin: 70px auto 0;
+  border-radius: 8px;
+  padding: 28px;
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.error-state {
+  display: grid;
+  gap: 16px;
+  border: 1px solid rgba(220, 38, 38, 0.18);
+  background: rgba(220, 38, 38, 0.07);
+  color: var(--danger);
+}
+
+.card-stack {
+  display: grid;
+  max-width: min(980px, 100%);
+  margin: 0 auto;
+  gap: 18px;
+}
+
+.card-stack.formula-stack {
+  max-width: min(1120px, 100%);
+}
+
+.formula-partial-notice {
+  max-width: 920px;
+  margin: 14px auto 0;
+  border: 1px solid rgba(217, 119, 6, 0.22);
+  border-radius: 8px;
+  padding: 11px 14px;
+  background: rgba(217, 119, 6, 0.07);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.teaching-list {
+  display: grid;
+  gap: 12px;
+}
+
+.teaching-card {
+  padding: 18px;
+}
+
+.teaching-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teaching-card p {
+  margin-top: 12px;
+  color: var(--text-secondary);
+  line-height: 1.72;
+}
+
+.teaching-card small {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-muted);
+}
+
+.chat-pane {
+  position: relative;
+  grid-area: chat;
+  height: 100%;
+  min-width: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  box-shadow: -14px 0 34px rgba(15, 23, 42, 0.06);
+}
+
+.chat-resize-handle {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  cursor: col-resize;
+}
+
+.chat-resize-handle::after {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 2px;
+  background: transparent;
+  content: '';
+}
+
+.chat-resize-handle:hover::after,
+.chat-resize-handle:focus-visible::after {
+  background: var(--accent);
+}
+
+.chat-overlay {
+  position: fixed;
+  z-index: 80;
+  inset: 49px 0 0;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.chat-pane.compact {
+  width: min(440px, 100%);
+  max-width: 100%;
+  border-left: 1px solid var(--border-subtle);
+  outline: none;
+}
+
+.chat-fab {
+  position: fixed;
+  z-index: 45;
+  right: 18px;
+  bottom: 18px;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  background: var(--text-primary);
+  color: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.formula-focus-backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.56);
+}
+
+.formula-focus-dialog {
+  width: min(920px, 100%);
+  max-height: min(88dvh, 920px);
+  overflow-y: auto;
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+  outline: none;
+}
+
+.formula-focus-dialog > header {
+  position: sticky;
+  z-index: 5;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px 18px;
+  background: var(--bg-card);
+}
+
+.formula-focus-dialog > header span,
+.formula-focus-dialog > header strong {
+  display: block;
+}
+
+.formula-focus-dialog > header span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.formula-focus-dialog > header strong {
+  margin-top: 3px;
+  color: var(--text-primary);
+}
+
+.formula-focus-dialog > header button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  font-size: 22px;
+}
+
+@media (max-width: 720px) {
+  .reader-pane {
+    padding: 22px 14px 44px;
+  }
+
+  .reader-header {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .reader-actions {
+    justify-content: flex-start;
+  }
+
+  .chat-pane.compact {
+    width: 100vw;
+  }
+
+  .formula-focus-backdrop {
+    padding: 10px;
+  }
+}

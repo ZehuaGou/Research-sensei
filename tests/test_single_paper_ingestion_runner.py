@@ -105,6 +105,30 @@ def test_single_paper_runner_records_degraded_pdf_warnings(tmp_path: Path) -> No
     assert any(warning.code == "PDF_PARSE_FAILED" for warning in job.warnings)
 
 
+def test_configured_opencode_pdf_failure_is_not_hidden_by_parser_fallback(
+    tmp_path: Path,
+) -> None:
+    class FailingPaperAgent:
+        def ingest_path(self, *_args, **_kwargs):
+            raise TimeoutError("vision request timed out")
+
+    source = tmp_path / "paper.pdf"
+    source.write_bytes(b"%PDF-1.4\n")
+    workspace = WorkspaceStore(tmp_path / "workspace")
+    jobs = JobStore(tmp_path / "jobs.sqlite3")
+
+    job = SinglePaperIngestionRunner(
+        workspace=workspace,
+        jobs=jobs,
+        paper_agent=FailingPaperAgent(),  # type: ignore[arg-type]
+    ).run(source, job_id="job-opencode-failed")
+
+    assert job.status == JobStatus.FAILED
+    assert job.current_step == "pipeline_error"
+    assert "OpenCode PDF analysis failed" in job.error
+    assert not (Path(job.run_dir) / "parsed_document.json").exists()
+
+
 def test_single_paper_runner_reports_real_pipeline_stages(tmp_path: Path) -> None:
     source = tmp_path / "paper.md"
     source.write_text(

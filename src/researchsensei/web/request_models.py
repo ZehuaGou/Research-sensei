@@ -15,11 +15,24 @@ class StrictRequest(BaseModel):
 
 
 class SettingsUpdate(StrictRequest):
-    model: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    model: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+    ] | None = None
     paper_model: Annotated[
         str,
         StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
     ] | None = None
+    tutor_model: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+    ] | None = None
+
+    @model_validator(mode="after")
+    def require_one_model(self) -> "SettingsUpdate":
+        if not any((self.model, self.paper_model, self.tutor_model)):
+            raise ValueError("At least one model selection is required.")
+        return self
 
 
 class SettingsValidationRequest(StrictRequest):
@@ -53,9 +66,7 @@ class M4AskRequest(StrictRequest):
     user_question: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1200)] = ""
     selected_text: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ""
     context_scope: Literal["paper", "selection"] = "paper"
-    # Browser clients explicitly request ``full_paper``. Keep the legacy API
-    # default for older integrations that still depend on strict claim JSON.
-    answer_mode: Literal["full_paper", "evidence_only", "enhanced"] = "enhanced"
+    answer_mode: Literal["full_paper", "evidence_only"] = "full_paper"
     conversation_history: list[ConversationTurn] = Field(default_factory=list, max_length=20)
 
 

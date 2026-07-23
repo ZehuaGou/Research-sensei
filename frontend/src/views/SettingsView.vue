@@ -19,6 +19,7 @@ const isTesting = ref(false)
 const isSaving = ref(false)
 const modelDraft = ref('')
 const paperModelDraft = ref('')
+const tutorModelDraft = ref('')
 
 const providerLabel = computed(() => {
   if (settings.value.provider_display_name) return settings.value.provider_display_name
@@ -37,6 +38,10 @@ const paperModelDirty = computed(() => (
   paperModelDraft.value.trim() !== (settings.value.paper_agent_model || '')
 ))
 const paperModelOptions = computed(() => settings.value.paper_agent_model_options || [])
+const tutorModelDirty = computed(() => (
+  tutorModelDraft.value.trim() !== (settings.value.paper_tutor_model || '')
+))
+const tutorModelOptions = computed(() => settings.value.paper_tutor_model_options || [])
 
 const requestModeLabel = computed(() => (
   settings.value.provider_kind === 'anthropic_compatible'
@@ -52,7 +57,7 @@ const settingsTitle = computed(() => (
 
 const settingsDescription = computed(() => (
   isOpenCodeGo.value
-    ? 'Research Sensei 直连 OpenCode Go。模型列表由 OpenCode Go 接口自动获取，保存后立即用于后续 M2/M4 请求，无需重启项目。'
+    ? 'Research Sensei 直连 OpenCode Go。通用模型、PDF 识读模型和论文讲解模型分开选择，保存后无需重启项目。'
     : '这里保存的是随请求发送的 model 字段；实际请求通道由当前提供方配置决定。'
 ))
 
@@ -67,6 +72,7 @@ onMounted(async () => {
     settings.value = await researchApi.getSettings()
     modelDraft.value = settings.value.model
     paperModelDraft.value = settings.value.paper_agent_model || ''
+    tutorModelDraft.value = settings.value.paper_tutor_model || ''
   } catch {}
 })
 
@@ -94,7 +100,6 @@ async function savePaperModel() {
   saveResult.value = ''
   try {
     const data = await researchApi.updateSettings({
-      model: modelDraft.value.trim() || settings.value.model,
       paper_model: paperModel,
     })
     settings.value = data
@@ -102,6 +107,25 @@ async function savePaperModel() {
     saveResult.value = 'PDF 视觉解析模型已保存，后续重新解析论文时生效。'
   } catch (saveError) {
     saveResult.value = apiErrorMessage(saveError, '保存 PDF 视觉解析模型失败。')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function saveTutorModel() {
+  const tutorModel = tutorModelDraft.value.trim()
+  if (!tutorModel || isSaving.value) return
+  isSaving.value = true
+  saveResult.value = ''
+  try {
+    const data = await researchApi.updateSettings({
+      tutor_model: tutorModel,
+    })
+    settings.value = data
+    tutorModelDraft.value = data.paper_tutor_model || tutorModel
+    saveResult.value = '论文讲解模型已保存，后续 M4 对话立即使用。'
+  } catch (saveError) {
+    saveResult.value = apiErrorMessage(saveError, '保存论文讲解模型失败。')
   } finally {
     isSaving.value = false
   }
@@ -189,9 +213,36 @@ async function testConnection() {
           </div>
           <small>
             M2 会把 PDF 按页渲染后交给这个支持图像附件的 OpenCode 模型，识别章节、公式和图表；
-            聊天模型仍由上方单独选择。
+            论文讲解模型在下一项单独选择。
           </small>
           <small>{{ settings.paper_agent_base_url }}</small>
+        </div>
+
+        <div v-if="settings.paper_agent_enabled" class="setting-row paper-agent-row">
+          <label>论文讲解模型</label>
+          <div class="model-editor">
+            <select
+              v-model="tutorModelDraft"
+              data-testid="tutor-model-select"
+              :disabled="!tutorModelOptions.length"
+            >
+              <option v-for="option in tutorModelOptions" :key="option.id" :value="option.id">
+                {{ option.label || option.id }}{{ option.source ? ` · ${option.source}` : '' }}
+              </option>
+            </select>
+            <button
+              data-testid="save-tutor-model"
+              class="secondary-btn"
+              :disabled="!tutorModelDraft.trim() || !tutorModelDirty || isSaving"
+              @click="saveTutorModel"
+            >
+              {{ isSaving ? '保存中…' : '保存' }}
+            </button>
+          </div>
+          <small>
+            M4 会在同一个论文会话中使用该模型继续讲解。视觉解析与讲解分开选择：
+            Qwen 负责公式和页面，MiMo 可以专注长上下文问答。
+          </small>
         </div>
 
         <button
@@ -239,9 +290,12 @@ async function testConnection() {
 
 <style scoped>
 .settings-page {
-  width: min(980px, calc(100vw - 36px));
+  width: 100%;
+  max-width: 1040px;
   margin: 0 auto;
-  padding: 34px 0 60px;
+  padding: 34px 24px 60px;
+  box-sizing: border-box;
+  overflow-x: clip;
 }
 
 .settings-head {
@@ -275,6 +329,10 @@ async function testConnection() {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 12px;
+}
+
+.settings-grid > * {
+  min-width: 0;
 }
 
 .settings-panel,
@@ -417,12 +475,29 @@ async function testConnection() {
   line-height: 1.7;
 }
 
-@media (max-width: 820px) {
+@media (max-width: 1200px) {
   .settings-grid {
     grid-template-columns: 1fr;
   }
 
+  .status-panel {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .status-panel h2,
+  .status-panel .notice {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
   .model-editor {
+    grid-template-columns: 1fr;
+  }
+
+  .status-panel {
     grid-template-columns: 1fr;
   }
 }

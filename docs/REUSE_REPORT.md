@@ -19,15 +19,11 @@ cards.
 | Tool | Decision | Maintained boundary |
 |---|---|---|
 | paper-search-mcp | `OPTIONAL_ADAPTER` | Broad metadata discovery. ResearchSensei owns normalization, deterministic relevance, legal full-text resolution, source status, and selection gates. |
-| GPT-Researcher | `REFERENCE_ONLY` | Useful research-orchestration ideas, but it does not replace M1 source verification or M2 evidence contracts. |
-| PaperQA2 | `OPTIONAL_ADAPTER` | A possible future retrieval component. It cannot replace claim-level evidence validation or the M4 paper boundary. |
-| Docling | `OPTIONAL_ADAPTER` | Legacy/alternative parsing route only; the configured maintained built-in backend is PyMuPDF and parser status remains explicit. |
-| Marker | `OPTIONAL_ADAPTER` | Fallback/audit parser baseline, never a reason to bypass canonical provenance checks. |
-| GROBID | `OPTIONAL_ADAPTER` | Structured metadata/text extraction option; source identity and formula provenance remain project-owned. |
-| MinerU2.5-Pro | `OPTIONAL_ADAPTER` | Primary M1 parser through mineru-vl-utils where available; missing capability is reported rather than faked. |
-| Ollama | `OPTIONAL_ADAPTER` | Optional structured refiner. It must not modify LaTeX, bbox, page, or source identity. |
+| OpenCode Server | `OPTIONAL_ADAPTER` | Local attachment/session control plane. ResearchSensei owns run state, evidence and failure semantics. |
+| OpenCode Go | `OPTIONAL_ADAPTER` | Model provider for page vision and tutoring. Vision and tutor models are configured independently. |
+| PyMuPDF | `OPTIONAL_ADAPTER` | Deterministic PDF validation, page text and rendering; it does not invent semantic claims. |
 | FlashRank | `OPTIONAL_ADAPTER` | Candidate reranking signal. Deterministic task/concept relevance gates remain authoritative. |
-| ccswitch | `OPTIONAL_ADAPTER` | Default local live LLM route. ResearchSensei owns request schemas, timeouts, redaction, and fail-closed handling. |
+| ccswitch | `OPTIONAL_ADAPTER` | Compatibility route only. Direct OpenCode Go does not require it. |
 
 ## Project-Owned Contracts
 
@@ -38,7 +34,7 @@ tool:
 - deterministic relevance coverage and intent-mismatch penalties;
 - legal/OA full-text verification and `pdf_ready` download confirmation;
 - QualityAuditor, FSA-5, `source_latex`, and `/cards` gates;
-- claim-level M4 evidence binding and support validation;
+- claim-level evidence binding, formula provenance and source-only lookup;
 - local job, paper-library, and bounded M4-memory persistence;
 - typed Chinese PaperWorkspace behavior.
 

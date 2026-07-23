@@ -118,6 +118,11 @@ class CandidatePaper(SenseiModel):
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
     m2_ready: bool = False
+    # Current product gate: a verified local PDF can be handed to the
+    # OpenCode paper agent.  Canonical fields above remain read-compatible for
+    # old saved direction bundles but no longer participate in decisions.
+    paper_agent_ready: bool = False
+    paper_agent_input_path: str = ""
     degradation_reason: str = ""
 
 
@@ -209,6 +214,8 @@ class ResolvedPaperSource(SenseiModel):
     canonical_quality_status: CanonicalQualityStatus = CanonicalQualityStatus.FAIL
     canonical_paper_path: str = ""
     m2_ready: bool = False
+    paper_agent_ready: bool = False
+    paper_agent_input_path: str = ""
     degradation_reason: str = ""
 
 

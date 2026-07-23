@@ -245,6 +245,31 @@ describe('AskPanel', () => {
     expect(wrapper.text()).not.toContain('---')
   })
 
+  it('turns model markdown tables into readable rows', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) return jsonResponse({ records: [] })
+      if (url.endsWith('/ask')) return jsonResponse({
+        status: 'SUCCESS',
+        answer: '## 条件对比\n\n| 条件 | 处理 |\n|---|---|\n| 弯曲根 | 缩短节点间距 |\n| 交叉根 | 约束直径 |',
+        evidence_refs: [],
+        context_trace: { scope: 'paper', context_mode: 'full_paper', evidence_count: 0 },
+      })
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('对比两种情况')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('• 弯曲根 · 缩短节点间距')
+    expect(wrapper.text()).toContain('• 交叉根 · 约束直径')
+    expect(wrapper.text()).not.toContain('|---|')
+  })
+
   it('keeps strict lookup only when the user explicitly chooses 找证据', async () => {
     const fetchMock = mockM4Fetch()
     vi.stubGlobal('fetch', fetchMock)

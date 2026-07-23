@@ -26,13 +26,12 @@ the exact final commit, commands, pass/fail counts, and live-verification state.
   explanation, single-paper Q&A, advisor questions/evaluation, and atomic
   bounded `m4_memory.json` remain available.
 
-Live LLM runs default to ccswitch (`cc_switch` config key). ResearchSensei calls
-the local ccswitch endpoint; the request model can be selected from the settings
-page.
+Live LLM runs default to direct OpenCode Go (`opencode_go` config key). The
+general chat model, PDF vision model and paper tutor model can all be selected
+from the settings page. CC Switch remains available as an optional compatibility
+route, but it is no longer required by the default workflow.
 
-When the active CC Switch Claude provider itself forwards to an OpenAI-format
-OpenCode Go endpoint, use the checked-in `opencode_go` provider for low-latency
-M4 chat. If `OPENCODE_GO_API_KEY` is not set, ResearchSensei can read the key
+If `OPENCODE_GO_API_KEY` is not set, ResearchSensei can read the key
 from the active matching CC Switch provider in read-only mode. The configured
 HTTPS upstream must match exactly; the key stays in memory and is never copied
 to project files or settings responses. Set
@@ -161,6 +160,7 @@ or provider secrets.
 ## Documentation Map
 
 - `docs/STATUS.md`: current project state, evidence, blockers, and next steps.
+- `docs/ARCHITECTURE.md`: maintained M1-M4 runtime and deleted legacy boundaries.
 - `docs/DESIGN.md`: architecture overview.
 - `docs/DEVELOPMENT.md`: development rules and commands.
 - `docs/MODULE_CONTRACTS.md`: module input/output/boundary contracts.

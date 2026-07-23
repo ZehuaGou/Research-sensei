@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import httpx
@@ -88,6 +90,92 @@ def test_downloaded_pdf_sets_source_aware_fields(tmp_path: Path) -> None:
     assert result.local_path
     assert Path(result.local_path).exists()
     assert Path(result.local_path).name == "Downloaded PDF.pdf"
+
+
+def test_arxiv_retains_source_but_hands_validated_pdf_to_paper_agent(tmp_path: Path) -> None:
+    source_buffer = io.BytesIO()
+    latex = b"\\documentclass{article}\\begin{document}paper\\end{document}"
+    with tarfile.open(fileobj=source_buffer, mode="w:gz") as archive:
+        info = tarfile.TarInfo("main.tex")
+        info.size = len(latex)
+        archive.addfile(info, io.BytesIO(latex))
+
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if "/e-print/" in request.url.path:
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/x-gzip"},
+                content=source_buffer.getvalue(),
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/pdf"},
+            content=b"%PDF-1.4\narxiv paper\n%%EOF",
+            request=request,
+        )
+
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="arxiv-paper",
+            title="Agent Ready Arxiv Paper",
+            arxiv_id="2401.00001",
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.source_type == PaperSourceType.PDF
+    assert result.preferred_m2_input == "pdf"
+    assert result.metadata["resolution_strategy"] == "arxiv_source_plus_pdf"
+    assert result.metadata["latex_source_retained"] == "true"
+    assert result.latex_source_available is True
+    assert result.latex_source_downloaded is True
+    assert Path(result.latex_source_path).suffix == ".tex"
+    assert Path(result.local_path).read_bytes().startswith(b"%PDF")
+    assert calls == [
+        "https://arxiv.org/e-print/2401.00001",
+        "https://arxiv.org/pdf/2401.00001.pdf",
+    ]
+
+
+def test_arxiv_source_fallback_pdf_is_not_mislabeled_as_latex(tmp_path: Path) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "/pdf/" in request.url.path:
+            return httpx.Response(
+                200,
+                headers={"content-type": "application/pdf"},
+                content=b"%PDF-1.4\nfallback paper\n%%EOF",
+                request=request,
+            )
+        return httpx.Response(404, request=request)
+
+    resolver = PaperSourceResolver(
+        network_enabled=True,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = resolver.resolve_one(
+        CandidatePaper(
+            paper_id="arxiv-fallback",
+            title="Arxiv PDF Fallback",
+            arxiv_id="2401.00002",
+        ),
+        download_dir=tmp_path,
+    )
+
+    assert result.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
+    assert result.source_type == PaperSourceType.PDF
+    assert result.preferred_m2_input == "pdf"
+    assert result.latex_source_available is False
+    assert result.latex_source_downloaded is False
+    assert Path(result.local_path).read_bytes().startswith(b"%PDF")
 
 
 def test_direct_open_pdf_does_not_launch_native_chrome(tmp_path: Path) -> None:

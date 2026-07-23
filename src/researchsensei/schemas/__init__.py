@@ -4,7 +4,6 @@ from researchsensei.schemas.direction import CandidatePaper, CandidatePool, Dire
 from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
 from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceRecord, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
 from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, FulltextSource, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VenueRank, VerificationStatus
-from researchsensei.schemas.canonical import AdapterInfo, CanonicalPaper, CanonicalPaperFrontMatter, CanonicalizationResult, FormulaBlock, FormulaOcrResult, FormulaRegionResult
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
 from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
 from researchsensei.schemas.m4 import AdvisorEvaluation, AdvisorQuestion, FormulaSymbolExplanation, GroundedClaim, InteractiveAnswer, M4MemoryBundle, M4MemoryRecord, MemoryRetrievalResult, SelectionExplanation
@@ -14,7 +13,6 @@ from researchsensei.schemas.source import SourceStatus
 from researchsensei.schemas.status import DownstreamGates, EvidencePackSummary, UnderstandingStatus
 
 __all__ = [
-    "AdapterInfo",
     "AdapterStatus",
     "ArtifactBundle",
     "AuditFinding",
@@ -23,9 +21,6 @@ __all__ = [
     "BlockType",
     "CanonicalizationStatus",
     "CanonicalQualityStatus",
-    "CanonicalPaper",
-    "CanonicalPaperFrontMatter",
-    "CanonicalizationResult",
     "CandidatePaper",
     "CandidatePool",
     "CardClaim",
@@ -46,12 +41,9 @@ __all__ = [
     "EvidencePackItem",
     "EvidenceRetrievalResult",
     "EvidenceType",
-    "FormulaBlock",
     "FulltextSource",
-    "FormulaOcrResult",
     "FormulaOcrStatus",
     "FormulaOrigin",
-    "FormulaRegionResult",
     "Passage",
     "PassageIndex",
     "PassageIndexBuildConfig",

@@ -31,21 +31,22 @@ def create_settings_router(
 
     @router.patch("")
     def update_settings(request: Request, payload: SettingsUpdate) -> dict[str, object]:
-        model = payload.model
-        env_writer(str(config_service.env_path), "RESEARCHSENSEI_LLM_MODEL", model)
-        os.environ["RESEARCHSENSEI_LLM_MODEL"] = model
-        provider_key = request.app.state.runtime_config.active_provider
-        provider = request.app.state.runtime_config.providers[provider_key].model_copy(update={"model": model})
-        request.app.state.runtime_config = request.app.state.runtime_config.model_copy(
-            update={
-                "providers": {
-                    **request.app.state.runtime_config.providers,
-                    provider_key: provider,
+        if payload.model:
+            model = payload.model
+            env_writer(str(config_service.env_path), "RESEARCHSENSEI_LLM_MODEL", model)
+            os.environ["RESEARCHSENSEI_LLM_MODEL"] = model
+            provider_key = request.app.state.runtime_config.active_provider
+            provider = request.app.state.runtime_config.providers[provider_key].model_copy(update={"model": model})
+            request.app.state.runtime_config = request.app.state.runtime_config.model_copy(
+                update={
+                    "providers": {
+                        **request.app.state.runtime_config.providers,
+                        provider_key: provider,
+                    }
                 }
-            }
-        )
-        if llm_client is not None:
-            llm_client.provider = llm_client.provider.model_copy(update={"model": model})
+            )
+            if llm_client is not None:
+                llm_client.provider = llm_client.provider.model_copy(update={"model": model})
         if payload.paper_model:
             paper_model = payload.paper_model
             env_writer(
@@ -56,6 +57,24 @@ def create_settings_router(
             os.environ["RESEARCHSENSEI_OPENCODE_MODEL"] = paper_model
             opencode_config = request.app.state.runtime_config.opencode.model_copy(
                 update={"model": paper_model}
+            )
+            request.app.state.runtime_config = request.app.state.runtime_config.model_copy(
+                update={"opencode": opencode_config}
+            )
+            paper_agent = getattr(request.app.state, "paper_agent", None)
+            if paper_agent is not None:
+                paper_agent.config = opencode_config
+                paper_agent.client.config = opencode_config
+        if payload.tutor_model:
+            tutor_model = payload.tutor_model
+            env_writer(
+                str(config_service.env_path),
+                "RESEARCHSENSEI_OPENCODE_TUTOR_MODEL",
+                tutor_model,
+            )
+            os.environ["RESEARCHSENSEI_OPENCODE_TUTOR_MODEL"] = tutor_model
+            opencode_config = request.app.state.runtime_config.opencode.model_copy(
+                update={"tutor_model": tutor_model}
             )
             request.app.state.runtime_config = request.app.state.runtime_config.model_copy(
                 update={"opencode": opencode_config}

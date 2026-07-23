@@ -11,7 +11,6 @@ from researchsensei.selection.venue_rankings import (
 from researchsensei.schemas import (
     CandidatePaper,
     CandidatePool,
-    CanonicalQualityStatus,
     QueryPlan,
     ReadingPlan,
     ReadingPlanItem,
@@ -336,11 +335,9 @@ class SelectionService:
     def _eligible_for_a_read(item: ReadingPlanItem) -> bool:
         """A_READ requires ALL of (AND logic, not OR):
 
-        Canonical gate:
-        - has_valid_deep_reading_source == True
-        - canonical_paper_path exists (non-empty)
-        - m2_ready == True
-        - canonical_quality_status != FAIL
+        OpenCode handoff gate:
+        - a verified local PDF exists
+        - paper_agent_ready == True
         - source_priority != METADATA_ONLY
 
         Selection gate:
@@ -356,11 +353,9 @@ class SelectionService:
         paper = item.paper
         sr = item.scoring_breakdown
 
-        # Canonical gate checks
+        # OpenCode paper-agent handoff checks
         has_valid_source = paper.has_valid_deep_reading_source
-        has_canonical = bool(paper.canonical_paper_path)
-        m2_ready = paper.m2_ready
-        quality_ok = paper.canonical_quality_status != CanonicalQualityStatus.FAIL
+        paper_agent_ready = paper.paper_agent_ready
         not_metadata_only = paper.source_priority != SourcePriority.METADATA_ONLY
 
         # Selection checks
@@ -385,11 +380,9 @@ class SelectionService:
         role_ok = item.role != "IRRELEVANT"
 
         return all([
-            # Canonical gate
+            # OpenCode handoff gate
             has_valid_source,
-            has_canonical,
-            m2_ready,
-            quality_ok,
+            paper_agent_ready,
             not_metadata_only,
             # Selection gate
             verified,

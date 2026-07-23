@@ -73,7 +73,7 @@ function warningText(warning: { code: string; message: string }) {
     return `${source} 暂时不可用，已用其它来源降级继续。`
   }
   if (code === 'PARTIAL_SOURCE_RESOLUTION') return '部分候选论文还没有解析出合法全文来源。'
-  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return 'M1 已完成全文下载；候选需进入 M2 解析与质量校验后才能标记为深读就绪。'
+  if (code === 'NO_A_READ_WITH_DOWNLOADABLE_FULL_TEXT') return 'M1 已完成全文下载；验证通过的 PDF 可交给论文代理建立深读会话。'
   if (code === 'UNVERIFIED_CANDIDATES') return `${message || '部分'} 个候选仍需进一步验证。`
   if (code === 'FILTERED_D_IGNORE') return `${message || '部分'} 个低相关候选已标记为暂不推荐。`
   if (code === 'NO_RATED_WITH_DOWNLOADABLE_FULL_TEXT') return '没有候选同时满足评分和可下载全文门槛。'

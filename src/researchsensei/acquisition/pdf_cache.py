@@ -28,7 +28,7 @@ Cache-corruption defense:
 - meta.json always in UTF-8.
 
 This cache is process-safe for single-process use. Multi-process use would
-require a file lock; we deliberately don't need it because DirectionRunner
+require a file lock; we deliberately don't need it because each direction task
 and FullTextResolver are serial within a single job.
 """
 

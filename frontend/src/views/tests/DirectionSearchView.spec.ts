@@ -315,7 +315,7 @@ describe('DirectionSearchView', () => {
     expect(card.text()).toContain('验证 已验证')
     expect(card.text()).toContain('全文 可用')
     expect(card.text()).toContain('发现来源 arxiv, openalex')
-    expect(card.text()).toContain('M2 待验证')
+    expect(card.text()).toContain('论文代理 待验证')
   })
 
   it('hides rejected candidates by default and keeps fulltext probes collapsed', async () => {
@@ -348,7 +348,7 @@ describe('DirectionSearchView', () => {
 
     expect(wrapper.findAll('[data-testid="candidate-card"]')).toHaveLength(1)
     expect(wrapper.get('[data-testid="toggle-filtered-candidates"]').text()).toContain('查看 1 篇已过滤结果')
-    expect(wrapper.get('[data-testid="direction-warning"]').text()).toContain('M2 解析与质量校验')
+    expect(wrapper.get('[data-testid="direction-warning"]').text()).toContain('论文代理建立深读会话')
     expect(wrapper.get('[data-testid="source-ledger"]').text()).not.toContain('unpaywall')
     expect(wrapper.get('.source-probe-details').attributes('open')).toBeUndefined()
 
@@ -548,7 +548,7 @@ describe('DirectionSearchView', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('尚未通过 M2 深读门槛')
+    expect(wrapper.get('[data-testid="m2-readiness-note"]').text()).toContain('尚未准备好深读')
   })
 
   it('explains publisher browser barriers on the candidate card', async () => {

@@ -751,7 +751,7 @@ def test_candidate_cards_include_required_direction_fields() -> None:
         "verification_status",
         "source_confidence",
         "pdf_available",
-        "canonicalization_status",
+            "paper_agent_ready",
         "m2_ready",
         "can_enter_m2",
     ):
@@ -796,8 +796,9 @@ def test_direction_download_attempts_follow_rerank_queue_not_venue_gate() -> Non
     assert cards["aaai-paper"]["download_selected"] is True
     assert cards["aaai-paper"]["venue_rank"] == "A*"
     assert cards["aaai-paper"]["can_prepare_deep_read"] is True
-    assert cards["aaai-paper"]["can_enter_m2"] is False
-    assert cards["aaai-paper"]["deep_read_button_state"] == "prepare"
+    assert cards["aaai-paper"]["paper_agent_ready"] is True
+    assert cards["aaai-paper"]["can_enter_m2"] is True
+    assert cards["aaai-paper"]["deep_read_button_state"] == "ready"
     assert cards["workshop-paper"]["download_selected"] is True
     assert cards["workshop-paper"]["download_decision"] == "SELECTED_BY_RERANKER"
     assert cards["workshop-paper"]["venue_rank"] == "unranked"

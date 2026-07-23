@@ -8,17 +8,17 @@
 #   > code default
 # create_app loads the merged configuration once and injects it into services.
 #
-# Typical .env for ccswitch live runs:
+# Typical .env for direct OpenCode Go runs:
 # RESEARCHSENSEI_ENABLE_API_LLM=1
-# RESEARCHSENSEI_LLM_PROVIDER=cc_switch
-# ccswitch listens on http://127.0.0.1:15721/v1. ResearchSensei sends the model selected in the settings page.
+# RESEARCHSENSEI_LLM_PROVIDER=opencode_go
+# OPENCODE_GO_API_KEY=...
 # UNPAYWALL_EMAIL=you@example.com
 # RESEARCHSENSEI_CONTACT_EMAIL=you@example.com
 # SEMANTIC_SCHOLAR_API_KEY=...
 # S2_API_KEY=...  # optional alias for SEMANTIC_SCHOLAR_API_KEY
 # OPENAI_COMPATIBLE_API_KEY=...
 
-active_provider = "cc_switch"
+active_provider = "opencode_go"
 
 [providers.deepseek]
 kind = "openai_compatible"
@@ -69,10 +69,9 @@ timeout_seconds = 60
 workspace_dir = "workspace"
 default_learning_mode = "reproducible_2h"
 max_upload_mb = 80
-# The maintained built-in parser path. PDF extraction uses PyMuPDF.
-# mineru: GPU layout/formula parsing with fail-closed PyMuPDF fallback.
-# pymupdf: lightweight text-only parsing.
-parser_backend = "mineru"
+# Lightweight deterministic importer for Markdown/text and explicit no-agent
+# workflows. Configured PDF deep reads use the OpenCode paper agent instead.
+parser_backend = "pymupdf"
 
 [server]
 host = "127.0.0.1"
@@ -91,6 +90,7 @@ provider_id = "opencode-go"
 # Select an attachment-capable model. DeepSeek V4 Flash is text-only in the
 # current OpenCode Go catalogue, so it cannot inspect PDF page images.
 model = "qwen3.7-plus"
+tutor_model = "mimo-v2.5"
 timeout_seconds = 600
 startup_timeout_seconds = 20
 page_batch_size = 4

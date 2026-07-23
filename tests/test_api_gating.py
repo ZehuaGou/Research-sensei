@@ -147,7 +147,7 @@ def test_understanding_status_endpoint_returns_status(tmp_path: Path) -> None:
     assert data["paper_workspace_status"]["verification_status"] == "verified"
     assert data["paper_workspace_status"]["can_enter_m2"] is True
     assert data["paper_workspace_status"]["source_confidence"] == 1.0
-    assert data["paper_workspace_status"]["canonicalization_status"] == "not_available"
+    assert data["paper_workspace_status"]["paper_agent_status"] == "not_available"
 
 
 def test_understanding_status_endpoint_missing_job_404(tmp_path: Path) -> None:
@@ -640,7 +640,7 @@ def test_parse_registers_existing_m2_artifacts_and_cards_are_gated(tmp_path: Pat
     status_data = status_response.json()
     assert status_data["understanding_status"]["status"] == "SUCCESS"
     assert status_data["paper_workspace_status"]["source_type"] == "m1_canonical_bundle"
-    assert status_data["paper_workspace_status"]["canonicalization_status"] == "success"
+    assert status_data["paper_workspace_status"]["paper_agent_status"] == "not_available"
     assert status_data["paper_workspace_status"]["m2_ready"] is True
     assert status_data["paper_workspace_status"]["formula_origin"] == "mineru_latex"
     assert status_data["paper_workspace_status"]["formula_ocr_status"] == "not_required"

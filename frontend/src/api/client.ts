@@ -415,7 +415,7 @@ export const researchApi = {
   getSettings(signal?: AbortSignal) {
     return apiRequest<SettingsPayload>('/api/v1/settings', { signal })
   },
-  updateSettings(update: { model: string; paper_model?: string }, signal?: AbortSignal) {
+  updateSettings(update: { model?: string; paper_model?: string; tutor_model?: string }, signal?: AbortSignal) {
     return apiRequest<SettingsPayload>('/api/v1/settings', { method: 'PATCH', body: update, signal })
   },
   validateSettings(signal?: AbortSignal) {

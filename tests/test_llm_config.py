@@ -338,6 +338,6 @@ def test_config_service_default_provider_fallback() -> None:
         env_path="/nonexistent/.env",
     )
     config = service.load()
-    assert config.active_provider == "cc_switch"
-    assert "cc_switch" in config.providers
-    assert config.providers["cc_switch"].base_url == "http://127.0.0.1:15721/v1"
+    assert config.active_provider == "opencode_go"
+    assert "opencode_go" in config.providers
+    assert config.providers["opencode_go"].base_url == "https://opencode.ai/zen/go/v1"

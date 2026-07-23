@@ -24,7 +24,6 @@ from researchsensei.relevance import (
     passes_strict_relevance_gate,
 )
 from researchsensei.schemas import (
-    CanonicalQualityStatus,
     CandidatePaper,
     CandidatePool,
     DirectionBundle,
@@ -659,12 +658,12 @@ class DirectionExplorationService:
             pdf_downloaded = resolved.status == PaperSourceStatus.RESOLVED_PDF_DOWNLOADED
             source_downloaded = bool(resolved.has_valid_deep_reading_source and resolved.local_path and resolved.sha256)
             pdf_available = bool(candidate.pdf_url or resolved.pdf_url)
-            can_enter_m2 = bool(
-                candidate.m2_ready
-                and candidate.canonical_paper_path
-                and candidate.canonical_quality_status != CanonicalQualityStatus.FAIL
-                and resolved.has_valid_deep_reading_source
+            paper_agent_ready = bool(
+                resolved.has_valid_deep_reading_source
+                and resolved.local_path
+                and Path(resolved.local_path).suffix.casefold() == ".pdf"
             )
+            can_enter_m2 = paper_agent_ready
             source_confidence = "high" if source_downloaded else ("medium" if pdf_available else candidate.source_confidence)
             metadata_confidence = candidate.metadata_confidence
             if source_confidence == "high" and metadata_confidence == "low":
@@ -678,6 +677,9 @@ class DirectionExplorationService:
                         "pdf_available": pdf_available,
                         "pdf_downloaded": pdf_downloaded,
                         "can_enter_m2": can_enter_m2,
+                        "m2_ready": paper_agent_ready,
+                        "paper_agent_ready": paper_agent_ready,
+                        "paper_agent_input_path": resolved.local_path if paper_agent_ready else "",
                         "source_priority": resolved.source_priority,
                         "preferred_m2_input": resolved.preferred_m2_input,
                         "has_valid_deep_reading_source": resolved.has_valid_deep_reading_source,
@@ -1405,7 +1407,7 @@ def _understanding_layer_status(candidates: list[CandidatePaper]) -> M1LayerStat
     m2_ready = [
         candidate
         for candidate in source_ready
-        if candidate.m2_ready and candidate.can_enter_m2
+        if candidate.paper_agent_ready and candidate.can_enter_m2
     ]
     details = {
         "m2_was_run": False,
@@ -1561,9 +1563,8 @@ def _candidate_cards_from_reading_plan(reading_plan: ReadingPlan) -> list[dict[s
             "source_confidence": paper.source_confidence,
             "metadata_confidence": paper.metadata_confidence,
             "pdf_available": paper.pdf_available,
-            "canonicalization_status": paper.canonicalization_status.value,
-            "canonical_quality_status": paper.canonical_quality_status.value,
             "m2_ready": paper.m2_ready,
+            "paper_agent_ready": paper.paper_agent_ready,
             "can_enter_m2": item.can_enter_m2,
             "priority": priority,
             "role": item.role,

@@ -34,7 +34,6 @@ from researchsensei.core.config import AppConfig, ConfigService, ModelProviderCo
 from researchsensei.direction import DirectionExplorationService, SeedExpansionService
 from researchsensei.ingestion import (
     LightweightIngestionService,
-    MineruEnhancedIngestionService,
     OpenCodePaperAgent,
     SinglePaperIngestionRunner,
 )
@@ -71,9 +70,7 @@ def _debug_enabled() -> bool:
     return os.getenv("SENSEI_DEBUG", "").lower() in {"1", "true", "yes"}
 
 
-def _ingestion_for_backend(parser_backend: str) -> LightweightIngestionService | MineruEnhancedIngestionService:
-    if parser_backend == "mineru":
-        return MineruEnhancedIngestionService()
+def _ingestion_for_backend(parser_backend: str) -> LightweightIngestionService:
     if parser_backend not in {"pymupdf", "lightweight"}:
         raise ValueError(f"Unsupported parser backend: {parser_backend}")
     return LightweightIngestionService()
@@ -1202,6 +1199,8 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
             "paper_agent_enabled": config.opencode.enabled,
             "paper_agent_model": config.opencode.model,
             "paper_agent_model_options": _opencode_paper_model_options(config.opencode.model),
+            "paper_tutor_model": config.opencode.tutor_model,
+            "paper_tutor_model_options": _opencode_tutor_model_options(config.opencode.tutor_model),
             "paper_agent_base_url": config.opencode.base_url,
             "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
             "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
@@ -1224,6 +1223,8 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
         "paper_agent_enabled": config.opencode.enabled,
         "paper_agent_model": config.opencode.model,
         "paper_agent_model_options": _opencode_paper_model_options(config.opencode.model),
+        "paper_tutor_model": config.opencode.tutor_model,
+        "paper_tutor_model_options": _opencode_tutor_model_options(config.opencode.tutor_model),
         "paper_agent_base_url": config.opencode.base_url,
         "model_env": "RESEARCHSENSEI_LLM_MODEL",
         "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
@@ -1320,6 +1321,25 @@ def _opencode_paper_model_options(current_model: str) -> list[dict[str, str]]:
                 "id": model,
                 "label": model,
                 "source": "OpenCode PDF/图像附件模型",
+            }
+        )
+    return options
+
+
+def _opencode_tutor_model_options(current_model: str) -> list[dict[str, str]]:
+    values = [current_model, *_OPENCODE_GO_FALLBACK_MODELS]
+    seen: set[str] = set()
+    options: list[dict[str, str]] = []
+    for value in values:
+        model = str(value or "").strip()
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        options.append(
+            {
+                "id": model,
+                "label": model,
+                "source": "OpenCode 论文讲解模型",
             }
         )
     return options
@@ -1721,7 +1741,7 @@ def _job_title_hint(job: JobRecord) -> str:
 def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dict[str, object]:
     status_content = understanding_status if isinstance(understanding_status, dict) else {}
     source_status = _artifact_content_dict(job, "source_status")
-    canonical_status = _artifact_content_dict(job, "canonical_status")
+    opencode_analysis = _artifact_content_dict(job, "opencode_analysis")
     claim_evidence = _artifact_content_dict(job, "claim_evidence")
     passage_index = _artifact_content_dict(job, "passage_index")
     quality_report = _artifact_content_dict(job, "quality_report")
@@ -1739,7 +1759,8 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     )
     source_type = str(source_status.get("source_type", "unknown"))
     source_resolved = source_status.get("status") == "resolved"
-    m2_ready = canonical_status.get("m2_ready")
+    is_pdf = Path(job.source_path).suffix.lower() == ".pdf"
+    m2_ready = bool(opencode_analysis.get("session_id")) if is_pdf else source_resolved
     return {
         "source_type": source_type,
         "source_status": source_status.get("status", "unknown"),
@@ -1752,13 +1773,14 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
         "verification_status": "verified" if source_resolved else "unverified",
         "pdf_metadata_check": source_status.get("pdf_metadata_check", "not_available"),
         "pdf_title_match": source_status.get("pdf_title_match", "not_available"),
-        "can_enter_m2": bool(m2_ready) if m2_ready is not None else source_resolved,
+        "can_enter_m2": m2_ready,
         "source_confidence": 1.0 if source_resolved else 0.0,
-        "canonicalization_status": canonical_status.get("canonicalization_status", "not_available"),
+        "paper_agent_status": "ready" if opencode_analysis.get("session_id") else "not_available",
+        "paper_agent_model": opencode_analysis.get("model", ""),
+        "paper_tutor_model": opencode_analysis.get("tutor_model", ""),
         "m2_ready": m2_ready,
         "degradation_reason": (
-            canonical_status.get("degradation_reason")
-            or "; ".join(degraded_flags)
+            "; ".join(degraded_flags)
             or status_content.get("blocking_reason", "")
         ),
         "formula_origin": formula_origin,
