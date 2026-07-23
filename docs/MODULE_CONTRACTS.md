@@ -126,12 +126,14 @@ Output: lightweight grouping labels used by Direction Exploration and Seed
 Expansion.
 Boundary: labels are navigation hints, not proof of scientific relation.
 
-## drill
+## learning
 
 Input: Paper Tutor learning state and paper-grounded teaching/advisor context.
-Output: future full drill sessions. Current v1 only exposes advisor-style
-questions and answer evaluation.
-Boundary: do not present v1 advisor checks as a complete drill engine.
+Output: persistent learning items, adaptive review sessions, free-form answer
+evaluation, attempt history, and FSRS due dates through the Learning Studio.
+Boundary: the model generates and evaluates paper-grounded prompts, while the
+application owns item identity, evidence binding, persistence, rating conversion,
+and scheduling. A rubric is a flexible set of key points, not a fixed answer sentence.
 
 ## interactive
 

@@ -14,6 +14,7 @@ research direction
   -> project-owned passage, claim, card, formula-provenance and quality gates
   -> reader workspace
   -> paper tutor: full-paper dialogue / deterministic source lookup / advisor rehearsal
+  -> learning studio: adaptive practice / attempt history / FSRS review scheduling
 ```
 
 There is one primary PDF path. When the OpenCode paper agent is configured, an
@@ -85,6 +86,28 @@ than returning canned pseudo-explanations.
 Evidence-only mode never calls an LLM. Formula explanations use the paper session
 when available and retain the project-owned formula provenance checks.
 
+## Learning Studio: persistent learning loop
+
+Learning Studio is a separate domain rather than another Paper Tutor tab. It
+imports reliable paper, teaching, and formula artifacts into durable learning
+items. A review session asks one question at a time through the same persistent
+paper context, accepts a free-form answer, and asks the model to evaluate
+coverage, omissions, misconceptions, and useful next steps. The learner is not
+required to reproduce a fixed reference sentence.
+
+ResearchSensei, not the model, owns learning identity and state:
+
+- learning items remain bound to a paper job and evidence refs;
+- sessions and prompts are persisted in SQLite;
+- every answer creates an immutable attempt record;
+- FSRS owns the next due time from the resulting Again/Hard/Good/Easy rating;
+- deleting a paper job cascades through its learning data.
+
+OpenCode produces paper-aware questions and qualitative feedback. It does not
+choose due dates, overwrite history, or promote unsupported source material
+into a learning item. Cross-paper synthesis remains a later layer on top of
+this single-paper learning state.
+
 ## Provider boundaries
 
 OpenCode Server is the local session and attachment control plane. OpenCode Go is
@@ -106,7 +129,8 @@ they do not describe callable code.
 2. Backend unit/API contracts, including strict evidence and failure gates.
 3. Frontend Vitest, typecheck and production build.
 4. A real PDF OpenCode run and a same-session Paper Tutor follow-up.
-5. Playwright inspection of the actual direction, settings and reader flows.
+5. Learning-session persistence and scheduler tests.
+6. Playwright inspection of the actual direction, settings, reader, and learning flows.
 
 Offline fixtures, provider probes and live end-to-end acceptance are reported
 separately. Passing one layer never implies that a different layer passed.

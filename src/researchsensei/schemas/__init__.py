@@ -1,14 +1,102 @@
-from researchsensei.schemas.cards import CardClaim, FormulaCard, FormulaCardBundle, FormulaSymbol, FormulaTerm, PaperCard, TeachingCard, TeachingCardBundle
+from researchsensei.schemas.cards import (
+    CardClaim,
+    FormulaCard,
+    FormulaCardBundle,
+    FormulaSymbol,
+    FormulaTerm,
+    PaperCard,
+    TeachingCard,
+    TeachingCardBundle,
+)
 from researchsensei.schemas.common import ErrorItem, GeneratedMetadata, StatusEnvelope, WarningItem
-from researchsensei.schemas.direction import CandidatePaper, CandidatePool, DirectionBundle, WorkflowLayerStatus, QueryPlan, ReadingPlan, ReadingPlanItem, ResolvedPaperSource, ScoringBreakdown, SeedExpansionBundle, SeedExpansionOrderItem, SeedExpansionPaper, SeedPaperInput, SourceResolutionResult
-from researchsensei.schemas.document import DocumentBlock, DocumentIngestion, ParseMetadata, ParserResult
-from researchsensei.schemas.evidence import ClaimEvidence, ClaimEvidenceBundle, ClaimEvidenceRecord, EvidenceIndex, EvidencePack, EvidencePackItem, EvidenceRetrievalResult, Passage, PassageIndex, PassageIndexBuildConfig, PassageIndexStats
-from researchsensei.schemas.enums import AdapterStatus, BlockType, CanonicalQualityStatus, CanonicalizationStatus, EvidenceType, FormulaOcrStatus, FormulaOrigin, FulltextSource, JobStatus, PaperSourceStatus, PaperSourceType, SearchIntent, SourcePriority, VenueRank, VerificationStatus
+from researchsensei.schemas.direction import (
+    CandidatePaper,
+    CandidatePool,
+    DirectionBundle,
+    WorkflowLayerStatus,
+    QueryPlan,
+    ReadingPlan,
+    ReadingPlanItem,
+    ResolvedPaperSource,
+    ScoringBreakdown,
+    SeedExpansionBundle,
+    SeedExpansionOrderItem,
+    SeedExpansionPaper,
+    SeedPaperInput,
+    SourceResolutionResult,
+)
+from researchsensei.schemas.document import (
+    DocumentBlock,
+    DocumentIngestion,
+    ParseMetadata,
+    ParserResult,
+)
+from researchsensei.schemas.evidence import (
+    ClaimEvidence,
+    ClaimEvidenceBundle,
+    ClaimEvidenceRecord,
+    EvidenceIndex,
+    EvidencePack,
+    EvidencePackItem,
+    EvidenceRetrievalResult,
+    Passage,
+    PassageIndex,
+    PassageIndexBuildConfig,
+    PassageIndexStats,
+)
+from researchsensei.schemas.enums import (
+    AdapterStatus,
+    BlockType,
+    CanonicalQualityStatus,
+    CanonicalizationStatus,
+    EvidenceType,
+    FormulaOcrStatus,
+    FormulaOrigin,
+    FulltextSource,
+    JobStatus,
+    PaperSourceStatus,
+    PaperSourceType,
+    SearchIntent,
+    SourcePriority,
+    VenueRank,
+    VerificationStatus,
+)
 from researchsensei.schemas.jobs import JobRecord, WorkspaceArtifact
-from researchsensei.schemas.llm_output import ClaimLLMOutput, FormulaCardLLMOutput, FormulaCardsLLMOutput, PaperCardLLMOutput, TeachingCardLLMOutput, TeachingCardsLLMOutput
-from researchsensei.schemas.tutor import AdvisorEvaluation, AdvisorQuestion, FormulaSymbolExplanation, GroundedClaim, InteractiveAnswer, TutorMemoryBundle, TutorMemoryRecord, MemoryRetrievalResult, SelectionExplanation
+from researchsensei.schemas.learning import (
+    LearningAnswerResult,
+    LearningAttempt,
+    LearningItem,
+    LearningOverview,
+    LearningPaperSummary,
+    LearningQuestion,
+    LearningSession,
+)
+from researchsensei.schemas.llm_output import (
+    ClaimLLMOutput,
+    FormulaCardLLMOutput,
+    FormulaCardsLLMOutput,
+    PaperCardLLMOutput,
+    TeachingCardLLMOutput,
+    TeachingCardsLLMOutput,
+)
+from researchsensei.schemas.tutor import (
+    AdvisorEvaluation,
+    AdvisorQuestion,
+    FormulaSymbolExplanation,
+    GroundedClaim,
+    InteractiveAnswer,
+    TutorMemoryBundle,
+    TutorMemoryRecord,
+    MemoryRetrievalResult,
+    SelectionExplanation,
+)
 from researchsensei.schemas.skeleton import PaperSkeleton
-from researchsensei.schemas.audit import ArtifactBundle, AuditFinding, ComponentAuditResult, QualityReport
+from researchsensei.schemas.audit import (
+    ArtifactBundle,
+    AuditFinding,
+    ComponentAuditResult,
+    QualityReport,
+)
 from researchsensei.schemas.source import SourceStatus
 from researchsensei.schemas.status import DownstreamGates, EvidencePackSummary, UnderstandingStatus
 
@@ -60,6 +148,13 @@ __all__ = [
     "GeneratedMetadata",
     "InteractiveAnswer",
     "JobRecord",
+    "LearningAnswerResult",
+    "LearningAttempt",
+    "LearningItem",
+    "LearningOverview",
+    "LearningPaperSummary",
+    "LearningQuestion",
+    "LearningSession",
     "TutorMemoryBundle",
     "TutorMemoryRecord",
     "WorkflowLayerStatus",

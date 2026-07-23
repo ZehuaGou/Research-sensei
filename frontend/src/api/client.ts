@@ -25,6 +25,11 @@ import type {
   ReparseResponse,
   UnderstandingStatusResponse,
 } from '../types/workspace'
+import type {
+  LearningAnswerResult,
+  LearningOverview,
+  LearningSession,
+} from '../types/learning'
 
 const DEFAULT_TIMEOUT_MS = 20_000
 const TUTOR_REQUEST_TIMEOUT_MS = 120_000
@@ -230,6 +235,57 @@ export const workspaceApi: WorkspaceApi = {
       signal,
       timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
     })
+  },
+}
+
+export const learningApi = {
+  getOverview(jobId?: string, signal?: AbortSignal) {
+    const path = jobId ? jobPath(jobId, 'learning') : '/api/v1/learning'
+    return apiRequest<LearningOverview>(path, { signal })
+  },
+  importPaper(jobId: string, signal?: AbortSignal) {
+    return apiRequest<{ job_id: string; imported_count: number; overview: LearningOverview }>(
+      jobPath(jobId, 'learning/import'),
+      { method: 'POST', signal },
+    )
+  },
+  startSession(
+    jobId: string,
+    options: { count?: number; include_not_due?: boolean } = {},
+    signal?: AbortSignal,
+  ) {
+    return apiRequest<LearningSession>(jobPath(jobId, 'learning/sessions'), {
+      method: 'POST',
+      body: {
+        count: options.count ?? 5,
+        include_not_due: options.include_not_due ?? false,
+      },
+      signal,
+      timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
+    })
+  },
+  getActiveSession(jobId: string, signal?: AbortSignal) {
+    return apiRequest<{ job_id: string; session: LearningSession | null }>(
+      jobPath(jobId, 'learning/active-session'),
+      { signal, timeoutMs: TUTOR_REQUEST_TIMEOUT_MS },
+    )
+  },
+  getSession(jobId: string, sessionId: string, signal?: AbortSignal) {
+    return apiRequest<LearningSession>(
+      jobPath(jobId, `learning/sessions/${encodeURIComponent(sessionId)}`),
+      { signal, timeoutMs: TUTOR_REQUEST_TIMEOUT_MS },
+    )
+  },
+  answer(jobId: string, sessionId: string, userAnswer: string, signal?: AbortSignal) {
+    return apiRequest<LearningAnswerResult>(
+      jobPath(jobId, `learning/sessions/${encodeURIComponent(sessionId)}/answer`),
+      {
+        method: 'POST',
+        body: { user_answer: userAnswer },
+        signal,
+        timeoutMs: TUTOR_REQUEST_TIMEOUT_MS,
+      },
+    )
   },
 }
 

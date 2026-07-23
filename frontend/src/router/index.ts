@@ -7,6 +7,7 @@ const router = createRouter({
     { path: '/directions/new', name: 'directions', component: () => import('../views/DirectionSearchView.vue') },
     { path: '/papers/library', name: 'paper-library', component: () => import('../views/LibraryView.vue') },
     { path: '/learn/:jobId', name: 'learn', component: () => import('../views/LearningWorkspaceView.vue') },
+    { path: '/study/:jobId?', name: 'study', component: () => import('../views/LearningStudioView.vue') },
     { path: '/papers/upload', name: 'upload', component: () => import('../views/UploadView.vue') },
     { path: '/settings', name: 'settings', component: () => import('../views/SettingsView.vue') },
   ],

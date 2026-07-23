@@ -7,6 +7,7 @@ from researchsensei.direction import DirectionExplorationService, SeedExpansionS
 from researchsensei.ingestion import SinglePaperIngestionRunner
 from researchsensei.jobs import JobStore
 from researchsensei.library import PaperLibraryStore
+from researchsensei.learning import LearningStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.source_resolver import SourceResolver
 from researchsensei.workspace import WorkspaceStore
@@ -23,6 +24,7 @@ class WebDependencies:
     jobs: JobStore
     job_service: JobService
     paper_library: PaperLibraryStore
+    learning_store: LearningStore
     background_tasks: PersistentTaskService
     source_resolver: SourceResolver
     direction_service: DirectionExplorationService

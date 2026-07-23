@@ -39,18 +39,28 @@ from researchsensei.ingestion import (
 )
 from researchsensei.jobs import JobStore
 from researchsensei.library import PaperLibraryStore
+from researchsensei.learning import LearningStore
 from researchsensei.llm.client import LLMClient
 from researchsensei.llm.ccswitch_bridge import resolve_ccswitch_api_key
 from researchsensei.llm.types import LLMConfig
 from researchsensei.tutor.service import PaperTutorService
 from researchsensei.query import QueryPlanner
-from researchsensei.schemas import CandidatePaper, InteractiveAnswer, JobRecord, JobStatus, SourceStatus, WarningItem, WorkspaceArtifact
+from researchsensei.schemas import (
+    CandidatePaper,
+    InteractiveAnswer,
+    JobRecord,
+    JobStatus,
+    SourceStatus,
+    WarningItem,
+    WorkspaceArtifact,
+)
 from researchsensei.source_resolver import PaperSourceResolver, SourceResolver
 from researchsensei.workspace import WorkspaceStore
 from researchsensei.web.routers import (
     DirectionRouteOps,
     create_directions_router,
     create_jobs_router,
+    create_learning_router,
     create_library_router,
     create_tutor_router,
     create_settings_router,
@@ -97,7 +107,9 @@ def create_app(
     app = FastAPI(title="ResearchSensei", version="0.6.0")
 
     @app.exception_handler(RequestValidationError)
-    async def request_validation_error(_request: Request, error: RequestValidationError) -> JSONResponse:
+    async def request_validation_error(
+        _request: Request, error: RequestValidationError
+    ) -> JSONResponse:
         details = jsonable_encoder(error.errors())
         return JSONResponse(
             status_code=422,
@@ -131,7 +143,11 @@ def create_app(
 
     resolved_config_service = config_service or ConfigService()
     runtime_config = resolved_config_service.load()
-    resolved_workspace_root = Path(workspace_root) if workspace_root is not None else Path(runtime_config.app.workspace_dir)
+    resolved_workspace_root = (
+        Path(workspace_root)
+        if workspace_root is not None
+        else Path(runtime_config.app.workspace_dir)
+    )
     resolved_max_bytes = (
         int(max_download_bytes)
         if max_download_bytes is not None
@@ -143,6 +159,7 @@ def create_app(
     _backfill_reparse_successors(jobs)
     job_service = JobService(jobs, workspace.root)
     paper_library = PaperLibraryStore(db_path, managed_roots=[workspace.root])
+    learning_store = LearningStore(db_path)
     background_tasks = PersistentTaskService(db_path)
     resolved_llm_client = llm_client or _configured_llm_client(
         enable_configured_llm=enable_configured_llm,
@@ -181,7 +198,10 @@ def create_app(
         timeout_seconds=float(runtime_config.search.timeout_seconds),
     )
     browser_downloader = None
-    if runtime_config.search.browser_download_enabled and runtime_config.search.browser_session_state:
+    if (
+        runtime_config.search.browser_download_enabled
+        and runtime_config.search.browser_session_state
+    ):
         browser_downloader = BrowserSessionDownloader(
             storage_state_path=runtime_config.search.browser_session_state,
             headless=runtime_config.search.browser_headless,
@@ -207,7 +227,9 @@ def create_app(
         paper_library=paper_library,
         max_results_per_source=runtime_config.search.max_results,
         max_download_candidates=runtime_config.search.max_download_candidates,
-        query_planner=QueryPlanner(resolved_llm_client) if resolved_llm_client is not None else None,
+        query_planner=QueryPlanner(resolved_llm_client)
+        if resolved_llm_client is not None
+        else None,
     )
     resolved_seed_expansion_service = seed_expansion_service or SeedExpansionService(
         adapters={"paper_search": configured_search_adapter},
@@ -218,6 +240,7 @@ def create_app(
     app.state.jobs = jobs
     app.state.job_service = job_service
     app.state.paper_library = paper_library
+    app.state.learning_store = learning_store
     app.state.background_tasks = background_tasks
     app.state.paper_agent = paper_agent
     app.state.dependencies = WebDependencies(
@@ -227,6 +250,7 @@ def create_app(
         jobs=jobs,
         job_service=job_service,
         paper_library=paper_library,
+        learning_store=learning_store,
         background_tasks=background_tasks,
         source_resolver=resolver,
         direction_service=resolved_direction_service,
@@ -286,7 +310,24 @@ def create_app(
         )
     )
     app.include_router(create_library_router(paper_library))
-    app.include_router(create_jobs_router(jobs=jobs, job_service=job_service, job_payload=_job_response))
+    app.include_router(
+        create_jobs_router(jobs=jobs, job_service=job_service, job_payload=_job_response)
+    )
+    app.include_router(
+        create_learning_router(
+            jobs=jobs,
+            store=learning_store,
+            get_job=_get_job_or_404,
+            service_for_job=lambda job, **kwargs: _tutor_service_for_job(
+                job,
+                llm_client=resolved_llm_client,
+                paper_agent=paper_agent,
+                **kwargs,
+            ),
+            artifacts_for_job=_tutor_artifacts,
+            sync_memory=_sync_tutor_memory_artifact,
+        )
+    )
     app.include_router(
         create_tutor_router(
             jobs=jobs,
@@ -380,7 +421,9 @@ def create_app(
             if existing is not None:
                 return _existing_job_response(existing, request_identity)
 
-        if doi.strip() and not any(value.strip() for value in [local_path, pdf_url, arxiv_id, arxiv_url]):
+        if doi.strip() and not any(
+            value.strip() for value in [local_path, pdf_url, arxiv_id, arxiv_url]
+        ):
             resolved_pdf_url, resolve_error = _resolve_doi_to_legal_pdf(
                 fulltext_resolver,
                 doi.strip(),
@@ -534,9 +577,7 @@ def create_app(
                 detail = error.detail
                 if isinstance(detail, dict):
                     error_type = str(
-                        detail.get("status")
-                        or detail.get("code")
-                        or f"HTTP_{error.status_code}"
+                        detail.get("status") or detail.get("code") or f"HTTP_{error.status_code}"
                     )
                     message = str(detail.get("message") or detail)
                 else:
@@ -630,9 +671,7 @@ def create_app(
                 detail = error.detail
                 if isinstance(detail, dict):
                     error_type = str(
-                        detail.get("status")
-                        or detail.get("code")
-                        or f"HTTP_{error.status_code}"
+                        detail.get("status") or detail.get("code") or f"HTTP_{error.status_code}"
                     )
                     message = str(detail.get("message") or detail)
                 else:
@@ -672,12 +711,17 @@ def create_app(
         if not _debug_enabled():
             raise HTTPException(
                 status_code=403,
-                detail={"message": "Raw artifacts are debug-only. Use /understanding_status or /cards."},
+                detail={
+                    "message": "Raw artifacts are debug-only. Use /understanding_status or /cards."
+                },
             )
         job = _get_job_or_404(jobs, job_id)
         return {
             "job_id": job.job_id,
-            "artifacts": [_artifact_response(job, artifact.path, artifact.artifact_type) for artifact in job.artifacts],
+            "artifacts": [
+                _artifact_response(job, artifact.path, artifact.artifact_type)
+                for artifact in job.artifacts
+            ],
         }
 
     @app.get("/api/v1/jobs/{job_id}/understanding_status")
@@ -706,7 +750,9 @@ def create_app(
 
         status_content = _read_artifact_content(job, us_artifact.path)
         if not isinstance(status_content, dict):
-            raise HTTPException(status_code=500, detail="understanding_status is not a JSON object.")
+            raise HTTPException(
+                status_code=500, detail="understanding_status is not a JSON object."
+            )
         status = status_content.get("status", "")
         blocking_reason = status_content.get("blocking_reason", "")
         paper_workspace_status = _paper_workspace_status(job, status_content)
@@ -778,8 +824,7 @@ def create_app(
         # DEGRADED requires paper_card + formula_cards; teaching_cards may be missing
         if status == "DEGRADED_STRUCTURAL":
             required_missing = [
-                m for m in missing
-                if _degraded_missing_component_is_required(m, component_status)
+                m for m in missing if _degraded_missing_component_is_required(m, component_status)
             ]
             if required_missing:
                 raise HTTPException(
@@ -869,26 +914,33 @@ def _try_register_analysis_artifact_job(
     status_content = _read_json_file(artifact_dir / "understanding_status.json")
     source_status = _read_json_file(artifact_dir / "source_status.json")
     warnings = [
-        WarningItem(code="ANALYSIS_ARTIFACT_JOB", message="Registered existing paper analysis artifact run for PaperWorkspace display.")
+        WarningItem(
+            code="ANALYSIS_ARTIFACT_JOB",
+            message="Registered existing paper analysis artifact run for PaperWorkspace display.",
+        )
     ]
     raw_warnings = status_content.get("warnings", [])
     for warning in raw_warnings if isinstance(raw_warnings, list) else []:
         if isinstance(warning, dict):
-            warnings.append(WarningItem(
-                code=str(warning.get("code") or "ANALYSIS_WARNING"),
-                message=str(warning.get("message") or ""),
-                detail=str(warning.get("detail") or ""),
-            ))
+            warnings.append(
+                WarningItem(
+                    code=str(warning.get("code") or "ANALYSIS_WARNING"),
+                    message=str(warning.get("message") or ""),
+                    detail=str(warning.get("detail") or ""),
+                )
+            )
 
-    return jobs.create(JobRecord(
-        job_id=job_id,
-        source_path=str(source_status.get("resolved_path") or artifact_dir),
-        run_dir=str(artifact_dir),
-        status=JobStatus.SUCCEEDED,
-        current_step="analysis_artifacts_registered",
-        warnings=warnings,
-        artifacts=artifacts,
-    ))
+    return jobs.create(
+        JobRecord(
+            job_id=job_id,
+            source_path=str(source_status.get("resolved_path") or artifact_dir),
+            run_dir=str(artifact_dir),
+            status=JobStatus.SUCCEEDED,
+            current_step="analysis_artifacts_registered",
+            warnings=warnings,
+            artifacts=artifacts,
+        )
+    )
 
 
 def _looks_like_analysis_artifact_dir(path: Path) -> bool:
@@ -1007,7 +1059,10 @@ def _sync_tutor_memory_artifact(jobs: JobStore, job: JobRecord, memory_path: Pat
         return job
     return jobs.update(
         job.job_id,
-        artifacts=[*job.artifacts, WorkspaceArtifact(artifact_type="tutor_memory", path=str(memory_path))],
+        artifacts=[
+            *job.artifacts,
+            WorkspaceArtifact(artifact_type="tutor_memory", path=str(memory_path)),
+        ],
     )
 
 
@@ -1022,7 +1077,9 @@ def _runtime_self_answer(
         return None
 
     settings = _runtime_llm_payload(llm_client=llm_client, config_service=config_service)
-    provider = str(settings.get("active_provider") or settings.get("provider_display_name") or "未配置")
+    provider = str(
+        settings.get("active_provider") or settings.get("provider_display_name") or "未配置"
+    )
     model = str(settings.get("model") or "未配置")
     endpoint = str(settings.get("request_endpoint") or "")
     route_note = str(settings.get("route_note") or "")
@@ -1068,7 +1125,9 @@ def _runtime_llm_payload(
         return {
             "active_provider": _public_provider_name(str(getattr(provider, "name", "") or "")),
             "provider_key": str(getattr(provider, "name", "") or ""),
-            "provider_display_name": _public_provider_name(str(getattr(provider, "name", "") or "")),
+            "provider_display_name": _public_provider_name(
+                str(getattr(provider, "name", "") or "")
+            ),
             "provider_kind": str(getattr(provider, "kind", "") or ""),
             "base_url": str(getattr(provider, "base_url", "") or ""),
             "request_endpoint": _provider_request_endpoint(provider),
@@ -1077,7 +1136,9 @@ def _runtime_llm_payload(
             "auth_header": str(getattr(provider, "auth_header", "") or ""),
             "route_note": _provider_route_note(provider),
             "llm_enabled": True,
-            "api_key_configured": bool(os.getenv(str(getattr(provider, "api_key_env", "") or ""), ""))
+            "api_key_configured": bool(
+                os.getenv(str(getattr(provider, "api_key_env", "") or ""), "")
+            )
             if getattr(provider, "api_key_env", "")
             else True,
             "provider_known": True,
@@ -1108,14 +1169,39 @@ def _is_runtime_self_question(question: str) -> bool:
         "ccswitch",
         "cc_switch",
     )
-    if any(marker in text for marker in paper_markers) and not any(marker in text for marker in self_markers):
+    if any(marker in text for marker in paper_markers) and not any(
+        marker in text for marker in self_markers
+    ):
         return False
 
     if _is_runtime_identity_question(text):
         return True
 
-    target_markers = ("模型", "model", "provider", "提供方", "接口", "api", "baseurl", "base_url", "ccswitch", "cc_switch")
-    action_markers = ("用", "使用", "调用", "接入", "跑", "配置", "当前", "现在", "哪个", "什么", "是谁")
+    target_markers = (
+        "模型",
+        "model",
+        "provider",
+        "提供方",
+        "接口",
+        "api",
+        "baseurl",
+        "base_url",
+        "ccswitch",
+        "cc_switch",
+    )
+    action_markers = (
+        "用",
+        "使用",
+        "调用",
+        "接入",
+        "跑",
+        "配置",
+        "当前",
+        "现在",
+        "哪个",
+        "什么",
+        "是谁",
+    )
     subject_markers = (*self_markers, "当前", "现在")
     return (
         any(marker in text for marker in subject_markers)
@@ -1165,19 +1251,24 @@ def _configured_llm_client(
         temperature=0.2,
         max_tokens=12000 if provider.kind == "anthropic_compatible" else 2400,
         json_mode=True,
-        timeout=max(provider_timeout, 300.0) if provider.kind == "anthropic_compatible" else provider_timeout,
+        timeout=max(provider_timeout, 300.0)
+        if provider.kind == "anthropic_compatible"
+        else provider_timeout,
         max_retries=2,
         retry_delay=1.0,
         disable_thinking=(
-            provider.kind == "anthropic_compatible"
-            or provider.name == "opencode_go"
+            provider.kind == "anthropic_compatible" or provider.name == "opencode_go"
         ),
     )
     return LLMClient(provider, config=runtime_config, api_key_override=api_key)
 
 
 def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[str, object]:
-    config = config_service if isinstance(config_service, AppConfig) else (config_service or ConfigService()).load()
+    config = (
+        config_service
+        if isinstance(config_service, AppConfig)
+        else (config_service or ConfigService()).load()
+    )
     requested_provider = _canonical_provider_name(
         os.getenv("RESEARCHSENSEI_LLM_PROVIDER", "") or config.active_provider,
         config.providers,
@@ -1229,7 +1320,9 @@ def _settings_payload(config_service: ConfigService | AppConfig | None) -> dict[
         "model_env": "RESEARCHSENSEI_LLM_MODEL",
         "enable_env": "RESEARCHSENSEI_ENABLE_API_LLM",
         "llm_enabled": _env_truthy("RESEARCHSENSEI_ENABLE_API_LLM"),
-        "api_key_configured": bool(resolve_ccswitch_api_key(provider)) if provider.api_key_env else True,
+        "api_key_configured": bool(resolve_ccswitch_api_key(provider))
+        if provider.api_key_env
+        else True,
         "provider_known": True,
     }
 
@@ -1249,7 +1342,9 @@ def _provider_request_endpoint(provider: object) -> str:
     base_url = str(getattr(provider, "base_url", "") or "").rstrip("/")
     if not base_url:
         return ""
-    return f"{base_url}/messages" if kind == "anthropic_compatible" else f"{base_url}/chat/completions"
+    return (
+        f"{base_url}/messages" if kind == "anthropic_compatible" else f"{base_url}/chat/completions"
+    )
 
 
 def _provider_route_note(provider: object) -> str:
@@ -1272,11 +1367,13 @@ def _model_options_for_provider(provider: object) -> list[dict[str, str]]:
         if not model or model in seen:
             return
         seen.add(model)
-        options.append({
-            "id": model,
-            "label": str(label or model).strip() or model,
-            "source": source,
-        })
+        options.append(
+            {
+                "id": model,
+                "label": str(label or model).strip() or model,
+                "source": source,
+            }
+        )
 
     add(current_model, source="当前配置")
     provider_name = _public_provider_name(str(getattr(provider, "name", "") or ""))
@@ -1456,10 +1553,17 @@ def _openai_compatible_live_models(
         elif isinstance(item, dict):
             model_id = item.get("id") or item.get("model") or item.get("name")
             if model_id:
-                models.append({
-                    "id": str(model_id),
-                    "label": str(item.get("display_name") or item.get("label") or item.get("name") or model_id),
-                })
+                models.append(
+                    {
+                        "id": str(model_id),
+                        "label": str(
+                            item.get("display_name")
+                            or item.get("label")
+                            or item.get("name")
+                            or model_id
+                        ),
+                    }
+                )
     with _MODEL_CATALOG_CACHE_LOCK:
         _MODEL_CATALOG_CACHE[cache_key] = (time.monotonic(), [dict(item) for item in models])
     return models
@@ -1511,10 +1615,17 @@ def _ccswitch_current_provider_models() -> list[str]:
     except sqlite3.Error:
         return []
     found: list[str] = []
-    pattern = re.compile(r"\b(?:claude|gpt|deepseek|gemini|minimax|qwen|kimi|glm|mistral|llama|doubao)[A-Za-z0-9_.:/-]*", re.I)
+    pattern = re.compile(
+        r"\b(?:claude|gpt|deepseek|gemini|minimax|qwen|kimi|glm|mistral|llama|doubao)[A-Za-z0-9_.:/-]*",
+        re.I,
+    )
     for settings_config, meta in rows:
         text = f"{settings_config or ''} {meta or ''}"
-        found.extend(match.group(0) for match in pattern.finditer(text) if _is_plausible_model_id(match.group(0)))
+        found.extend(
+            match.group(0)
+            for match in pattern.finditer(text)
+            if _is_plausible_model_id(match.group(0))
+        )
     return _unique_strings(found)
 
 
@@ -1698,7 +1809,9 @@ def _doi_failure_message(error: str) -> str:
     if error == "UNPAYWALL_NOT_FOUND":
         return "DOI was not found in Unpaywall. Try providing a PDF URL or arXiv ID."
     if error == "UNPAYWALL_NO_OA_LOCATION":
-        return "No legal open-access location found for this DOI. Try providing a PDF URL or arXiv ID."
+        return (
+            "No legal open-access location found for this DOI. Try providing a PDF URL or arXiv ID."
+        )
     if error == "UNPAYWALL_LANDING_ONLY":
         return "Only a landing page was found for this DOI, not a downloadable PDF. Try providing a PDF URL."
     if error == "DOI_MISSING":
@@ -1714,7 +1827,9 @@ def _job_understanding_status(job: JobRecord) -> dict[str, object]:
     return content if isinstance(content, dict) else {}
 
 
-def _degraded_missing_component_is_required(component: str, component_status: dict[str, object]) -> bool:
+def _degraded_missing_component_is_required(
+    component: str, component_status: dict[str, object]
+) -> bool:
     status = str(component_status.get(component) or "").upper()
     if status:
         return status == "SUCCESS"
@@ -1745,7 +1860,9 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     claim_evidence = _artifact_content_dict(job, "claim_evidence")
     passage_index = _artifact_content_dict(job, "passage_index")
     quality_report = _artifact_content_dict(job, "quality_report")
-    parsed_document = _artifact_content_dict(job, "parsed_document") or _artifact_content_dict(job, "ingestion")
+    parsed_document = _artifact_content_dict(job, "parsed_document") or _artifact_content_dict(
+        job, "ingestion"
+    )
     formula_origin, formula_ocr_status = _formula_status_summary(
         claim_evidence=claim_evidence,
         passage_index=passage_index,
@@ -1753,9 +1870,7 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
     component_status = status_content.get("component_status", {})
     raw_degraded_flags = source_status.get("degraded_flags", [])
     degraded_flags = (
-        [str(flag) for flag in raw_degraded_flags]
-        if isinstance(raw_degraded_flags, list)
-        else []
+        [str(flag) for flag in raw_degraded_flags] if isinstance(raw_degraded_flags, list) else []
     )
     source_type = str(source_status.get("source_type", "unknown"))
     source_resolved = source_status.get("status") == "resolved"
@@ -1780,8 +1895,7 @@ def _paper_workspace_status(job: JobRecord, understanding_status: object) -> dic
         "paper_tutor_model": opencode_analysis.get("tutor_model", ""),
         "analysis_ready": analysis_ready,
         "degradation_reason": (
-            "; ".join(degraded_flags)
-            or status_content.get("blocking_reason", "")
+            "; ".join(degraded_flags) or status_content.get("blocking_reason", "")
         ),
         "formula_origin": formula_origin,
         "formula_ocr_status": formula_ocr_status,
@@ -1798,7 +1912,8 @@ def _formula_detection_status(parsed_document: dict[str, object]) -> str:
     blocks = parsed_document.get("blocks", [])
     if isinstance(blocks, list):
         formulas = [
-            block for block in blocks
+            block
+            for block in blocks
             if isinstance(block, dict) and str(block.get("type") or "").lower() == "formula"
         ]
         if formulas:

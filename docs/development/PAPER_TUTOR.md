@@ -103,7 +103,9 @@ as compact technical details.
 - Direction-level interactive chat
 - Seed-expansion interactive chat
 - Broad cross-paper vector memory
-- Full drill/pattern engine beyond advisor v1
+
+Full learning sessions no longer belong inside the Paper Tutor panel. They are
+implemented by the separate Learning Studio; see `LEARNING_STUDIO.md`.
 
 ## Validation
 

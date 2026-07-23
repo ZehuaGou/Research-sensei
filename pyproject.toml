@@ -23,6 +23,7 @@ dependencies = [
   "requests>=2.31,<3",
   "paper-search-mcp>=0.1.4,<1",
   "flashrank>=0.2.10,<1",
+  "fsrs>=6.0,<7",
   "tomli>=2,<3; python_version < '3.11'",
 ]
 
@@ -35,7 +36,6 @@ dev = [
   "types-requests>=2.31,<3",
 ]
 external = [
-  "py-fsrs>=2.0,<3",
   "sympy>=1.12,<2",
 ]
 

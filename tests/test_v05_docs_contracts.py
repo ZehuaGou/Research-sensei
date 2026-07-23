@@ -33,7 +33,7 @@ def test_module_contracts_cover_every_required_module():
         "formula",
         "direction",
         "patterns",
-        "drill",
+        "learning",
         "interactive",
         "context",
         "llm",

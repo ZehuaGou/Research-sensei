@@ -7,6 +7,33 @@ ResearchSensei. Design documents describe contracts; this file records what was
 actually checked. A skipped, mocked, cached, or offline result is never reported
 as a live acceptance result.
 
+## 2026-07-23 Learning Studio first usable loop
+
+The next product domain is now named **Learning Studio**, not a numbered stage.
+It provides paper-grounded learning-item import, adaptive natural-language
+questions, free-form answer evaluation, immutable attempt history, and official
+FSRS scheduling in SQLite. The old unused `DrillCard.vue` placeholder was
+removed.
+
+The reader workspace now exposes `加入学习`; `/study` is the global review
+dashboard and `/study/{job_id}` is the paper-specific learning view. OpenCode
+owns question generation and qualitative feedback. ResearchSensei owns evidence
+binding, persistent state, score-to-rating conversion, and due dates.
+
+Verification completed in this change:
+
+| Check | Result |
+| --- | --- |
+| Backend learning API tests | `3 passed` |
+| Full backend suite | `648 passed` in 175.06s |
+| Full frontend suite | `111 passed`; typecheck and production build passed |
+| Real job `ba6875cc0282` | imported 12 learning nodes; generated two contextual questions; one free-form answer received score 0.85 with covered/missing points and an FSRS due time |
+| Playwright inspection | global dashboard and real practice flow rendered without console errors or horizontal overflow |
+
+The real smoke attempt was removed after validation so automated example text
+does not remain in the user's learning history. Cross-paper synthesis is not
+part of this first loop.
+
 ## 2026-07-23 semantic naming normalization
 
 Numbered implementation-stage names have been removed from maintained source,

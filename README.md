@@ -2,7 +2,8 @@
 
 ResearchSensei is a research-reading workflow for moving from a research
 direction to legal paper discovery, full-text acquisition, evidence-backed
-single-paper understanding, and a Chinese reader workspace with a paper tutor.
+single-paper understanding, a Chinese reader workspace with a paper tutor, and
+persistent spaced-repetition learning.
 
 `docs/STATUS.md` is the authoritative status file. Other docs describe design
 intent and contracts; if they disagree, update `docs/STATUS.md` and then bring
@@ -25,6 +26,10 @@ the exact final commit, commands, pass/fail counts, and live-verification state.
   can continue the persistent OpenCode paper session; selected-text and formula
   explanation, single-paper Q&A, advisor questions/evaluation, and atomic
   bounded `tutor_memory.json` remain available.
+- Learning Studio: paper-grounded learning nodes, adaptive natural-language
+  questions and evaluation, persistent attempt history, and FSRS review
+  scheduling. Learners are evaluated against flexible key points rather than
+  one fixed answer sentence.
 
 Live LLM runs default to direct OpenCode Go (`opencode_go` config key). The
 general chat model, PDF vision model and paper tutor model can all be selected
@@ -166,3 +171,4 @@ or provider secrets.
 - `docs/MODULE_CONTRACTS.md`: module input/output/boundary contracts.
 - `docs/development/READER_WORKSPACE.md`: UI/API gating contract.
 - `docs/development/PAPER_TUTOR.md`: current Paper Tutor v1 contract.
+- `docs/development/LEARNING_STUDIO.md`: learning sessions, persistence, and FSRS scheduling.

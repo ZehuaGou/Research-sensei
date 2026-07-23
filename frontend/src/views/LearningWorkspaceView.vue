@@ -334,6 +334,14 @@ onBeforeUnmount(() => {
             <p>{{ workspaceSubtitle }}</p>
           </div>
           <div v-if="workspace.canShowCards.value" class="reader-actions">
+            <button
+              type="button"
+              class="secondary-btn"
+              data-testid="open-learning-studio"
+              @click="router.push(`/study/${encodeURIComponent(jobId)}`)"
+            >
+              加入学习
+            </button>
             <button type="button" class="secondary-btn" :disabled="workspace.isReparsing.value" @click="reparseCurrentPaper">
               {{ workspace.isReparsing.value ? `重新解析 ${workspace.reparseProgress.value}% · ${formatTaskStage(workspace.reparseStage.value)}` : '重新解析' }}
             </button>

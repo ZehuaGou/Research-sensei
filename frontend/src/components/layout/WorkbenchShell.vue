@@ -31,6 +31,7 @@ const pinnedDirections = ref<string[]>(loadPinnedDirections())
 
 const routeTitle = computed(() => {
   const labels: Record<string, string> = {
+    study: '学习与复习',
     directions: '方向工作台',
     'paper-library': '论文库',
     learn: '深读工作区',
@@ -56,6 +57,7 @@ const filteredDirections = computed(() => groupedDirections.value)
 const filteredPinned = computed(() => pinnedDirections.value)
 
 const workspaceLinks = computed(() => [
+  { label: '学习与复习', short: '学', to: '/study', active: route.name === 'study' },
   { label: '方向检索', short: 'D', to: '/directions/new', active: route.name === 'directions' },
   { label: '本地论文库', short: 'L', to: '/papers/library', active: route.name === 'paper-library' },
   { label: '新建深读', short: 'R', to: '/papers/upload', active: route.name === 'upload' },

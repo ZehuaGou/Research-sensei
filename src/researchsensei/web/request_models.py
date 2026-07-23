@@ -15,18 +15,27 @@ class StrictRequest(BaseModel):
 
 
 class SettingsUpdate(StrictRequest):
-    model: Annotated[
-        str,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
-    ] | None = None
-    paper_model: Annotated[
-        str,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
-    ] | None = None
-    tutor_model: Annotated[
-        str,
-        StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
-    ] | None = None
+    model: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+        ]
+        | None
+    ) = None
+    paper_model: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+        ]
+        | None
+    ) = None
+    tutor_model: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+        ]
+        | None
+    ) = None
 
     @model_validator(mode="after")
     def require_one_model(self) -> "SettingsUpdate":
@@ -87,6 +96,18 @@ class AdvisorEvaluateRequest(StrictRequest):
     evidence_refs: list[EvidenceRef] = Field(default_factory=list, max_length=20)
 
 
+class LearningSessionRequest(StrictRequest):
+    count: int = Field(default=5, ge=1, le=20)
+    include_not_due: bool = False
+
+
+class LearningAnswerRequest(StrictRequest):
+    user_answer: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=8000),
+    ]
+
+
 class DirectionSearchRequest(StrictRequest):
     query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
@@ -127,7 +148,9 @@ class DirectionDeepReadRequest(StrictRequest):
 
     @model_validator(mode="after")
     def require_candidate_or_source(self) -> "DirectionDeepReadRequest":
-        if self.candidate is None and not any((self.doi, self.pdf_url, self.arxiv_id, self.arxiv_url)):
+        if self.candidate is None and not any(
+            (self.doi, self.pdf_url, self.arxiv_id, self.arxiv_url)
+        ):
             raise ValueError("candidate or a DOI/arXiv/PDF source is required")
         return self
 
