@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import MarkdownIt from 'markdown-it'
 import katex from 'katex'
+import { normalizeTutorMarkdown } from '../../utils/tutorAnswerFormatting'
 
 const props = defineProps<{ content: string }>()
 
@@ -40,13 +41,14 @@ markdown.renderer.rules.link_open = (tokens, index, options, env, renderer) => {
 }
 
 function normalizedMarkdown(value: string) {
-  return value
+  return normalizeTutorMarkdown(value)
     .replace(/^\s*```(?:markdown|md)\s*\n([\s\S]*?)\n```\s*$/i, '$1')
-    .replace(/\r\n/g, '\n')
-    .trim()
 }
 
-const rendered = computed(() => markdown.render(normalizedMarkdown(props.content)))
+const rendered = computed(() => markdown
+  .render(normalizedMarkdown(props.content))
+  .replace(/([\u4e00-\u9fff]) <strong>/g, '$1<strong>')
+  .replace(/<\/strong> ([\u4e00-\u9fff])/g, '</strong>$1'))
 </script>
 
 <template>

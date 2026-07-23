@@ -356,6 +356,41 @@ describe('PaperTutorPanel', () => {
     expect(wrapper.text()).not.toContain('|---|')
   })
 
+  it('repairs markdown that an older backend flattened into one line', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/memory')) return jsonResponse({ records: [] })
+      if (url.endsWith('/ask')) return jsonResponse({
+        status: 'SUCCESS',
+        answer: '## GiA Roots 是什么 GiA Roots 是根系分析软件。 ## 核心实现原理 GiA Roots 使用固定流水线。 ### 1. 图像导入与预处理 用户导入图像。 ### 2. 图像分割 分割方法如下： | 算法 | 原理 | |---|---| | **全局阈值** | 设定统一阈值 | 分割后从掩膜的**骨架**来估计性状。',
+        evidence_refs: [],
+        context_trace: { scope: 'paper', context_mode: 'full_paper', evidence_count: 0 },
+      })
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { wrapper } = mountPanel()
+    await flushPromises()
+
+    await wrapper.get('[data-testid="ask-input"]').setValue('请展开解释')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+
+    const headings = wrapper.findAll('.markdown-answer h2, .markdown-answer h3')
+    expect(headings.map(node => node.text())).toEqual([
+      'GiA Roots 是什么',
+      '核心实现原理',
+      '1. 图像导入与预处理',
+      '2. 图像分割',
+    ])
+    expect(wrapper.get('.markdown-answer table').findAll('tr')).toHaveLength(2)
+    expect(wrapper.text()).toContain('GiA Roots 是根系分析软件。')
+    expect(wrapper.findAll('.markdown-answer strong').map(node => node.text())).toContain('骨架')
+    expect(wrapper.text()).not.toContain('##')
+    expect(wrapper.text()).not.toContain('**')
+    expect(wrapper.text()).not.toContain('|---|')
+  })
+
   it('escapes model HTML and renders fenced latex with KaTeX', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input)

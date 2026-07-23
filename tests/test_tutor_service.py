@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from researchsensei.tutor.service import PaperTutorService
+from researchsensei.tutor.service import PaperTutorService, _clean_multiline
 
 
 class FakePaperAgent:
@@ -188,3 +188,9 @@ def test_general_chat_is_rejected_without_spending_model_request(tmp_path: Path)
     assert result.status == "DEGRADED"
     assert result.used_context["llm"] is False
     assert agent.calls == []
+
+
+def test_multiline_model_answer_preserves_markdown_structure() -> None:
+    answer = "## 核心方法\r\n\r\n第一步读取图像。\r\n\r\n- 保留根系结构"
+
+    assert _clean_multiline(answer) == "## 核心方法\n\n第一步读取图像。\n\n- 保留根系结构"

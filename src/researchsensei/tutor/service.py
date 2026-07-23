@@ -67,7 +67,9 @@ class PaperTutorService:
         if not question and selected_text:
             question = "请解释这段内容，并说明它在整篇论文中的作用。"
         if not question:
-            return _degraded("还没有收到问题。", "QUESTION_MISSING", "请先输入一个与当前论文有关的问题。")
+            return _degraded(
+                "还没有收到问题。", "QUESTION_MISSING", "请先输入一个与当前论文有关的问题。"
+            )
         if not selected_text and _is_general_chat(question):
             return _degraded(
                 "我是当前论文的阅读助教。你可以问研究问题、方法流程、公式、实验结论或局限性。",
@@ -122,21 +124,41 @@ class PaperTutorService:
                 warnings=[_warning("FORMULA_NOT_FOUND", "formula_cards 中没有这个公式。")],
             )
 
-        latex = _clean(formula.get("original_latex") or formula.get("formula_latex") or formula.get("formula_raw"))
+        latex = _clean(
+            formula.get("original_latex")
+            or formula.get("formula_latex")
+            or formula.get("formula_raw")
+        )
         fallback = _formula_fallback(formula, symbol)
         answer = ""
         warnings: list[WarningItem] = []
         if self._has_paper_session():
             prompt = (
                 f"请解释论文中的这个公式：{latex}。"
-                + (f"重点解释符号 {symbol}。" if symbol else "逐项解释符号、直觉、在方法中的作用，并给一个简单例子。")
+                + (
+                    f"重点解释符号 {symbol}。"
+                    if symbol
+                    else "逐项解释符号、直觉、在方法中的作用，并给一个简单例子。"
+                )
                 + "请明确区分论文原文信息与辅助理解的解释。"
             )
             try:
                 answer = self._session_prompt(prompt, selected_text=latex)
-            except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+            except (
+                OpenCodeAgentError,
+                httpx.HTTPError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ) as exc:
                 logger.warning("OpenCode formula explanation failed: %s", exc)
-                warnings.append(_warning("TUTOR_FORMULA_AGENT_FAILED", "公式讲解模型请求失败，已显示公式卡片内容。", str(exc)))
+                warnings.append(
+                    _warning(
+                        "TUTOR_FORMULA_AGENT_FAILED",
+                        "公式讲解模型请求失败，已显示公式卡片内容。",
+                        str(exc),
+                    )
+                )
         meaning = answer or fallback
         evidence_ref = _clean(formula.get("evidence_ref"))
         self.memory.append(
@@ -159,21 +181,29 @@ class PaperTutorService:
             evidence_ref=evidence_ref,
             formula_origin=_clean(formula.get("formula_origin")),
             formula_ocr_status=_clean(formula.get("formula_ocr_status")),
-            formula_explanation_status=_clean(formula.get("formula_explanation_status") or formula.get("derivation_status")),
+            formula_explanation_status=_clean(
+                formula.get("formula_explanation_status") or formula.get("derivation_status")
+            ),
             confidence=0.85 if answer else 0.65,
             warnings=warnings,
         )
 
     def advisor_question(self, payload: dict[str, object]) -> AdvisorQuestion:
         focus = _compact(
-            payload.get("user_question") or payload.get("focus_question") or payload.get("question"),
+            payload.get("user_question")
+            or payload.get("focus_question")
+            or payload.get("question"),
             600,
         )
         selected = _compact(payload.get("selected_text"), 900)
         evidence_refs = self._evidence_refs(focus or selected, limit=3)
         prompt = (
             "你是严格但友善的论文组会导师。基于当前论文生成一个能检验真正理解的问题。"
-            + (f"用户想重点讨论：{focus}。" if focus else "重点考察研究问题、方法机制与证据之间的联系。")
+            + (
+                f"用户想重点讨论：{focus}。"
+                if focus
+                else "重点考察研究问题、方法机制与证据之间的联系。"
+            )
             + (f"用户选中了：{selected}。" if selected else "")
             + "只返回 JSON：question, target_concept, expected_answer_points(数组), why_it_matters, answer_format(数组)。"
         )
@@ -182,7 +212,11 @@ class PaperTutorService:
         try:
             data = parse_llm_json(self._session_prompt(prompt)) if self._has_paper_session() else {}
         except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
-            warnings.append(_warning("TUTOR_ADVISOR_AGENT_FAILED", "组会问题生成失败，已使用简洁备用问题。", str(exc)))
+            warnings.append(
+                _warning(
+                    "TUTOR_ADVISOR_AGENT_FAILED", "组会问题生成失败，已使用简洁备用问题。", str(exc)
+                )
+            )
         question = _clean(data.get("question")) or (
             f"请说明“{focus}”与论文核心方法和实验依据之间的关系。"
             if focus
@@ -198,8 +232,10 @@ class PaperTutorService:
             user_question=focus,
             target_concept=_clean(data.get("target_concept")) or focus or "论文核心方法",
             expected_answer_points=expected,
-            why_it_matters=_clean(data.get("why_it_matters")) or "检查是否把问题、方法和证据连成了一条线。",
-            answer_format=_string_list(data.get("answer_format")) or ["先给结论", "再讲机制", "最后给论文依据"],
+            why_it_matters=_clean(data.get("why_it_matters"))
+            or "检查是否把问题、方法和证据连成了一条线。",
+            answer_format=_string_list(data.get("answer_format"))
+            or ["先给结论", "再讲机制", "最后给论文依据"],
             evidence_refs=evidence_refs,
             question_type="custom_focus" if focus else "paper_understanding",
             warnings=warnings,
@@ -218,7 +254,9 @@ class PaperTutorService:
         question = _compact(payload.get("question"), 1200)
         answer = _compact(payload.get("user_answer") or payload.get("answer"), 4000)
         expected = _string_list(payload.get("expected_answer_points"))
-        evidence_refs = _string_list(payload.get("evidence_refs")) or self._evidence_refs(question, limit=3)
+        evidence_refs = _string_list(payload.get("evidence_refs")) or self._evidence_refs(
+            question, limit=3
+        )
         if not answer:
             return AdvisorEvaluation(
                 status="DEGRADED",
@@ -236,7 +274,13 @@ class PaperTutorService:
         try:
             data = parse_llm_json(self._session_prompt(prompt)) if self._has_paper_session() else {}
         except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
-            warnings.append(_warning("TUTOR_ADVISOR_EVALUATION_FAILED", "模型评价失败，已给出基础完整度反馈。", str(exc)))
+            warnings.append(
+                _warning(
+                    "TUTOR_ADVISOR_EVALUATION_FAILED",
+                    "模型评价失败，已给出基础完整度反馈。",
+                    str(exc),
+                )
+            )
         score = _score(data.get("score"), answer, expected)
         covered = _string_list(data.get("covered_points"))
         missing = _string_list(data.get("missing_points"))
@@ -244,14 +288,17 @@ class PaperTutorService:
             covered = [point for point in expected if _overlap(point, answer) >= 0.18]
             missing = [point for point in expected if point not in covered]
         feedback = _clean(data.get("feedback")) or (
-            "回答已经覆盖主要链条。" if score >= 0.7 else "回答有方向，但还需要把方法机制和论文证据讲得更具体。"
+            "回答已经覆盖主要链条。"
+            if score >= 0.7
+            else "回答有方向，但还需要把方法机制和论文证据讲得更具体。"
         )
         result = AdvisorEvaluation(
             score=score,
             covered_points=covered,
             missing_points=missing,
             misconceptions=_string_list(data.get("misconceptions")),
-            improvement_steps=_string_list(data.get("improvement_steps")) or [f"补充：{item}" for item in missing[:3]],
+            improvement_steps=_string_list(data.get("improvement_steps"))
+            or [f"补充：{item}" for item in missing[:3]],
             next_question=_clean(data.get("next_question")),
             evidence_refs=evidence_refs,
             feedback=feedback,
@@ -288,17 +335,37 @@ class PaperTutorService:
         used_session = False
         if self._has_paper_session():
             try:
-                answer = self._session_prompt(_markdown_answer_question(question), selected_text=selected_text)
+                answer = self._session_prompt(
+                    _markdown_answer_question(question), selected_text=selected_text
+                )
                 used_session = True
-            except (OpenCodeAgentError, httpx.HTTPError, RuntimeError, ValueError, TypeError) as exc:
+            except (
+                OpenCodeAgentError,
+                httpx.HTTPError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+            ) as exc:
                 logger.warning("OpenCode paper session failed for %s: %s", self.job_id, exc)
-                warnings.append(_warning("TUTOR_OPENCODE_SESSION_FAILED", "论文会话请求失败，正在尝试全文模型备用通道。", str(exc)))
+                warnings.append(
+                    _warning(
+                        "TUTOR_OPENCODE_SESSION_FAILED",
+                        "论文会话请求失败，正在尝试全文模型备用通道。",
+                        str(exc),
+                    )
+                )
         if not answer and self.llm_client is not None:
             try:
                 answer = self._direct_llm_answer(question, selected_text, history, paper_text)
             except (LLMClientError, RuntimeError, ValueError, TypeError) as exc:
-                logger.warning("paper tutor direct full-paper fallback failed for %s: %s", self.job_id, exc)
-                code = "TUTOR_LLM_TIMEOUT" if "timeout" in str(exc).lower() else "TUTOR_LLM_REQUEST_FAILED"
+                logger.warning(
+                    "paper tutor direct full-paper fallback failed for %s: %s", self.job_id, exc
+                )
+                code = (
+                    "TUTOR_LLM_TIMEOUT"
+                    if "timeout" in str(exc).lower()
+                    else "TUTOR_LLM_REQUEST_FAILED"
+                )
                 warnings.append(_warning(code, "全文模型备用请求失败。", str(exc)))
         trace = TutorContextTrace(
             scope="selection" if selected_text else "paper",
@@ -320,7 +387,8 @@ class PaperTutorService:
                 follow_up_suggestions=_follow_ups(),
                 used_context={"memory": False, "artifacts": True, "llm": False, "full_paper": True},
                 context_trace=trace,
-                warnings=warnings or [_warning("TUTOR_MODEL_UNAVAILABLE", "没有可用的论文讲解模型。")],
+                warnings=warnings
+                or [_warning("TUTOR_MODEL_UNAVAILABLE", "没有可用的论文讲解模型。")],
             )
         record = self.memory.append(
             memory_type="interactive_answer",
@@ -360,11 +428,17 @@ class PaperTutorService:
     def _evidence_only(self, *, question: str, selected_text: str) -> InteractiveAnswer:
         rows = self._ranked_evidence(selected_text or question, limit=5)
         if selected_text:
-            answer = f"选中的原文是：\n\n> {selected_text}\n\n这个模式只展示原文位置，不补充模型解释。"
+            answer = (
+                f"选中的原文是：\n\n> {selected_text}\n\n这个模式只展示原文位置，不补充模型解释。"
+            )
         elif rows:
             pieces = []
             for row in rows:
-                location = " · ".join(part for part in [_page_label(row.get("page")), _clean(row.get("section"))] if part)
+                location = " · ".join(
+                    part
+                    for part in [_page_label(row.get("page")), _clean(row.get("section"))]
+                    if part
+                )
                 pieces.append(f"- {location or '论文正文'}：{_compact(row.get('text'), 420)}")
             answer = "与问题最相关的原文位置：\n\n" + "\n\n".join(pieces)
         else:
@@ -427,7 +501,9 @@ class PaperTutorService:
                     "独立公式使用 latex 代码围栏。"
                 ),
             ),
-            ChatMessage(role="user", content=f"<paper_full_text>\n{paper_text}\n</paper_full_text>"),
+            ChatMessage(
+                role="user", content=f"<paper_full_text>\n{paper_text}\n</paper_full_text>"
+            ),
         ]
         for item in history[-8:]:
             messages.append(ChatMessage(role=item["role"], content=item["content"]))
@@ -447,17 +523,21 @@ class PaperTutorService:
                 ),
             )
         )
-        return _clean(response.content)
+        return _clean_multiline(response.content)
 
     def _full_paper_text(self) -> tuple[str, int, bool]:
-        document = _as_dict(self.artifacts.get("parsed_document") or self.artifacts.get("ingestion"))
+        document = _as_dict(
+            self.artifacts.get("parsed_document") or self.artifacts.get("ingestion")
+        )
         rendered: list[str] = []
         blocks = document.get("blocks", [])
         if isinstance(blocks, list):
             for block in blocks:
                 if not isinstance(block, dict):
                     continue
-                text = _clean(block.get("text") or block.get("formula_latex") or block.get("raw_latex"))
+                text = _clean(
+                    block.get("text") or block.get("formula_latex") or block.get("raw_latex")
+                )
                 if not text:
                     continue
                 page = _page_label(block.get("page"))
@@ -474,19 +554,31 @@ class PaperTutorService:
 
     def _ranked_evidence(self, query: str, *, limit: int) -> list[dict[str, object]]:
         candidates: list[dict[str, object]] = []
-        document = _as_dict(self.artifacts.get("parsed_document") or self.artifacts.get("ingestion"))
+        document = _as_dict(
+            self.artifacts.get("parsed_document") or self.artifacts.get("ingestion")
+        )
         blocks = document.get("blocks", [])
         if isinstance(blocks, list):
-            candidates.extend(block for block in blocks if isinstance(block, dict) and _clean(block.get("text")))
+            candidates.extend(
+                block for block in blocks if isinstance(block, dict) and _clean(block.get("text"))
+            )
         passages = _as_dict(self.artifacts.get("passage_index")).get("passages", [])
         if isinstance(passages, list):
-            candidates.extend(row for row in passages if isinstance(row, dict) and _clean(row.get("text")))
+            candidates.extend(
+                row for row in passages if isinstance(row, dict) and _clean(row.get("text"))
+            )
         deduped: dict[str, dict[str, object]] = {}
         for row in candidates:
-            key = _clean(row.get("evidence_ref")) or _clean(row.get("passage_id")) or _clean(row.get("text"))[:120]
+            key = (
+                _clean(row.get("evidence_ref"))
+                or _clean(row.get("passage_id"))
+                or _clean(row.get("text"))[:120]
+            )
             if key:
                 deduped.setdefault(key, row)
-        ranked = sorted(deduped.values(), key=lambda row: _overlap(query, _clean(row.get("text"))), reverse=True)
+        ranked = sorted(
+            deduped.values(), key=lambda row: _overlap(query, _clean(row.get("text"))), reverse=True
+        )
         return ranked[:limit]
 
     def _evidence_refs(self, query: str, *, limit: int) -> list[str]:
@@ -501,7 +593,9 @@ class PaperTutorService:
         if not isinstance(cards, list):
             return None
         for value in cards:
-            if isinstance(value, dict) and (not formula_id or _clean(value.get("formula_id")) == formula_id):
+            if isinstance(value, dict) and (
+                not formula_id or _clean(value.get("formula_id")) == formula_id
+            ):
                 return value
         return None
 
@@ -608,6 +702,12 @@ def _as_dict(value: object) -> dict[str, object]:
 
 def _clean(value: object) -> str:
     return " ".join(str(value or "").split()).strip()
+
+
+def _clean_multiline(value: object) -> str:
+    text = str(value or "").replace("\r\n", "\n").replace("\r", "\n")
+    lines = [line.rstrip() for line in text.split("\n")]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def _compact(value: object, max_chars: int) -> str:
